@@ -4,12 +4,12 @@ type: 'feature'
 created: '2026-11-21'
 status: 'in-review'
 baseline_commit: 'e82bb39cd6c9681ca6a8ee78a48dbd3c765c7c11'
-review_loop_iteration: 0
+review_loop_iteration: 2
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-17-context.md'
 ---
 
-Status: review (built, review 1's patches applied, CI pending). DONE MEANS MERGED WITH GREEN CI: the frontmatter stays `in-review` and the sprint status `review` until the PR merges green. Approved unattended under the founder's standing instruction (decide and record, no questions). ~2.4k tokens, kept whole: one user goal (a due reminder is written once, from the schedule as it stands) across the domain, SQL and one function; splitting the RPCs from the function would ship either half unusable. Baseline: `main` at #347 (17.1). Touches the structural pin tests (no hot UI file). Migration `0070` (19.3 runs in parallel and takes `0071`). Residual risks: the DB suite `test/shift-reminders.test.ts`, the provisioning inventories, the claimless sweep's `remind` call, 0070 on the real stack, the image probe and the runtime-parity job have never run (CI is their first run).
+Status: review (built, reviews 1 and 2's patches applied, CI pending). DONE MEANS MERGED WITH GREEN CI: the frontmatter stays `in-review` and the sprint status `review` until the PR merges green. Approved unattended under the founder's standing instruction (decide and record, no questions). ~2.4k tokens, kept whole: one user goal (a due reminder is written once, from the schedule as it stands) across the domain, SQL and one function; splitting the RPCs from the function would ship either half unusable. Baseline: `main` at #347 (17.1). Touches the structural pin tests (no hot UI file). Migration `0070` (19.3 runs in parallel and takes `0071`). Residual risks: the DB suite `test/shift-reminders.test.ts`, the provisioning inventories, the claimless sweep's `remind` call, 0070 on the real stack, the image probe and the runtime-parity job have never run (CI is their first run).
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 
@@ -116,6 +116,8 @@ Decisions (founder: decide and record):
 - Bundle `remind` with the saved pinned `edge-runtime` under chroot (no network) as 16.4 did, and serve it: a POST without the secret is 401.
 - Unrun by rule: `test/shift-reminders.test.ts`, the provisioning inventories, the claimless sweep, the image probe and runtime-parity job; CI is their first run.
 
+**Results (review 2, 2026-11-21).** `pnpm typecheck`, `pnpm lint`, `pnpm build`: clean. `pnpm --filter @shift/domain test`: 22 files, 975 passed. `pnpm --filter @shift/ics test`: 31 passed. The nine DB-free root files above: 2503 passed. Still unrun by rule, and so first run in CI: `test/shift-reminders.test.ts` with its two new cases, the provisioning inventories, the claimless sweep and the image probe.
+
 **Results (review 1, 2026-11-21).** `pnpm typecheck`, `pnpm lint`, `pnpm build`: clean. `pnpm --filter @shift/domain test`: 22 files, 974 passed. `pnpm --filter @shift/ics test`: 31 passed. `pnpm --filter ./apps/web test`: 183 files, 6830 passed. The nine DB-free root files above: 2502 passed (17.1's 3002 was a different set of eight, with `localization-applied`, not these). 0070 re-run in the throwaway PGlite after the today patch: unchanged behaviour.
 
 **Results (implementation, 2026-11-21).**
@@ -150,6 +152,56 @@ Decisions (founder: decide and record):
   - The `sb_secret_claimless_probe` literal: pre-existing, short of the key-material bound.
   - Pinning the `<=` start boundary: the whole-second shape cannot express it; commented.
 - Incident (for the orchestrator): during implementation a `pkill -f "edge-runtime start"` stopped the manual-test stack's `supabase_edge_runtime_shift` container (`Exited (15)`). It was not restarted: containers are off limits to this story.
+
+## Review Findings (review 2, 2026-11-21)
+
+Seven layers ran unattended: Blind Hunter, Edge Case Hunter, Verification Gap, Acceptance Auditor, Epic AC Auditor, Unrun DB Test Auditor, and a regression diff of the re-created filter and claim against 0044 and 0046. The Artifact Renderer had nothing to render because the change generates no file. The Epic AC Auditor found no unlisted deviation. The regression diff found the filter is 0044's with one `SHIFT_REMINDER` email clause, and the claim is 0046's with three reminder-only settles and one reminder-only guard. Signatures, `security definer`, `search_path = ''` and grants are unchanged. Every new clause is gated on `code = 'SHIFT_REMINDER'`, so existing kinds see no change. `for update skip locked` is kept on every settle and the claim. `invoke_remind` is `invoke_notify` with the Vault names swapped, and it is inert without both secrets.
+
+- [x] [Review][Patch] The window's comments now say what the code does. A row is first computed at most 5 minutes before it falls due, within D5's 15, and is still computed for up to 15 minutes after. The window is four runs wide, so every item is sent by about four consecutive runs, not "on an overlap": the unique key makes every later write nothing, and `accepted` counts each of them. [shift-reminders.ts, remind/handler.ts, 0070 comments]
+- [x] [Review][Patch] The domain's `startsAt > now` test cannot drop a pair in the window, because every lead is due at least an hour before the start. This is now documented; the RPC's skip is the guard that matters, and the DB suite tests it. [shift-reminders.ts]
+- [x] [Review][Patch] `invoke_remind`'s send branch was never run. A DB case now creates both Vault secrets in the rolled-back transaction and asserts one queued POST to `remind_url` with `Authorization: Bearer <remind_invoke_secret>`. It also replays those headers through `remind`'s handler and gets 200 `REMIND_RAN`. It copies `notify-boundary`'s `invoke_notify` case. [test/shift-reminders.test.ts]
+- [x] [Review][Patch] Nothing pinned that `reminder_inputs()` answers `members: []`, not null, when nobody has a lead on. The handler would make a null into a 503 on every run. A DB case now turns every lead off in the transaction and asserts `[]`. [test/shift-reminders.test.ts]
+- [x] [Review][Patch] New handler tests cover four more inputs:
+  - an empty read gives 200 with nothing written;
+  - a lowercase `bearer` scheme is accepted;
+  - a read whose `now` is 0 or negative gives 503;
+  - a write answered `1.5` or `null` gives 503.
+
+  [test/remind.test.ts]
+- [x] [Review][Patch] Key hygiene's "out of every migration" test now scans every migration for `vault.create_secret` or `vault.update_secret`, not only 0070. [test/key-hygiene.test.ts]
+- [x] [Review][Patch] The autumn transition is now run through the selection as well as through `reminderDueAt`. On 2027-10-31, m1's 07:00 shift with H6 falls due at 00:00Z, not at the wall clock's 23:00Z. [packages/domain/test/shift-reminders.test.ts]
+- [x] [Review][Patch] The parity probe used to check `Australia/Sydney` on Zagreb's dates only. It now uses Sydney's own four transition dates, with a spring pin: on 2026-10-04, H3 is 17:00Z, H6 is 14:00Z, and the evening before is 10:00Z (still AEST). [probe.ts, test/runtime-parity.test.ts]
+- [x] [Review][Patch] The shape-breach case claimed it "writes nothing of its batch". That half is Postgres's statement atomicity, and no savepoint-free assertion can observe it. The case is retitled to what it shows: one bad item refuses the whole batch. [test/shift-reminders.test.ts]
+- [x] [Review][Patch] Two ledger and spec fixes:
+  - The 17.1 layout entry in `deferred-work.md` credited 17.2 with 17.1 review 2's browser check. It now says only that 17.2 recorded it.
+  - 16.2's entry names the probe's zones and dates.
+  - This spec's `review_loop_iteration` was stale.
+- [x] [Review][Defer] OWNER 17.3: prove the armed path once (the cron's request answered 200, not 401 from a Vault and environment secret drift). A reminder more than 15 minutes behind every successful run is lost silently. [deferred-work.md]
+- [x] [Review][Defer] OWNER 17.3: a late reminder. A `notify` backlog can send an `H12` row hours late, because the claim expires a row only at the start. Bound the staleness beside the push TTL, for email too. [deferred-work.md]
+- Rejected, with reasons:
+  - **Revive a row settled `REMINDER_TURNED_OFF` or `EMAIL_TURNED_OFF` when the lead is turned back on.**
+    - The gap is between the write (at most 5 minutes before due) and the next once-a-minute claim.
+    - Reviving settled rows is a retraction path in reverse. D5 and Q25 choose at most once.
+    - The filter already drops an email that is off at insert, and a later run inserts it once the email is on again.
+  - **Key on the shift type or start, or have the RPC check the timing.** Design Notes 3 and 8 (review 1). The caller is the trusted `service_role` function that runs the domain's selection (AD-7).
+  - **One bad item blocks its chunk.** Design Note 10: items come from the domain only, so a malformed one is a defect to surface.
+  - **"Two fetch POSTs" versus the chunked write.** This was review 1's recorded patch. A run with at most 1000 items still makes two POSTs.
+  - **A whole-run deadline, an advisory lock, duration logs.**
+    - This is AD-14's accepted scale risk. At pilot scale a run is one chunk.
+    - Overlapping runs are harmless under the unique key.
+    - pg_net keeps the answer body, which carries the counts.
+  - **A success log line, or aggregate skip kinds.** AD-17 allows fixed codes only. The 200 body carries `members`, `due`, `accepted` and `skipped`.
+  - **Start the image without `REMIND_INVOKE_SECRET` in the probe.**
+    - "Refuses a missing invoke secret" is read as the bearer, as `notify`'s probe does.
+    - The configuration fail-fast is unit-tested.
+    - A second container for it is out of proportion.
+  - **The cron test's Vault privileges.** `notify-boundary`'s identical delete and `vault.create_secret` steps run green in CI.
+  - **Settle precedence for reminder rows (expired before email-off).** Both codes are final and neither is sent. Cosmetic.
+  - **The new settles' scans.** They are at the same scale as 0046's, every pending row.
+  - **A local manual-run guide.** That is DEPLOY.md, which belongs to 17.3.
+  - **17.1's closure inside this PR.** This is the orchestration's choice, recorded in 17.1's spec.
+  - **An end-to-end cron, function and database test.** Nothing is armed before 17.3. The deferred smoke covers it.
+  - **No `anon` probe in "service_role alone".** The provisioning grant inventory pins it.
 
 ## Suggested Review Order
 

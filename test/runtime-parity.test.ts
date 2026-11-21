@@ -101,6 +101,18 @@ describe('runtime parity: the probe under Node (AD-19)', () => {
     expect(leadsOn('2026-10-25', 420)).toMatchObject({ H3: '2026-10-25T03:00:00Z', H6: '2026-10-25T00:00:00Z' });
     expect(leadsOn('2027-03-28', 420)).toMatchObject({ H6: '2027-03-27T23:00:00Z', EVENING_BEFORE: '2027-03-27T19:00:00Z' });
     expect(leadsOn('2027-10-31', 1500)).toMatchObject({ H1: '2027-10-31T23:00:00Z', EVENING_BEFORE: '2027-10-30T18:00:00Z' });
+    // Sydney on its own spring date: 02:00 AEST jumps to 03:00 AEDT at 16:00Z the
+    // day before. 07:00 AEDT is 20:00Z; H6 reaches back across the gap to 14:00Z;
+    // the evening before is 20:00 AEST, 10:00Z.
+    const sydney = answer.reminders.dueAt.find((zone) => zone.zone === 'Australia/Sydney');
+    expect(sydney?.dates.map((one) => one.date)).toEqual(['2026-04-05', '2026-10-04', '2027-04-04', '2027-10-03']);
+    const sydneySpring = Object.fromEntries(
+      (sydney?.dates.find((one) => one.date === '2026-10-04')?.minutes.find((one) => one.minute === 420)?.leads ?? []).map((due) => [
+        due.lead,
+        due.iso,
+      ]),
+    );
+    expect(sydneySpring).toMatchObject({ H3: '2026-10-03T17:00:00Z', H6: '2026-10-03T14:00:00Z', EVENING_BEFORE: '2026-10-03T10:00:00Z' });
 
     const pilot = answer.reminders.due.find((one) => one.fixture === 'pilot');
     const spring = pilot?.clocks.find((clock) => clock.iso === '2026-03-29T02:00:00Z');

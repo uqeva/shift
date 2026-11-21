@@ -35,7 +35,8 @@
 --          so 0042's unique key holds each reminder to one row per channel
 --          however runs overlap (Q25). Answers the accepted count: the items
 --          that passed the write-time re-check, not the rows inserted (an
---          overlapping run's items are accepted again and insert nothing).
+--          domain's window is four runs wide, so about four consecutive runs
+--          send each item: the later ones are accepted and insert nothing).
 --   (iv)   The outbox filter, 0044's with one clause more: a `SHIFT_REMINDER`
 --          email row is dropped while `private.reminder_email_on(recipient)`
 --          (0069's one predicate) is false.
@@ -174,7 +175,8 @@ declare
   v_operands jsonb;
   v_today date;
   -- Items that passed the write-time re-check, NOT rows inserted: an item
-  -- whose rows the unique key already holds (an overlapping run) counts again.
+  -- whose rows the unique key already holds (a later run of the about four
+  -- that send each item) counts again.
   accepted integer := 0;
 begin
   if p_items is null

@@ -21,7 +21,9 @@
  *   3. POSTs to `enqueue_shift_reminders` with every item due, when there is
  *      any, in chunks of at most {@link ENQUEUE_CHUNK} items, one call per
  *      chunk. The RPC re-checks the state and writes the outbox rows; its
- *      unique key makes an overlapping run's second write nothing (Q25).
+ *      unique key makes every later write of the same item nothing (Q25):
+ *      the domain's window is four runs wide, so each item is sent by about
+ *      four consecutive runs.
  *
  * One member whose row is not an object, whose frame is malformed, or whose
  * assembly breaks a domain precondition is skipped (`REMINDER_MEMBER_SKIPPED`),
@@ -33,7 +35,8 @@
  * {@link RPC_TIMEOUT_MS}.
  *
  * `accepted` in the answer is the sum of the RPC's answers: the items that
- * passed the write-time re-check, NOT rows inserted.
+ * passed the write-time re-check, NOT rows inserted (an item is accepted by
+ * each of the about four runs that send it).
  *
  * AD-17: the gateway's address, the secret key (for its two RPCs only, sent
  * as `apikey`) and its own invoke secret are its whole environment. No

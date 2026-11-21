@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { REMINDER_LEAD_HOURS } from '../packages/domain/src/index.ts';
 
+import { REMIND_RAN, createHandler, readConfiguration } from '../supabase/functions/remind/handler.ts';
 import { FIXTURES, inRolledBackTransaction, noDatabase, refused, type Refusal } from './database.ts';
 
 /**
@@ -347,7 +348,7 @@ describe.each(FIXTURES)('the $fixture reminder job (0070)', ({ slug, admin, memb
 });
 
 describe('the reminder write refuses a malformed batch whole (0070)', () => {
-  it.skipIf(noDatabase)('raises 22023 REMINDER_ITEMS_INVALID for each shape breach, and writes nothing of its batch', async () => {
+  it.skipIf(noDatabase)('raises 22023 REMINDER_ITEMS_INVALID for each shape breach, and refuses the whole batch for one bad item', async () => {
     await inRolledBackTransaction(async (client) => {
       const [pilot] = FIXTURES;
       const who = await member(client, pilot.slug, pilot.member);
@@ -378,9 +379,10 @@ describe('the reminder write refuses a malformed batch whole (0070)', () => {
       for (const [why, items] of breaches) {
         expect(await refusedThenContinue(client, () => enqueue(client, items)), why).toMatchObject(ITEMS_INVALID);
       }
-      // A raise rolls back its whole statement (here, to the savepoint), so a
-      // good item ahead of a bad one is not kept. That the mixed batch's
-      // refusal was the bad item's: the good item alone is accepted.
+      // That nothing of a refused batch is kept is Postgres's statement
+      // atomicity (any way of catching the raise is a subtransaction too), so
+      // it is not asserted here. What is: the mixed batch's refusal was the
+      // bad item's, since the good item alone is accepted.
       expect(await enqueue(client, [good]), 'the good item alone is not the refusal').toBe(1);
     });
   });
@@ -461,6 +463,60 @@ describe('the remind cron job (0070)', () => {
       await client.query(`select vault.create_secret('http://remind.invalid/functions/v1/remind', 'remind_url')`);
       const { rows: half } = await client.query<{ id: string | null }>('select private.invoke_remind()::text as id');
       expect(half[0]?.id).toBeNull();
+    });
+  });
+
+  // The send branch, as `test/notify-boundary.test.ts`'s for `invoke_notify`:
+  // with both secrets, one POST to `remind_url` with the invoke secret as its
+  // bearer, which `remind`'s own check lets through. Rolled back, so pg_net's
+  // worker never sees it.
+  it.skipIf(noDatabase)('queues a POST to remind_url with Authorization: Bearer <remind_invoke_secret> once Vault holds both', async () => {
+    await inRolledBackTransaction(async (client) => {
+      const target = 'http://remind.invalid/functions/v1/remind';
+      const secret = 'r'.repeat(48);
+      await client.query(`delete from vault.secrets where name in ('remind_url', 'remind_invoke_secret')`);
+      await client.query(`select vault.create_secret($1, 'remind_url')`, [target]);
+      await client.query(`select vault.create_secret($1, 'remind_invoke_secret')`, [secret]);
+
+      const { rows: queued } = await client.query<{ id: string | null }>('select private.invoke_remind()::text as id');
+      const id = queued[0]?.id;
+      expect(id, 'invoke_remind queued nothing').toBeTruthy();
+      const { rows } = await client.query<{ url: string; method: string; headers: Record<string, string> }>(
+        'select url, method::text as method, headers from net.http_request_queue where id = $1::bigint',
+        [id],
+      );
+      const request = rows[0];
+      expect(request).toMatchObject({ url: target, method: 'POST' });
+      expect(request?.headers['Authorization']).toBe(`Bearer ${secret}`);
+
+      // The same headers, as the request `remind` receives: past its check, to the read.
+      const handle = createHandler(
+        readConfiguration((name) =>
+          ({ SUPABASE_URL: 'http://supabase-kong:8000', SHIFT_SECRET_KEY: `sb_secret_${'x'.repeat(12)}`, REMIND_INVOKE_SECRET: secret })[name],
+        ),
+        {
+          fetch: () => Promise.resolve(new Response(JSON.stringify({ now: Date.now(), members: [] }), { status: 200 })),
+          timeout: () => new AbortController().signal,
+          log: () => undefined,
+        },
+      );
+      const response = await handle(new Request(target, { method: 'POST', headers: request?.headers ?? {} }));
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ code: REMIND_RAN });
+    });
+  });
+});
+
+describe('the reminder read with nobody to remind (0070)', () => {
+  // `remind` answers 503 to a read whose `members` is not an array, so the
+  // read's empty answer must be `[]`, never null (the aggregate's coalesce).
+  it.skipIf(noDatabase)('answers members [] when no member has a lead on', async () => {
+    await inRolledBackTransaction(async (client) => {
+      // Owner scene: every member's reminders off, for this transaction only.
+      await client.query(`update reminder_settings set leads = '{}'::text[]`);
+      await actAsService(client);
+      const { rows } = await client.query<{ members: unknown }>(`select public.reminder_inputs() -> 'members' as members`);
+      expect(rows).toEqual([{ members: [] }]);
     });
   });
 });

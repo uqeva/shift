@@ -41,6 +41,14 @@ const PROBED_MINUTES = [0, 59, 60, 119, 120, 150, 179, 180, 1439, 1440 + 420];
 /** The four transition dates of Europe/Zagreb in 2026 and 2027. */
 const TRANSITION_DATES = ['2026-03-29', '2026-10-25', '2027-03-28', '2027-10-31'];
 
+/** The zones every lead's due instant is probed in, each on its own transition dates (UTC on Zagreb's). */
+const REMINDER_ZONES = [
+  { zone: 'Europe/Zagreb', dates: TRANSITION_DATES },
+  // The southern hemisphere: back in April, forward in October.
+  { zone: 'Australia/Sydney', dates: ['2026-04-05', '2026-10-04', '2027-04-04', '2027-10-03'] },
+  { zone: 'UTC', dates: TRANSITION_DATES },
+];
+
 /** Worked start minutes probed for every lead: midnight, the gap, the morning, the evening, and a night's second half. */
 const REMINDER_MINUTES = [0, 120, 150, 180, 360, 420, 1140, 1320, 1500];
 
@@ -131,9 +139,9 @@ export async function runtimeParityProbe(
   // both years, and the reminders due around them for every member of both
   // fixtures, at six clocks on or the day before each of the four transitions.
   const reminders = {
-    dueAt: ['Europe/Zagreb', 'Australia/Sydney', 'UTC'].map((zone) => ({
+    dueAt: REMINDER_ZONES.map(({ zone, dates }) => ({
       zone,
-      dates: TRANSITION_DATES.map((date) => ({
+      dates: dates.map((date) => ({
         date,
         minutes: REMINDER_MINUTES.map((minute) => ({
           minute,

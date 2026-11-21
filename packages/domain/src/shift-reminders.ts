@@ -10,10 +10,17 @@
  * in the window that has not started (`startsAt > now`), and each lead they
  * have on, the reminder is due at `reminderDueAt` (`zone.ts`, the one
  * local-to-UTC conversion). It is kept when that instant falls in
- * `[now − 15 min, now + 5 min)`: computed from the schedule as it stands at
- * most 15 minutes before it is due (D5), and a run every five minutes reaches
- * every instant once. Overlapping runs may keep the same pair twice; the
- * outbox's unique key makes the second write nothing (Q25).
+ * `[now − 15 min, now + 5 min)`: first computed at most 5 minutes before it
+ * is due, from the schedule as it stands then (within D5's 15), and still
+ * computed up to 15 minutes after, so a missed run or two loses nothing. The
+ * window is four runs wide, so EVERY pair is kept by about four consecutive
+ * runs, not only on an overlap: the outbox's unique key makes every write
+ * after the first nothing (Q25), and `accepted` counts each of them again.
+ *
+ * The `startsAt > now` test cannot drop a pair whose due instant is in the
+ * window (every lead falls due at least an hour before the start); it is the
+ * rule stated once, and the RPC's own started-shift skip is the guard that
+ * matters.
  *
  * Codes and values only: no name, no text. This module names no `Intl` and no
  * built-in date object (`test/purity.test.ts`).

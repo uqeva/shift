@@ -94,6 +94,23 @@ describe('shiftRemindersDueOf', () => {
     expect(shiftRemindersDueOf(m5, ['H3'], window, at('2026-03-29T03:00:00Z'))).toEqual([]);
   });
 
+  it('counts real hours across the autumn transition, through the selection', () => {
+    // 2027-10-31: 03:00 CEST repeats as 02:00 CET at 01:00Z. m1's day shift
+    // (its full-day Leave Record lifted) starts 07:00 CET, 06:00Z; H6 reaches
+    // back across the repeated hour, so it is due 00:00Z, not the wall
+    // clock's 01:00 CEST (23:00Z the day before).
+    const m1 = pilotOf('pilot-m1');
+    const withoutLeave: ScheduleInputs = {
+      ...m1,
+      leave: m1.leave.filter((record) => !(record.from <= '2027-10-31' && record.to >= '2027-10-31')),
+    };
+    const window = { from: '2027-10-30', to: '2027-11-01' };
+    expect(shiftRemindersDueOf(withoutLeave, ['H6'], window, at('2027-10-31T00:00:00Z')).map(line)).toEqual([
+      '2027-10-31 a H6 420 1140 2027-10-31T06:00:00Z',
+    ]);
+    expect(shiftRemindersDueOf(withoutLeave, ['H6'], window, at('2027-10-30T23:00:00Z'))).toEqual([]);
+  });
+
   it('reminds the evening before at 20:00 local, the day before the start date', () => {
     const m5 = pilotOf('pilot-m5');
     const window = { from: '2026-03-27', to: '2026-03-29' };

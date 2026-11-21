@@ -209,6 +209,14 @@ describe('remind: the run', () => {
     });
   });
 
+  it('answers an empty read 200 with nothing written, and takes the bearer scheme in any case', async () => {
+    const { handle, calls } = harness([json({ now: at('2026-01-04T12:00:00Z'), members: [] })]);
+    const response = await handle(post(`bearer ${INVOKE}`));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ code: REMIND_RAN, members: 0, due: 0, accepted: 0, skipped: 0 });
+    expect(calls).toHaveLength(1);
+  });
+
   it('writes nothing when nothing is due', async () => {
     const { handle, calls } = harness([json({ now: at('2026-01-04T12:00:00Z'), members: [member('pilot-m2', ['H2'], '2026-01-03', '2026-01-05')] })]);
     const response = await handle(post());
@@ -254,6 +262,8 @@ describe('remind: the run', () => {
       json({ members: [] }),
       json({ now: '1795000000000', members: [] }),
       json({ now: 1.5, members: [] }),
+      json({ now: 0, members: [] }),
+      json({ now: -1, members: [] }),
       json({ now: at('2026-01-04T04:00:00Z'), members: {} }),
     ];
     for (const answer of answers) {
@@ -269,7 +279,7 @@ describe('remind: the run', () => {
   it('answers 503 REMINDER_ENQUEUE_FAILED when the write fails', async () => {
     const read = (): Response =>
       json({ now: at('2026-01-04T04:00:00Z'), members: [member('pilot-m2', ['H2'], '2026-01-03', '2026-01-05')] });
-    for (const write of [new Error('network'), json({ code: '22023', message: 'REMINDER_ITEMS_INVALID' }, 400), json('1'), new Response('x')]) {
+    for (const write of [new Error('network'), json({ code: '22023', message: 'REMINDER_ITEMS_INVALID' }, 400), json('1'), json(1.5), json(null), new Response('x')]) {
       const { handle, calls, logs } = harness([read(), write]);
       const response = await handle(post());
       expect(response.status).toBe(503);

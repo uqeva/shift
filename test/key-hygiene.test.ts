@@ -389,7 +389,12 @@ describe('the secret key is three functions’ (story 17.2)', () => {
     const code = stripComments(migration, readFileSync(migration, 'utf8'));
     expect(code).toContain("s.name = 'remind_url'");
     expect(code).toContain("s.name = 'remind_invoke_secret'");
-    expect(code).not.toMatch(/vault\.(create|update)_secret/);
+    // No migration at all writes a Vault secret: the values are 17.3's deploy step's.
+    const directory = join(repoRoot, 'supabase', 'migrations');
+    for (const name of readdirSync(directory).filter((file) => file.endsWith('.sql'))) {
+      const path = join(directory, name);
+      expect(stripComments(path, readFileSync(path, 'utf8')), name).not.toMatch(/vault\.(create|update)_secret/);
+    }
   });
 });
 
