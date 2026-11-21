@@ -152,9 +152,9 @@ export function SignupForm({ screen }: { readonly screen: SignupScreenState }): 
         >
           {pending ? t('signup.form.pending') : t('signup.form.submit')}
         </Button>
-        <p className="flex flex-wrap gap-x-1 text-sm">
+        <p className="flex flex-wrap items-center gap-x-1 text-sm">
           <span>{t('signup.form.haveAccount')}</span>
-          <Link to="/prijava" className="font-medium underline underline-offset-4">
+          <Link to="/prijava" className="inline-flex min-h-11 items-center font-medium underline underline-offset-4">
             {t('signup.form.signIn')}
           </Link>
         </p>

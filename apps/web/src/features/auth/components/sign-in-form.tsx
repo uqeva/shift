@@ -217,11 +217,12 @@ export function SignInForm({ screen }: { readonly screen: SignInScreenState }): 
           </div>
         </Callout>
         {/* UX-DR62: only on bare `/prijava`, so a member who followed their
-            organization's link is never offered a new organization. */}
+            organization's link is never offered a new organization. The
+            link is a 44 px target like every control (CI of 19.2). */}
         {screen.registerOffered ? (
-          <p className="flex flex-wrap gap-x-1 text-sm">
+          <p className="flex flex-wrap items-center gap-x-1 text-sm">
             <span>{t('signup.signIn.register')}</span>
-            <Link to="/registracija" className="font-medium underline underline-offset-4">
+            <Link to="/registracija" className="inline-flex min-h-11 items-center font-medium underline underline-offset-4">
               {t('signup.signIn.registerLink')}
             </Link>
           </p>

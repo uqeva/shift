@@ -5,7 +5,7 @@ import { AuthLayout } from '@/components/layout/auth-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmPanel, DeadLinkPanel, RecoveryForm } from '@/features/auth/components/mail-link-panels';
 import { useMailLink, type MailLinkScreenState } from '@/features/auth/hooks/use-mail-link';
-import { potvrdaRemountKey, potvrdaSearchOf, signupEnabled } from '@/features/auth/services/signup';
+import { NO_LINK_KEY, potvrdaRemountKey, potvrdaSearchOf, signupEnabled } from '@/features/auth/services/signup';
 import { t } from '@/lib/i18n';
 import { rootRoute } from '@/pages/__root';
 
@@ -77,13 +77,18 @@ function MailLinkCard({ screen }: { readonly screen: MailLinkScreenState }): Rea
   );
 }
 
+/** The last link's remount key, held while its token leaves the address. */
+let heldRemountKey = NO_LINK_KEY;
+
 export const potvrdaRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/potvrda',
   // The two values, as strings, and nothing else; judged only on the press.
   validateSearch: potvrdaSearchOf,
   // REMOUNTED PER LINK (review of 19.2): the hook reads the link once, at
-  // mount, so a second link opened in the same tab mounts afresh.
-  remountDeps: ({ search }) => potvrdaRemountKey(search),
+  // mount, so a second link opened in the same tab mounts afresh. Taking the
+  // token out of the address keeps the key (CI of 19.2), or the screen would
+  // remount with no link and call a live link dead.
+  remountDeps: ({ search }) => (heldRemountKey = potvrdaRemountKey(search, heldRemountKey)),
   component: MailLinkScreen,
 });

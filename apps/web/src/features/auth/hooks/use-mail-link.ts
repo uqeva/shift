@@ -43,8 +43,9 @@ export function useMailLink(search: { readonly token_hash?: string | undefined; 
   const [link] = useState(() => mailLinkOf(search.token_hash, search.type));
 
   // The token leaves the address bar and the history entry as soon as it is in
-  // memory (security review of 19.2). Outside the router on purpose: a router
-  // navigation would change the remount key and drop the link just read.
+  // memory (security review of 19.2). The router still sees it (its history
+  // patches `replaceState`), so the route's remount key holds through an
+  // address without a token (`potvrdaRemountKey`).
   useEffect(() => {
     forgetLinkInAddress(window.location, window.history);
   }, []);

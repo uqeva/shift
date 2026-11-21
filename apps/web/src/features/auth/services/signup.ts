@@ -254,9 +254,22 @@ export function forgetLinkInAddress(
   if (scrubbed !== null) history.replaceState(history.state, '', scrubbed);
 }
 
-/** `/potvrda`'s remount key: a new link, a new screen. */
-export function potvrdaRemountKey(search: { token_hash?: string; type?: string }): string {
-  return `${search.token_hash ?? ''}:${search.type ?? ''}`;
+/** `/potvrda`'s remount key before any link was read. */
+export const NO_LINK_KEY = '';
+
+/**
+ * `/potvrda`'s remount key: a new link, a new screen. An address WITHOUT a
+ * token keeps the key it follows (`held`), because the router sees the
+ * address change: TanStack's browser history patches `history.replaceState`,
+ * so {@link forgetLinkInAddress} is a navigation to it, and a key that changed
+ * with it remounted the screen with no link, showing the dead-link page for
+ * a live link (CI of 19.2). Leaving `/potvrda` unmounts the screen anyway, so
+ * a held key never outlives the link it was read from.
+ */
+export function potvrdaRemountKey(search: { token_hash?: string; type?: string }, held = NO_LINK_KEY): string {
+  if (search.token_hash === undefined) return held;
+
+  return `${search.token_hash}:${search.type ?? ''}`;
 }
 
 /** The link worked: a session now exists. */

@@ -278,6 +278,11 @@ describe('review of 19.2: the ceiling, a refused password, and the link helpers'
     expect(setupSearchOf({ potvrdeno: 'true' })).toEqual({ potvrdeno: true });
     expect(setupSearchOf({ potvrdeno: '1' })).toEqual({});
     expect(potvrdaRemountKey({ token_hash: 'ab', type: 'signup' })).not.toBe(potvrdaRemountKey({ token_hash: 'cd', type: 'signup' }));
+    // The token leaving the address keeps the key, so the link read is not dropped (CI of 19.2).
+    const held = potvrdaRemountKey({ token_hash: 'ab', type: 'signup' });
+    expect(potvrdaRemountKey({ type: 'signup' }, held)).toBe(held);
+    expect(potvrdaRemountKey({}, held)).toBe(held);
+    expect(potvrdaRemountKey({}, '')).toBe('');
   });
 });
 

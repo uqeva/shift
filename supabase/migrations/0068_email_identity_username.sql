@@ -65,6 +65,8 @@ revoke execute on function private.email_identity_username(text) from service_ro
 --   row can neither be re-pointed to nor away from an email identity);
 -- - an INSERT must carry the derived username (19.3's `create_organization`
 --   writes exactly that; anything else is refused).
+-- A row with no organization, no account, or an account that does not exist
+-- is not judged here: the constraints refuse it, with their own codes.
 create function private.refuse_username_change_of_email_identity() returns trigger
 language plpgsql
 security definer
@@ -74,8 +76,20 @@ declare
   address  text;
   previous text;
 begin
-  if new.auth_user_id is not null then
-    select u.email into address from auth.users u where u.id = new.auth_user_id;
+  -- CONSTRAINTS ANSWER FIRST (CI of 19.2). A BEFORE trigger runs ahead of the
+  -- NOT NULL and foreign key checks, so a row those refuse anyway is let
+  -- through untouched and they name the fault: no organization (23502), no
+  -- account (23502), or an account that does not exist (23503, `0002:128`,
+  -- not deferrable). This is no gap in fail-closed: every row let through
+  -- here is refused by a constraint before it lands. An account that EXISTS
+  -- with a missing or malformed address is still held as an email identity's.
+  if new.organization_id is null or new.auth_user_id is null then
+    return new;
+  end if;
+
+  select u.email into address from auth.users u where u.id = new.auth_user_id;
+  if not found then
+    return new;
   end if;
 
   if tg_op = 'INSERT' then

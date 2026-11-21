@@ -320,7 +320,13 @@ export class PeoplePage extends BasePage {
     await this.fillNewMember(name, username);
     await this.addSubmitButton.click();
 
-    await expect(this.createdStatus(name, username)).toBeVisible();
+    // A ROUND TRIP THROUGH THE EDGE FUNCTION, not a render: `admin-auth`
+    // authorizes, creates the GoTrue account and inserts the row, and on a
+    // loaded CI runner that has outrun the default 5 s on main's branches and
+    // 19.2's alike (people, teams, first sign-in; each passed on retry). The
+    // wait is bounded and for the same status, so a create that never lands
+    // still fails here.
+    await expect(this.createdStatus(name, username)).toBeVisible({ timeout: 15_000 });
   }
 
   /** Closes the add dialog from its close control, onto the list. */
