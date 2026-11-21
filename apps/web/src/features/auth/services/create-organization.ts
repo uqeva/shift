@@ -461,8 +461,12 @@ export interface RefreshAuth {
  * AD-23 step 8 and AD-24: after `ORGANIZATION_CREATED`, or after
  * `ORGANIZATION_NOT_CREATABLE`, the session is refreshed, so the hook stamps
  * the claim, and `sessionDestination` asks again. A failed refresh is retried
- * ONCE; after a second failure the answer is `null`, and the screen routes
- * anyway (the app's guard reads the session it has).
+ * ONCE; after a second failure the answer is `null`, and the screen shows
+ * `afterCreateOf`'s neutral notice instead of routing (review 1 of 19.3,
+ * finding 6): the token it holds is still claimless, so the app's guard would
+ * send it straight back here. The next press refreshes again and routes.
+ * A refusal of the refresh (a banned account) is answered the same way, not
+ * signed out: the spec's recorded deviation from AD-24's fourth answer.
  */
 export async function refreshedDestination(auth: RefreshAuth): Promise<SessionDestination | null> {
   for (let attempt = 0; attempt < 2; attempt += 1) {

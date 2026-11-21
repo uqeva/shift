@@ -113,6 +113,9 @@ test('Potvrda sends nothing on load, and a dead link names no address', async ({
   await loginPage.linkRepeatInput.fill(chosen);
   await loginPage.confirmButton.click();
   await expect(loginPage.heading(hr.signup.dead.heading)).toBeVisible();
+  // D2 (review 2 of 19.3): a dead SIGNUP link offers recovery, the way back
+  // for an account confirmed with no password yet.
+  await expect(loginPage.deadLinkRecoverLink).toBeVisible();
   expect(verifies).toHaveLength(1);
   expect(verifies[0]?.method).toBe('POST');
   expect(verifies[0]?.body).toContain(tokenHash);

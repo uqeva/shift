@@ -2054,3 +2054,12 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-19-3-a-verified-account-creates-its-organization.md`
   summary: OWNER the founder (UX acceptance). Step 1's lede omits the mockup's `Korak 1 od 7`, because steps 2–7 do not exist until 19.4; 19.4 adds the step count with the rail. A person who leaves `/potvrda` after the verify and before the save holds a confirmed account with no password and recovers by email (D2).
   evidence: Spec 19.3, Design Notes D2; UX-DR66.
+
+## Deferred from: code review 2 of spec-19-3-a-verified-account-creates-its-organization (2026-11-21)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-19-3-a-verified-account-creates-its-organization.md`
+  summary: OWNER 20.5 (check on the stack). D4's GraphQL refusal reads PostgREST's `request.path` and does nothing when it is unset (a direct SQL call). The DB case sets the setting itself; the e2e proves the pinned PostgREST passes `/rpc/create_organization`, not that it sets the path on `rpc/graphql`. On the rehearsal stack, send a `create_organization` mutation to `/graphql/v1` as a claimless founder and expect 42501 `ORGANIZATION_NOT_CREATABLE` (or no such mutation). The per-account `attempts_per_account` limit holds either way; only Kong's per-IP route is at stake.
+  evidence: 0071 (v), D4; review 2 of 19.3 (Acceptance Auditor).
+- source_spec: `_bmad-output/implementation-artifacts/spec-19-3-a-verified-account-creates-its-organization.md`
+  summary: OWNER operator tooling (DEPLOY.md, with 20.5). C8 applies to every first confirmation of a real address that does not write a password in the same UPDATE, including GoTrue's admin `createUser({ email, password, email_confirm: true })`: that password is forgotten and must be set again by an update that confirms nothing (`updateUserById({ password })`), as `test/claimless-account.test.ts` does. Say so wherever the operator is told how to create a real-address account by hand. The product's own `admin-auth` creates synthesized addresses only, which C8 exempts.
+  evidence: 0071 (vii) as corrected by review 2; GoTrue v2.196.0 `internal/api/admin.go`.

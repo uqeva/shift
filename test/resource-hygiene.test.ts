@@ -3090,6 +3090,9 @@ const SANCTIONED_SCREEN_KEYS = [
   'signup.confirm.heading',
   'signup.confirm.lede',
   'signup.confirm.submit',
+  // Review 2 of 19.3: an email-change link's own lede and press.
+  'signup.confirm.changeLede',
+  'signup.confirm.changeSubmit',
   'signup.confirm.pending',
   'signup.confirm.confirmed',
   'signup.confirm.error.unavailable',

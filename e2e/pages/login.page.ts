@@ -149,6 +149,11 @@ export class LoginPage extends BasePage {
     return this.page.getByRole('button', { name: hr.signup.sent.correct, exact: true });
   }
 
+  /** A dead link's way to recovery, *Zatraži novu poveznicu* (story 19.3, D2). */
+  get deadLinkRecoverLink(): Locator {
+    return this.page.getByRole('link', { name: hr.signup.dead.recover, exact: true });
+  }
+
   /** `/potvrda`'s press on a signup's link: *Potvrdi i spremi lozinku* (story 19.3, C8). */
   get confirmButton(): Locator {
     return this.page.getByRole('button', { name: hr.signup.confirm.submit, exact: true });

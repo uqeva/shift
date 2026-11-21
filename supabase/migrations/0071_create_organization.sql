@@ -3,9 +3,7 @@
 -- Forward-only. Once this file has been promoted past local it is never edited;
 -- a correction is a new migration with a higher number.
 --
--- NUMBERING. Main holds 0069 (17.1); story 17.2 runs in parallel with 0070, so
--- this story takes 0071 and the scaffold's no-gap case fails locally until
--- 0070 merges.
+-- NUMBERING. 0070 is story 17.2's (the reminder job); this story takes 0071.
 --
 -- Story 19.3: a verified account creates its organization (AD-23, AD-12,
 -- AD-10, AD-11; checklist C8, B6, B7, D1–D7, E4). In order:
@@ -68,10 +66,21 @@
 --          the operator script inserts its row confirmed.
 --
 --          ONLY A HASH THE SAME UPDATE LEAVES UNCHANGED (review of 19.3): an
---          UPDATE that confirms and sets a password together (an admin's
---          `updateUserById({ password, email_confirm })`) keeps the password
---          it sets. GoTrue's verify confirms with two columns only, so its
---          UPDATE never carries a new hash, and the old one is nulled.
+--          UPDATE that confirms and sets a password together (the operator's
+--          SQL) keeps the password it sets. GoTrue's `User.Confirm` writes
+--          two columns only, so its UPDATE never carries a new hash, and the
+--          old one is nulled. Read against admin.go (review 2 of 19.3):
+--          `updateUserById({ password, email_confirm })` confirms first
+--          (nulling the old hash), then writes the new one in
+--          `UpdatePassword`'s own UPDATE, which this trigger ignores, so the
+--          password it sets is kept; `createUser({ email, password,
+--          email_confirm })` of a REAL address INSERTs the hash and then
+--          confirms, so that password is forgotten and must be set again by
+--          an update that confirms nothing (`test/claimless-account.test.ts`).
+--          An invite's verify writes GoTrue's temporary random password and
+--          then confirms, so the invitee holds none, and sets one anyway.
+--          Nothing in the product creates a real address through the admin
+--          API: `admin-auth` creates synthesized ones only.
 --
 --          TWO OTHER EDGES, recorded (review of 19.3):
 --            * AUTOCONFIRM. With `GOTRUE_MAILER_AUTOCONFIRM`, `/signup`
@@ -84,6 +93,16 @@
 --              linked identity is removed, and a later re-confirmation would
 --              forget the password again. `/user/identities` is not on Kong's
 --              allow-list (AD-22), so no session reaches it.
+--
+--          GoTrue v2.196.0's `migrations/` only add columns and indexes to
+--          `auth.users`; none drops or recreates the table or its triggers,
+--          and one dropping `email_confirmed_at` would fail on this trigger's
+--          column dependency rather than drop it silently. Accounts confirmed
+--          before 0071 are untouched: only the null-to-set transition acts.
+--
+--   (viii) 0064's `public.refuse_write_by_stale_admin()`, restated word for
+--          word with one early exit: the Founding Admin's INSERT that
+--          `create_organization` names in `shift.founding_account`.
 
 -- ------------------------------------------------------------ (i) the timezone
 

@@ -109,7 +109,7 @@ Decisions (the founder said decide and record):
 
 **Commands:**
 - `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm --filter ./apps/web test`, `pnpm --filter @shift/domain test` -- pass.
-- `pnpm exec vitest run` on the allowed root files -- pass (the 0070 gap excepted).
+- `pnpm exec vitest run` on the allowed root files -- pass.
 
 **Results (2026-11-21, implementation):**
 - `pnpm typecheck`, `pnpm lint`, `pnpm build`: pass.
@@ -142,6 +142,36 @@ Review of 2026-11-21, every finding patched (frozen text unchanged):
 16. Patched: an e2e step opens `/kalendar` as the claimless founder, lands on `/postavljanje?povratak=%2Fkalendar`, founds, and lands on `/kalendar`.
 
 Layers: Blind Hunter, Edge Case Hunter, Verification Gap, Epic AC Auditor, Unrun DB Test Auditor (all five ran). Rejected, each with its reason: the `-2…-9` proposal walk reveals which suffixed slugs exist (slugs are not secret, D-S8, and each probe costs an attempt); reserved slugs are not refused on the page (the answer is the same proposal, and a second list in the SPA would be a second owner of the rule); `organization_attempts` has no retention (AD-25's housekeeping purges rows older than 30 days, story 19.5); `address_kind` of a null email in the C8 trigger (an account with no email has no email confirmation to make); no test that PostgREST cannot set `shift.founding_account` (no exposed schema holds `set_config`, and PostgREST sets only `request.*` settings; recorded for the D-S5 review); a two-account concurrent ceiling case (reasoned from the advisory lock, a residual risk above).
+
+### Review 2 (security review, 2026-11-21, after the rebase onto 17.2)
+
+Rebased onto `origin/main` with 17.2 (#348, 0070). Conflicts: `deferred-work.md` (both stories' sections kept), `sprint-status.yaml` (`last_updated`), `test/provisioning.test.ts` (three catalog lists: 17.2's 0070 entries, then 19.3's 0071 entries), `test/supabase-scaffold.test.ts` (17.2's 0070 describe block closed, then 19.3's 0071 block). 0071 keeps its number; the scaffold's no-gap case now passes.
+
+Run unattended (the founder said not to ask). Layers: Blind Hunter, Edge Case Hunter, Verification Gap, Acceptance Auditor with the checklist rows, Epic AC Auditor (all five ran; Artifact Renderer: no generated file), plus the orchestrator's own read of C8 against GoTrue v2.196.0's source (`internal/models/user.go`, `internal/api/{verify,admin,signup,external,identity,token}.go`, `migrations/`).
+
+**C8 evidence (read against the pinned source):**
+- Every GoTrue path that sets `email_confirmed_at` goes through `User.Confirm`, `UpdateOnly(confirmation_token, email_confirmed_at)` (callers: `signupVerify`, `recoverVerify`, `ConfirmEmailChange` when unconfirmed, autoconfirm `/signup`, admin create and update, OAuth and identity linking). None writes `encrypted_password` in that UPDATE, so the trigger always sees an unchanged hash and nulls it; nothing after it in those requests writes the old hash back (pop's `UpdateOnly` names its columns; the token endpoint's re-encrypt only runs on a valid password, which a null hash never is).
+- Bypass by "confirm and set the password in one UPDATE": no GoTrue route issues one. `updateUserById({ password, email_confirm })` confirms (nulls) and then writes the new hash in `UpdatePassword`'s own UPDATE, so the admin's password is kept; only the operator's SQL can do both at once, and it is trusted. A stranger controls no confirming UPDATE.
+- Admin `createUser({ email: real, password, email_confirm: true })` INSERTs the hash then confirms, so that password is forgotten (already handled in `test/claimless-account.test.ts`; `admin-auth` only creates synthesized addresses, which are exempt). An invite's temporary random password is forgotten too: harmless.
+- Upgrades: GoTrue's migrations only add columns and indexes to `auth.users`; none drops or recreates the table or its triggers. Dropping `email_confirmed_at` would fail on the trigger's column dependency rather than drop it silently.
+- Existing accounts: only the null-to-set transition acts. The founder's and the pilot's accounts are confirmed already (and the pilot's synthesized), so no existing password is touched. The seed, the demo and the e2e helper insert confirmed rows (an INSERT fires no UPDATE trigger).
+- Shape: `security definer`, `set search_path = ''`, owned by the migration role, EXECUTE revoked from `public`, `anon`, `authenticated`, `service_role`; reads only `private.address_kind` (a null address reads `malformed`, and the trigger fires only when `email_confirmed_at` is set, which a phone-only account never does).
+
+**`create_organization` evidence:** 0071's `refuse_write_by_stale_admin()` diffed against 0064's: identical but for the one early exit (and the 0035/0036/0064/0071 chain has no other definer). `shift.founding_account` follows 0043/0045's `shift.notify_*` pattern: transaction-local, set and cleared inside the definer, rolled back with the block's subtransaction; PostgREST sets only `request.*` settings and no exposed schema holds `set_config`. The `request.path` guard cannot be spoofed (the client's own path is what PostgREST records, and only `/rpc/create_organization` passes); it does nothing when the setting is unset (deferred: a live GraphQL probe, OWNER 20.5). Tenant isolation: the definer reads only the caller's `auth.users` row, the caller's membership, the attempt and ceiling counts and slug existence; it returns only the new organization's id and slug. Races: the caller's row lock and the advisory lock serialize, and `organizations_founded_by_key` answers a self-race.
+
+**Findings, review 2:**
+1. Patched: an email-change link's `ConfirmPanel` showed the signup's reworded lede and press ("Postavi lozinku…", *Potvrdi i spremi lozinku*) with no password field. New keys `signup.confirm.changeLede` and `signup.confirm.changeSubmit`, used by `potvrda.tsx`'s last branch and `ConfirmPanel`; resource inventory updated.
+2. Patched: a `SLUG_UNAVAILABLE` proposal (and its `aria-invalid`) stayed on a newly typed slug; typing the slug, or the name while the slug follows it, now drops it.
+3. Patched: `route()`'s refresh ran outside its `try`, so a throw on the second press was an unhandled rejection; it now ends in the notice.
+4. Patched: 0071's header (not yet promoted) corrected: the stale NUMBERING note; the admin-API mechanics of C8 stated as read in admin.go (the earlier text named `updateUserById` as a single confirming-and-setting UPDATE, which it is not); GoTrue's migrations and already-confirmed accounts; section (viii) listed.
+5. Patched: `refreshedDestination`'s docstring said the screen routes after two failed refreshes; it shows the neutral notice (review 1, finding 6), recorded there as the deviation from AD-24's "refresh and route" and its fourth answer (a refused refresh is not signed out).
+6. Patched: the e2e dead signup link now asserts D2's *Zatraži novu poveznicu*.
+7. Deferred (OWNER 20.5): a live `rpc/graphql` probe of D4 on the pinned PostgREST.
+8. Deferred (operator tooling): C8 forgets a password the admin API's `createUser` sets for a real address; documented where an operator creates one by hand.
+
+Rejected, each with its reason: a null address passing step 2 (`address_kind(null)` is `malformed`, refused); the dead signup link offering recovery (D2, intended); `attempts` never purged and throttled retries extending the window (AD-25's housekeeping owns retention, review 1; counting every attempt is AD-23 step 5); slug enumeration through proposals (review 1: slugs are not secret, D-S8, each probe costs an attempt); the client not refusing reserved slugs (review 1); the global advisory lock (held for one short definer call, under per-account and per-IP limits); the over-length name message (the field's own maxLength stops it on the page); no hook-level test for the second press (no React test harness in `apps/web`; the decision is `afterCreateOf`, node-tested, and the guard is three lines); `NOT_CREATABLE` with a still-claimless session showing "try again" (banned, deleted or held accounts only; suspension is 19.5's); the routing loop via `povratak=/postavljanje` (each hop drops one level of nesting and ends at `/`); `founded_by` outliving its account (an attribution like `created_by`, by design).
+
+Open for CI (not runnable here): every DB and e2e case, and that the migration role may create a trigger on `auth.users` and lock its rows (0071 is the first migration to do either; Supabase supports triggers on `auth.users` from user migrations).
 
 ## Suggested Review Order
 

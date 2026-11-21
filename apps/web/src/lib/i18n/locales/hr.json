@@ -2533,6 +2533,8 @@
       "heading": "Potvrdi adresu",
       "lede": "Postavi lozinku kojom ćeš se prijavljivati. Spremanjem potvrđuješ adresu i nastavljaš na postavljanje organizacije.",
       "submit": "Potvrdi i spremi lozinku",
+      "changeLede": "Pritisni Potvrdi da potvrdiš novu adresu.",
+      "changeSubmit": "Potvrdi",
       "pending": "Potvrđivanje…",
       "confirmed": "Adresa je potvrđena.",
       "error": {

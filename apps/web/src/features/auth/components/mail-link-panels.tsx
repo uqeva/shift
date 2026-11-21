@@ -20,7 +20,11 @@ import { useWriteGate } from '@/lib/offline/use-write-gate';
  * saves (recovery, and since 19.3 a signup: C8), and the dead link. Each is drawn under the page's card title.
  */
 
-/** A confirmation link: one button, and nothing sent until it is pressed. */
+/**
+ * An email-change link (since 19.3 the only link without the password form):
+ * one button, and nothing sent until it is pressed. Its own words (review 2 of
+ * 19.3): a signup's lede and press now name the password.
+ */
 export function ConfirmPanel({ screen }: { readonly screen: MailLinkScreenState }): ReactNode {
   const gate = useWriteGate();
 
@@ -38,7 +42,7 @@ export function ConfirmPanel({ screen }: { readonly screen: MailLinkScreenState 
           void screen.confirm();
         }}
       >
-        {screen.pending ? t('signup.confirm.pending') : t('signup.confirm.submit')}
+        {screen.pending ? t('signup.confirm.pending') : t('signup.confirm.changeSubmit')}
       </Button>
     </div>
   );

@@ -70,7 +70,7 @@ function MailLinkCard({ screen }: { readonly screen: MailLinkScreenState }): Rea
         <CardTitle asChild>
           <h1>{t('signup.confirm.heading')}</h1>
         </CardTitle>
-        <CardDescription>{t('signup.confirm.lede')}</CardDescription>
+        <CardDescription>{t('signup.confirm.changeLede')}</CardDescription>
       </CardHeader>
       <CardContent>
         <ConfirmPanel screen={screen} />

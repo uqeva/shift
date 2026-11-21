@@ -81,12 +81,18 @@ export function useCreateOrganization(povratak: string | undefined) {
   function nameInput(event: ChangeEvent<HTMLInputElement>): void {
     const { value } = event.target;
     setName(value);
-    if (!slugEdited.current) setSlug(slugProposalOf(value));
+    if (!slugEdited.current) {
+      setSlug(slugProposalOf(value));
+      setProposal(null);
+    }
   }
 
+  // A proposal answers the slug it was made for (review 2 of 19.3): typing a
+  // new one drops it, and its refusal with it.
   function slugInput(event: ChangeEvent<HTMLInputElement>): void {
     slugEdited.current = true;
     setSlug(event.target.value);
+    setProposal(null);
   }
 
   function confirmZone(): void {
@@ -112,9 +118,11 @@ export function useCreateOrganization(povratak: string | undefined) {
   }
 
   async function route(code: typeof ORGANIZATION_CREATED | typeof ORGANIZATION_NOT_CREATABLE): Promise<void> {
-    const next = afterCreateOf(code, await refreshedDestination(supabaseClient().auth));
-
     try {
+      // Inside the `try` (review 2 of 19.3): a client that cannot be made
+      // ends in the notice, never in an unhandled rejection.
+      const next = afterCreateOf(code, await refreshedDestination(supabaseClient().auth));
+
       if (next.kind === AFTER_NAVIGATE) {
         await navigate({ href: returnTargetOf(povratak, knownPathOf(router)), replace: true });
 
