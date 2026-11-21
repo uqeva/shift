@@ -165,7 +165,8 @@ export function FeedCard({ state, timeZone }: { readonly state: CalendarFeedStat
         {view.kind === FEED_UNAVAILABLE_VIEW ? renderUnavailable() : null}
         {view.kind === FEED_NONE ? renderNone() : null}
         {view.kind === FEED_LIVE ? renderLive(view.lastFetchedAt) : null}
-        <OfflineWriteNote gate={gate} />
+        {/* ONE note under the gate's id: an open confirmation draws its own. */}
+        {confirming ? null : <OfflineWriteNote gate={gate} />}
         {/* A create's refusal here; a confirmed write's stays in its dialog. */}
         {failure === null || confirming ? null : (
           <Notice id={FEED_FAILURE_ID} role="alert">
@@ -334,6 +335,8 @@ function FeedLink({ urls, masked }: { readonly urls: FeedUrls; readonly masked: 
             <a href={urls.google} {...NEW_TAB_LINK}>
               <CalendarPlus aria-hidden />
               {t('feed.google.add')}
+              {/* It opens a new tab: said to a screen reader, as the name alone would not. */}
+              <span className="sr-only"> {t('feed.google.newTab')}</span>
             </a>
           </Button>
           <ol className="grid list-decimal gap-1 pl-5 text-sm">

@@ -1210,6 +1210,18 @@ export function holdFireRanks(slug: string): RotationHold {
 }
 
 /**
+ * The run member's ONE calendar link, held by one test at a time (story
+ * 16.5). A member has at most one live link and every create revokes the one
+ * before (0067), so `calendar-feed.spec.ts` (16.4) and
+ * `kalendar-na-mobitelu.spec.ts` (16.5), which both create and revoke
+ * `fixture.member`'s, would kill each other's link side by side. Under the
+ * same bounded, session-level advisory lock as {@link holdRotation}.
+ */
+export function holdCalendarFeed(slug: string): RotationHold {
+  return holdLock(`e2e-calendar-feed:${slug}`, async () => undefined);
+}
+
+/**
  * Annual leave's fixed id and seeded name (`0052`), which every organization
  * holds. The name is also *Sati*'s annual leave column (story 13.2), declared
  * once beside the resource file's labels.

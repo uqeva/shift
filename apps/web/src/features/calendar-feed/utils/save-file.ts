@@ -1,3 +1,6 @@
+/** How long the object URL outlives the click: FileSaver's 40 s, rounded up. */
+export const OBJECT_URL_LIFETIME_MS = 60_000;
+
 /**
  * Hands the browser a text file to save (story 16.5's month download): an
  * object URL on a one-off link, clicked once and released. The browser's own
@@ -13,8 +16,10 @@ export function saveTextFile(fileName: string, text: string, type: string): void
   document.body.append(link);
   link.click();
   link.remove();
-  // Released after the click has been handled, never before.
+  // Released well after the click: some browsers (Safari, an installed
+  // app) read the object URL only once the download has begun, and a release
+  // on the next tick can cancel it.
   setTimeout(() => {
     URL.revokeObjectURL(url);
-  }, 0);
+  }, OBJECT_URL_LIFETIME_MS);
 }

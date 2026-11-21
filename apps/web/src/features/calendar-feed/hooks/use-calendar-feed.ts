@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
   CALENDAR_FEED_KEY,
@@ -13,6 +13,8 @@ import {
   createFeedToken,
   feedArmed,
   feedCancelled,
+  feedHeldLinkLost,
+  feedLinkDropped,
   feedUrlsOf,
   feedViewOf,
   feedWriteSettled,
@@ -67,11 +69,20 @@ export function useCalendarFeed() {
     retry: false,
   });
   const writing = useRef(false);
+  /** When the last write landed: a read stamped before it describes the state before it. */
+  const settledAt = useRef(0);
   const [state, setState] = useState<FeedWriteState>(FEED_WRITE_INITIAL);
+  const fresh = read.dataUpdatedAt >= settledAt.current;
+  // Turned off elsewhere (an admin, another device) since this visit made it: never shown as working.
+  const lost = feedHeldLinkLost(read.data, state.token !== null, fresh);
+
+  useEffect(() => {
+    if (lost) setState(feedLinkDropped);
+  }, [lost]);
 
   const project = projectUrl();
   let urls: FeedUrls | null = null;
-  if (state.token !== null && isFeedProjectUrl(project)) {
+  if (state.token !== null && !lost && isFeedProjectUrl(project)) {
     try {
       urls = feedUrlsOf(project, state.token);
     } catch {
@@ -91,6 +102,7 @@ export function useCalendarFeed() {
       const outcome: FeedCreateOutcome | FeedRevokeOutcome =
         needsUrl && !isFeedProjectUrl(project) ? { ok: false, code: CALENDAR_FEED_UNAVAILABLE } : await send();
       const settled = (was: FeedWriteState) => feedWriteSettled(was, during, outcome).state;
+      settledAt.current = Date.now();
       setState(settled);
     } finally {
       writing.current = false;
@@ -100,7 +112,7 @@ export function useCalendarFeed() {
   }
 
   return {
-    view: feedViewOf(read.data, urls !== null),
+    view: feedViewOf(read.data, urls !== null, { fresh, turnedOff: state.turnedOff }),
     /** The URLs while this visit created the link, else `null`. */
     urls,
     /** The masked form, the project URL's alone. */

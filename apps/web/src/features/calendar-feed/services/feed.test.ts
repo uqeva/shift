@@ -37,6 +37,11 @@ import {
   feedWriteStarted,
   isFeedProjectUrl,
   memberFeedArmed,
+  memberFeedCancelled,
+  memberFeedLiveOf,
+  memberFeedStarted,
+  feedHeldLinkLost,
+  feedLinkDropped,
   memberFeedReadMessageKey,
   memberFeedReadRetryable,
   memberFeedSettled,
@@ -339,6 +344,33 @@ describe('the link card’s writes (pure transitions, the hook only sends)', () 
     expect(isFeedProjectUrl(PROJECT)).toBe(true);
     expect(isFeedProjectUrl('http://127.0.0.1:54321/')).toBe(true);
     for (const bad of [null, '', ' ', 'api.shift.example', 'ftp://x', 'https://']) expect(isFeedProjectUrl(bad), String(bad)).toBe(false);
+    // A query or fragment would swallow the token's path.
+    for (const bad of [`${PROJECT}/?x=1`, `${PROJECT}#a`]) {
+      expect(isFeedProjectUrl(bad), bad).toBe(false);
+      expect(() => feedUrlsOf(bad, TOKEN)).toThrow(RangeError);
+    }
+  });
+
+  it('drops a held link a fresh read answers turned off (an admin, another device), never a stale or failed read', () => {
+    const none = { ok: true, state: { live: false, createdAt: null, lastFetchedAt: null } } as const;
+    const live = { ok: true, state: { live: true, createdAt: CREATED, lastFetchedAt: null } } as const;
+    expect(feedHeldLinkLost(none, true, true)).toBe(true);
+    expect(feedHeldLinkLost(none, true, false)).toBe(false);
+    expect(feedHeldLinkLost({ ok: false, code: CALENDAR_FEED_UNAVAILABLE }, true, true)).toBe(false);
+    expect(feedHeldLinkLost(live, true, true)).toBe(false);
+    expect(feedHeldLinkLost(none, false, true)).toBe(false);
+    const held = { ...FEED_WRITE_INITIAL, token: TOKEN, focus: FEED_FOCUS_LINK, landed: 1 } as const;
+    expect(feedLinkDropped(held)).toEqual({ ...held, token: null, focus: null });
+    expect(feedLinkDropped(FEED_WRITE_INITIAL)).toBe(FEED_WRITE_INITIAL);
+  });
+
+  it('reads no state from before the last landed write: a turn-off stays off, a new link has no old last fetch', () => {
+    const live = { ok: true, state: { live: true, createdAt: CREATED, lastFetchedAt: FETCHED } } as const;
+    expect(feedViewOf(live, false, { fresh: false, turnedOff: true })).toEqual({ kind: FEED_NONE });
+    expect(feedViewOf(live, true, { fresh: false, turnedOff: false })).toEqual({ kind: FEED_LIVE, lastFetchedAt: null });
+    expect(feedViewOf(live, true, { fresh: true, turnedOff: false })).toEqual({ kind: FEED_LIVE, lastFetchedAt: FETCHED });
+    // Once fresh, the read decides again.
+    expect(feedViewOf(live, false, { fresh: true, turnedOff: true })).toEqual({ kind: FEED_LIVE, lastFetchedAt: FETCHED });
   });
 });
 
@@ -359,6 +391,18 @@ describe('the admin card (UX-DR55)', () => {
 
   it('offers a retry for an unavailable read only', () => {
     expect(memberFeedReadRetryable(CALENDAR_FEED_UNAVAILABLE)).toBe(true);
+    // Start and cancel are transitions too; a cancel never closes a turn-off in flight.
+    const armed = memberFeedArmed({ ...MEMBER_FEED_WRITE_INITIAL, failure: CALENDAR_FEED_REFUSED }, true, true);
+    const sent = memberFeedStarted({ ...armed, failure: CALENDAR_FEED_REFUSED });
+    expect(sent).toEqual({ ...armed, busy: true, failure: null });
+    expect(memberFeedCancelled(sent)).toBe(sent);
+    expect(memberFeedCancelled({ ...armed, failure: CALENDAR_FEED_REFUSED })).toEqual({ ...armed, armed: false, failure: null });
+    // A landed turn-off is not undone by a read from before it.
+    const on = { ok: true, state: { live: true, createdAt: CREATED, lastFetchedAt: null } } as const;
+    expect(memberFeedLiveOf(on, true, false)).toBe(false);
+    expect(memberFeedLiveOf(on, true, true)).toBe(true);
+    expect(memberFeedLiveOf(on, false, false)).toBe(true);
+    expect(memberFeedLiveOf(undefined, false, true)).toBe(false);
     expect(memberFeedReadRetryable(CALENDAR_FEED_REFUSED)).toBe(false);
     expect(memberFeedReadRetryable(CALENDAR_FEED_MEMBER_UNKNOWN)).toBe(false);
     expect(memberFeedReadMessageKey(CALENDAR_FEED_UNAVAILABLE)).toBe('feed.member.unavailable');

@@ -33,8 +33,9 @@ export class CalendarFeedPage extends BasePage {
     return this.page.locator('#calendar-feed-url');
   }
 
+  /** Named with the new-tab hint a screen reader hears after it. */
   get googleLink(): Locator {
-    return this.page.getByRole('link', { name: copy.google.add, exact: true });
+    return this.page.getByRole('link', { name: `${copy.google.add} ${copy.google.newTab}`, exact: true });
   }
 
   get appleLink(): Locator {

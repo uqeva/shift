@@ -54,6 +54,7 @@ export function MemberFeedCard({ memberId }: { readonly memberId: string }): Rea
             type="button"
             variant="outline"
             disabled={feed.busy}
+            aria-busy={feed.busy}
             aria-disabled={gate.disabled}
             aria-describedby={gate.describedBy()}
             onClick={() => {
@@ -72,7 +73,7 @@ export function MemberFeedCard({ memberId }: { readonly memberId: string }): Rea
             <div className="h-5 w-56 max-w-full rounded bg-muted" />
           </div>
         ) : null}
-        {outcome?.ok === true ? <p className="text-sm font-medium">{t(memberFeedLineMessageKey(outcome.state.live))}</p> : null}
+        {outcome?.ok === true ? <p className="text-sm font-medium">{t(memberFeedLineMessageKey(live))}</p> : null}
         {outcome?.ok === false ? (
           <div className="grid min-w-0 gap-2">
             <Notice role="alert">{t(memberFeedReadMessageKey(outcome.code))}</Notice>
@@ -92,7 +93,8 @@ export function MemberFeedCard({ memberId }: { readonly memberId: string }): Rea
             ) : null}
           </div>
         ) : null}
-        <OfflineWriteNote gate={gate} />
+        {/* ONE note under the gate's id: the open dialog draws its own. */}
+        {feed.armed ? null : <OfflineWriteNote gate={gate} />}
         {feed.turnedOff ? <Notice role="status">{t('feed.member.turnedOff')}</Notice> : null}
       </CardContent>
       {feed.armed ? (

@@ -1339,14 +1339,15 @@ export const KEY_SOURCES = [
     // poveznicu* and *Isključi*, each confirmation's prompt, cancel and confirm,
     // the turned-off line, the two fixed notes; the created link's heading,
     // warning title and text, its label, *Prikaži* and *Sakrij*, *Kopiraj*,
-    // each calendar's heading, add link and steps; the download's heading,
+    // each calendar's heading, add link and steps, Google's new-tab hint
+    // (review 2); the download's heading,
     // lede, unavailable line, retry, *Preuzmi*, failure and saved lines. The
     // last fetch, the copy's status and the write failure come through the
     // rules entries below.
     name: 'the calendar link screen',
     file: CALENDAR_FEED,
     keys: translationKeys,
-    strings: 46,
+    strings: 47,
   },
   {
     // STORY 16.5 (UX-DR55): the member card's heading, loading words,

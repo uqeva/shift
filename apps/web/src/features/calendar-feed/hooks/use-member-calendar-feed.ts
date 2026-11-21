@@ -5,7 +5,10 @@ import {
   MEMBER_CALENDAR_FEED_KEY,
   MEMBER_FEED_WRITE_INITIAL,
   memberFeedArmed,
+  memberFeedCancelled,
+  memberFeedLiveOf,
   memberFeedSettled,
+  memberFeedStarted,
   readMemberFeedState,
   revokeMemberFeed,
   type FeedRpc,
@@ -33,17 +36,20 @@ export function useMemberCalendarFeed(memberId: string) {
     retry: false,
   });
   const writing = useRef(false);
+  /** When the last turn-off landed: a read stamped before it still says the link is on. */
+  const settledAt = useRef(0);
   const [state, setState] = useState<MemberFeedWriteState>(MEMBER_FEED_WRITE_INITIAL);
-  const live = read.data !== undefined && read.data.ok && read.data.state.live;
+  const live = memberFeedLiveOf(read.data, state.turnedOff, read.dataUpdatedAt >= settledAt.current);
 
   async function turnOff(): Promise<void> {
     if (writing.current || !writesOnline()) return;
 
     writing.current = true;
-    setState((was) => ({ ...was, busy: true, failure: null }));
+    setState(memberFeedStarted);
 
     try {
       const outcome = await revokeMemberFeed(rpc(), memberId);
+      settledAt.current = Date.now();
       setState((was) => memberFeedSettled(was, outcome).state);
     } finally {
       writing.current = false;
@@ -63,7 +69,7 @@ export function useMemberCalendarFeed(memberId: string) {
       setState((was) => memberFeedArmed(was, writesOnline(), live));
     },
     cancel: () => {
-      if (!writing.current) setState((was) => ({ ...was, armed: false, failure: null }));
+      if (!writing.current) setState(memberFeedCancelled);
     },
     turnOff,
     retry: async () => {

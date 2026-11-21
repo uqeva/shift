@@ -2948,6 +2948,7 @@ const SANCTIONED_SCREEN_KEYS = [
   'feed.copyFailed',
   'feed.google.heading',
   'feed.google.add',
+  'feed.google.newTab',
   'feed.google.step1',
   'feed.google.step2',
   'feed.google.step3',

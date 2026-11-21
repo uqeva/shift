@@ -2000,3 +2000,12 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-16-5-a-member-subscribes-from-kalendar-na-mobitelu.md`
   summary: OWNER the epic 16 retrospective (consider). `/kalendar-na-mobitelu` is not in `OFFLINE_READABLE_PATHS`, on `/obavijesti`'s terms: offline, the link's state read fails into its message and *Pokušaj ponovno*, and the month download still builds from the device's snapshot. Decide whether the route should open offline from a cold start with an expired token (as the destinations do), which would list it there.
   evidence: 16.5 spec, Design Notes 9.
+
+## Deferred from: code review of spec-16-5-a-member-subscribes-from-kalendar-na-mobitelu (review 2, 2026-11-21)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-16-5-a-member-subscribes-from-kalendar-na-mobitelu.md`
+  summary: OWNER the founder, at the epic's `security-review` (before production). Design Note 11's accepted risks were recorded unattended under the standing "decide and record" instruction and need the founder's sign-off as security-sensitive decisions: the token stands in *Dodaj u Google kalendar*'s `cid` href (the new tab's history, and Google, which receives the link anyway as the subscriber; `rel="noopener noreferrer"` sends no referrer, and the app's own URL never holds the token), and *Kopiraj* puts the link in the OS clipboard and any clipboard history. The app itself persists it nowhere (no query key or value, no mutation cache, no storage, no log, no URL; sign-out clears the cache and the page's unmount drops the token).
+  evidence: 16.5 review 2 (blind hunter); workspace rule "stop and ask before security-sensitive decisions".
+- source_spec: `_bmad-output/implementation-artifacts/spec-16-5-a-member-subscribes-from-kalendar-na-mobitelu.md`
+  summary: OWNER 20.5 (with the real-client subscription check above). On a real iPhone, in Safari and in the installed app (*Instaliraj*, standalone), press *Preuzmi .ics* once and confirm the file is offered for import (a blob URL with `download`; the object URL now lives 60 s after the click). Only headless Chromium downloaded it here.
+  evidence: 16.5 review 2 (blind hunter, edge case hunter).

@@ -238,7 +238,7 @@ export function feedUrlsOf(projectUrl: string, token: string): FeedUrls {
 
   const base = baseOf(projectUrl);
 
-  if (!/^https?:\/\/[^/]/.test(base)) throw new RangeError('the project URL is not http(s)');
+  if (!isFeedProjectUrl(base)) throw new RangeError('the project URL is not http(s)');
 
   const https = `${base}${FEED_PATH}${token}${FEED_EXTENSION}`;
   const webcal = https.replace(/^https?:/, 'webcal:');
@@ -394,7 +394,15 @@ export function feedWriteSettled(
  * before a token is asked for, so an issued token is never left unshown.
  */
 export function isFeedProjectUrl(projectUrl: string | null): projectUrl is string {
-  return projectUrl !== null && /^https?:\/\/[^/\s]/.test(baseOf(projectUrl));
+  if (projectUrl === null || !/^https?:\/\/[^/\s]/.test(baseOf(projectUrl))) return false;
+
+  // A query or fragment would swallow the token's path: no link could be built on it.
+  try {
+    const url = new URL(baseOf(projectUrl));
+    return url.search === '' && url.hash === '';
+  } catch {
+    return false;
+  }
 }
 
 /** The admin card's write state (UX-DR55), on the link card's terms. */
@@ -408,6 +416,26 @@ export interface MemberFeedWriteState {
 }
 
 export const MEMBER_FEED_WRITE_INITIAL: MemberFeedWriteState = { armed: false, busy: false, failure: null, turnedOff: false, landed: 0 };
+
+/** The admin's turn-off sent: busy, any earlier refusal cleared. */
+export function memberFeedStarted(state: MemberFeedWriteState): MemberFeedWriteState {
+  return { ...state, busy: true, failure: null };
+}
+
+/** The admin's confirmation closed without writing; never while the turn-off is in flight. */
+export function memberFeedCancelled(state: MemberFeedWriteState): MemberFeedWriteState {
+  return state.busy ? state : { ...state, armed: false, failure: null };
+}
+
+/**
+ * Whether the admin card says the link is on: the read's answer, except that
+ * a landed turn-off is not undone by a read from before it (`fresh` false)
+ * while the re-read is under way.
+ */
+export function memberFeedLiveOf(outcome: FeedStateOutcome | undefined, turnedOff: boolean, fresh: boolean): boolean {
+  if (turnedOff && !fresh) return false;
+  return outcome !== undefined && outcome.ok && outcome.state.live;
+}
 
 /** *Isključi poveznicu* opens its confirmation only online and only while the link is live. */
 export function memberFeedArmed(state: MemberFeedWriteState, online: boolean, live: boolean): MemberFeedWriteState {
@@ -447,15 +475,37 @@ export type FeedView =
  * link is live whatever the read says while it catches up, so *Izradi
  * poveznicu* is never offered beside a link just shown.
  */
-export function feedViewOf(outcome: FeedStateOutcome | undefined, holdsLink = false): FeedView {
+export function feedViewOf(
+  outcome: FeedStateOutcome | undefined,
+  holdsLink = false,
+  freshness: { readonly fresh: boolean; readonly turnedOff: boolean } = { fresh: true, turnedOff: false },
+): FeedView {
   const live = outcome !== undefined && outcome.ok && outcome.state.live;
 
-  if (holdsLink && !live) return { kind: FEED_LIVE, lastFetchedAt: null };
+  // A landed turn-off is not undone by a read from before it.
+  if (freshness.turnedOff && !freshness.fresh) return { kind: FEED_NONE };
+  // A read from before the link was made says nothing of it, not even its last fetch.
+  if (holdsLink && (!live || !freshness.fresh)) return { kind: FEED_LIVE, lastFetchedAt: null };
   if (outcome === undefined) return { kind: FEED_LOADING };
   if (!outcome.ok) return { kind: FEED_UNAVAILABLE_VIEW };
   if (!outcome.state.live) return { kind: FEED_NONE };
 
   return { kind: FEED_LIVE, lastFetchedAt: outcome.state.lastFetchedAt };
+}
+
+/**
+ * Whether the link this visit holds was turned off elsewhere (by an admin, or
+ * on another device): a read made after the write landed answers it not
+ * live. The link is then dropped, never shown as working. A read that failed,
+ * or one from before the write, says nothing of it.
+ */
+export function feedHeldLinkLost(outcome: FeedStateOutcome | undefined, holdsLink: boolean, fresh: boolean): boolean {
+  return holdsLink && fresh && outcome !== undefined && outcome.ok && !outcome.state.live;
+}
+
+/** The held link dropped ({@link feedHeldLinkLost}); nothing else changes. */
+export function feedLinkDropped(state: FeedWriteState): FeedWriteState {
+  return state.token === null ? state : { ...state, token: null, focus: null };
 }
 
 /**

@@ -2390,6 +2390,7 @@
     "google": {
       "heading": "Google kalendar",
       "add": "Dodaj u Google kalendar",
+      "newTab": "(otvara se u novoj kartici)",
       "step1": "Kopiraj poveznicu ili pritisni Dodaj u Google kalendar.",
       "step2": "Otvori calendar.google.com u pregledniku: aplikacija Google kalendar na mobitelu ne može dodati kalendar po poveznici.",
       "step3": "Kod Ostali kalendari pritisni +, pa Iz URL-a.",
@@ -2416,7 +2417,7 @@
     "refused": "Ovu poveznicu ne možeš promijeniti.",
     "download": {
       "heading": "Preuzmi mjesec",
-      "lede": "Jednokratna datoteka .ics s tvojim radnim danima u mjesecu, za uvoz u bilo koji kalendar. Ne osvježava se sama. Mjesec biraš do 12 mjeseci unatrag ili unaprijed.",
+      "lede": "Jednokratna datoteka .ics s tvojim radnim danima u mjesecu, za uvoz u bilo koji kalendar. Ne osvježava se sama, a uz pretplatu na poveznicu radni bi se dani prikazali dvaput. Mjesec biraš do 12 mjeseci unatrag ili unaprijed.",
       "action": "Preuzmi .ics",
       "unavailable": "Raspored trenutačno nije moguće učitati.",
       "failed": "Ovaj mjesec trenutačno nije moguće preuzeti.",

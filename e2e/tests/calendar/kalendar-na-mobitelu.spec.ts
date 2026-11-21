@@ -1,7 +1,16 @@
+import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 import { ADMIN_STATE, MEMBER_STATE, readFixture } from '../../utils/run-fixture.ts';
-import { API_URL, createCalendarFeedTokenInSql, revokeCalendarFeedTokenInSql } from '../../utils/database-helper.ts';
+import {
+  API_URL,
+  createCalendarFeedTokenInSql,
+  holdCalendarFeed,
+  removeSeededRotation,
+  revokeCalendarFeedTokenInSql,
+  seedTeamRotation,
+  type RotationHold,
+} from '../../utils/database-helper.ts';
 import { hr } from '../../utils/i18n.ts';
 import { expect, test } from '../../utils/custom-fixtures.ts';
 
@@ -24,6 +33,24 @@ const FEED_URL = /\/functions\/v1\/calendar-feed\/([A-Za-z0-9_-]{43})\.ics$/;
 const feedUrl = (token: string): string => `${API_URL}/functions/v1/calendar-feed/${token}.ics`;
 
 test.describe.configure({ mode: 'serial' });
+
+/**
+ * The member's ONE link, held for each case ({@link holdCalendarFeed}): `calendar-feed.spec.ts` (16.4)
+ * creates and revokes the same member's link, in another worker.
+ */
+let feedHold: RotationHold | null = null;
+
+test.beforeEach(async ({ fixture }) => {
+  // Waiting for the other holder may take a while.
+  test.slow();
+  feedHold = holdCalendarFeed(fixture.slug);
+  await feedHold.ready;
+});
+
+test.afterEach(async () => {
+  await feedHold?.release();
+  feedHold = null;
+});
 
 test.describe('a member on a phone', () => {
   test.use({ storageState: MEMBER_STATE, ...PHONE });
@@ -88,11 +115,15 @@ test.describe('a member on a phone', () => {
       const second = FEED_URL.exec((await calendarFeedPage.url.textContent()) ?? '')?.[1] ?? '';
       expect(second).toHaveLength(43);
       expect(second).not.toBe(first);
+      // *Kopiraj* says whether it landed (the headless clipboard may refuse it; either line is its notice).
+      const copyNotice = calendarFeedPage.line(copy.copied).or(calendarFeedPage.line(copy.copyFailed));
+      await calendarFeedPage.button(copy.copy).click();
+      await expect(copyNotice).toBeVisible();
       // Regenerated again in the same visit: masked once more, no earlier copy notice.
       await calendarFeedPage.button(copy.regenerate).click();
       await calendarFeedPage.button(copy.regenerateConfirm).click();
       await expect(calendarFeedPage.url).toContainText('•');
-      await expect(calendarFeedPage.line(copy.copied)).toHaveCount(0);
+      await expect(copyNotice).toHaveCount(0);
       await calendarFeedPage.button(copy.show).click();
       const third = FEED_URL.exec((await calendarFeedPage.url.textContent()) ?? '')?.[1] ?? '';
       expect(third).not.toBe(second);
@@ -113,16 +144,26 @@ test.describe('a member on a phone', () => {
     }
   });
 
-  test('downloads a month as a .ics file', async ({ calendarFeedPage }) => {
-    await calendarFeedPage.goto();
-    const download = await calendarFeedPage.downloadMonth();
-    expect(download.suggestedFilename()).toMatch(/^shift-\d{4}-\d{2}\.ics$/);
-    const path = await download.path();
-    const text = readFileSync(path, 'utf8');
-    expect(text.startsWith('BEGIN:VCALENDAR\r\n')).toBe(true);
-    expect(text).not.toContain('REFRESH-INTERVAL');
-    const uids = text.replaceAll('\r\n ', '').match(/^UID:.*$/gm) ?? [];
-    for (const uid of uids) expect(uid).toMatch(/@shift-download$/);
+  test('downloads a month as a .ics file', async ({ calendarFeedPage, fixture, holdRotationForTeams }) => {
+    // The run seeds no rotation: the member's team gets one from today
+    // ([Dan, Noć, Slobodno, Slobodno]), so the current month has a working day.
+    await holdRotationForTeams(async () => {
+      const seeded = await seedTeamRotation(fixture.slug, fixture.team.id, randomBytes(3).toString('hex'));
+      try {
+        await calendarFeedPage.goto();
+        const download = await calendarFeedPage.downloadMonth();
+        expect(download.suggestedFilename()).toMatch(/^shift-\d{4}-\d{2}\.ics$/);
+        const text = readFileSync(await download.path(), 'utf8');
+        expect(text.startsWith('BEGIN:VCALENDAR\r\n')).toBe(true);
+        expect(text).not.toContain('REFRESH-INTERVAL');
+        const uids = text.replaceAll('\r\n ', '').match(/^UID:.*$/gm) ?? [];
+        // An empty file would pass the loop below.
+        expect(uids.length).toBeGreaterThan(0);
+        for (const uid of uids) expect(uid).toMatch(/@shift-download$/);
+      } finally {
+        await removeSeededRotation(seeded);
+      }
+    });
   });
 });
 
