@@ -2812,6 +2812,12 @@ describe('the access-control layer runs as the owner and hands that power to nob
     // devices, their settings rows and the organization's switch through
     // `private.reminder_email_on`, which no session may call.
     { name: 'reminder_channels', argumentCount: 0 },
+    // STORY 17.2 (0070). `remind`'s read gates the assembly to members with
+    // reminders on who are active today; its write re-checks and writes the
+    // outbox through `notify_members`; the cron job's call reads Vault.
+    { name: 'reminder_inputs', argumentCount: 0 },
+    { name: 'enqueue_shift_reminders', argumentCount: 1 },
+    { name: 'invoke_remind', argumentCount: 0, schema: 'private' },
   ];
 
   it.skipIf(noDatabase).each(ACCESS_CONTROL_FUNCTIONS)(
@@ -3061,6 +3067,13 @@ describe('the access-control layer runs as the owner and hands that power to nob
     // email predicate is nobody's: its callers are definers.
     { name: 'reminder_channels', argumentCount: 0, expected: ['authenticated'] },
     { name: 'reminder_email_on', argumentCount: 1, expected: [], schema: 'private' },
+    // STORY 17.2 (0070). `remind`'s two RPCs are `service_role`'s alone; the
+    // cron job's call and the two helpers are nobody's.
+    { name: 'reminder_inputs', argumentCount: 0, expected: ['service_role'] },
+    { name: 'enqueue_shift_reminders', argumentCount: 1, expected: ['service_role'] },
+    { name: 'invoke_remind', argumentCount: 0, expected: [], schema: 'private' },
+    { name: 'reminder_lead_on', argumentCount: 3, expected: [], schema: 'private' },
+    { name: 'reminder_starts_at', argumentCount: 1, expected: [], schema: 'private' },
   ];
 
   it.skipIf(noDatabase).each([
@@ -3118,6 +3131,10 @@ describe('the access-control layer runs as the owner and hands that power to nob
     // STORY 17.1 (0069). AD-18's email predicate runs as its caller, always a
     // definer owned by the migration role.
     { name: 'reminder_email_on', argumentCount: 1, schema: 'private' },
+    // STORY 17.2 (0070). The lead check and the `startsAt` reader run as their
+    // caller, always a definer owned by the migration role.
+    { name: 'reminder_lead_on', argumentCount: 3, schema: 'private' },
+    { name: 'reminder_starts_at', argumentCount: 1, schema: 'private' },
   ] as { name: string; argumentCount: number; schema?: string }[])('runs $name as the caller, with an empty search_path', async ({ name, argumentCount, schema }) => {
     // INVOKER, the opposite of the helper and the hook. They are reached from
     // the helper, the hook and the zero-admins function as the owner, and from

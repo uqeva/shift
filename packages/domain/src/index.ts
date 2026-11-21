@@ -221,18 +221,29 @@ export {
   checkTimeZone,
   instantOf,
   offsetMinutesAt,
+  reminderDueAt,
   utcIsoOf,
   zoneTransitionsOf,
   type ZoneTransition,
 } from './zone.js';
 
 export {
+  EVENING_BEFORE_MINUTE,
   MAX_REMINDER_LEADS,
+  REMINDER_LEAD_HOURS,
   REMINDER_LEADS,
   isReminderLead,
   reminderLeadsOf,
+  type ReminderHoursLead,
   type ReminderLead,
 } from './reminders.js';
+
+export {
+  REMINDER_WINDOW_AFTER_MS,
+  REMINDER_WINDOW_BEFORE_MS,
+  shiftRemindersDueOf,
+  type ShiftReminder,
+} from './shift-reminders.js';
 
 export {
   DEFAULT_HISTORY_PERIOD,

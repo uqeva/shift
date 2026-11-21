@@ -642,6 +642,8 @@ describe('deploy-images.sh: the image half of a deploy (story 20.6)', () => {
         'packages/ics/tsconfig.json',
         'packages/ics/tsconfig.test.json',
         'supabase/functions/calendar-feed',
+        // Story 17.2: the reminder job runs the same domain.
+        'supabase/functions/remind',
         'tsconfig.base.json',
         'pnpm-lock.yaml',
       ]),
@@ -1064,6 +1066,7 @@ describe('the pipeline deploys through Coolify (story 20.6)', () => {
       'SUPABASE_SECRET_KEY',
       'RESEND_API_KEY',
       'NOTIFY_INVOKE_SECRET',
+      'REMIND_INVOKE_SECRET',
       'VAPID_PRIVATE_KEY',
     ]) {
       expect(actionText, forbidden).not.toContain(forbidden);

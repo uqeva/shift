@@ -68,6 +68,72 @@ describe('runtime parity: the probe under Node (AD-19)', () => {
       ['2027-10-31T01:00:00Z', 120, 60],
     ]);
   });
+
+  it('covers every reminder lead on both transition dates of both years, and the reminders due around them (story 17.2)', async () => {
+    interface Due {
+      readonly lead: string;
+      readonly iso: string;
+    }
+    const answer = JSON.parse(await probeOverDist()) as {
+      reminders: {
+        dueAt: { zone: string; dates: { date: string; minutes: { minute: number; leads: Due[] }[] }[] }[];
+        due: { fixture: string; clocks: { iso: string; members: { memberId: string; reminders: Record<string, unknown>[] }[] }[] }[];
+      };
+    };
+    const zagreb = answer.reminders.dueAt.find((zone) => zone.zone === 'Europe/Zagreb');
+    const leadsOn = (date: string, minute: number): Record<string, string> =>
+      Object.fromEntries(
+        (zagreb?.dates.find((one) => one.date === date)?.minutes.find((one) => one.minute === minute)?.leads ?? []).map(
+          (due) => [due.lead, due.iso],
+        ),
+      );
+
+    expect(zagreb?.dates.map((one) => one.date)).toEqual(['2026-03-29', '2026-10-25', '2027-03-28', '2027-10-31']);
+    // Real hours before 07:00 across the gap and the overlap; 20:00 local the day before.
+    expect(leadsOn('2026-03-29', 420)).toEqual({
+      H1: '2026-03-29T04:00:00Z',
+      H2: '2026-03-29T03:00:00Z',
+      H3: '2026-03-29T02:00:00Z',
+      H6: '2026-03-28T23:00:00Z',
+      H12: '2026-03-28T17:00:00Z',
+      EVENING_BEFORE: '2026-03-28T19:00:00Z',
+    });
+    expect(leadsOn('2026-10-25', 420)).toMatchObject({ H3: '2026-10-25T03:00:00Z', H6: '2026-10-25T00:00:00Z' });
+    expect(leadsOn('2027-03-28', 420)).toMatchObject({ H6: '2027-03-27T23:00:00Z', EVENING_BEFORE: '2027-03-27T19:00:00Z' });
+    expect(leadsOn('2027-10-31', 1500)).toMatchObject({ H1: '2027-10-31T23:00:00Z', EVENING_BEFORE: '2027-10-30T18:00:00Z' });
+    // Sydney on its own spring date: 02:00 AEST jumps to 03:00 AEDT at 16:00Z the
+    // day before. 07:00 AEDT is 20:00Z; H6 reaches back across the gap to 14:00Z;
+    // the evening before is 20:00 AEST, 10:00Z.
+    const sydney = answer.reminders.dueAt.find((zone) => zone.zone === 'Australia/Sydney');
+    expect(sydney?.dates.map((one) => one.date)).toEqual(['2026-04-05', '2026-10-04', '2027-04-04', '2027-10-03']);
+    const sydneySpring = Object.fromEntries(
+      (sydney?.dates.find((one) => one.date === '2026-10-04')?.minutes.find((one) => one.minute === 420)?.leads ?? []).map((due) => [
+        due.lead,
+        due.iso,
+      ]),
+    );
+    expect(sydneySpring).toMatchObject({ H3: '2026-10-03T17:00:00Z', H6: '2026-10-03T14:00:00Z', EVENING_BEFORE: '2026-10-03T10:00:00Z' });
+
+    const pilot = answer.reminders.due.find((one) => one.fixture === 'pilot');
+    const spring = pilot?.clocks.find((clock) => clock.iso === '2026-03-29T02:00:00Z');
+    expect(spring?.members.find((member) => member.memberId === 'pilot-m5')?.reminders).toEqual([
+      {
+        memberId: 'pilot-m5',
+        date: '2026-03-29',
+        teamId: 'pilot-smjena-a',
+        shiftTypeId: 'pilot-dan',
+        lead: 'H3',
+        start: 420,
+        end: 1140,
+        startsAt: '2026-03-29T05:00:00Z',
+      },
+    ]);
+    const autumn = pilot?.clocks.find((clock) => clock.iso === '2027-10-31T00:00:00Z');
+    // A worked second half, from 13:00: twelve real hours before it.
+    expect(autumn?.members.find((member) => member.memberId === 'pilot-m1')?.reminders).toMatchObject([
+      { date: '2027-10-31', lead: 'H12', start: 780, startsAt: '2027-10-31T12:00:00Z' },
+    ]);
+  });
 });
 
 describe('runtime parity: the Deno half is the one a function would run (AD-7)', () => {

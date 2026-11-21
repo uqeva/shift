@@ -284,11 +284,14 @@ describe('the functions router (story 20.2): the table is config.toml’s', () =
       expect(enabled, `${name} is disabled in config.toml`).toBe(true);
       expect(FUNCTIONS.get(name)?.verifyJwt, `${name} verify_jwt`).toBe(verifyJwt);
     }
-    // As AD-14 counts them (remind joins in 17.2).
+    // As AD-14 counts them: exactly four (story 17.2).
+    expect([...FUNCTIONS.keys()].sort()).toEqual(['admin-auth', 'calendar-feed', 'notify', 'remind']);
     expect(FUNCTIONS.get('admin-auth')?.verifyJwt).toBe(true);
     expect(FUNCTIONS.get('notify')?.verifyJwt).toBe(false);
     // Story 16.4: public, the token in the path is the credential.
     expect(FUNCTIONS.get('calendar-feed')?.verifyJwt).toBe(false);
+    // Story 17.2: the cron job's invoke secret is the credential.
+    expect(FUNCTIONS.get('remind')?.verifyJwt).toBe(false);
   });
 
   it('gives each worker exactly the variables its own handler reads, and nothing of the other’s', () => {
@@ -306,6 +309,9 @@ describe('the functions router (story 20.2): the table is config.toml’s', () =
     expect(FUNCTIONS.get('notify')?.environment).not.toContain('SHIFT_PUBLISHABLE_KEY');
     // AD-17 (story 16.4): the feed reads past `anon`'s one grant with nothing.
     expect(FUNCTIONS.get('calendar-feed')?.environment).toEqual(['SUPABASE_URL', 'SHIFT_PUBLISHABLE_KEY']);
+    // AD-17 (story 17.2): exactly three, and none of notify's or the publishable key.
+    expect(FUNCTIONS.get('remind')?.environment).toEqual(['SUPABASE_URL', 'SHIFT_SECRET_KEY', 'REMIND_INVOKE_SECRET']);
+    expect(FUNCTIONS.get('notify')?.environment).not.toContain('REMIND_INVOKE_SECRET');
   });
 
   it('maps every function that imports a workspace package onto its built dist, where the image copies it (AD-7)', () => {
@@ -331,6 +337,8 @@ describe('the functions router (story 20.2): the table is config.toml’s', () =
       '@shift/domain',
       '@shift/ics',
     ]);
+    // Story 17.2: the reminder job imports the domain alone.
+    expect(Object.keys(JSON.parse(read('supabase', 'functions', 'remind', 'deno.json')).imports)).toEqual(['@shift/domain']);
   });
 });
 

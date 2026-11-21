@@ -46,8 +46,9 @@ coolify() { node "$here/coolify.mjs" "$@"; }
 # tsconfig and the lockfile. Never `dist` itself (untracked, so `git ls-tree`
 # cannot see it). Otherwise a change to the domain alone would reuse an image
 # running the old rules beside a new SPA. Story 16.4 adds `calendar-feed` and
-# `@shift/ics` (the serializer it bundles), on the same terms.
-FUNCTIONS_SOURCES=(deploy/functions supabase/functions/admin-auth supabase/functions/notify supabase/functions/calendar-feed .dockerignore scripts/ci/probe-functions-image.sh packages/domain/src packages/domain/package.json packages/domain/tsconfig.json packages/domain/tsconfig.test.json packages/ics/src packages/ics/package.json packages/ics/tsconfig.json packages/ics/tsconfig.test.json tsconfig.base.json pnpm-lock.yaml)
+# `@shift/ics` (the serializer it bundles), on the same terms; 17.2 adds
+# `remind`.
+FUNCTIONS_SOURCES=(deploy/functions supabase/functions/admin-auth supabase/functions/notify supabase/functions/calendar-feed supabase/functions/remind .dockerignore scripts/ci/probe-functions-image.sh packages/domain/src packages/domain/package.json packages/domain/tsconfig.json packages/domain/tsconfig.test.json packages/ics/src packages/ics/package.json packages/ics/tsconfig.json packages/ics/tsconfig.test.json tsconfig.base.json pnpm-lock.yaml)
 
 # Moves <repository>:<tag> to $1 and arms a trap that moves it back to what it
 # named before if the script then fails. Armed BEFORE the move, so a move whose

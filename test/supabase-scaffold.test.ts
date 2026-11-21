@@ -6,7 +6,14 @@ import { describe, expect, it } from 'vitest';
 import { parse as parseYaml } from 'yaml';
 
 import { NAME_WHITESPACE } from '../apps/web/src/utils/name.ts';
-import { HISTORY_HIDDEN_COLUMNS, MAX_REMINDER_LEADS, REMINDER_LEADS, historyFieldOfColumn } from '../packages/domain/src/index.ts';
+import {
+  EVENING_BEFORE_MINUTE,
+  HISTORY_HIDDEN_COLUMNS,
+  MAX_REMINDER_LEADS,
+  REMINDER_LEAD_HOURS,
+  REMINDER_LEADS,
+  historyFieldOfColumn,
+} from '../packages/domain/src/index.ts';
 
 import { collectFiles } from './source-scan.ts';
 
@@ -183,13 +190,13 @@ function coreSql(): string {
 }
 
 describe('supabase scaffold', () => {
-  it('holds the Edge Functions AD-14 names: the auth boundary, notify and calendar-feed (remind joins in 17.2)', () => {
+  it('holds exactly the four Edge Functions AD-14 names: the auth boundary, notify, calendar-feed and remind (story 17.2)', () => {
     const functions = readdirSync(join(supabaseRoot, 'functions'), { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
       .map((entry) => entry.name)
       .sort();
 
-    expect(functions).toEqual(['admin-auth', 'calendar-feed', 'notify']);
+    expect(functions).toEqual(['admin-auth', 'calendar-feed', 'notify', 'remind']);
   });
 
   it('declares both functions in config.toml, and notify takes no user JWT (story 10.1)', () => {
@@ -209,6 +216,11 @@ describe('supabase scaffold', () => {
     expect(section('calendar-feed')).toMatch(/^verify_jwt = false$/m);
     expect(section('calendar-feed')).toMatch(/^enabled = true$/m);
     expect(section('calendar-feed')).toMatch(/^import_map = "\.\/functions\/calendar-feed\/deno\.json"$/m);
+    // Story 17.2: the cron job's invoke secret is no JWT either; the domain
+    // through the function's own map (AD-7).
+    expect(section('remind')).toMatch(/^verify_jwt = false$/m);
+    expect(section('remind')).toMatch(/^enabled = true$/m);
+    expect(section('remind')).toMatch(/^import_map = "\.\/functions\/remind\/deno\.json"$/m);
   });
 
   it('numbers migrations 0001, 0002, … with no gaps and no duplicates', () => {
@@ -6342,5 +6354,189 @@ describe("a member's reminder choice (0069, story 17.1)", () => {
     expect(sql).not.toMatch(/record_audit_event|notification_outbox|filter_notification_outbox|claim_notifications/);
     expect(sql).not.toMatch(/reminder_inputs|enqueue_shift_reminders|cron\./);
     expect(sql.match(/create (or replace )?function/g), 'a function beyond the predicate and the read').toHaveLength(2);
+  });
+});
+
+describe('the reminder job (0070, story 17.2)', () => {
+  const read = (name: string): string => stripLineComments(readFileSync(join(supabaseRoot, 'migrations', name), 'utf8'));
+  const migration = (): string => read('0070_shift_reminders.sql');
+  /** One `create [or replace] function <name>(…` through its closing `$$;`. */
+  const bodyOf = (sql: string, name: string): string =>
+    new RegExp(`create (?:or replace )?function ${name.replace('.', '\\.')}\\([\\s\\S]*?\\$\\$;`).exec(sql)?.[0] ?? '';
+  const escaped = (text: string): string => text.replace(/[.()]/g, (c) => `\\${c}`);
+
+  /** Every function 0070 creates or replaces, its signature as `revoke` names it, and who may execute it. */
+  const FUNCTIONS: readonly (readonly [string, string, readonly string[]])[] = [
+    ['private.reminder_lead_on', 'uuid, uuid, text', []],
+    ['private.reminder_starts_at', 'jsonb', []],
+    ['public.reminder_inputs', '', ['service_role']],
+    ['public.enqueue_shift_reminders', 'jsonb', ['service_role']],
+    ['private.filter_notification_outbox', '', []],
+    ['private.invoke_remind', '', []],
+  ];
+
+  it('declares every function with an empty search_path and grants each to service_role alone, or to none', () => {
+    const sql = migration();
+    for (const [name, args, roles] of FUNCTIONS) {
+      expect(bodyOf(sql, name), `${name} is not declared`).toMatch(/set search_path = ''/);
+      const signature = `${name}(${args})`;
+      const revoked = ['public', 'anon', 'authenticated', 'service_role'].filter((role) => !roles.includes(role));
+      if (name !== 'private.invoke_remind') {
+        expect(sql, `${signature} keeps a default EXECUTE`).toContain(`revoke execute on function ${signature} from ${revoked.join(', ')};`);
+      }
+      expect(
+        [...sql.matchAll(new RegExp(`grant execute on function ${escaped(signature)} to (\\w+);`, 'g'))].map((match) => match[1]),
+        `${signature} is granted other than to its role`,
+      ).toEqual([...roles]);
+    }
+    for (const role of ['public', 'anon', 'authenticated', 'service_role']) {
+      expect(sql).toContain(`revoke execute on function private.invoke_remind() from ${role};`);
+    }
+    expect(sql, 'a function is granted to a session role').not.toMatch(/grant execute on function [^;]* to (anon|authenticated);/);
+    expect(sql, 'a table is created or granted').not.toMatch(/\bcreate table\b|\bgrant [^;]* on table\b|\bsend_after\b/);
+  });
+
+  it("gates the assembly to members with a lead on who are active in their organization's today, over today ± 1", () => {
+    const body = bodyOf(migration(), 'public.reminder_inputs');
+    expect(body).toMatch(/returns jsonb\s+language plpgsql\s+stable\s+security definer/);
+    expect(body).toContain('where pg_catalog.cardinality(r.leads) > 0');
+    expect(body).toContain('public.organization_today(r.organization_id) as today');
+    expect(body).toMatch(/where due\.today is not null\s+and public\.member_active_on\(due\.member_id, due\.today\);/);
+    expect(body).toContain("'window', pg_catalog.jsonb_build_object('from', due.today - 1, 'to', due.today + 1)");
+    expect(body).toContain("'inputs', private.member_schedule_inputs(due.member_id, due.today - 1, due.today + 1)");
+    expect(body.match(/private\.member_schedule_inputs\(/g), 'the assembly is reached twice').toHaveLength(1);
+    // One clock: the database's, in epoch milliseconds.
+    expect(body).toContain("'now', (extract(epoch from now()) * 1000)::bigint");
+    expect(new Set([...body.matchAll(/'(\w+)', /g)].map((match) => match[1]))).toEqual(
+      new Set(['memberId', 'leads', 'window', 'from', 'to', 'inputs', 'now', 'members']),
+    );
+  });
+
+  it("checks the item's shape, re-checks the state, names in SQL and writes through notify_members alone", () => {
+    const body = bodyOf(migration(), 'public.enqueue_shift_reminders');
+    // The argument's name is the wire contract: PostgREST matches the body's key to it.
+    expect(body.startsWith('create function public.enqueue_shift_reminders(p_items jsonb)')).toBe(true);
+    const handler = readFileSync(join(supabaseRoot, 'functions', 'remind', 'handler.ts'), 'utf8');
+    expect(handler).toContain("export const ENQUEUE_RPC = 'enqueue_shift_reminders';");
+    expect(handler).toContain('`${configuration.projectUrl}/rest/v1/rpc/${rpc}`');
+    expect(handler).toContain('await post(configuration.configuration, ENQUEUE_RPC, { p_items: chunk }, dependencies)');
+    expect(handler).toContain("export const INPUTS_RPC = 'reminder_inputs';");
+    expect(body).toMatch(/returns integer\s+language plpgsql\s+volatile\s+security definer/);
+    expect(body.match(/raise exception using errcode = 'invalid_parameter_value', message = 'REMINDER_ITEMS_INVALID';/g)?.length).toBeGreaterThanOrEqual(4);
+    expect(body, 'a raise other than the shape refusal').not.toMatch(/message = '(?!REMINDER_ITEMS_INVALID')/);
+    // The lead set is the domain's.
+    const set = /\(item ->> 'lead'\) = any\(array\[([^\]]*)\]::text\[\]\)/.exec(body)?.[1] ?? '';
+    expect(set.split(',').map((code) => code.trim().replace(/^'|'$/g, ''))).toEqual([...REMINDER_LEADS]);
+    expect(body).toContain("item ?& array['memberId', 'date', 'teamId', 'shiftTypeId', 'lead', 'start', 'end', 'startsAt']");
+    expect(body).toContain('(select pg_catalog.count(*) from pg_catalog.jsonb_object_keys(item)) <> 8');
+    // The re-check: every skip, and skips only (`continue`).
+    // An unknown today (no zone row) is a skip, never "active".
+    expect(body).toContain(
+      'v_today := case when v_organization is null then null else public.organization_today(v_organization) end;',
+    );
+    expect(body).toMatch(
+      /if v_organization is null\s+or v_today is null\s+or not public\.member_active_on\(v_member, v_today\)\s+or not private\.reminder_lead_on\(v_organization, v_member, v_lead\)\s+or v_starts_at <= now\(\)\s+or v_starts_at > now\(\) \+ interval '2 days' then\s+continue;/,
+    );
+    expect(body).toMatch(/from public\.teams t\s+where t\.organization_id = v_organization\s+and t\.id = v_team;/);
+    expect(body).toMatch(/from public\.shift_types s\s+where s\.organization_id = v_organization\s+and s\.id = v_shift_type;/);
+    expect(body).toMatch(/if v_team_name is null or v_shift_type_name is null then\s+continue;/);
+    // AD-18's key, computed here.
+    expect(body).toContain(
+      "'SHIFT_REMINDER:' || v_member::text || ':' || pg_catalog.to_char(v_date, 'YYYY-MM-DD') || ':' || v_team::text || ':' || v_lead",
+    );
+    expect(body).toMatch(/pg_catalog\.md5\(\s+'SHIFT_REMINDER:'[^\n]*\n\s+\)::uuid,/);
+    expect(body.match(/perform private\.notify_members\(/g), 'the write is not notify_members alone').toHaveLength(1);
+    expect(body).toMatch(/perform private\.notify_members\(\s+v_organization,\s+'SHIFT_REMINDER',/);
+    expect(body).not.toMatch(/notification_outbox/);
+    // The operands, and leadHours as the domain counts it.
+    expect(new Set([...body.matchAll(/'(\w+)', v_/g)].map((match) => match[1]))).toEqual(
+      new Set(['teamId', 'start', 'end', 'lead', 'shiftTypeName', 'teamName']),
+    );
+    expect(body).toContain("'date', pg_catalog.to_char(v_date, 'YYYY-MM-DD')");
+    expect(body).toContain(`'startsAt', pg_catalog.to_char(v_starts_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`);
+    expect(body).toMatch(
+      /when v_lead = 'EVENING_BEFORE' then '\{\}'::jsonb\s+else pg_catalog\.jsonb_build_object\('leadHours', pg_catalog\.substr\(v_lead, 2\)::integer\)/,
+    );
+    for (const [lead, hours] of Object.entries(REMINDER_LEAD_HOURS)) expect(Number(lead.slice(1)), lead).toBe(hours);
+    expect(Object.keys(REMINDER_LEAD_HOURS).sort()).toEqual(REMINDER_LEADS.filter((lead) => lead !== 'EVENING_BEFORE').sort());
+    expect(EVENING_BEFORE_MINUTE).toBe(20 * 60);
+  });
+
+  it('re-creates the latest filter and claim: no other migration defines them after their sources', () => {
+    const definers = (name: string): string[] =>
+      [...migrationNames()].sort().filter((file) =>
+        new RegExp(`create (?:or replace )?function ${name.replace('.', '\\.')}\\(`).test(read(file)),
+      );
+    expect(definers('private.filter_notification_outbox')).toEqual(['0044_notification_settings.sql', '0070_shift_reminders.sql']);
+    const claims = definers('public.claim_notifications');
+    expect(claims.filter((file) => file > '0046_notification_recipient_rules.sql')).toEqual(['0070_shift_reminders.sql']);
+    expect(claims).toContain('0046_notification_recipient_rules.sql');
+    expect(migrationNames().filter((file) => file > '0070_shift_reminders.sql').filter((file) =>
+      /function (?:private\.filter_notification_outbox|public\.claim_notifications|private\.notify_members)\(/.test(read(file)),
+    )).toEqual([]);
+  });
+
+  it("keeps 0044's filter and drops a reminder email while 0069's predicate is false", () => {
+    const ours = bodyOf(migration(), 'private.filter_notification_outbox');
+    const theirs = bodyOf(read('0044_notification_settings.sql'), 'private.filter_notification_outbox');
+    expect(theirs, "0044's filter is not found").not.toBe('');
+    const reminderClause =
+      "if new.code = 'SHIFT_REMINDER' and not private.reminder_email_on(new.recipient_member_id) then\n      return null;\n    end if;";
+    expect(ours).toContain(reminderClause);
+    const words = (body: string): string => body.replace(/\s+/g, ' ');
+    expect(words(ours.replace(reminderClause, '').replace('create or replace function', 'create function'))).toBe(words(theirs));
+  });
+
+  it("keeps every settle of 0046's claim and adds the three reminder settles, never returning such a row", () => {
+    const ours = bodyOf(migration(), 'public.claim_notifications');
+    const theirs = bodyOf(read('0046_notification_recipient_rules.sql'), 'public.claim_notifications');
+    expect(theirs, "0046's claim is not found").not.toBe('');
+    const signature = (body: string): string => /returns table \(([\s\S]*?)\)\nlanguage/.exec(body)?.[1] ?? '';
+    expect(signature(ours)).toBe(signature(theirs));
+    for (const settle of theirs.matchAll(/failure_code = '([A-Z_]+)'/g)) expect(ours).toContain(`failure_code = '${settle[1] ?? ''}'`);
+    expect(ours.match(/failure_code = '([A-Z_]+)'/g)).toEqual([
+      "failure_code = 'ATTEMPTS_EXHAUSTED'",
+      "failure_code = 'RECIPIENT_INACTIVE'",
+      "failure_code = 'REMINDER_EXPIRED'",
+      "failure_code = 'REMINDER_TURNED_OFF'",
+      "failure_code = 'EMAIL_TURNED_OFF'",
+      "failure_code = 'EMAIL_TURNED_OFF'",
+      "failure_code = 'PUSH_NO_SUBSCRIPTION'",
+    ]);
+    expect(ours).toContain("and not coalesce(now() < private.reminder_starts_at(c.operands), false)");
+    expect(ours).toContain("and not private.reminder_lead_on(c.organization_id, c.recipient_member_id, c.operands ->> 'lead')");
+    expect(ours).toContain('and not private.reminder_email_on(c.recipient_member_id)');
+    expect(ours).toMatch(
+      /c\.code <> 'SHIFT_REMINDER'\s+or \(\s+coalesce\(now\(\) < private\.reminder_starts_at\(c\.operands\), false\)\s+and private\.reminder_lead_on\(c\.organization_id, c\.recipient_member_id, c\.operands ->> 'lead'\)\s+and \(c\.channel <> 'email' or private\.reminder_email_on\(c\.recipient_member_id\)\)\s+\)/,
+    );
+    // Everything 0046 returned, and from where, unchanged.
+    const tail = (body: string): string => body.slice(body.indexOf('    returning o.id'));
+    expect(tail(ours)).toBe(tail(theirs));
+    const sql = migration();
+    expect(sql).toContain('revoke execute on function public.claim_notifications(integer) from public;');
+    expect(sql).toContain('revoke execute on function public.claim_notifications(integer) from anon;');
+    expect(sql).toContain('revoke execute on function public.claim_notifications(integer) from authenticated;');
+    expect(sql).toContain('grant execute on function public.claim_notifications(integer) to service_role;');
+    // An unreadable `startsAt` is null, so expired.
+    const startsAt = bodyOf(sql, 'private.reminder_starts_at');
+    expect(startsAt).toContain("raw !~ '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$'");
+    expect(startsAt).toMatch(/exception\s+when others then\s+return null;/);
+    expect(bodyOf(sql, 'private.reminder_lead_on')).toContain('and p_lead = any(r.leads)');
+  });
+
+  it("copies 0042's invoke_notify for remind's Vault names, writes no secret, and schedules it every five minutes", () => {
+    const sql = migration();
+    const ours = bodyOf(sql, 'private.invoke_remind');
+    const theirs = bodyOf(read('0042_notification_outbox.sql'), 'private.invoke_notify');
+    expect(theirs, "0042's invoke_notify is not found").not.toBe('');
+    expect(ours).toBe(
+      theirs
+        .replace('private.invoke_notify()', 'private.invoke_remind()')
+        .replace("'notify_url'", "'remind_url'")
+        .replace("'notify_invoke_secret'", "'remind_invoke_secret'"),
+    );
+    expect(sql).toContain("select cron.schedule('remind', '*/5 * * * *', 'select private.invoke_remind()');");
+    expect(sql.match(/cron\.schedule\(/g)).toHaveLength(1);
+    expect(sql, 'a migration writes a Vault secret').not.toMatch(/vault\.(create|update)_secret|insert into vault\./);
   });
 });
