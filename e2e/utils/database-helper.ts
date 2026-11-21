@@ -1222,6 +1222,17 @@ export function holdCalendarFeed(slug: string): RotationHold {
 }
 
 /**
+ * The run member's and admin's notification settings, held by one test at a
+ * time (story 17.1): `settings.spec.ts` (10.3, 10.4) sets their recorded
+ * address, their email row and their devices, and `reminders.spec.ts` (17.1)
+ * reads its channel line off the same facts, in another worker. Under the
+ * same bounded, session-level advisory lock as {@link holdRotation}.
+ */
+export function holdNotificationSettings(slug: string): RotationHold {
+  return holdLock(`e2e-notification-settings:${slug}`, async () => undefined);
+}
+
+/**
  * Annual leave's fixed id and seeded name (`0052`), which every organization
  * holds. The name is also *Sati*'s annual leave column (story 13.2), declared
  * once beside the resource file's labels.
@@ -2467,6 +2478,130 @@ export async function removePushEndpointInSql(endpoint: string): Promise<void> {
   const client = await connect();
   try {
     await client.query('delete from push_subscriptions where endpoint = $1', [endpoint]);
+  } finally {
+    await client.end();
+  }
+}
+
+/** What {@link holdReminderSettingsInSql} found, for {@link restoreReminderSettingsInSql}. */
+export interface HeldReminderSettings {
+  readonly memberId: string;
+  /** Their own `reminder_settings` row, or `null` when they had none. */
+  readonly row: { readonly leads: readonly string[]; readonly email: boolean } | null;
+}
+
+/**
+ * Story 17.1: removes the run organization's member `username`'s own
+ * reminder row, so the case starts with reminders off (no row is off, D4).
+ * Answers it as it was, for {@link restoreReminderSettingsInSql}. The row goes
+ * with its member (`on delete cascade`), so the run's teardown needs nothing.
+ */
+export async function holdReminderSettingsInSql(slug: string, username: string): Promise<HeldReminderSettings> {
+  const client = await connect();
+  try {
+    const before = await client.query<{ id: string; leads: string[] | null; email: boolean | null }>(
+      `select m.id::text as id, r.leads, r.email
+         from members m
+         join organizations o on o.id = m.organization_id
+         left join reminder_settings r on r.organization_id = m.organization_id and r.member_id = m.id
+        where o.slug = $1 and m.username = $2`,
+      [slug, username],
+    );
+    const found = before.rows[0];
+    if (found === undefined) throw new Error(`E2E: no member ${username} in ${slug}`);
+    await client.query('delete from reminder_settings where member_id = $1', [found.id]);
+
+    return {
+      memberId: found.id,
+      row: found.leads === null || found.email === null ? null : { leads: found.leads, email: found.email },
+    };
+  } finally {
+    await client.end();
+  }
+}
+
+/** Puts back the reminder row {@link holdReminderSettingsInSql} found. */
+export async function restoreReminderSettingsInSql(held: HeldReminderSettings): Promise<void> {
+  const client = await connect();
+  try {
+    await client.query('delete from reminder_settings where member_id = $1', [held.memberId]);
+    if (held.row !== null) {
+      await client.query(
+        `insert into reminder_settings (organization_id, member_id, leads, email)
+         select organization_id, id, $2::text[], $3 from members where id = $1`,
+        [held.memberId, held.row.leads, held.row.email],
+      );
+    }
+  } finally {
+    await client.end();
+  }
+}
+
+/** What {@link holdPushDevicesInSql} removed, for {@link restorePushDevicesInSql}. */
+export interface HeldPushDevices {
+  readonly rows: readonly {
+    readonly organizationId: string;
+    readonly memberId: string;
+    readonly endpoint: string;
+    readonly p256dh: string;
+    readonly auth: string;
+  }[];
+}
+
+/**
+ * Story 17.1: removes every push device of the member `username`, so the case
+ * starts with no push channel, and answers them for {@link restorePushDevicesInSql}.
+ */
+export async function holdPushDevicesInSql(slug: string, username: string): Promise<HeldPushDevices> {
+  const client = await connect();
+  try {
+    const { rows } = await client.query<HeldPushDevices['rows'][number]>(
+      `delete from push_subscriptions s
+        using members m, organizations o
+        where m.organization_id = s.organization_id and m.id = s.member_id
+          and o.id = m.organization_id and o.slug = $1 and m.username = $2
+        returning s.organization_id::text as "organizationId", s.member_id::text as "memberId",
+                  s.endpoint, s.p256dh, s.auth`,
+      [slug, username],
+    );
+    return { rows };
+  } finally {
+    await client.end();
+  }
+}
+
+/** Puts back the devices {@link holdPushDevicesInSql} removed (an endpoint registered since wins). */
+export async function restorePushDevicesInSql(held: HeldPushDevices): Promise<void> {
+  const client = await connect();
+  try {
+    for (const row of held.rows) {
+      await client.query(
+        `insert into push_subscriptions (organization_id, member_id, endpoint, p256dh, auth)
+         values ($1, $2, $3, $4, $5) on conflict (endpoint) do nothing`,
+        [row.organizationId, row.memberId, row.endpoint, row.p256dh, row.auth],
+      );
+    }
+  } finally {
+    await client.end();
+  }
+}
+
+/** Story 17.1: the member `username`'s stored reminder row, or `null`. */
+export async function reminderSettingsOf(
+  slug: string,
+  username: string,
+): Promise<{ leads: string[]; email: boolean } | null> {
+  const client = await connect();
+  try {
+    const { rows } = await client.query<{ leads: string[]; email: boolean }>(
+      `select r.leads, r.email
+         from reminder_settings r
+         join members m on m.organization_id = r.organization_id and m.id = r.member_id
+         join organizations o on o.id = m.organization_id
+        where o.slug = $1 and m.username = $2`,
+      [slug, username],
+    );
+    return rows[0] ?? null;
   } finally {
     await client.end();
   }

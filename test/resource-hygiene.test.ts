@@ -2499,6 +2499,37 @@ const SANCTIONED_SCREEN_KEYS = [
   'postavkeObavijesti.pushStatusOn',
   'postavkeObavijesti.pushStatusOff',
   'postavkeObavijesti.pushNotConfigured',
+  // STORY 17.1 (UX-DR57): *Podsjetnici*, the third card on `/obavijesti`: the
+  // six leads in their order, the limit line, the reminder email switch, the
+  // channel line (or that none is available), why email reminders are not
+  // sent, and the card's own states, its retry and its save failure included
+  // (review 1: all of the card's copy in `reminders`).
+  'reminders.heading',
+  'reminders.lede',
+  'reminders.leadsLabel',
+  'reminders.lead.h1',
+  'reminders.lead.h2',
+  'reminders.lead.h3',
+  'reminders.lead.h6',
+  'reminders.lead.h12',
+  'reminders.lead.eveningBefore',
+  'reminders.limit',
+  'reminders.emailChoice',
+  'reminders.off',
+  'reminders.channelBoth',
+  'reminders.channelPush',
+  'reminders.channelEmail',
+  'reminders.channelNone',
+  'reminders.channelNoneEmailOn',
+  'reminders.emailNoAddress',
+  'reminders.emailOrganizationOff',
+  'reminders.emailOff',
+  'reminders.emailUnreachable',
+  'reminders.saved',
+  'reminders.loading',
+  'reminders.unavailable',
+  'reminders.retry',
+  'reminders.saveFailed',
   // STORY 12.2. A member proposes a swap: *Predloži zamjenu* in the day
   // detail's footer and the surface's heading, back link and lede; the given
   // shift, the colleague and return fields with their options, hint and the

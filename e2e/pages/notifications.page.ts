@@ -88,6 +88,35 @@ export class NotificationsPage extends BasePage {
     return this.pushSection.getByRole('alert').filter({ hasText: copy.saveFailed });
   }
 
+  /** Story 17.1: the *Podsjetnici* section. */
+  get remindersSection(): Locator {
+    return this.page.getByRole('region', { name: hr.reminders.heading, exact: true });
+  }
+
+  /** One lead's switch, by its label. */
+  reminderLead(label: string): Locator {
+    return this.remindersSection.getByRole('switch', { name: label, exact: true });
+  }
+
+  /** Every switch of the reminders section: six leads and the email one. */
+  get reminderSwitches(): Locator {
+    return this.remindersSection.getByRole('switch');
+  }
+
+  get reminderEmail(): Locator {
+    return this.remindersSection.getByRole('switch', { name: hr.reminders.emailChoice, exact: true });
+  }
+
+  /** A line of the reminders section, by its exact text. */
+  reminderLine(text: string): Locator {
+    return this.remindersSection.getByText(text, { exact: true });
+  }
+
+  /** The reminders section's failed save. */
+  get reminderFailed(): Locator {
+    return this.remindersSection.getByRole('alert').filter({ hasText: copy.saveFailed });
+  }
+
   /** The address, shown read-only. */
   address(text: string): Locator {
     return this.page.getByText(text, { exact: true });

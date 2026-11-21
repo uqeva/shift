@@ -30,6 +30,7 @@ import { SESSION_SUBJECT_KEY } from '@/features/members/services/write';
 import { MEMBER_NAME_KEY } from '@/features/navigation/services/profile';
 import { MEMBER_ROLE_KEY } from '@/features/navigation/services/role';
 import { NOTIFICATION_SETTINGS_KEY } from '@/features/notifications/services/settings';
+import { REMINDER_CHANNELS_KEY, REMINDER_SETTINGS_KEY } from '@/features/notifications/services/reminders';
 import { CALENDAR_FEED_KEY, MEMBER_CALENDAR_FEED_KEY } from '@/features/calendar-feed/services/feed';
 import { ORGANIZATION_SNAPSHOT_KEY } from '@/features/organization/services/snapshot';
 import { ACTING_ADMINS_KEY } from '@/features/conflicts/services/resolved-conflicts';
@@ -131,6 +132,12 @@ const CLASSIFIED: Readonly<Record<string, readonly QueryKey[]>> = {
   // write re-reads it (`saveEmailNotifications`), and each visit to
   // `/obavijesti` reads it again.
   NOTIFICATION_SETTINGS_KEY: [NOTIFICATION_SETTINGS_KEY],
+  // Story 17.1: the person's own reminder choice and its channel line. No
+  // team, membership, member or leave write here names either; the channel
+  // line is read again after a landed email, push or reminder write on
+  // `/obavijesti`, and both on each visit.
+  REMINDER_SETTINGS_KEY: [REMINDER_SETTINGS_KEY],
+  REMINDER_CHANNELS_KEY: [REMINDER_CHANNELS_KEY],
   // Story 16.5: the viewer's calendar link state and an admin's read of a
   // member's. No other write names either: each is read again on every
   // visit, and the link's own writes re-read it themselves.

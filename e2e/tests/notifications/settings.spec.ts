@@ -4,10 +4,12 @@ import { ADMIN_STATE, MEMBER_STATE, readFixture } from '../../utils/run-fixture.
 import {
   emailNotificationsOf,
   holdMemberEmailInSql,
+  holdNotificationSettings,
   pushEndpointsOf,
   removePushEndpointInSql,
   restoreMemberEmailInSql,
   setEmailNotificationsInSql,
+  type RotationHold,
 } from '../../utils/database-helper.ts';
 import { hr } from '../../utils/i18n.ts';
 import { expect, test } from '../../utils/custom-fixtures.ts';
@@ -103,6 +105,25 @@ function prompts(page: Page): Promise<number> {
 }
 
 test.describe.configure({ mode: 'serial' });
+
+/**
+ * The run's notification settings, held for each case ({@link holdNotificationSettings}):
+ * `reminders.spec.ts` (17.1) reads its channel line off the same member's
+ * address, email row and devices, in another worker.
+ */
+let settingsHold: RotationHold | null = null;
+
+test.beforeEach(async () => {
+  // Waiting for the other holder may take a while.
+  test.slow();
+  settingsHold = holdNotificationSettings(readFixture().slug);
+  await settingsHold.ready;
+});
+
+test.afterEach(async () => {
+  await settingsHold?.release();
+  settingsHold = null;
+});
 
 test.describe('a member on a phone, from Više', () => {
   test.use({ storageState: MEMBER_STATE, ...PHONE });
