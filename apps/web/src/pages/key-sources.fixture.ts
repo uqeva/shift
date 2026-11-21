@@ -61,6 +61,7 @@ import {
   MEMBER_FEED_CARD,
   ORGANIZATION_HOURS_KEYS,
   PUSH_KEYS,
+  REMINDER_KEYS,
   ORGANIZATION_MESSAGE_KEYS,
   POSITION_KEYS,
   RANK_KEYS,
@@ -1327,10 +1328,15 @@ export const KEY_SOURCES = [
     // line and its retry, its lede, its control's label, its two options and
     // its failure notice. Its saved line comes through `pushStatusMessageKey`.
     // TWENTY-SIX: the line a build with no VAPID public key shows.
+    // THIRTY-SEVEN SINCE STORY 17.1: the reminders card's heading, its loading
+    // words, the unavailable line and its retry (`reminders.retry`), its lede, the leads' label,
+    // the limit line, the email switch's label, the off line, its failure
+    // notice and its saved line. The leads' labels and the channel lines come
+    // through `reminders.ts`'s unions, the entry for the reminder rules.
     name: 'the notification settings screen',
     file: NOTIFICATIONS,
     keys: translationKeys,
-    strings: 26,
+    strings: 37,
   },
   {
     // STORY 16.5. On *Kalendar na mobitelu*: the heading, the link card's
@@ -1383,6 +1389,16 @@ export const KEY_SOURCES = [
     file: CALENDAR_FEED_COPY_KEYS,
     keys: messageKeyUnions,
     strings: 2,
+  },
+  {
+    // STORY 17.1: the six leads' labels (`leadMessageKey`), the five channel
+    // lines (`channelMessageKey`, the no-channel line in two forms by the
+    // email switch) and the four reasons email reminders are not sent
+    // (`emailUnreachableMessageKey`).
+    name: 'the reminder settings rules',
+    file: REMINDER_KEYS,
+    keys: messageKeyUnions,
+    strings: 15,
   },
   {
     // STORY 10.4: the push section's two saved lines, off `pushStatusMessageKey`.

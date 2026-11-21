@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { pagePush, pushBackend, vapidPublicKey } from '@/features/notifications/services/page-push';
@@ -15,6 +16,7 @@ import {
   whenVisibleAgain,
   type PushDevice,
 } from '@/features/notifications/services/push';
+import { REMINDER_CHANNELS_KEY } from '@/features/notifications/services/reminders';
 import { INSTALL_IOS } from '@/lib/pwa/install';
 import { useInstall } from '@/lib/pwa/use-install';
 import { writesOnline } from '@/lib/offline/use-write-gate';
@@ -35,6 +37,7 @@ import { writesOnline } from '@/lib/offline/use-write-gate';
  * into view: the permission may have changed in the browser's settings.
  */
 export function usePushSettings() {
+  const queryClient = useQueryClient();
   const install = useInstall();
   const [device, setDevice] = useState<PushDevice | undefined>(undefined);
   const [reading, setReading] = useState(false);
@@ -106,6 +109,10 @@ export function usePushSettings() {
     } finally {
       saving.current = false;
       setPending(null);
+      // Story 17.1: the reminders' channel line follows this member's
+      // devices, also after a write that failed part way (a device row may
+      // have been written or removed before the failure).
+      void queryClient.invalidateQueries({ queryKey: REMINDER_CHANNELS_KEY });
     }
   }
 

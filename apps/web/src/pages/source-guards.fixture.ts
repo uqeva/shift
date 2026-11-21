@@ -366,6 +366,9 @@ export const CALENDAR_FEED_COPY_KEYS = join(CALENDAR_FEED_FEATURE, 'utils', 'cop
 /** Story 10.4: the push section's rules, its saved lines off one `\w*MessageKey` union. */
 export const PUSH_KEYS = join(NOTIFICATIONS_FEATURE, 'services', 'push.ts');
 
+/** Story 17.1: the reminders section's rules, the leads' labels and the channel lines off `\w*MessageKey` unions. */
+export const REMINDER_KEYS = join(NOTIFICATIONS_FEATURE, 'services', 'reminders.ts');
+
 /** Story 5.4b's rules: the resolution screen's facts, strip and lines, off `\w*MessageKey` unions. */
 export const RESOLUTION_SCREEN_KEYS = join(CONFLICTS_FEATURE, 'services', 'resolution-screen.ts');
 
@@ -1223,8 +1226,10 @@ export const SCREENS = [
   // STORY 10.3. ONE on *Obavijesti*: the unavailable alert's retry. The email
   // on/off is a radio group, never a `<Button>`, and the address is shown,
   // never a field: the count is what notices an address input arriving.
-  // Two buttons since story 10.4: each section's retry.
-  { name: 'the notification settings screen', file: NOTIFICATIONS, expectedFields: 0, expectedButtons: 2 },
+  // Two buttons since story 10.4: each section's retry. Three since story
+  // 17.1: the reminders card's retry; its seven switches are `Switch`es,
+  // never a `<Button>` or a field.
+  { name: 'the notification settings screen', file: NOTIFICATIONS, expectedFields: 0, expectedButtons: 3 },
   // STORY 16.5. On *Kalendar na mobitelu*, no field (the URL is shown, never
   // an input) and TWELVE buttons, each written once: the link card's write
   // (*Izradi poveznicu*, *Izradi novu poveznicu*, *Isključi*, one element),

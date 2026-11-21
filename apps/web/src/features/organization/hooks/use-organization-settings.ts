@@ -68,6 +68,7 @@ import {
 import { ORGANIZATION_ERROR_ID, offersReadRetry } from '@/features/organization/utils/messages';
 import { enteredCarryOver } from '@/features/organization/utils/carry-over';
 import { enteredMinimumMembers } from '@/features/organization/utils/minimum-members';
+import { REMINDER_CHANNELS_KEY } from '@/features/notifications/services/reminders';
 import { NOTIFICATION_SETTINGS_KEY } from '@/features/notifications/services/settings';
 import { offlineNoteOf } from '@/lib/offline/freshness';
 import { useSnapshotFreshness } from '@/lib/offline/use-snapshot-freshness';
@@ -468,11 +469,12 @@ export function useOrganizationSettings() {
    * already in flight can still send.
    */
   async function saveEmailNotifications(on: boolean): Promise<void> {
-    // `/obavijesti` reads this switch, so a landed write re-reads it too.
+    // `/obavijesti` reads this switch, so a landed write re-reads it too, and
+    // the reminders' channel line (story 17.1) with it.
     await write(
       EMAIL_NOTIFICATIONS_DIALOG,
       (row) => updateOrganization(organizationTable(), row.id, { emailNotifications: on }),
-      [NOTIFICATION_SETTINGS_KEY],
+      [NOTIFICATION_SETTINGS_KEY, REMINDER_CHANNELS_KEY],
     );
   }
 

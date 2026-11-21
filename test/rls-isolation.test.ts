@@ -942,7 +942,7 @@ describe('the access-control layer is present, so nothing below passes vacuously
       );
       expect(
         policies.map((row) => row.policyname),
-        'stories 1.3a, 1.4a, 1.6, 1.7a, 1.7b, 2.1a, 2.2a, 2.3a, 3.5a, 3.6a, 5.1b, 5.4a, 9.2, 10.3, 10.4, 12.1, 13.1, 13.2, 13.3, 14.1, 18.2 and 0025 own exactly these policies; a missing one refuses silently and looks like a working refusal',
+        'stories 1.3a, 1.4a, 1.6, 1.7a, 1.7b, 2.1a, 2.2a, 2.3a, 3.5a, 3.6a, 5.1b, 5.4a, 9.2, 10.3, 10.4, 12.1, 13.1, 13.2, 13.3, 14.1, 17.1, 18.2 and 0025 own exactly these policies; a missing one refuses silently and looks like a working refusal',
       ).toEqual([
         // STORY 13.1 (0052): an active admin defines and renames a type or
         // sets its drawing flag. No delete. STORY 13.2 (0053, PO Q2): every
@@ -1007,6 +1007,11 @@ describe('the access-control layer is present, so nothing below passes vacuously
         // member alone; registered only through `register_push_subscription`.
         'push_subscriptions_delete_own',
         'push_subscriptions_select_own',
+        // STORY 17.1 (0069): the member's own reminder choice, on 0044's
+        // terms. No delete.
+        'reminder_settings_insert_own',
+        'reminder_settings_select_own',
+        'reminder_settings_update_own',
         // STORY 3.6a: read and insert alone, and both an active admin's only,
         // as 3.5a's; members read the live rows through
         // `calendar_roster_overrides`. No update and no delete.

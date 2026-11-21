@@ -701,7 +701,7 @@ describe('every organization table carries row level security, and only its revi
               'leave_request_decisions', 'notification_outbox', 'notification_settings',
               'push_subscriptions', 'swap_requests', 'swap_request_decisions',
               'absence_types', 'leave_allowances', 'audit_events', 'team_loans',
-              'calendar_feed_tokens'
+              'calendar_feed_tokens', 'reminder_settings'
             )
           order by relname`,
       );
@@ -737,6 +737,8 @@ describe('every organization table carries row level security, and only its revi
         'organizations',
         // STORY 10.4 (0045): a member's devices, own rows only.
         'push_subscriptions',
+        // STORY 17.1 (0069): a member's own reminder choice, own row only.
+        'reminder_settings',
         'roster_overrides',
         'rotation_assignments',
         'rotation_patterns',
@@ -817,6 +819,40 @@ describe('every organization table carries row level security, and only its revi
           .map((row) => `${row.verb}:${row.column}`)
           .sort(),
       ).toEqual(['INSERT:email', 'INSERT:member_id', 'INSERT:organization_id', 'UPDATE:email']);
+    } finally {
+      await client.end();
+    }
+  });
+
+  it.skipIf(noDatabase)('holds no privilege on reminder_settings but its own row read and its column writes (0069)', async () => {
+    // STORY 17.1, on 0044's terms: `authenticated` reads (the policy narrows
+    // it to the own row), inserts the four facts and updates `leads` and
+    // `email` alone. No delete; `anon` nothing.
+    const client = await connect();
+    try {
+      const { rows } = await client.query<{ role: string; privilege: string; held: boolean }>(
+        `select role, privilege,
+                has_table_privilege(role, 'public.reminder_settings', privilege) as held
+           from unnest(array['anon', 'authenticated']) as role,
+                unnest(array['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'])
+                  as privilege`,
+      );
+      expect(rows.filter((row) => row.held).map((row) => `${row.role}:${row.privilege}`).sort()).toEqual([
+        'authenticated:SELECT',
+      ]);
+
+      const { rows: columns } = await client.query<{ column: string; verb: string; held: boolean }>(
+        `select column_name as column, verb,
+                has_column_privilege('authenticated', 'public.reminder_settings', column_name, verb) as held
+           from unnest(array['organization_id', 'member_id', 'leads', 'email', 'updated_at']) as column_name,
+                unnest(array['INSERT', 'UPDATE']) as verb`,
+      );
+      expect(
+        columns
+          .filter((row) => row.held)
+          .map((row) => `${row.verb}:${row.column}`)
+          .sort(),
+      ).toEqual(['INSERT:email', 'INSERT:leads', 'INSERT:member_id', 'INSERT:organization_id', 'UPDATE:email', 'UPDATE:leads']);
     } finally {
       await client.end();
     }
@@ -2531,7 +2567,8 @@ describe('every organization table carries row level security, and only its revi
       const { rows: excluded } = await client.query<{ tgname: string }>(
         `select tgname from pg_trigger
           where tgrelid in ('public.audit_events'::regclass, 'public.notification_outbox'::regclass,
-                            'public.notification_settings'::regclass, 'public.push_subscriptions'::regclass)
+                            'public.notification_settings'::regclass, 'public.push_subscriptions'::regclass,
+                            'public.reminder_settings'::regclass)
             and tgfoid = 'private.record_audit_event()'::regprocedure`,
       );
       expect(excluded, 'an excluded table is recorded').toEqual([]);
@@ -2771,6 +2808,10 @@ describe('the access-control layer runs as the owner and hands that power to nob
     // STORY 19.2 (0068). The email identity's username trigger reads the
     // member's `auth.users` address, which no session role may read.
     { name: 'refuse_username_change_of_email_identity', argumentCount: 0, schema: 'private' },
+    // STORY 17.1 (0069). The caller's own reminder channels read their
+    // devices, their settings rows and the organization's switch through
+    // `private.reminder_email_on`, which no session may call.
+    { name: 'reminder_channels', argumentCount: 0 },
   ];
 
   it.skipIf(noDatabase).each(ACCESS_CONTROL_FUNCTIONS)(
@@ -3016,6 +3057,10 @@ describe('the access-control layer runs as the owner and hands that power to nob
     // the trigger that holds it; their callers are the trigger and definers.
     { name: 'email_identity_username', argumentCount: 1, expected: [], schema: 'private' },
     { name: 'refuse_username_change_of_email_identity', argumentCount: 0, expected: [], schema: 'private' },
+    // STORY 17.1 (0069). A member's own channels are `authenticated`'s; AD-18's
+    // email predicate is nobody's: its callers are definers.
+    { name: 'reminder_channels', argumentCount: 0, expected: ['authenticated'] },
+    { name: 'reminder_email_on', argumentCount: 1, expected: [], schema: 'private' },
   ];
 
   it.skipIf(noDatabase).each([
@@ -3070,6 +3115,9 @@ describe('the access-control layer runs as the owner and hands that power to nob
     { name: 'lock_calendar_feed_tokens', argumentCount: 1, schema: 'private' },
     { name: 'calendar_feed_state', argumentCount: 2, schema: 'private' },
     { name: 'calendar_feed_member_live', argumentCount: 2, schema: 'private' },
+    // STORY 17.1 (0069). AD-18's email predicate runs as its caller, always a
+    // definer owned by the migration role.
+    { name: 'reminder_email_on', argumentCount: 1, schema: 'private' },
   ] as { name: string; argumentCount: number; schema?: string }[])('runs $name as the caller, with an empty search_path', async ({ name, argumentCount, schema }) => {
     // INVOKER, the opposite of the helper and the hook. They are reached from
     // the helper, the hook and the zero-admins function as the owner, and from

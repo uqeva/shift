@@ -2563,5 +2563,35 @@
       "signOut": "Odjava",
       "signOutError": "Odjava trenutačno nije moguća. Pokušaj ponovno."
     }
+  },
+  "reminders": {
+    "heading": "Podsjetnici",
+    "lede": "Javljamo ti prije nego što počneš raditi, na tvoje uređaje s uključenim obavijestima ili e-poštom. Odaberi najviše dva podsjetnika.",
+    "leadsLabel": "Kada te podsjetiti",
+    "lead": {
+      "h1": "1 h prije",
+      "h2": "2 h prije",
+      "h3": "3 h prije",
+      "h6": "6 h prije",
+      "h12": "12 h prije",
+      "eveningBefore": "večer prije u 20:00"
+    },
+    "limit": "Uključena su dva podsjetnika, koliko je najviše moguće. Isključi jedan da uključiš drugi.",
+    "emailChoice": "Podsjetnici e-poštom",
+    "off": "Podsjetnici su isključeni.",
+    "channelBoth": "Podsjetnike šaljemo na tvoje uređaje s uključenim obavijestima i e-poštom.",
+    "channelPush": "Podsjetnike šaljemo na tvoje uređaje s uključenim obavijestima.",
+    "channelEmail": "Podsjetnike šaljemo e-poštom.",
+    "channelNone": "Podsjetnici trenutačno nemaju kamo stići. Uključi obavijesti na uređaju ili podsjetnike e-poštom.",
+    "channelNoneEmailOn": "Podsjetnici trenutačno nemaju kamo stići: nijedan tvoj uređaj nema uključene obavijesti, a e-poštom se ne šalju. Uključi obavijesti na uređaju ili provjeri postavke pod E-pošta.",
+    "emailNoAddress": "Podsjetnici e-poštom ne šalju se jer nemaš upisan e-mail.",
+    "emailOrganizationOff": "Podsjetnici e-poštom ne šalju se jer tvoja organizacija ne šalje obavijesti e-poštom.",
+    "emailOff": "Podsjetnici e-poštom ne šalju se jer su obavijesti e-poštom isključene. Uključuju se gore, pod E-pošta.",
+    "emailUnreachable": "Podsjetnici e-poštom trenutačno se ne šalju. Provjeri postavke pod E-pošta.",
+    "saved": "Podsjetnici su spremljeni.",
+    "loading": "Učitavanje podsjetnika",
+    "unavailable": "Podsjetnike trenutačno nije moguće prikazati.",
+    "retry": "Pokušaj ponovno",
+    "saveFailed": "Spremanje trenutačno nije moguće. Pokušaj ponovno."
   }
 }

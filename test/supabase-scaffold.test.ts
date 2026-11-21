@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { parse as parseYaml } from 'yaml';
 
 import { NAME_WHITESPACE } from '../apps/web/src/utils/name.ts';
-import { HISTORY_HIDDEN_COLUMNS, historyFieldOfColumn } from '../packages/domain/src/index.ts';
+import { HISTORY_HIDDEN_COLUMNS, MAX_REMINDER_LEADS, REMINDER_LEADS, historyFieldOfColumn } from '../packages/domain/src/index.ts';
 
 import { collectFiles } from './source-scan.ts';
 
@@ -491,7 +491,7 @@ describe('the access-control migration', () => {
     ).toEqual([]);
   });
 
-  it('declares exactly the sixty-three policies stories 1.3a, 1.4a, 1.4b, 1.6, 1.7a, 1.7b, 2.1a, 2.2a, 2.3a, 3.5a, 3.6a, 5.1b, 5.4a, 9.2, 10.3, 10.4, 12.1, 13.1, 13.3, 14.1, 18.2, 0025 and 0036 reviewed, and no sixty-fourth', () => {
+  it('declares exactly the sixty-six policies stories 1.3a, 1.4a, 1.4b, 1.6, 1.7a, 1.7b, 2.1a, 2.2a, 2.3a, 3.5a, 3.6a, 5.1b, 5.4a, 9.2, 10.3, 10.4, 12.1, 13.1, 13.3, 14.1, 17.1, 18.2, 0025 and 0036 reviewed, and no sixty-seventh', () => {
     // EXTENDED BY STORY 1.4a, exactly as this comment asked: `0004_organization
     // _settings.sql` adds `organizations_update_by_own_active_admin`, built by
     // copying `members_update_by_own_active_admin`, and its name is added here
@@ -603,6 +603,11 @@ describe('the access-control migration', () => {
       // is registered only through the definer, so no insert or update.
       'push_subscriptions_delete_own',
       'push_subscriptions_select_own',
+      // STORY 17.1 (0069): the member's own reminder choice, on 0044's terms:
+      // read, insert and update the own row, no delete.
+      'reminder_settings_insert_own',
+      'reminder_settings_select_own',
+      'reminder_settings_update_own',
       // STORY 3.6a, and TWO, as 3.5a's: read and insert, both an active
       // admin's alone. No update and no delete policy: story 3.6b removes a
       // roster override through 0027's definer `remove_roster_override()`,
@@ -3581,7 +3586,7 @@ describe('the access-control migration', () => {
   };
 
   /** AD-11's excluded organization tables, exactly. */
-  const AUDIT_EXCLUDED = ['audit_events', 'notification_outbox', 'notification_settings', 'push_subscriptions'];
+  const AUDIT_EXCLUDED = ['audit_events', 'notification_outbox', 'notification_settings', 'push_subscriptions', 'reminder_settings'];
 
   /** The migration that brought the change history; a table created after it attaches its triggers itself. */
   const AUDIT_MIGRATION = '0061_audit_events.sql';
@@ -6224,5 +6229,118 @@ describe("a member's feed token (0067, story 16.3)", () => {
     expect(body).toContain("pg_catalog.to_jsonb(new) - 'token_hash' - 'last_fetched_at'");
     expect(body.match(/to_jsonb\((old|new)\)/g), 'a row is recorded with its hash').toHaveLength(2);
     expect(body).toMatch(/security definer/);
+  });
+});
+
+describe("a member's reminder choice (0069, story 17.1)", () => {
+  const migration = (): string =>
+    stripLineComments(readFileSync(join(supabaseRoot, 'migrations', '0069_reminder_settings.sql'), 'utf8'));
+  /** One `create function <name>(…` through its closing `$$;`. */
+  const bodyOf = (sql: string, name: string): string =>
+    new RegExp(`create function ${name.replace('.', '\\.')}\\([\\s\\S]*?\\$\\$;`).exec(sql)?.[0] ?? '';
+  const escaped = (text: string): string => text.replace(/[.()]/g, (c) => `\\${c}`);
+  /** The lead check, `constraint reminder_settings_leads_check check (` through the line that closes it. */
+  const leadsCheck = (): string =>
+    /constraint reminder_settings_leads_check check \(([\s\S]*?)\n {2}\),/.exec(migration())?.[1] ?? '';
+
+  it("checks exactly the domain's lead set, at most two, distinct and in its order", () => {
+    const check = leadsCheck();
+    expect(check, 'the lead check is not declared').not.toBe('');
+    const literals = [...check.matchAll(/array\[([^\]]*)\]::text\[\]/g)].map((match) =>
+      (match[1] ?? '').split(',').map((code) => code.trim().replace(/^'|'$/g, '')),
+    );
+    expect(literals.length, 'the check does not name its set three times').toBe(3);
+    for (const literal of literals) expect(literal, "the check's set is not REMINDER_LEADS").toEqual([...REMINDER_LEADS]);
+    expect(check).toContain(`cardinality(leads) <= ${MAX_REMINDER_LEADS}`);
+    expect(check).toContain('leads <@ array[');
+    expect(check, "two leads are not held in the set's order").toMatch(
+      /cardinality\(leads\) < 2\s+or array_position\(array\[[^\]]*\]::text\[\], leads\[1\]\)\s+< array_position\(array\[[^\]]*\]::text\[\], leads\[2\]\)/,
+    );
+    expect(check).toContain('coalesce(array_ndims(leads), 1) = 1');
+    expect(check).toContain('coalesce(array_lower(leads, 1), 1) = 1');
+  });
+
+  it("stores the row organization first, off by default, own-row under 0044's grants (D4, D-S6)", () => {
+    const sql = migration();
+    const table = /create table public\.reminder_settings \(([\s\S]*?)\n\);/.exec(sql)?.[1] ?? '';
+    expect(table, 'reminder_settings is not declared').not.toBe('');
+    expect(table.trim(), 'organization_id is not the first column (Q3)').toMatch(
+      /^organization_id uuid not null references public\.organizations \(id\) on delete cascade,/,
+    );
+    expect(table).toMatch(/\bleads text\[\] not null default '\{\}',/);
+    expect(table).toMatch(/\bemail boolean not null default false,/);
+    expect(table, 'reminders carry a separate on flag').not.toMatch(/\b(enabled|active|on) boolean\b/);
+    expect(table).toMatch(/constraint reminder_settings_pkey primary key \(organization_id, member_id\)/);
+    expect(table).toMatch(
+      /foreign key \(organization_id, member_id\)\s+references public\.members \(organization_id, id\)\s+on delete cascade/,
+    );
+    expect(sql).toMatch(/alter table public\.reminder_settings enable row level security;/);
+    expect(sql).toContain('revoke all on table public.reminder_settings from anon;');
+    expect(sql).toMatch(
+      /revoke insert, update, delete, truncate, references, trigger on table public\.reminder_settings\s+from authenticated;/,
+    );
+    expect(sql).toContain('grant select on table public.reminder_settings to authenticated;');
+    expect(sql).toMatch(
+      /grant insert \(organization_id, member_id, leads, email\) on table public\.reminder_settings\s+to authenticated;/,
+    );
+    expect(sql).toContain('grant update (leads, email) on table public.reminder_settings to authenticated;');
+    expect(sql.match(/\bgrant [^;]* on table public\.reminder_settings\b[^;]*;/g), 'a grant beyond the three').toHaveLength(3);
+    expect(sql).toMatch(
+      /create trigger reminder_settings_touch\s+before update on public\.reminder_settings\s+for each row execute function private\.touch_notification_settings\(\);/,
+    );
+  });
+
+  it("holds each own-row policy to 0044's three conjuncts", () => {
+    const sql = migration();
+    const notification = stripLineComments(
+      readFileSync(join(supabaseRoot, 'migrations', '0044_notification_settings.sql'), 'utf8'),
+    );
+    const policyOf = (text: string, table: string, verb: string): string =>
+      new RegExp(`create policy ${table}_${verb}_own on public\\.${table}[\\s\\S]*?\\);\\n`).exec(text)?.[0] ?? '';
+    for (const verb of ['select', 'insert', 'update']) {
+      const ours = policyOf(sql, 'reminder_settings', verb);
+      expect(ours, `reminder_settings_${verb}_own is not declared`).not.toBe('');
+      expect(ours.replaceAll('reminder_settings', 'notification_settings')).toBe(
+        policyOf(notification, 'notification_settings', verb),
+      );
+    }
+    expect(sql, 'a delete policy exists').not.toMatch(/create policy \w+ on public\.reminder_settings\s+for delete/);
+  });
+
+  it('states the email predicate once, as AD-18 lists it, and refuses the read to all but an active member', () => {
+    const sql = migration();
+    const predicate = bodyOf(sql, 'private.reminder_email_on');
+    expect(predicate).toMatch(/returns boolean\s+language sql\s+stable\s+security invoker\s+set search_path = ''/);
+    expect(predicate).toContain("and pg_catalog.btrim(m.email) <> ''");
+    expect(predicate).toContain('and o.email_notifications');
+    expect(predicate).toContain('and r.email');
+    expect(predicate).toMatch(/join public\.reminder_settings r/);
+    expect(predicate).toMatch(/not exists \(\s+select 1\s+from public\.notification_settings s[\s\S]*?and not s\.email/);
+    expect(sql).toContain(
+      'revoke execute on function private.reminder_email_on(uuid) from public, anon, authenticated, service_role;',
+    );
+    expect(sql, 'the predicate is granted to a role').not.toMatch(/grant execute on function private\.reminder_email_on/);
+
+    const channels = bodyOf(sql, 'public.reminder_channels');
+    expect(channels).toMatch(/returns jsonb\s+language plpgsql\s+stable\s+security definer\s+set search_path = ''/);
+    expect(channels).toContain("message = 'REMINDER_SETTINGS_REFUSED'");
+    expect(channels).toContain("errcode = 'insufficient_privilege'");
+    expect(channels).toMatch(/access\.organization_id = claimed\s+and access\.is_active/);
+    expect(channels).toContain("'email', private.reminder_email_on(own_member)");
+    expect(channels).toMatch(/'push', exists \([\s\S]*?from public\.push_subscriptions p/);
+    expect(new Set([...channels.matchAll(/'(\w+)', /g)].map((match) => match[1]))).toEqual(new Set(['push', 'email']));
+    expect(sql).toContain('revoke execute on function public.reminder_channels() from public, anon, service_role;');
+    expect(
+      [...sql.matchAll(new RegExp(`grant execute on function ${escaped('public.reminder_channels()')} to (\\w+);`, 'g'))].map(
+        (match) => match[1],
+      ),
+    ).toEqual(['authenticated']);
+  });
+
+  it("writes no audit trigger, no outbox filter and no reminder job (17.2's and 17.3's)", () => {
+    const sql = migration();
+    expect(sql).not.toMatch(/record_audit_event|notification_outbox|filter_notification_outbox|claim_notifications/);
+    expect(sql).not.toMatch(/reminder_inputs|enqueue_shift_reminders|cron\./);
+    expect(sql.match(/create (or replace )?function/g), 'a function beyond the predicate and the read').toHaveLength(2);
   });
 });

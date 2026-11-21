@@ -11,6 +11,9 @@ export const NOTIFICATIONS_SCREEN_PARTS = {
   // Story 10.4: this device's push section, its hook and its card.
   pushHook: ['features', 'notifications', 'hooks', 'use-push-settings.ts'],
   pushCard: ['features', 'notifications', 'components', 'push-settings-card.tsx'],
+  // Story 17.1: the reminders section, its hook and its card.
+  reminderHook: ['features', 'notifications', 'hooks', 'use-reminder-settings.ts'],
+  reminderCard: ['features', 'notifications', 'components', 'reminder-settings-card.tsx'],
 } as const;
 
 /**
@@ -34,6 +37,10 @@ export const NOTIFICATIONS_SCREEN_EXEMPT: readonly { readonly file: string; read
   {
     file: 'services/push.ts',
     why: 'the device read, the push on and off, sign-out’s forgetting and the view rule; a key source of its own, executed by push.test.ts',
+  },
+  {
+    file: 'services/reminders.ts',
+    why: 'the reminder read, the channel read, the write and the card rules; a key source of its own, executed by reminders.test.ts',
   },
   {
     file: 'services/page-push.ts',

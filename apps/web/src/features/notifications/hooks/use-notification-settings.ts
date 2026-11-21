@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 
+import { REMINDER_CHANNELS_KEY } from '@/features/notifications/services/reminders';
 import {
   MEMBERS_TABLE,
   NOTIFICATION_SETTINGS_KEY,
@@ -83,6 +84,8 @@ export function useNotificationSettings() {
       };
       queryClient.setQueryData(NOTIFICATION_SETTINGS_KEY, landed);
       setSaved(written.email);
+      // Story 17.1: the reminders' channel line follows the email switch.
+      void queryClient.invalidateQueries({ queryKey: REMINDER_CHANNELS_KEY });
     } finally {
       saving.current = false;
       setPending(null);

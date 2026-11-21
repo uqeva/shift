@@ -411,7 +411,8 @@ describe('the screen is read at all, so every sweep below means something', () =
     // A HUNDRED AND THREE SINCE STORY 16.5: *Kalendar na mobitelu*, the member
     // page's card, and their two rules modules.
     // A HUNDRED AND FOUR SINCE ITS REVIEW: the month download's rules.
-    expect(KEY_SOURCES).toHaveLength(104);
+    // A HUNDRED AND FIVE SINCE STORY 17.1: the reminder settings rules.
+    expect(KEY_SOURCES).toHaveLength(105);
   });
 
   // Vacuous-pass guard. A renamed or moved file would make each "contains no"

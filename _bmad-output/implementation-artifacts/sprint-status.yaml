@@ -691,8 +691,8 @@ development_status:
   16-5-a-member-subscribes-from-kalendar-na-mobitelu: done  # #345
   epic-16-retrospective: done
 
-  epic-17: backlog  # shift reminders (CAP-26); reuses 16.2; D-S6
-  17-1-a-member-chooses-their-reminders: backlog  # after 16.2 (D-S6 ratified 2026-11-21)
+  epic-17: in-progress  # shift reminders (CAP-26); reuses 16.2; D-S6
+  17-1-a-member-chooses-their-reminders: review  # built, CI pending
   17-2-the-remind-job-writes-reminders-that-fall-due: backlog  # after 17.1 (D-S6 ratified 2026-11-21)
   17-3-reminders-reach-the-member-by-push-or-email: backlog  # after 17.2 (D-S6 ratified 2026-11-21)
   epic-17-retrospective: optional
