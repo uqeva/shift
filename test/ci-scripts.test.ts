@@ -247,7 +247,7 @@ describe('write-local-env: the E2E env files from supabase status', () => {
 
     expect(files.web).toBe(
       'VITE_SUPABASE_URL=http://127.0.0.1:54321\nVITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_local\n' +
-        `VITE_VAPID_PUBLIC_KEY=${LOCAL_VAPID_PUBLIC_KEY}\n`,
+        `VITE_VAPID_PUBLIC_KEY=${LOCAL_VAPID_PUBLIC_KEY}\nVITE_SIGNUP_ENABLED=true\n`,
     );
     // Story 10.4: a public key's shape (65 bytes, unpadded base64url), never a private one's.
     expect(LOCAL_VAPID_PUBLIC_KEY).toMatch(/^[A-Za-z0-9_-]{87}$/);

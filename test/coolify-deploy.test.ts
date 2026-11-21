@@ -1026,6 +1026,26 @@ describe('the pipeline deploys through Coolify (story 20.6)', () => {
     expect(read('scripts/ci/require-config.mjs')).toMatch(/production: \['VITE_SIGNUP_ENABLED'\]/);
   });
 
+  it('builds with the signup switch from the checked variable only, and never for production (story 19.2, AD-21)', () => {
+    const action = read('.github/actions/deploy/action.yml');
+    for (const job of ['deploy-staging', 'deploy-production']) {
+      const steps = pipeline.jobs[job]?.steps ?? [];
+      const check = steps.find((candidate) => candidate.name === 'Check configuration');
+      const deploy = steps.find((candidate) => candidate.name === 'Deploy') as
+        | { with?: Record<string, string> }
+        | undefined;
+      expect(check?.env?.['VITE_SIGNUP_ENABLED'], job).toBe('${{ vars.VITE_SIGNUP_ENABLED }}');
+      expect(deploy?.with?.['signup-enabled'], job).toBe(check?.env?.['VITE_SIGNUP_ENABLED']);
+    }
+    // One reader: the build step's env, from the input; no other step and no
+    // other source names the build variable.
+    expect(action.match(/VITE_SIGNUP_ENABLED: /g)).toHaveLength(1);
+    expect(action).toContain('VITE_SIGNUP_ENABLED: ${{ inputs.signup-enabled }}');
+    expect(action).toMatch(
+      /if \[ "\$ENVIRONMENT" = production \] && \[ -n "\$VITE_SIGNUP_ENABLED" \] && \[ "\$VITE_SIGNUP_ENABLED" != false \]; then\s+echo "::error title=Refused variable::VITE_SIGNUP_ENABLED is set for production \(AD-21\)"\s+exit 1/,
+    );
+  });
+
   it('reads no hosted-platform credential and no runtime secret from GitHub (AD-17 as amended)', () => {
     for (const forbidden of [
       'supabase link',

@@ -73,6 +73,12 @@ export const MEMBER_USERNAME_TAKEN = 'MEMBER_USERNAME_TAKEN';
 /** The username cannot be the local part of a sign-in address. */
 export const MEMBER_USERNAME_INVALID = 'MEMBER_USERNAME_INVALID';
 /**
+ * Story 19.2 (AD-12): the member signs in with an email address, and its
+ * username follows that address (0068), so it is not renamed. Its own code:
+ * "try again" would repeat a rename that can never succeed.
+ */
+export const MEMBER_SIGN_IN_IS_EMAIL = 'MEMBER_SIGN_IN_IS_EMAIL';
+/**
  * The member id reaches nobody.
  *
  * ITS OWN CODE, and that is the finding it closes rather than a nicety.
@@ -397,6 +403,7 @@ export type MemberWriteFailure =
   | typeof MEMBER_NAME_TOO_LONG
   | typeof MEMBER_USERNAME_TAKEN
   | typeof MEMBER_USERNAME_INVALID
+  | typeof MEMBER_SIGN_IN_IS_EMAIL
   | typeof MEMBER_UNKNOWN
   | typeof MEMBER_USERNAME_NOT_APPLIED
   | typeof MEMBER_USERNAME_UNSETTLED
@@ -473,6 +480,8 @@ export const WIRE_CODES = [
   'PASSWORD_NOT_APPLIED',
   'PASSWORD_FLAG_NOT_CLEARED',
   'OPERATION_FAILED',
+  // STORY 19.2: `updateUserById` refused for an email identity (0068).
+  'SIGN_IN_IS_EMAIL',
 ] as const;
 
 /**
@@ -497,6 +506,7 @@ export function memberWriteFailureOf(code: string): MemberWriteFailure {
   if (code === 'NOT_AN_ADMIN') return MEMBER_WRITE_REFUSED;
   if (code === 'USERNAME_TAKEN') return MEMBER_USERNAME_TAKEN;
   if (code === 'USERNAME_INVALID') return MEMBER_USERNAME_INVALID;
+  if (code === 'SIGN_IN_IS_EMAIL') return MEMBER_SIGN_IN_IS_EMAIL;
   if (code === 'PAYLOAD_INVALID') return MEMBER_WRITE_INVALID;
   if (code === 'MEMBER_INVALID') return MEMBER_WRITE_INVALID;
   if (code === 'MEMBER_UNKNOWN') return MEMBER_UNKNOWN;
@@ -691,12 +701,14 @@ export function memberWriteMessageKey(
   | 'smjene.membership.error.archived'
   | 'smjene.membership.error.stale'
   | 'smjene.membership.error.unpicked'
+  | 'ljudi.form.error.signInIsEmail'
   | 'ljudi.form.error.unavailable' {
   if (failure === MEMBER_WRITE_REFUSED) return 'ljudi.form.error.refused';
   if (failure === MEMBER_WRITE_INVALID) return 'ljudi.form.error.invalid';
   if (failure === MEMBER_NAME_TOO_LONG) return 'ljudi.form.error.nameTooLong';
   if (failure === MEMBER_USERNAME_TAKEN) return 'ljudi.form.error.usernameTaken';
   if (failure === MEMBER_USERNAME_INVALID) return 'ljudi.form.error.usernameInvalid';
+  if (failure === MEMBER_SIGN_IN_IS_EMAIL) return 'ljudi.form.error.signInIsEmail';
   if (failure === MEMBER_UNKNOWN) return 'ljudi.form.error.unknown';
   if (failure === MEMBER_USERNAME_NOT_APPLIED) return 'ljudi.form.error.notApplied';
   if (failure === MEMBER_USERNAME_UNSETTLED) return 'ljudi.form.error.unsettled';

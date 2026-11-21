@@ -6,6 +6,12 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ADDRESS_DOMAIN,
+  addressKind,
+  isEmailEntry,
+  isSynthesizedAddress,
+  signupAddressOf,
+  trimAsciiWhitespace,
+  type AddressKind,
   INVALID_ORGANIZATION_SLUG,
   INVALID_USERNAME,
   isOrganizationSlug,
@@ -257,5 +263,64 @@ describe('the organization a session address names (retro 10 A5)', () => {
     ]) {
       expect(organizationOfAddress(address), String(address)).toBeNull();
     }
+  });
+});
+
+describe("AD-12's predicate, the SPA's home (story 19.2)", () => {
+  const VECTORS = (
+    JSON.parse(readFileSync(join(repoRoot, 'test', 'fixtures', 'synthesized-addresses.json'), 'utf8')) as {
+      vectors: { address: string; kind: AddressKind }[];
+    }
+  ).vectors;
+
+  it('answers every vector the SQL and Kong homes answer', () => {
+    expect(VECTORS.length).toBeGreaterThan(30);
+    for (const { address, kind } of VECTORS) {
+      expect(addressKind(address), JSON.stringify(address)).toBe(kind);
+      expect(isSynthesizedAddress(address), JSON.stringify(address)).toBe(kind === 'synthesized');
+    }
+  });
+
+  it('answers malformed for no value at all', () => {
+    expect(addressKind(null)).toBe('malformed');
+    expect(addressKind(undefined)).toBe('malformed');
+  });
+
+  it('trims ASCII white space only, never a no-break space', () => {
+    expect(trimAsciiWhitespace('\t\n\v\f\r ana@example.com \r\n')).toBe('ana@example.com');
+    expect(trimAsciiWhitespace(' ana@example.com')).toBe(' ana@example.com');
+  });
+
+  it.each([
+    ['a plain address', 'ana@example.com', 'ana@example.com'],
+    ['mixed case, kept as typed', 'Ana.Horvat@Example.COM', 'Ana.Horvat@Example.COM'],
+    ['padded with ASCII white space', ' ana@example.com\n', 'ana@example.com'],
+    ['a plus tag and a subdomain', 'ana+shift@mail.example.hr', 'ana+shift@mail.example.hr'],
+  ])('sends %s', (_case, typed, sent) => {
+    expect(signupAddressOf(typed)).toBe(sent);
+  });
+
+  it.each([
+    ['no @', 'ana.example.com'],
+    ['two @', 'ana@@example.com'],
+    ['an apostrophe (19.1 D9, kept)', "o'brien@example.com"],
+    ['a double quote', '"ana"@example.com'],
+    ['a mixed-case synthesized address', 'ana@DVD.Shift.Invalid'],
+    ['a synthesized subdomain with a trailing dot', 'ana@dvd.shift.invalid.'],
+    ['a no-break space', ' ana@example.com'],
+    ['a non-ASCII letter', 'ana@primjer.hrı'],
+    ['a trailing dot GoTrue refuses', 'ana@example.com.'],
+    ['a doubled dot in the domain', 'ana@example..com'],
+    ['a space inside', 'ana horvat@example.com'],
+    ['a domain label starting with a hyphen', 'ana@-example.com'],
+    ['over 255 characters', `${'a'.repeat(250)}@example.com`],
+    ['nothing', ''],
+  ])('refuses %s on the page', (_case, typed) => {
+    expect(signupAddressOf(typed)).toBeNull();
+  });
+
+  it('tells an email entry from a username by its @', () => {
+    expect(isEmailEntry('ana@example.com')).toBe(true);
+    expect(isEmailEntry('ivan.maric')).toBe(false);
   });
 });

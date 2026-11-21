@@ -2,14 +2,23 @@ import { useNavigate, useRouter, useSearch } from '@tanstack/react-router';
 import { useRef, useState, type FormEvent } from 'react';
 import { flushSync } from 'react-dom';
 
-import { organizationDestination } from '@/features/auth/services/address';
+import { isEmailEntry, organizationDestination, trimAsciiWhitespace } from '@/features/auth/services/address';
 import * as lastOrganization from '@/features/auth/services/last-organization';
 import { knownPathOf, returnTargetOf } from '@/features/auth/services/return-target';
 import {
   SIGN_IN_UNAVAILABLE,
+  SIGN_IN_UNCONFIRMED,
   signIn,
   type SignInFailure,
 } from '@/features/auth/services/sign-in';
+import {
+  MAIL_SENT,
+  MAIL_UNAVAILABLE,
+  NO_ADDRESS,
+  mailFailureMessageKey,
+  requestConfirmationResend,
+  signupEnabled,
+} from '@/features/auth/services/signup';
 import { supabaseClient } from '@/lib/supabase/client';
 import { writesOnline } from '@/lib/offline/use-write-gate';
 
@@ -95,6 +104,16 @@ export function useSignIn(slug: string | undefined) {
   const exchanging = useRef(false);
   const [failure, setFailure] = useState<SignInFailure | null>(null);
   const [pending, setPending] = useState(false);
+  // STORY 19.2: the email path's state.
+  const [emailEntry, setEmailEntry] = useState(false);
+  // The entry the form reopens with after *Natrag na prijavu* or *Ispravi
+  // adresu* (review of 19.2: UX-DR63 keeps the address).
+  const [entryDefault, setEntryDefault] = useState(NO_ADDRESS);
+  const [unconfirmed, setUnconfirmed] = useState<string | null>(null);
+  const [sent, setSent] = useState<{ readonly address: string; readonly at: number } | null>(null);
+  const resending = useRef(false);
+  const [resendPending, setResendPending] = useState(false);
+  const [resendFailure, setResendFailure] = useState<ReturnType<typeof mailFailureMessageKey>>(null);
   // The field is on screen unless the URL slug's row stands in for it.
   const organizationEditable = slug === undefined || editing;
 
@@ -114,6 +133,49 @@ export function useSignIn(slug: string | undefined) {
     setPasswordShown((shown) => !shown);
   }
 
+  // STORY 19.2 (UX-DR62): whether the entry is an address, from the field's
+  // own input event. While it is, the organization is dimmed and unsent, and
+  // nothing above the cursor moves.
+  function usernameInput(event: FormEvent<HTMLInputElement>): void {
+    setEmailEntry(isEmailEntry(event.currentTarget.value));
+  }
+
+  // *Pošalji novu poveznicu* on an unconfirmed sign-in, which then shows the
+  // one neutral screen (UX-DR63).
+  async function requestNewLink(): Promise<void> {
+    if (unconfirmed === null || resending.current || !writesOnline()) return;
+
+    resending.current = true;
+    setResendPending(true);
+    setResendFailure(null);
+
+    try {
+      const outcome = await requestConfirmationResend(supabaseClient().auth, unconfirmed);
+
+      if (outcome === MAIL_SENT) {
+        setSent({ address: unconfirmed, at: Date.now() });
+
+        return;
+      }
+
+      setResendFailure(mailFailureMessageKey(outcome));
+    } catch (cause) {
+      console.error(MAIL_UNAVAILABLE, cause);
+      setResendFailure(mailFailureMessageKey(MAIL_UNAVAILABLE));
+    } finally {
+      resending.current = false;
+      setResendPending(false);
+    }
+  }
+
+  // Back to the form, from either panel. The fields mount afresh.
+  function backToForm(): void {
+    setSent(null);
+    setUnconfirmed(null);
+    setResendFailure(null);
+    setEmailEntry(isEmailEntry(entryDefault));
+  }
+
   function toggleForgot(): void {
     setForgotOpen((open) => !open);
   }
@@ -125,6 +187,9 @@ export function useSignIn(slug: string | undefined) {
     const password = passwordField.current;
     // The row's slug, or what the field holds. `signIn` normalizes and judges
     // it, exactly as it judges the other two values.
+    // STORY 19.2 (AD-12): an entry with an `@` is an email sign-in, and the
+    // organization is neither read nor sent.
+    const byEmail = username !== null && isEmailEntry(username.value);
     const organization = organizationEditable ? organizationField.current?.value : shownSlug;
 
     if (username === null || password === null || organization === undefined || exchanging.current) {
@@ -152,6 +217,15 @@ export function useSignIn(slug: string | undefined) {
         slug: organization,
       });
 
+      // STORY 19.2: the right password on an address nobody confirmed yet.
+      // The card shows *Potvrdi adresu e-pošte* in place of the form.
+      if (!outcome.ok && outcome.code === SIGN_IN_UNCONFIRMED) {
+        setUnconfirmed(trimAsciiWhitespace(username.value));
+        setEntryDefault(trimAsciiWhitespace(username.value));
+
+        return;
+      }
+
       if (!outcome.ok) {
         // COMMITTED FIRST, then focused: `flushSync` renders the refusal and
         // the field's `aria-describedby` pointing at it before focus lands, so
@@ -165,8 +239,9 @@ export function useSignIn(slug: string | undefined) {
       }
 
       // REMEMBERED ONLY NOW, after the service accepted it, so a typo is never
-      // stored. Only the normalized slug: nothing about the person.
-      lastOrganization.remember(lastOrganization.deviceStorage(), organization);
+      // stored. Only the normalized slug: nothing about the person. An email
+      // sign-in names no organization, so nothing is remembered for it.
+      if (!byEmail) lastOrganization.remember(lastOrganization.deviceStorage(), organization);
 
       // The return target, or `/` when there is none that is safe. Neither is
       // handed the session: it is established inside the client by the time
@@ -225,10 +300,23 @@ export function useSignIn(slug: string | undefined) {
     forgotOpen,
     failure,
     pending,
+    emailEntry,
+    entryDefault,
+    unconfirmed,
+    sent,
+    resendPending,
+    resendFailure,
+    // AD-21's third switch: the email recovery path and, on bare `/prijava`
+    // only, the way to `/registracija` (UX-DR62).
+    signupOffered: signupEnabled(),
+    registerOffered: slug === undefined && signupEnabled(),
     changeOrganization,
     organizationInput,
+    usernameInput,
     togglePassword,
     toggleForgot,
+    requestNewLink,
+    backToForm,
     submit,
   };
 }

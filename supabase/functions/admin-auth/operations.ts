@@ -152,6 +152,13 @@ export const USERNAME_NOT_APPLIED = 'USERNAME_NOT_APPLIED';
 export const USERNAME_NOT_RESTORED = 'USERNAME_NOT_RESTORED';
 /** An operation threw. Wrapped so the SPA sees a code rather than a bare 500. */
 export const OPERATION_FAILED = 'OPERATION_FAILED';
+/**
+ * Story 19.2 (AD-12, AD-16 as amended): the member signs in with an email
+ * address, and its username follows that address. The database refused the
+ * rename (`members_username_follows_email_identity`, 0068), so no auth call
+ * was made and the address was never rewritten to a synthesized one.
+ */
+export const SIGN_IN_IS_EMAIL = 'SIGN_IN_IS_EMAIL';
 
 /**
  * Every code this module can put on the wire, success and failure alike.
@@ -185,6 +192,7 @@ export const OPERATION_CODES = [
   PASSWORD_NOT_APPLIED,
   PASSWORD_FLAG_NOT_CLEARED,
   OPERATION_FAILED,
+  SIGN_IN_IS_EMAIL,
 ] as const;
 
 // ------------------------------------------------------------------ the address
@@ -429,6 +437,8 @@ export const EMAIL_EXISTS = 'email_exists';
  *  copy can be pinned against them in the file that can import both trees. */
 export const UNIQUE_VIOLATION = '23505';
 export const INSUFFICIENT_PRIVILEGE = '42501';
+/** 0068's trigger raises a check violation with its own message. */
+export const CHECK_VIOLATION = '23514';
 
 /**
  * The SQLSTATE classes that mean the ROW was wrong rather than the service.
@@ -473,6 +483,13 @@ function namesAValue(code: string | undefined): boolean {
  */
 export function membersRefusal(error: PostgrestFailure): OperationReply {
   if (error.code === UNIQUE_VIOLATION) return { status: 409, body: { code: USERNAME_TAKEN } };
+  // STORY 19.2: the one check violation with a meaning of its own. Mapping a
+  // database refusal to a reply is what this function already does; it is no
+  // rule from `engine-rules.md` (AD-16's no-rule clause holds). The trigger is
+  // the rule's one owner, and nothing here reads the address.
+  if (error.code === CHECK_VIOLATION && error.message === SIGN_IN_IS_EMAIL) {
+    return { status: 409, body: { code: SIGN_IN_IS_EMAIL } };
+  }
   if (error.code === INSUFFICIENT_PRIVILEGE) return { status: 403, body: { code: NOT_AN_ADMIN } };
   if (namesAValue(error.code)) return { status: 409, body: { code: MEMBER_INVALID } };
 

@@ -84,6 +84,8 @@ import {
   SCREEN,
   SET_PASSWORD_KEYS,
   SET_PASSWORD_SCREEN,
+  SIGNUP_KEYS,
+  SIGNUP_SCREEN,
   SETTINGS,
   SHIFT_TYPE_EDIT,
   SHIFT_TYPE_LIST,
@@ -124,7 +126,9 @@ export const KEY_SOURCES = [
   // `trigger`, `heading` and `body`.
   // TWENTY-TWO SINCE RETRO 10 A5: the other-organization offer's heading,
   // body, switch, pending, stay and refusal.
-  { name: 'the sign-in screen', file: SCREEN, keys: translationKeys, strings: 22 },
+  // THIRTY-EIGHT SINCE STORY 19.2: the email path's hint, refusal panel,
+  // recovery path and the way to `/registracija`.
+  { name: 'the sign-in screen', file: SCREEN, keys: translationKeys, strings: 38 },
   // STORY 7.8. ELEVEN on the set-password step: the heading and the lede; the
   // two field labels and the toggle's `passwordShow`; the two live checks;
   // `submit` and `pending`; `Odjava` and the sign-out refusal. The checks'
@@ -135,6 +139,9 @@ export const KEY_SOURCES = [
   // password landed — and the live checks' two states in words
   // (`ruleStateMessageKey`).
   { name: 'the set-password rules', file: SET_PASSWORD_KEYS, keys: messageKeyUnions, strings: 8 },
+  // STORY 19.2: the signup screens, and their rules' message unions.
+  { name: 'the signup screens', file: SIGNUP_SCREEN, keys: translationKeys, strings: 53 },
+  { name: 'the signup rules', file: SIGNUP_KEYS, keys: messageKeyUnions, strings: 10 },
   { name: 'the not-found component', file: NOT_FOUND, keys: translationKeys, strings: 2 },
   // A148. THREE on the error screen: the heading, the lede and the retry.
   { name: 'the error screen', file: ERROR_SCREEN, keys: translationKeys, strings: 3 },
@@ -148,7 +155,8 @@ export const KEY_SOURCES = [
   // brand panel's product name, headline and subline, written once and
   // rendered around both steps, so neither step's own count moved.
   { name: 'the sign-in frame', file: AUTH_LAYOUT, keys: translationKeys, strings: 3 },
-  { name: 'the failure-to-message mapping', file: MESSAGE_KEYS, keys: messageKeyUnion, strings: 2 },
+  // STORY 19.2: the email refusal and the unconfirmed address joined the two.
+  { name: 'the failure-to-message mapping', file: MESSAGE_KEYS, keys: messageKeyUnion, strings: 4 },
   // TWELVE on the settings surface: its own `nav.organizacija` heading, five
   // field labels, the save and cancel actions, the logo's own label, the choose
   // action — rendered TWICE, once as the button's text and once as the hidden
@@ -1780,10 +1788,12 @@ export const KEY_SOURCES = [
     // without the month clause (`deactivationConsequenceMessageKey`).
     //
     // SIXTY-FIVE SINCE 0036: a name over the maximum.
+    //
+    // SIXTY-SIX SINCE STORY 19.2: an email identity's username is not renamed.
     name: 'the member write rules',
     file: MEMBER_WRITE_KEYS,
     keys: memberWriteKeys,
-    strings: 65,
+    strings: 66,
   },
   {
     // ELEVEN on the member list's rules: four column headings, two permission

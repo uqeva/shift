@@ -62,6 +62,9 @@ import {
   organizacijaSatniPojasiRoute,
 } from '@/pages/organizacija.satni-pojasi';
 import { SetPasswordScreen, postaviLozinkuRoute } from '@/pages/postavi-lozinku';
+import { postavljanjeRoute } from '@/pages/postavljanje';
+import { registracijaRoute } from '@/pages/registracija';
+import { zaboravljenaLozinkaRoute } from '@/pages/zaboravljena-lozinka';
 import { PostavkeRotacijeScreen, postavkeRotacijeRoute } from '@/pages/postavke-rotacije';
 import { PovijestPromjenaScreen, povijestPromjenaRoute } from '@/pages/povijest-promjena';
 import {
@@ -512,10 +515,70 @@ describe('the shell route tree', () => {
       // STORY 7.8. The first sign-in's set-password step: a root route, outside
       // the layout whose guard sends a flagged session to it.
       '/postavi-lozinku',
+      // STORY 19.2. Root routes, all outside the layout: the claimless
+      // email identity's placeholder (the layout's guard sends it there),
+      // the link every Auth email opens, signup and email recovery.
+      '/postavljanje',
+      '/potvrda',
       '/prijava',
       '/prijava/$slug',
+      '/registracija',
+      '/zaboravljena-lozinka',
       '__root__',
     ]);
+  });
+
+  it('resolves the signup routes outside the layout (story 19.2)', () => {
+    for (const path of ['/registracija', '/potvrda', '/zaboravljena-lozinka', '/postavljanje']) {
+      expect(match(path).map((matched) => matched.routeId), path).toEqual(['__root__', path]);
+    }
+  });
+
+  describe('the signup routes’ guards (story 19.2, AD-21, AD-24)', () => {
+    type Guard = (options: { context: { currentSession: () => Promise<Session | null> } }) => unknown;
+    const tokenOf = (claims: Record<string, unknown>): string =>
+      `e30.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.signature`;
+    const claimless = {
+      access_token: tokenOf({ sub: 'founder' }),
+      user: { id: 'founder', email: 'ana@example.com', app_metadata: {} },
+    } as unknown as Session;
+    const claimed = {
+      access_token: tokenOf({ sub: 'founder', organization_id: '00000000-0000-4000-8000-000000000001' }),
+      user: { id: 'founder', email: 'ana@example.com', app_metadata: {} },
+    } as unknown as Session;
+
+    async function outcomeOf(route: { options: unknown }, session: Session | null): Promise<unknown> {
+      const guard = (route.options as { beforeLoad?: Guard }).beforeLoad;
+      if (typeof guard !== 'function') throw new Error('the route has no guard');
+      try {
+        return { returned: await guard({ context: { currentSession: () => Promise.resolve(session) } }) };
+      } catch (thrown) {
+        return { to: (thrown as { options?: { to?: string } }).options?.to };
+      }
+    }
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('sends everyone to Prijava from signup and recovery while the SPA switch is shut', async () => {
+      vi.stubEnv('VITE_SIGNUP_ENABLED', '');
+      expect(await outcomeOf(registracijaRoute, null)).toEqual({ to: '/prijava' });
+      expect(await outcomeOf(zaboravljenaLozinkaRoute, null)).toEqual({ to: '/prijava' });
+    });
+
+    it('opens both with the switch on, and sends a signed-in visitor from signup to /', async () => {
+      vi.stubEnv('VITE_SIGNUP_ENABLED', 'true');
+      expect(await outcomeOf(registracijaRoute, null)).toEqual({ returned: undefined });
+      expect(await outcomeOf(zaboravljenaLozinkaRoute, null)).toEqual({ returned: undefined });
+      expect(await outcomeOf(registracijaRoute, claimed)).toEqual({ to: '/' });
+    });
+
+    it('holds only a claimless email identity at /postavljanje', async () => {
+      expect(await outcomeOf(postavljanjeRoute, null)).toEqual({ to: '/prijava' });
+      expect(await outcomeOf(postavljanjeRoute, claimed)).toEqual({ to: '/' });
+      expect(await outcomeOf(postavljanjeRoute, claimless)).toEqual({ returned: { email: 'ana@example.com' } });
+    });
   });
 
   it('resolves /postavi-lozinku outside the layout, to the set-password screen (story 7.8)', () => {
@@ -1932,6 +1995,26 @@ describe('the signed-in layout guards every destination once, and is pathless', 
     expect((thrown as { options: { search?: unknown } }).options.search).toEqual({
       povratak: '/kalendar?tim=2#tjedan',
     });
+  });
+
+  it('holds a claimless email identity at /postavljanje, and lets a claimed one through (story 19.2)', async () => {
+    const tokenOf = (claims: Record<string, unknown>): string =>
+      `e30.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.signature`;
+    const claimless = {
+      access_token: tokenOf({ sub: 'founder' }),
+      user: { id: 'founder', email: 'ana@example.com', app_metadata: {} },
+    } as unknown as Session;
+    const thrown = thrownBy(await beforeLoad(() => Promise.resolve(claimless)));
+
+    expect(isRedirect(thrown), 'the layout let a claimless email identity through').toBe(true);
+    expect((thrown as { options: { to?: string } }).options.to).toBe('/postavljanje');
+
+    const claimed = {
+      access_token: tokenOf({ sub: 'founder', organization_id: '00000000-0000-4000-8000-000000000001' }),
+      user: { id: 'founder', email: 'ana@example.com', app_metadata: {} },
+    } as unknown as Session;
+
+    expect(await beforeLoad(() => Promise.resolve(claimed))).toEqual({ returned: undefined });
   });
 
   it('drops the location when the bounce is the re-guard for a session change (C516)', async () => {

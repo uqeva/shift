@@ -1,6 +1,12 @@
 import type { Session } from '@supabase/supabase-js';
 
-import { normalizeUsername, organizationDestination, signInAddress } from '@/features/auth/services/address';
+import {
+  isEmailEntry,
+  normalizeUsername,
+  organizationDestination,
+  signInAddress,
+  signupAddressOf,
+} from '@/features/auth/services/address';
 
 /**
  * Credentials in, a session or one stable code out (story 1.3b).
@@ -33,8 +39,26 @@ import { normalizeUsername, organizationDestination, signInAddress } from '@/fea
 export const SIGN_IN_REFUSED = 'SIGN_IN_REFUSED';
 /** The service could not be reached, or answered that it could not answer. */
 export const SIGN_IN_UNAVAILABLE = 'SIGN_IN_UNAVAILABLE';
+/**
+ * Story 19.2 (AD-12, UX-DR62): an EMAIL sign-in refused, for every cause —
+ * an unknown address, a wrong password, a refused token, or an address the
+ * page refuses (synthesized, malformed). Its own code because its message
+ * names its own kind (`E-mail ili lozinka nisu točni.`): which kind was typed
+ * is the person's own fact, so naming it reveals nothing.
+ */
+export const SIGN_IN_EMAIL_REFUSED = 'SIGN_IN_EMAIL_REFUSED';
+/**
+ * The address is not confirmed yet. GoTrue says `email_not_confirmed` only
+ * for the RIGHT password (AD-22's `/token` row), so saying so tells nobody
+ * anything they did not already hold; the screen offers a new link.
+ */
+export const SIGN_IN_UNCONFIRMED = 'SIGN_IN_UNCONFIRMED';
 
-export type SignInFailure = typeof SIGN_IN_REFUSED | typeof SIGN_IN_UNAVAILABLE;
+export type SignInFailure =
+  | typeof SIGN_IN_REFUSED
+  | typeof SIGN_IN_UNAVAILABLE
+  | typeof SIGN_IN_EMAIL_REFUSED
+  | typeof SIGN_IN_UNCONFIRMED;
 
 /**
  * The message key each failure renders as.
@@ -54,8 +78,12 @@ export type SignInFailure = typeof SIGN_IN_REFUSED | typeof SIGN_IN_UNAVAILABLE;
  */
 export function signInMessageKey(
   failure: SignInFailure,
-): 'auth.error.credentials' | 'auth.error.unavailable' {
-  return failure === SIGN_IN_UNAVAILABLE ? 'auth.error.unavailable' : 'auth.error.credentials';
+): 'auth.error.credentials' | 'auth.error.unavailable' | 'signup.signIn.error' | 'signup.unconfirmed.body' {
+  if (failure === SIGN_IN_UNAVAILABLE) return 'auth.error.unavailable';
+  if (failure === SIGN_IN_EMAIL_REFUSED) return 'signup.signIn.error';
+  if (failure === SIGN_IN_UNCONFIRMED) return 'signup.unconfirmed.body';
+
+  return 'auth.error.credentials';
 }
 
 export type SignInOutcome =
@@ -139,6 +167,11 @@ function isServiceFailure(error: AuthFailure): boolean {
 export async function signIn(auth: PasswordAuth, credentials: Credentials): Promise<SignInOutcome> {
   const { username, password, slug } = credentials;
 
+  // STORY 19.2 (AD-12): an entry with an `@` is an email identity's address,
+  // signed in as typed (trimmed of ASCII white space) with no slug. A username
+  // can never hold an `@` (`members_username_check`), so the kinds never mix.
+  if (isEmailEntry(username)) return signInWithEmail(auth, username, password);
+
   const organization = organizationDestination(slug);
   const account = normalizeUsername(username);
 
@@ -173,6 +206,43 @@ export async function signIn(auth: PasswordAuth, credentials: Credentials): Prom
   // mapped rather than trusted, because the alternative is returning `ok: true`
   // with nothing behind it and letting `/` redirect straight back.
   if (session === null) return { ok: false, code: SIGN_IN_REFUSED };
+
+  return { ok: true, session };
+}
+
+/** GoTrue's code for a correct password on an address nobody has confirmed. */
+const EMAIL_NOT_CONFIRMED = 'email_not_confirmed';
+
+/**
+ * The email path (story 19.2, UX-DR62). What the page would refuse — a
+ * synthesized address above all, which AD-12 says the SPA refuses locally —
+ * is refused here with the email refusal and no request, exactly as the
+ * username path refuses an unusable slug: well-formedness is computable by
+ * anyone, existence is never answered.
+ */
+async function signInWithEmail(auth: PasswordAuth, entry: string, password: string): Promise<SignInOutcome> {
+  const email = signupAddressOf(entry);
+
+  if (email === null || password === '') return { ok: false, code: SIGN_IN_EMAIL_REFUSED };
+
+  let answered;
+
+  try {
+    answered = await auth.signInWithPassword({ email, password });
+  } catch {
+    return { ok: false, code: SIGN_IN_UNAVAILABLE };
+  }
+
+  if (answered.error !== null) {
+    if (isServiceFailure(answered.error)) return { ok: false, code: SIGN_IN_UNAVAILABLE };
+    if (answered.error.code === EMAIL_NOT_CONFIRMED) return { ok: false, code: SIGN_IN_UNCONFIRMED };
+
+    return { ok: false, code: SIGN_IN_EMAIL_REFUSED };
+  }
+
+  const session = answered.data.session;
+
+  if (session === null) return { ok: false, code: SIGN_IN_EMAIL_REFUSED };
 
   return { ok: true, session };
 }

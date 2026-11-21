@@ -23,6 +23,8 @@ export const SIGN_IN_PARTS = {
   // offered it in the same card, in place of the form, on the same page.
   switchHook: ['features', 'auth', 'hooks', 'use-organization-switch.ts'],
   switchOffer: ['features', 'auth', 'components', 'organization-switch-offer.tsx'],
+  // STORY 19.2: an unconfirmed email sign-in's panel, drawn in the card.
+  unconfirmed: ['features', 'auth', 'components', 'unconfirmed-panel.tsx'],
 } as const;
 
 /**

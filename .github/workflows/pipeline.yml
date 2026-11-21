@@ -58,10 +58,12 @@ env:
   # Supabase CLI: no prompts, no telemetry, no update nag.
   SUPABASE_TELEMETRY_DISABLED: '1'
   # Local stack services no CI job uses, left out of `supabase start`: Studio
-  # and its postgres-meta, the analytics pair (logflare, vector), Realtime (the
-  # app opens no channel) and the mail catcher (no account has a real address).
-  # About 4 GB of images every runner no longer pulls.
-  SUPABASE_UNUSED_SERVICES: studio,postgres-meta,logflare,vector,realtime,mailpit,imgproxy
+  # and its postgres-meta, the analytics pair (logflare, vector) and Realtime
+  # (the app opens no channel). About 4 GB of images every runner no longer
+  # pulls. The mail catcher (mailpit) runs since story 19.2: the signup suites
+  # sign up a real address, and GoTrue refuses a signup whose mail it cannot
+  # send.
+  SUPABASE_UNUSED_SERVICES: studio,postgres-meta,logflare,vector,realtime,imgproxy
 
 jobs:
   # ----------------------------------------------------------------- Stage 1
@@ -583,6 +585,9 @@ jobs:
           ts-oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           ts-oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           registry-token: ${{ github.token }}
+          # Story 19.2: the same variable the Check configuration step hands
+          # require-config.mjs, and no other source (AD-21's third switch).
+          signup-enabled: ${{ vars.VITE_SIGNUP_ENABLED }}
 
   # The SPA, the Supabase environment it was built with, Kong's one answer on
   # the signup route (story 19.1: `200 {}`, for a synthesized address Kong
@@ -705,6 +710,9 @@ jobs:
           registry-token: ${{ github.token }}
           functions-image: ${{ needs.deploy-staging.outputs.functions-image }}
           pre-migration-backup-at: ${{ vars.PRE_MIGRATION_BACKUP_AT }}
+          # Story 19.2: the variable require-config.mjs refused above if set;
+          # the action refuses it for production again before it builds.
+          signup-enabled: ${{ vars.VITE_SIGNUP_ENABLED }}
 
   # Anonymous: production has no smoke account, so nothing here signs in.
   smoke-production:

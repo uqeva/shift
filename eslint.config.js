@@ -135,8 +135,10 @@ export const FEATURE_PUBLIC = {
     'services/address', // pages
     'services/organization-switch', // pages (retro 10 A5: the other-organization offer)
     'services/return-target', // pages, router
+    'services/session-destination', // pages (story 19.2, AD-24: the one router the guards share)
     'services/set-password', // pages
     'services/sign-out', // navigation
+    'services/signup', // pages (story 19.2: AD-21's SPA switch and `/potvrda`'s search)
   ],
   // Story 5.3d: *Sati* reads leave by the marks' own role rule
   // (`readsOrganizationLeave`), and draws the conflict's one glyph

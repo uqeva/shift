@@ -5852,6 +5852,12 @@ describe('the local auth provider configuration', () => {
     'auth.site_url': 'per environment: SHIFT_APP_URL',
     'auth.additional_redirect_urls': 'per environment: SHIFT_APP_URL',
     'auth.rate_limit.*': 'local only; story 19.1 owns production’s limits',
+    // STORY 19.2: the compose names the same templates by URL and the same
+    // subjects (`GOTRUE_MAILER_TEMPLATES_*`, `GOTRUE_MAILER_SUBJECTS_*`), and
+    // `test/auth-email.test.ts` pins both ends to `hr.json`.
+    'auth.email.template.confirmation.*': 'local files of the staging templates; test/auth-email.test.ts pins both',
+    'auth.email.template.recovery.*': 'local files of the staging templates; test/auth-email.test.ts pins both',
+    'auth.email.template.email_change.*': 'local files of the staging templates; test/auth-email.test.ts pins both',
   };
 
   /** Every `section.key` under `[api]`, `[auth]` and `[auth.*]` in config.toml. */

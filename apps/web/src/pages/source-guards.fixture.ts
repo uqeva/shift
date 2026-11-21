@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 import { SET_PASSWORD_PARTS } from '@/features/auth/set-password-screen.fixture';
 import { SIGN_IN_PARTS } from '@/features/auth/sign-in-screen.fixture';
+import { SIGNUP_PARTS } from '@/features/auth/signup-screens.fixture';
 import { CALENDAR_SCREEN_PARTS } from '@/features/calendar/calendar-screen.fixture';
 import {
   CONFLICTS_QUEUE_PARTS,
@@ -111,6 +112,15 @@ export const SET_PASSWORD_HOOK = join(srcRoot, ...SET_PASSWORD_PARTS.hook);
 export const SET_PASSWORD_SCREEN: readonly string[] = Object.values(SET_PASSWORD_PARTS).map((parts) =>
   join(srcRoot, ...parts),
 );
+
+/**
+ * Story 19.2's signup screens: a third DISJOINT file set under the auth
+ * feature, written ONCE in `signup-screens.fixture.ts`.
+ */
+export const SIGNUP_SCREEN: readonly string[] = Object.values(SIGNUP_PARTS).map((parts) => join(srcRoot, ...parts));
+
+/** Their rules: the mail, link and refusal messages, off `\w*MessageKey` unions. */
+export const SIGNUP_KEYS = join(srcRoot, 'features', 'auth', 'services', 'signup.ts');
 
 /** Its rules: the local refusals, the save's failures and the live checks' state, off `\w*MessageKey` unions. */
 export const SET_PASSWORD_KEYS = join(srcRoot, 'features', 'auth', 'services', 'set-password.ts');
@@ -816,10 +826,19 @@ export const SCREENS = [
   // controls went with it.
   // SIX SINCE RETRO 10 A5: the other-organization offer's two buttons (switch
   // and stay), drawn in the same card in place of the form.
-  { name: 'the sign-in screen', file: SCREEN, expectedFields: 3, expectedButtons: 6 },
+  // NINE SINCE STORY 19.2: the forgot panel's *Nova lozinka e-mailom*, and an
+  // unconfirmed sign-in's *Pošalji novu poveznicu* and *Natrag na prijavu*.
+  { name: 'the sign-in screen', file: SCREEN, expectedFields: 3, expectedButtons: 9 },
   // STORY 7.8. FIVE on the set-password step: the new password and its
   // repeat, the show/hide toggle, `Spremi i nastavi` and `Odjava`.
   { name: 'the set-password screen', file: SET_PASSWORD_SCREEN, expectedFields: 2, expectedButtons: 3 },
+  // STORY 19.2. FIVE fields: the signup's address and password, the recovery
+  // request's address, and a recovery link's new password and its repeat.
+  // ELEVEN buttons: the signup's toggle and submit; the neutral screen's
+  // *Ispravi adresu* and *Pošalji ponovno*; the recovery request's submit;
+  // `/potvrda`'s *Potvrdi*, the recovery toggle and *Spremi novu lozinku*,
+  // and the dead link's two ways on; the placeholder's *Odjava*.
+  { name: 'the signup screens', file: SIGNUP_SCREEN, expectedFields: 5, expectedButtons: 11 },
   { name: 'the not-found component', file: NOT_FOUND, expectedFields: 0, expectedButtons: 1 },
   // A148. ONE on the error screen: *Pokušaj ponovno*. It shows nothing of the
   // error itself, which the literal sweeps below hold it to.
