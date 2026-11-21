@@ -830,6 +830,29 @@ export default [
       ],
     },
   },
+  // AD-20 (story 16.4): `@shift/ics` serializes, and takes every instant and
+  // offset from the domain's `zone.ts`: no clock or zone data of its own.
+  {
+    files: ['packages/ics/src/**/*.ts'],
+    rules: {
+      'no-restricted-globals': [
+        'error',
+        ...['Date', 'Intl', 'Temporal', 'globalThis', 'performance'].map((name) => ({
+          name,
+          message: `packages/ics takes instants and offsets from @shift/domain's zone.ts (AD-6, AD-20). Not ${name}.`,
+        })),
+      ],
+      'no-restricted-properties': [
+        'error',
+        ...['localeCompare', 'toLocaleString', 'toLocaleDateString', 'toLocaleTimeString', 'toLocaleUpperCase', 'toLocaleLowerCase'].map(
+          (property) => ({
+            property,
+            message: `packages/ics answers alike in every runtime (AD-20): ${property} reads the runtime's locale data.`,
+          }),
+        ),
+      ],
+    },
+  },
   {
     files: ['packages/domain/src/zone.ts'],
     rules: {

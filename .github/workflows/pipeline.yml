@@ -166,6 +166,13 @@ jobs:
         with:
           persist-credentials: false
 
+      - uses: ./.github/actions/setup
+
+      # Story 16.4 (AD-7): calendar-feed bundles both packages' built dist,
+      # which the Dockerfile copies; a missing dist fails the build.
+      - name: Build @shift/domain and @shift/ics
+        run: pnpm --filter @shift/domain --filter @shift/ics build
+
       - name: Build shift-functions (not pushed)
         run: docker build --pull -f deploy/functions/Dockerfile -t "shift-functions:ci-$GITHUB_SHA" .
 
@@ -341,6 +348,11 @@ jobs:
 
       - uses: ./.github/actions/playwright
 
+      # Story 16.4 (AD-7): `functions serve` follows calendar-feed's deno.json
+      # onto both packages' built dist, which must exist before it starts.
+      - name: Build @shift/domain and @shift/ics
+        run: pnpm --filter @shift/domain --filter @shift/ics build
+
       # Started here rather than by Playwright's webServer, so the same two
       # servers are up for the E2E suite (whose webServer entries reuse them)
       # and for the smoke after it. Same host and port as playwright.config.ts:
@@ -495,7 +507,9 @@ jobs:
   # ------------------------------------------------------- staging (main only)
   deploy-staging:
     name: Deploy staging
-    needs: [test, e2e]
+    # Story 16.4: the functions image now holds the domain, so the deploy also
+    # waits for the domain's answers under the pinned runtime.
+    needs: [test, e2e, runtime-parity]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 45

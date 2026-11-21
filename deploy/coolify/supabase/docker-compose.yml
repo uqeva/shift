@@ -384,6 +384,12 @@ services:
       # `calendar-feed/<token>`), no referer.
       - KONG_NGINX_HTTP_INCLUDE=/home/kong/log-redaction.conf
       - 'KONG_PROXY_ACCESS_LOG=/dev/stdout shift_redacted'
+      # NFR-27 (story 16.4; AD-14, D-S1): Kong 2.8.1 has one level for all its
+      # error logs, and nginx writes the request line, a feed token's path
+      # included, on upstream failures at `error` and on some `warn` lines. So
+      # only `crit` and above are written; every lesser gateway diagnostic is
+      # given up, and outages are seen through the uptime check (20.8).
+      - KONG_LOG_LEVEL=crit
       # The one origin the functions route answers CORS for (story 20.2).
       - SHIFT_APP_URL=${SHIFT_APP_URL:?}
       # Both role JWTs and both opaque keys; NOT the signing secret.

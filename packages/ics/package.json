@@ -1,0 +1,29 @@
+{
+  "name": "@shift/ics",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "//": "AD-20 (story 16.4): the RFC 5545 subset the calendar feed (and, from 16.5, the browser's month download) serializes with, written by hand. Its ONE dependency is the workspace's own `@shift/domain` (`zone.ts`, R12's types); nothing else may be added, and `test/purity.test.ts` holds it. Edge Functions consume the tsc-built `dist` through their `deno.json` map, as for the domain (AD-7).",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "main": "./dist/index.js",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@shift/domain": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "typescript": "7.0.2",
+    "vitest": "4.1.11"
+  }
+}

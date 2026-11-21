@@ -1,0 +1,3 @@
+# AD-20 (story 16.4): the ICS golden files are compared byte for byte, and
+# RFC 5545 requires CRLF line ends. Never normalize them.
+packages/ics/test/golden/*.ics -text

@@ -25,6 +25,9 @@
     // one date validator, and the root vitest config maps the same alias.
     "paths": {
       "@shift/domain": ["./packages/domain/src/index.ts"],
+      // Story 16.4: `calendar-feed` imports the serializer by its bare
+      // specifier (its `deno.json` maps it onto the built `dist` under Deno).
+      "@shift/ics": ["./packages/ics/src/index.ts"],
       "@/*": ["./apps/web/src/*"]
     }
   },

@@ -183,13 +183,13 @@ function coreSql(): string {
 }
 
 describe('supabase scaffold', () => {
-  it('holds exactly two Edge Functions, the privileged auth boundary and notify (AD-14)', () => {
+  it('holds the Edge Functions AD-14 names: the auth boundary, notify and calendar-feed (remind joins in 17.2)', () => {
     const functions = readdirSync(join(supabaseRoot, 'functions'), { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
       .map((entry) => entry.name)
       .sort();
 
-    expect(functions).toEqual(['admin-auth', 'notify']);
+    expect(functions).toEqual(['admin-auth', 'calendar-feed', 'notify']);
   });
 
   it('declares both functions in config.toml, and notify takes no user JWT (story 10.1)', () => {
@@ -203,6 +203,12 @@ describe('supabase scaffold', () => {
     // constant-time check.
     expect(section('notify')).toMatch(/^verify_jwt = false$/m);
     expect(section('notify')).toMatch(/^enabled = true$/m);
+    // Story 16.4 (D-S1): a calendar app sends a URL and nothing else, so the
+    // token in the path is the credential; `functions serve` follows the
+    // function's own map onto the packages' built dist (AD-7).
+    expect(section('calendar-feed')).toMatch(/^verify_jwt = false$/m);
+    expect(section('calendar-feed')).toMatch(/^enabled = true$/m);
+    expect(section('calendar-feed')).toMatch(/^import_map = "\.\/functions\/calendar-feed\/deno\.json"$/m);
   });
 
   it('numbers migrations 0001, 0002, … with no gaps and no duplicates', () => {

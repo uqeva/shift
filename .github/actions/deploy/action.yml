@@ -160,6 +160,13 @@ runs:
     # probed build of these exact sources (`:src-<hash>`), which is reused so
     # an SPA-only release never restarts the stack. Production deploys the
     # digest staging deployed (`functions-image`), never a rebuild.
+    # Story 16.4 (AD-7): the functions image copies both packages' built
+    # dist (calendar-feed bundles them). Built whether or not the image is
+    # rebuilt: a few seconds, and the Dockerfile cannot run without them.
+    - name: Build @shift/domain and @shift/ics
+      shell: bash
+      run: pnpm --filter @shift/domain --filter @shift/ics build
+
     - name: shift-functions (build and probe, or reuse)
       id: functions-image
       shell: bash

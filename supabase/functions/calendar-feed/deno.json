@@ -1,0 +1,6 @@
+{
+  "imports": {
+    "@shift/domain": "../../../packages/domain/dist/index.js",
+    "@shift/ics": "../../../packages/ics/dist/index.js"
+  }
+}

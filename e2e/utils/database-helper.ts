@@ -2494,3 +2494,55 @@ export async function minimumMembersOf(slug: string): Promise<number | null | un
     await client.end();
   }
 }
+
+/**
+ * Story 16.4: runs `call` (a 0067 definer) as the run member `username`'s own
+ * request session: claims injected, `set local role authenticated`, committed.
+ */
+async function asMemberInSql<T>(slug: string, username: string, call: (client: pg.Client) => Promise<T>): Promise<T> {
+  const client = await connect();
+  try {
+    await client.query('begin');
+    const found = await client.query<{ organization_id: string; auth_user_id: string }>(
+      `select m.organization_id, m.auth_user_id from members m
+         join organizations o on o.id = m.organization_id
+        where o.slug = $1 and m.username = $2 and m.auth_user_id is not null`,
+      [slug, username],
+    );
+    const member = found.rows[0];
+    if (member === undefined) throw new Error(`E2E: no member ${username} with an account in ${slug}`);
+    await client.query(`select set_config('request.jwt.claims', $1, true)`, [
+      JSON.stringify({ sub: member.auth_user_id, role: 'authenticated', organization_id: member.organization_id }),
+    ]);
+    await client.query('set local role authenticated');
+    const result = await call(client);
+    await client.query('commit');
+    return result;
+  } catch (cause) {
+    await client.query('rollback').catch(() => undefined);
+    throw cause;
+  } finally {
+    await client.end();
+  }
+}
+
+/**
+ * Story 16.4: a feed token for the run member `username`, made by
+ * `create_calendar_feed_token()` as their own session, so the served
+ * `calendar-feed` finds it. Only the test holds the token. A token goes with
+ * its member (the keys cascade), so the run's teardown removes it;
+ * {@link revokeCalendarFeedTokenInSql} ends it sooner.
+ */
+export async function createCalendarFeedTokenInSql(slug: string, username: string): Promise<string> {
+  return asMemberInSql(slug, username, async (client) => {
+    const { rows } = await client.query<{ token: string }>('select public.create_calendar_feed_token() as token');
+    const token = rows[0]?.token;
+    if (token === undefined) throw new Error('E2E: create_calendar_feed_token returned no token');
+    return token;
+  });
+}
+
+/** Story 16.4: turns the run member's feed off, as their own session. */
+export async function revokeCalendarFeedTokenInSql(slug: string, username: string): Promise<void> {
+  await asMemberInSql(slug, username, (client) => client.query('select public.revoke_own_calendar_feed_token()'));
+}
