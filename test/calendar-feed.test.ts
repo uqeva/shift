@@ -270,6 +270,7 @@ describe('calendar-feed: one answer for every miss (D-S8, NFR-27)', () => {
       headers: [
         ['cache-control', 'no-store'],
         ['content-type', 'application/json'],
+        ['x-content-type-options', 'nosniff'],
       ],
       body: JSON.stringify({ code: FEED_NOT_FOUND }),
     });
@@ -282,6 +283,15 @@ describe('calendar-feed: one answer for every miss (D-S8, NFR-27)', () => {
     expect(response.status).toBe(404);
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(await response.text()).toBe('');
+  });
+
+  it('never holds a miss longer than the floor, even when the wall clock steps back', async () => {
+    let calls = 0;
+    // The arrival reads the clock; the miss then reads it an hour earlier.
+    const { handle, slept } = harness(undefined, CONFIGURED, { now: () => (calls++ === 0 ? ARRIVED : ARRIVED - 3_600_000) });
+    const response = await handle(feedRequest('not-a-token'));
+    expect(response.status).toBe(404);
+    expect(slept).toEqual([MISS_FLOOR_MS]);
   });
 
   it('never sends a malformed token anywhere, and never logs a token or a hash', async () => {
@@ -326,6 +336,7 @@ describe('calendar-feed: what is not a fetch', () => {
       { status: 200, body: '"text"' },
       hit(INPUTS, { from: '2026-10-21' }),
       hit(INPUTS, { from: 20261021, to: '2027-05-22' }),
+      hit(INPUTS, { from: '2027-05-22', to: '2026-10-21' }),
       hit(null),
       hit({ ...INPUTS, timeZone: undefined }),
       hit({ ...INPUTS, memberId: 7 }),

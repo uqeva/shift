@@ -4,7 +4,7 @@ type: 'feature'
 created: '2026-11-21'
 status: 'in-review'
 baseline_commit: 'e5f6b7faf57ee53b94c37d8542b3befb2726102b'
-review_loop_iteration: 0
+review_loop_iteration: 1
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-16-context.md'
 ---
@@ -74,13 +74,30 @@ Status: built, CI pending (in review). Approved unattended under the orchestrato
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `packages/ics/**`, `packages/domain/src/index.ts`, `pnpm-lock.yaml` -- the serializer, goldens, purity -- AD-20.
+- [x] `packages/ics/**`, `pnpm-lock.yaml` -- the serializer, goldens, purity -- AD-20.
 - [x] `supabase/functions/calendar-feed/**`, `test/calendar-feed.test.ts` -- the function and its matrix (vector `PARITY_VECTOR`) -- AD-14, D-S8.
 - [x] `config.toml`, router, Dockerfile, `deploy-images.sh`, probe, pipeline, deploy action, compose and their pin tests -- AD-7, AD-14, AD-17.
 - [x] `e2e/**`, `playwright.config.ts` -- the CLI serves the map (written unrun).
 - [x] `test/concurrent-writes.test.ts` -- regeneration ×2; creation vs deactivation, both orders (unrun).
 - [x] `ARCHITECTURE-SPINE.md` -- `Amended 2026-11-21 (16.4)` on AD-7, AD-14, AD-17, AD-20.
 - [x] `deferred-work.md`, `sprint-status.yaml` -- entries marked; Outlook, timing, roles entries.
+
+### Review Findings
+
+Review 2, the epic's security review (2026-11-21; D-S1, D-S2, D-S8, NFR-27).
+
+- [x] [Review][Patch] The miss floor's wait read the wall clock unbounded: a clock stepped back held a 404 open up to the worker timeout; capped at the floor [supabase/functions/calendar-feed/handler.ts:224]
+- [x] [Review][Patch] A reversed window from the lookup was a 500, not the 503 of an answer that is not the lookup's [supabase/functions/calendar-feed/handler.ts:167]
+- [x] [Review][Patch] Every answer carries `x-content-type-options: nosniff` (the body holds stored names) [supabase/functions/calendar-feed/handler.ts:52]
+- [x] [Review][Patch] TEXT values turn U+0080–U+009F, U+2028 and U+2029 into a space, so no client that reads them as breaks sees one [packages/ics/src/text.ts:40]
+- [x] [Review][Patch] The floor was proven against a fake clock only: the image probe and the e2e spec now time a real miss (>= 250 ms) [scripts/ci/probe-functions-image.sh:150, e2e/tests/calendar/calendar-feed.spec.ts:30]
+- [x] [Review][Patch] The e2e misses left out the replaced token: a regenerated link's predecessor is now fetched [e2e/tests/calendar/calendar-feed.spec.ts:49]
+- [x] [Review][Patch] The ics purity scan missed side-effect imports and `require`, and its comment stripper cut lines at a `//` inside a string [packages/ics/test/purity.test.ts:24]
+- [x] [Review][Patch] Docs: DEPLOY.md names all five misses and the floor, says how to raise Kong's level for a session; the functions `.env.example` names `calendar-feed`; the e2e comment no longer credits the probe with events; the spine's bundle size, the spec's task list and its SUMMARY fold count corrected [DEPLOY.md:148]
+- [x] [Review][Defer] The hash is a credential too: PostgREST and Postgres argument logging joins 20.5's host check [deferred-work.md] — deferred, needs a running stack
+- [x] [Review][Defer] No `SEQUENCE`/`LAST-MODIFIED`: Outlook's update of a changed shift, checked with the Outlook step [deferred-work.md] — deferred, AD-20's fixed lines
+- [x] [Review][Defer] Kong at `crit` leans on 20.8's uptime check [deferred-work.md] — deferred, 20.5/20.8
+- [x] [Review][Defer] End-to-end timing of unknown vs revoked misses and the rate limit re-owned to 20.5 (a running stack) [deferred-work.md] — deferred, cannot be measured here
 
 **Acceptance Criteria:**
 - Given the built image, when the probe asks for an unknown and a malformed token, then both get the identical 404.
@@ -90,6 +107,7 @@ Status: built, CI pending (in review). Approved unattended under the orchestrato
 ## Spec Change Log
 
 - 2026-11-21, review 1 (five layers: blind hunter, edge-case hunter, verification gap, epic AC auditor, unrun DB test auditor). No intent_gap or bad_spec; the epic AC auditor found no unlisted deviation, and the unrun DB auditor no defect in the race cases or the e2e helpers. Patched: the lookup now answers 503 for an assembly whose frame is wrong (string ids and zone, nine arrays), as AD-14 says, and `calendarOf` refuses a non-string zone (`RegExp.test(undefined)` passed); `SUPABASE_URL` with a query or fragment is refused; the lookup's bound is an injected `timeout` so a stalled gateway is proven to end in 503; tests pin `redirect: 'manual'`, the digest-failure 500 and the HEAD miss's floor; the probe also checks the vector's 503 with the stand-in gone and refuses two empty misses as "identical"; the e2e spec unfolds SUMMARY lines and checks the HEAD's cache-control; `foldLine` lost a dead variable; spine wording (the floor's limit; zone data via `zone.ts`, not `Intl`); DEPLOY.md names every answer's meaning. Deferred: rate limiting (security review / 20.x), refresh hints and DST-gap display (16.5), an ICS library parse (20.5). Rejected: changing the ratified UID format, DTSTAMP and the stack-wide Kong level (spine decisions); collapsing a duplicate UID (R12 cannot give one); a lenient path (AD-14's canonical form); ETag (pilot scale); per-worker SUPABASE_URL in the probe (commented instead). KEEP: the handler's shape, the 250 ms floor, the goldens.
+- 2026-11-21, review 2, the epic's security review (layers: blind hunter, edge-case hunter, verification gap, acceptance auditor, epic AC auditor, unrun DB test auditor; the artifact renderer's ICS was the goldens, already read back in review 1). No intent_gap or bad_spec. Checked and held: the token is never logged (handler fixed codes, `index.ts`'s two `console.error` calls, the router's codes, Kong's redacted access log and `crit` error level; no path, token or hash in any error path, and nothing in the handler throws); every miss is one 404 in status, body and headers, GET and HEAD alike, and the floor holds for malformed and RPC misses; the path is AD-14's canonical form only (the router refuses `%2e`, dot segments and backslashes, the token class excludes `%`, so an encoded, cased, trailing-slash or over-long path is the miss); the feed is R12 over the member's own assembly with `SUMMARY:<type> · <team>` only (D-S2); escaping, folding and the zone's shape close CRLF injection; `private, max-age=900` and `no-store` on every refusal; the window is the RPC's, the lookup bounded at 10 s; the Dockerfile copies `dist` CI builds from the locked sources in the same job, and the eszip holds only the import graph; the unrun race cases and e2e helpers match 0067 word for word (unrun DB test auditor, verification gap). Patched: the floor's wait capped at the floor (a wall clock stepped back); a reversed window is 503; `nosniff` on every answer; C1 controls and U+2028/U+2029 become a space in TEXT; the floor timed in the probe and the e2e spec; the replaced-token miss in e2e; the ics purity scan; DEPLOY.md, `.env.example`, spine and spec wording. Deferred (deferred-work.md): the hash in PostgREST/Postgres logs, `SEQUENCE` for Outlook, Kong `crit` vs 20.8, end-to-end timing and the rate limit (20.5; the rate limit's number is the founder's). Rejected: a cap on the RPC body (the gateway is ours, the worker has 150 MB and the lookup 10 s); validating each team and shift-type row in the handler (the assembly is AD-19's from the database, and a broken row is a 500 naming nothing); decoding percent-encoded token characters (AD-14's canonical form, as review 1); the router's own 404 for a dot-segment feed path (it depends on the path the client chose, never on a token's state); HEAD's missing `content-length` (every HEAD miss is alike); lowercase methods (`get` is still a read); `noindex`/`Referrer-Policy` (no HTML, no links); an event in the image probe (runtime-parity runs the domain on the pinned runtime, and review 1 served a 106-shift assembly through it); asserting an event count in e2e (the run's rotation is not the test's); narrowing `@shift/ics`'s exports (16.5 is their next consumer); the router test reading `index.ts` imports (it imports `./handler.ts` only, and `deno.json` is pinned). Not listed in Epic AC Deviations (frozen; for the founder): AC 4's "the token is never written to a log in full" is met in the repository, and its host half (Traefik, the host log search) is 20.5's, already in deferred-work.
 
 ## Design Notes
 
@@ -116,7 +134,7 @@ Decisions (founder: decide and record):
 - The image layout (both `dist`s in `/home/packages/`, the three functions, the router) built as the Dockerfile's COPY lines; `edge-runtime bundle` of `calendar-feed` offline: 249 790 bytes (after review).
 - `scripts/ci/probe-functions-image.sh` itself, through a stand-in `docker` (the chroot, host busybox 1.37 httpd and its CGI): 16/16 ok after review, the unknown and malformed 404s identical, the vector's calendar, and its 503 with the stand-in gone.
 - A real assembly (the pilot parity member, D2 window 2026-10-21…2027-05-22, 106 shifts, a transition inside) served by the router and the function behind a busybox CGI: 200 `text/calendar`, `private, max-age=900`; HEAD the same headers, no body; the body byte-identical to Node's `calendarOf` of the same assembly, `DTSTAMP` aside; the stub gone, 503; a malformed token 404 in 279 ms. The runtime's log held `calendar-feed: FEED_UNAVAILABLE` and nothing else.
-- The golden files opened: `zagreb-named.ics` (9 events, both transitions, a folded 3-line SUMMARY of Croatian letters and every escape), `tokyo.ics`, `parity-pilot.ics` (112 events over 2026-03-20…10-31; the runtime check's 106 are the same member over the D2 window). Each was read back by a reader of the file alone, in the test (an ICS library could not be fetched here): every event resolved through the file's own observances to an instant Node's tz database formats back to the written wall clock; the spring night is 11 h (18:00Z–05:00Z), the autumn night 13 h (17:00Z–06:00Z).
+- The golden files opened: `zagreb-named.ics` (9 events, both transitions, a SUMMARY of Croatian letters folded over 2 lines and every escape), `tokyo.ics`, `parity-pilot.ics` (112 events over 2026-03-20…10-31; the runtime check's 106 are the same member over the D2 window). Each was read back by a reader of the file alone, in the test (an ICS library could not be fetched here): every event resolved through the file's own observances to an instant Node's tz database formats back to the written wall clock; the spring night is 11 h (18:00Z–05:00Z), the autumn night 13 h (17:00Z–06:00Z).
 
 **Residual risk:** the e2e spec (the CLI's `functions serve` over the map, the local gateway, the real lookup) and the race cases run first in CI; Outlook is unchecked (deferred-work, OWNER 20.5); the 404's timing end to end is the epic's `security-review`'s.
 

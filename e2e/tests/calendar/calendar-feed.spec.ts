@@ -25,19 +25,28 @@ const feedUrl = (token: string): string => `${API_URL}/functions/v1/calendar-fee
 /** A canonical token no row holds. */
 const NEVER_ISSUED = `${'n'.repeat(42)}A`;
 
-/** What a miss answers, the per-response headers aside. */
-async function missOf(response: APIResponse) {
+/** The miss floor (`MISS_FLOOR_MS` in the handler): no 404 leaves sooner. */
+const MISS_FLOOR_MS = 250;
+
+/** What a miss answers, the per-response headers aside, and whether it kept the floor. */
+async function missOf(send: () => Promise<APIResponse>) {
+  const started = Date.now();
+  const response = await send();
+  const elapsed = Date.now() - started;
   const headers = response.headers();
   return {
     status: response.status(),
     body: await response.text(),
     contentType: headers['content-type'],
     cacheControl: headers['cache-control'],
+    floorKept: elapsed >= MISS_FLOOR_MS,
   };
 }
 
 test.describe('a member’s calendar feed (story 16.4)', () => {
   test('serves the member’s calendar to a client with no session, and one 404 once the link is gone', async ({ request, fixture }) => {
+    // Regenerating replaces the first link, which is then a miss like any other.
+    const replaced = await createCalendarFeedTokenInSql(fixture.slug, fixture.member.username);
     const token = await createCalendarFeedTokenInSql(fixture.slug, fixture.member.username);
     try {
       const response = await request.get(feedUrl(token));
@@ -52,8 +61,8 @@ test.describe('a member’s calendar feed (story 16.4)', () => {
       expect(text).not.toMatch(/DESCRIPTION|LOCATION|ATTENDEE|ORGANIZER/);
       // Each event's SUMMARY is a shift type and a team (unfolded first: a long
       // one continues on the next line). The run's rotation may give the member
-      // no shift in the window, so the count is not asserted here; Vitest and
-      // the image probe hold the events themselves.
+      // no shift in the window, so the count is not asserted here; Vitest
+      // (`test/calendar-feed.test.ts`, `packages/ics`) holds the events.
       const unfolded = text.replaceAll('\r\n ', '');
       for (const summary of unfolded.match(/^SUMMARY:.*$/gm) ?? []) expect(summary).toMatch(/ · /);
 
@@ -66,16 +75,19 @@ test.describe('a member’s calendar feed (story 16.4)', () => {
       await revokeCalendarFeedTokenInSql(fixture.slug, fixture.member.username);
     }
 
-    // Revoked, never issued and malformed: one answer.
-    const revoked = await missOf(await request.get(feedUrl(token)));
-    const unknown = await missOf(await request.get(feedUrl(NEVER_ISSUED)));
-    const malformed = await missOf(await request.get(feedUrl('not-a-token')));
+    // Revoked, replaced, never issued and malformed: one answer, none before the floor.
+    const revoked = await missOf(() => request.get(feedUrl(token)));
+    const replacedMiss = await missOf(() => request.get(feedUrl(replaced)));
+    const unknown = await missOf(() => request.get(feedUrl(NEVER_ISSUED)));
+    const malformed = await missOf(() => request.get(feedUrl('not-a-token')));
     expect(revoked).toEqual({
       status: 404,
       body: '{"code":"FEED_NOT_FOUND"}',
       contentType: 'application/json',
       cacheControl: 'no-store',
+      floorKept: true,
     });
+    expect(replacedMiss).toEqual(revoked);
     expect(unknown).toEqual(revoked);
     expect(malformed).toEqual(revoked);
   });

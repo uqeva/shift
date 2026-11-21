@@ -13,6 +13,7 @@ describe('TEXT escaping (RFC 5545 §3.3.11)', () => {
   it('keeps a tab and the Croatian letters, and turns any other control character into a space', () => {
     expect(escapeText('Noć\tčćđšž ŽĆČĐŠ')).toBe('Noć\tčćđšž ŽĆČĐŠ');
     expect(escapeText('a\u0000b\u001fc\u007fd')).toBe('a b c d');
+    expect(escapeText('a\u0085b\u009fc\u2028d\u2029e')).toBe('a b c d e');
   });
 
   it('leaves the colon alone: a value may hold one', () => {

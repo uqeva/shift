@@ -152,6 +152,17 @@ else
   echo "FAIL  the unknown and the malformed token are answered differently"
   failed=1
 fi
+# And not before the floor (D-S8): the runtime's own clock and timer, which
+# Vitest's fakes cannot prove.
+miss_started="$(date +%s%N)"
+miss_of /calendar-feed/not-a-token.ics >/dev/null
+miss_elapsed_ms=$(( ($(date +%s%N) - miss_started) / 1000000 ))
+if (( miss_elapsed_ms >= 250 )); then
+  echo "ok    a miss is answered no sooner than 250 ms (${miss_elapsed_ms} ms)"
+else
+  echo "FAIL  a miss was answered in ${miss_elapsed_ms} ms, before the 250 ms floor"
+  failed=1
+fi
 # The vector's hash is a hit: the calendar of an empty assembly, its
 # VTIMEZONE written by the bundled serializer from the runtime's zone data.
 feed="$(request GET "/calendar-feed/$feed_vector.ics" '' '' || true)"

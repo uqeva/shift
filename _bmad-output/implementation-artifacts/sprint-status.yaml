@@ -687,7 +687,7 @@ development_status:
   16-1-the-month-prints: done  # #335
   16-2-the-domain-package-runs-on-the-server: done  # #339
   16-3-a-member-s-feed-token-is-a-revocable-secret: done  # #342
-  16-4-the-calendar-feed-serves-a-member-s-own-shifts: review  # built, CI pending
+  16-4-the-calendar-feed-serves-a-member-s-own-shifts: review  # built, security-reviewed, CI pending
   16-5-a-member-subscribes-from-kalendar-na-mobitelu: backlog  # after 16.4 (D-S1, D-S2 ratified 2026-11-21)
   epic-16-retrospective: optional
 

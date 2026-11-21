@@ -25,7 +25,9 @@ function utf8Octets(codePoint: number): number {
  * A TEXT value as RFC 5545 §3.3.11 writes it: `\` `;` `,` escaped, any line
  * break (CRLF, LF or CR) as `\n`. Every other control character (which TEXT
  * does not admit, the tab excepted) becomes a space, so a stray one in a
- * stored name cannot break the line structure.
+ * stored name cannot break the line structure. So do the C1 controls and the
+ * Unicode line and paragraph separators (U+0085, U+2028, U+2029): RFC 5545
+ * admits them, but a client that reads them as line breaks must not see one.
  */
 export function escapeText(value: string): string {
   let escaped = '';
@@ -35,7 +37,7 @@ export function escapeText(value: string): string {
     if (character === '\\' || character === ';' || character === ',') escaped += `\\${character}`;
     else if (character === '\n') escaped += '\\n';
     else if (code === 0x09) escaped += character;
-    else if (code < 0x20 || code === 0x7f) escaped += ' ';
+    else if (code < 0x20 || (code >= 0x7f && code <= 0x9f) || code === 0x2028 || code === 0x2029) escaped += ' ';
     else escaped += character;
   }
   return escaped;

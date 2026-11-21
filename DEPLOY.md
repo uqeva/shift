@@ -146,9 +146,11 @@ pnpm --filter @shift/domain --filter @shift/ics build
 
 The feed is public: a calendar app GETs
 `http://127.0.0.1:54321/functions/v1/calendar-feed/<token>.ics` with no
-header at all, and every unknown, revoked or malformed token answers the same
-`404 {"code":"FEED_NOT_FOUND"}`. Its other answers say where to look:
-`405 METHOD_NOT_ALLOWED` (a client sent something but GET or HEAD);
+header at all, and every unknown, revoked, replaced, deactivated or malformed
+token answers the same `404 {"code":"FEED_NOT_FOUND"}`, never sooner than
+250 ms after it arrived (the timing class, D-S8: a slow 404 is by design).
+Its other answers say where to look: `405 METHOD_NOT_ALLOWED` (a client sent
+anything but GET or HEAD);
 `503 FEED_UNAVAILABLE`, logged as `calendar-feed: FEED_UNAVAILABLE` (the
 function is misconfigured, logged at start as `calendar-feed is misconfigured:
 <code>`, or the lookup through the gateway failed, timed out or answered
@@ -2347,7 +2349,11 @@ on the host by story 20.5 (`deferred-work.md`):
   (`request: "GET /functions/v1/...`). Story 16.4 set `KONG_LOG_LEVEL=crit`,
   so no `error` or `warn` line is written: every lesser gateway diagnostic is
   given up with it, and outages are seen through the uptime check (20.8).
-  20.5 still searches the host's Kong and functions logs for `calendar-feed/`.
+  To diagnose a gateway failure before 20.8 exists, raise the level on the
+  host for the session only (`KONG_LOG_LEVEL=error`, redeploy), set it back
+  to `crit`, and delete what was written meanwhile: those lines may hold a
+  feed token. 20.5 still searches the host's Kong and functions logs for
+  `calendar-feed/`.
 - **Traefik's access log** is Coolify's proxy, off by default. Keep it off; if
   it is ever turned on, drop the request path and query fields.
 

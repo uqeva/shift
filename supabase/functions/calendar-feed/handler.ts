@@ -52,11 +52,14 @@ export const METHOD_NOT_ALLOWED = 'METHOD_NOT_ALLOWED';
 export const CALENDAR_HEADERS = {
   'content-type': 'text/calendar; charset=utf-8',
   'cache-control': 'private, max-age=900',
+  // The body holds stored names: no client may read it as anything else.
+  'x-content-type-options': 'nosniff',
 } as const;
 
 const REFUSAL_HEADERS = {
   'content-type': 'application/json',
   'cache-control': 'no-store',
+  'x-content-type-options': 'nosniff',
 } as const;
 
 export type ConfigurationCode =
@@ -160,6 +163,8 @@ function lookupOf(answer: unknown): Lookup {
   const { window, inputs } = answer as { window?: unknown; inputs?: unknown };
   const { from, to } = (window ?? {}) as { from?: unknown; to?: unknown };
   if (typeof from !== 'string' || typeof to !== 'string' || !DATE.test(from) || !DATE.test(to)) return { kind: 'unavailable' };
+  // ISO dates order as text: a reversed window is not the lookup's either.
+  if (from > to) return { kind: 'unavailable' };
   if (typeof inputs !== 'object' || inputs === null || Array.isArray(inputs)) return { kind: 'unavailable' };
   // The assembly's frame, as AD-19 shapes it; its rows are the domain's
   // preconditions' to check (a breach there is a 500, not this).
@@ -214,7 +219,9 @@ export function createHandler(
     }
 
     const miss = async (): Promise<Response> => {
-      const wait = arrived + MISS_FLOOR_MS - dependencies.now();
+      // Never longer than the floor itself: a wall clock stepped back while
+      // the request ran must not hold a miss open.
+      const wait = Math.min(arrived + MISS_FLOOR_MS - dependencies.now(), MISS_FLOOR_MS);
       if (wait > 0) await dependencies.sleep(wait);
       return refusal(404, FEED_NOT_FOUND, method);
     };

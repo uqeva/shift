@@ -20,15 +20,16 @@ const sources = readdirSync(sourceRoot)
   .filter((name) => name.endsWith('.ts'))
   .map((name) => ({ name, text: readFileSync(join(sourceRoot, name), 'utf8') }));
 
-const code = (text: string): string => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+// A line comment starts a line or follows a space: `'-//Shift//…'` is a string.
+const code = (text: string): string => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|\s)\/\/.*$/gm, '$1');
 
 describe('@shift/ics is pure (AD-20)', () => {
   it('imports only its own files and @shift/domain', () => {
     expect(sources.length).toBeGreaterThan(2);
     for (const { name, text } of sources) {
-      const specifiers = [...code(text).matchAll(/\bfrom\s*['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]/g)].map(
-        (match) => match[1] ?? match[2] ?? '',
-      );
+      const specifiers = [
+        ...code(text).matchAll(/\bfrom\s*['"]([^'"]+)['"]|\bimport\s*\(?\s*['"]([^'"]+)['"]|\brequire\s*\(\s*['"]([^'"]+)['"]/g),
+      ].map((match) => match[1] ?? match[2] ?? match[3] ?? '');
       for (const specifier of specifiers) {
         expect(specifier === '@shift/domain' || specifier.startsWith('./'), `${name}: ${specifier}`).toBe(true);
       }
