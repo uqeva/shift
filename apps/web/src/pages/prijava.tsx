@@ -4,12 +4,15 @@ import type { ReactNode } from 'react';
 import { AuthLayout } from '@/components/layout/auth-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { OrganizationSwitchOffer } from '@/features/auth/components/organization-switch-offer';
+import { SentCard } from '@/features/auth/components/sent-card';
 import { SignInForm } from '@/features/auth/components/sign-in-form';
+import { UnconfirmedPanel } from '@/features/auth/components/unconfirmed-panel';
 import { useOrganizationSwitch } from '@/features/auth/hooks/use-organization-switch';
 import { useSignIn } from '@/features/auth/hooks/use-sign-in';
 import { organizationDestination } from '@/features/auth/services/address';
 import { organizationSwitchOf, type OrganizationSwitch } from '@/features/auth/services/organization-switch';
 import { returnSearchOf, returnTargetOf } from '@/features/auth/services/return-target';
+import { SENT_SIGNUP } from '@/features/auth/services/signup';
 import { t } from '@/lib/i18n';
 import { resolvedSession } from '@/lib/supabase/client';
 import { rootRoute } from '@/pages/__root';
@@ -43,6 +46,41 @@ export function SignInScreen() {
   // `slug`, and the form then offers the field instead of the row.
   const { slug } = useParams({ strict: false });
   const screen = useSignIn(slug);
+
+  // STORY 19.2: an unconfirmed email sign-in shows *Potvrdi adresu e-pošte*
+  // in the card, and its new link the one neutral screen.
+  if (screen.sent !== null) {
+    return (
+      <AuthLayout>
+        <Card className="w-full max-w-sm">
+          <SentCard
+            key={screen.sent.at}
+            address={screen.sent.address}
+            kind={SENT_SIGNUP}
+            at={screen.sent.at}
+            onCorrect={screen.backToForm}
+          />
+        </Card>
+      </AuthLayout>
+    );
+  }
+
+  if (screen.unconfirmed !== null) {
+    return (
+      <AuthLayout>
+        <Card className="w-full max-w-sm">
+          <CardHeader>
+            <CardTitle asChild>
+              <h1>{t('signup.unconfirmed.heading')}</h1>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <UnconfirmedPanel screen={screen} />
+          </CardContent>
+        </Card>
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout>

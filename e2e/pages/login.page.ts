@@ -91,6 +91,69 @@ export class LoginPage extends BasePage {
     return this.page.getByRole('button', { name: fill(hr.auth.switch.stay, { current }), exact: true });
   }
 
+  // ------------------------------------------------- story 19.2: signup screens
+
+  /** *Prijava*'s way to `/registracija` (bare `/prijava` only). */
+  get registerLink(): Locator {
+    return this.page.getByRole('link', { name: hr.signup.signIn.registerLink, exact: true });
+  }
+
+  /** The hint the organization field shows while the entry is an address. */
+  get emailOrganizationHint(): Locator {
+    return this.page.locator('#organization-hint');
+  }
+
+  /** The forgot panel's *Nova lozinka e-mailom*. */
+  get recoverByEmailLink(): Locator {
+    return this.page.getByRole('link', { name: hr.signup.forgot.emailLink, exact: true });
+  }
+
+  /** The address field of `/registracija` and `/zaboravljena-lozinka`. */
+  get signupEmailInput(): Locator {
+    return this.page.getByLabel(hr.signup.form.email, { exact: true });
+  }
+
+  get signupPasswordInput(): Locator {
+    return this.page.getByLabel(hr.signup.form.password, { exact: true });
+  }
+
+  get signupButton(): Locator {
+    return this.page.getByRole('button', { name: hr.signup.form.submit, exact: true });
+  }
+
+  get recoverButton(): Locator {
+    return this.page.getByRole('button', { name: hr.signup.recover.submit, exact: true });
+  }
+
+  /** The Callout telling a member of an existing organization not to register. */
+  get memberCallout(): Locator {
+    return this.page.getByText(hr.signup.member.heading, { exact: true });
+  }
+
+  /** The neutral screen's sentence and the address it shows. */
+  get sentBody(): Locator {
+    return this.page.getByText(hr.signup.sent.body, { exact: true });
+  }
+
+  sentAddress(address: string): Locator {
+    return this.page.getByText(fill(hr.signup.sent.typed, { address }), { exact: true });
+  }
+
+  /** *Pošalji ponovno*, while the throttle runs (its name carries the time). */
+  get resendWaiting(): Locator {
+    const [before = '', after = ''] = hr.signup.sent.resendIn.split('{time}');
+    return this.page.getByRole('button', { name: new RegExp(`^${before}\\d:\\d\\d${after}$`) });
+  }
+
+  get correctAddressButton(): Locator {
+    return this.page.getByRole('button', { name: hr.signup.sent.correct, exact: true });
+  }
+
+  /** `/potvrda`'s one press. */
+  get confirmButton(): Locator {
+    return this.page.getByRole('button', { name: hr.signup.confirm.submit, exact: true });
+  }
+
   /** The real sign-in from bare `/prijava`, through GoTrue. Leaves the page
    *  wherever the attempt lands. */
   async submitSignIn(slug: string, username: string, password: string): Promise<void> {

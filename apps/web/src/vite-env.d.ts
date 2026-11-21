@@ -17,6 +17,12 @@ interface ImportMetaEnv {
    * exists only in `notify`'s environment. Absent, push cannot be turned on.
    */
   readonly VITE_VAPID_PUBLIC_KEY?: string;
+  /**
+   * Story 19.2 (AD-21's third switch): exactly `true` renders `/registracija`,
+   * *Prijava*'s link to it and `/zaboravljena-lozinka`. Cosmetic, not a
+   * control; `scripts/ci/require-config.mjs` refuses it for production.
+   */
+  readonly VITE_SIGNUP_ENABLED?: string;
 }
 
 interface ImportMeta {

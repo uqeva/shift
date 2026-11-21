@@ -1624,6 +1624,9 @@ describe('the self-hosted stack (story 19.1): the signup door in GoTrue (AD-21)'
 
   it('builds every link on the site URL, which is the app origin', () => {
     expect(environment('supabase-auth').get('GOTRUE_SITE_URL')).toBe('${SHIFT_APP_URL:?}');
+    // C7 (security review of 19.2): the redirect allow list is the app origin
+    // alone, so no `redirect_to` can send a link anywhere else.
+    expect(environment('supabase-auth').get('GOTRUE_URI_ALLOW_LIST')).toBe('${SHIFT_APP_URL:?}');
     for (const html of Object.values(servedTemplates())) {
       const links = [...html.matchAll(/href="([^"]*)"/g)].map((match) => match[1] ?? '');
       expect(links.length).toBeGreaterThan(0);

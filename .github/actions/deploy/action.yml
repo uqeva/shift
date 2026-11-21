@@ -68,6 +68,15 @@ inputs:
     description: Production only, when migrations are pending - the UTC time of the backup taken for them.
     required: false
     default: ''
+  signup-enabled:
+    description: >-
+      Story 19.2 (AD-21's third switch): VITE_SIGNUP_ENABLED for this build,
+      passed ONLY from the same vars.VITE_SIGNUP_ENABLED the calling job's
+      Check configuration step hands require-config.mjs, which refuses it for
+      production. Exactly true renders the signup screens; anything else
+      leaves them out.
+    required: false
+    default: ''
 
 outputs:
   app-origin:
@@ -118,13 +127,30 @@ runs:
 
     # Vite inlines VITE_* at build time, so each environment builds its own
     # bundle (and its own CSP, which names this API origin).
+    #
+    # Story 19.2: VITE_SIGNUP_ENABLED comes from the signup-enabled input
+    # alone. require-config.mjs has already refused it for production in the
+    # calling job; the build refuses it again here, so a production bundle can
+    # never carry the signup screens whatever a caller passes.
     - name: Build apps/web for ${{ inputs.environment }}
       shell: bash
       env:
+        ENVIRONMENT: ${{ inputs.environment }}
         VITE_SUPABASE_URL: ${{ inputs.supabase-api-url }}
         VITE_SUPABASE_PUBLISHABLE_KEY: ${{ inputs.supabase-publishable-key }}
         VITE_VAPID_PUBLIC_KEY: ${{ inputs.vapid-public-key }}
-      run: pnpm --filter "@shift/web..." build
+        VITE_SIGNUP_ENABLED: ${{ inputs.signup-enabled }}
+      run: |
+        if [ "$ENVIRONMENT" = production ] && [ -n "$VITE_SIGNUP_ENABLED" ] && [ "$VITE_SIGNUP_ENABLED" != false ]; then
+          echo "::error title=Refused variable::VITE_SIGNUP_ENABLED is set for production (AD-21)"
+          exit 1
+        fi
+        # Fail closed (19.2's security review): production's bundle is built
+        # with the switch explicitly off, so no .env file can turn it on.
+        if [ "$ENVIRONMENT" = production ]; then
+          export VITE_SIGNUP_ENABLED=false
+        fi
+        pnpm --filter "@shift/web..." build
 
     # AD-17 on the bundle about to ship: no sb_secret_ key, no JWT whose role
     # is not anon, no Resend key, and not the private half of this

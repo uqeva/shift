@@ -14,6 +14,7 @@ import {
   SIGN_IN_PARTS,
   SIGN_IN_SCREEN_EXEMPT,
 } from '../apps/web/src/features/auth/sign-in-screen.fixture.ts';
+import { SIGNUP_PARTS, SIGNUP_SCREEN_EXEMPT } from '../apps/web/src/features/auth/signup-screens.fixture.ts';
 import { CALENDAR_SCREEN_PARTS } from '../apps/web/src/features/calendar/calendar-screen.fixture.ts';
 import {
   HOUR_BAND_EDIT_PARTS,
@@ -270,13 +271,22 @@ const SIGN_IN_PAGE = join(webRoot, 'src', ...SIGN_IN_PARTS.page);
 /** Story 7.8's set-password page, from its own fixture. */
 const SET_PASSWORD_PAGE = join(webRoot, 'src', ...SET_PASSWORD_PARTS.page);
 
+/** Story 19.2's four pages, from the signup screens' fixture. */
+const SIGNUP_PAGES = Object.values(SIGNUP_PARTS)
+  .filter((parts) => parts[0] === 'pages')
+  .map((parts) => join(webRoot, 'src', ...parts));
+
 /** The service modules beside the two sets' parts, read off both fixtures' exempt lists. */
-const AUTH_RULE_MODULES = [...SIGN_IN_SCREEN_EXEMPT, ...SET_PASSWORD_SCREEN_EXEMPT]
+const AUTH_RULE_MODULES = [...SIGN_IN_SCREEN_EXEMPT, ...SET_PASSWORD_SCREEN_EXEMPT, ...SIGNUP_SCREEN_EXEMPT]
   .map((entry) => entry.file)
   .filter((file) => !/\.fixture\.[cm]?[jt]sx?$/.test(file));
 
-/** Every part of the two auth sets outside `pages/`, from the fixtures. */
-const AUTH_FEATURE_PARTS = [...Object.values(SIGN_IN_PARTS), ...Object.values(SET_PASSWORD_PARTS)].filter(
+/** Every part of the three auth sets outside `pages/`, from the fixtures. */
+const AUTH_FEATURE_PARTS = [
+  ...Object.values(SIGN_IN_PARTS),
+  ...Object.values(SET_PASSWORD_PARTS),
+  ...Object.values(SIGNUP_PARTS),
+].filter(
   (parts) => parts[0] !== 'pages',
 );
 
@@ -405,6 +415,10 @@ const SOURCES = [
   // Story 7.8: the first sign-in's set-password step, its hook and form read
   // off the auth feature's folders with the sign-in screen's.
   SET_PASSWORD_PAGE,
+  // Story 19.2: *Registracija*, *Potvrda*, *Zaboravljena lozinka* and the
+  // `/postavljanje` placeholder, from their fixture; their hooks and parts
+  // are read off the auth feature's folders with the other two sets'.
+  ...SIGNUP_PAGES,
   join(webRoot, 'src', 'pages', 'not-found.tsx'),
   // `/`. A `.tsx` carrying a string that is absent from this list is swept by
   // nothing — the freshness guard would not notice a build that predates it.
@@ -910,9 +924,11 @@ describe('the build being read reflects the current localization source', () => 
         'services/last-organization.ts',
         'services/organization-switch.ts',
         'services/return-target.ts',
+        'services/session-destination.ts',
         'services/set-password.ts',
         'services/sign-in.ts',
         'services/sign-out.ts',
+        'services/signup.ts',
       ].sort(),
     );
     expect(parts, 'the auth feature grew or lost a module').toHaveLength(
@@ -921,9 +937,14 @@ describe('the build being read reflects the current localization source', () => 
     // TEN SINCE STORY 7.8: the set-password step's hook and form, and its
     // service module. FOURTEEN SINCE RETRO 10 A5: the other-organization
     // offer's hook and component, its rule, and the shared session end.
-    expect(parts, 'the auth feature grew or lost a module').toHaveLength(14);
+    // TWENTY-SEVEN SINCE STORY 19.2: the unconfirmed sign-in's panel, the
+    // signup screens' five hooks and five parts, and their two rules
+    // (`signup.ts`, `session-destination.ts`).
+    expect(parts, 'the auth feature grew or lost a module').toHaveLength(27);
     expect(SOURCES, `${SIGN_IN_PAGE} is not in SOURCES`).toContain(SIGN_IN_PAGE);
     expect(SOURCES, `${SET_PASSWORD_PAGE} is not in SOURCES`).toContain(SET_PASSWORD_PAGE);
+    expect(SIGNUP_PAGES, 'the signup set lost a page').toHaveLength(4);
+    for (const page of SIGNUP_PAGES) expect(SOURCES, `${page} is not in SOURCES`).toContain(page);
     expect([...parts].sort(), 'the feature holds a module no set and no service list names').toEqual(
       [...AUTH_SOURCES_REQUIRED].sort(),
     );
@@ -1762,7 +1783,15 @@ function wordOccurrences(haystack: string, needle: string): number {
 // path (the route definition and both guards' redirects), never copy.
 // STORY 14.2: `/povijest-promjena`, whose `promjena` is the change history's
 // path (the route definition and the destination table), never copy.
-const ROUTE_SEGMENTS = ['/postavke-rotacije/tipovi-smjena/', '/postavi-lozinku', '/povijest-promjena'];
+// STORY 19.2: `/zaboravljena-lozinka`, whose `lozinka` is email recovery's
+// path (the route definition and the two `<Link to>` that open it: the
+// sign-in's forgot panel and the dead-link page), never copy.
+const ROUTE_SEGMENTS = [
+  '/postavke-rotacije/tipovi-smjena/',
+  '/postavi-lozinku',
+  '/povijest-promjena',
+  '/zaboravljena-lozinka',
+];
 
 function withoutRouteSegments(chunk: string): string {
   return ROUTE_SEGMENTS.reduce((text, segment) => text.replaceAll(segment, ''), chunk);

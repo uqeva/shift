@@ -1,7 +1,7 @@
 {
   "auth": {
     "heading": "Prijava",
-    "username": "Korisničko ime",
+    "username": "Korisničko ime ili e-mail",
     "password": "Lozinka",
     "submit": "Prijava",
     "pending": "Prijava…",
@@ -38,7 +38,7 @@
       "changeLabel": "Promijeni organizaciju",
       "remembered": "Zapamćeno na ovom uređaju.",
       "hint": "Kratica organizacije je na poveznici za prijavu ili je dobiješ od administratora.",
-      "placeholder": "npr. dvd-kastel-novi"
+      "placeholder": "npr. naziv-organizacije"
     },
     "forgot": {
       "trigger": "Zaboravljena lozinka?",
@@ -1216,6 +1216,7 @@
         "nameTooLong": "Ime može imati najviše 100 znakova.",
         "usernameTaken": "Ovo korisničko ime već postoji u organizaciji.",
         "usernameInvalid": "Korisničko ime ne smije sadržavati razmak ili znak @.",
+        "signInIsEmail": "Ova se osoba prijavljuje e-mailom, pa se njezino korisničko ime ne mijenja.",
         "unknown": "Ova osoba više ne postoji u organizaciji.",
         "notApplied": "Korisničko ime nije promijenjeno. Pokušaj ponovno.",
         "unsettled": "Korisničko ime nije usklađeno. Potrebna je pomoć operatera.",
@@ -2383,6 +2384,106 @@
       },
       "expiry": "Poveznica vrijedi jedan sat i može se upotrijebiti jednom.",
       "fallback": "Ako gumb ne radi, otvori ovu poveznicu u pregledniku:"
+    },
+    "heading": "Nova organizacija",
+    "lede": "Registracijom stvaraš novu organizaciju u kojoj si administrator.",
+    "member": {
+      "heading": "Tvoja organizacija već koristi Shift?",
+      "body": "Ne registriraj se. Korisničko ime i lozinku dobivaš od svog administratora."
+    },
+    "form": {
+      "email": "E-mail",
+      "emailHint": "Na ovu adresu šaljemo poveznicu za potvrdu.",
+      "password": "Lozinka",
+      "submit": "Registriraj se",
+      "pending": "Slanje…",
+      "haveAccount": "Već imaš račun?",
+      "signIn": "Prijava",
+      "error": {
+        "address": "Upiši ispravnu adresu e-pošte, npr. ime@domena.hr.",
+        "password": "Lozinka mora imati najmanje 10 znakova.",
+        "passwordLong": "Lozinka je preduga: najviše 72 znaka, a č, ć, đ, š i ž broje se kao dva."
+      }
+    },
+    "error": {
+      "throttled": "Poruku trenutačno ne možemo poslati. Pokušaj ponovno za sat vremena.",
+      "unavailable": "Slanje trenutačno nije moguće. Pokušaj ponovno."
+    },
+    "sent": {
+      "heading": "Provjeri e-poštu",
+      "body": "Ako adresa može primiti poruku, poslali smo poveznicu za potvrdu.",
+      "typed": "Upisana adresa: {address}",
+      "correct": "Ispravi adresu",
+      "note": "Poveznica vrijedi sat vremena. Poruku potraži i u neželjenoj pošti.",
+      "resend": "Pošalji ponovno",
+      "resendIn": "Pošalji ponovno za {time}",
+      "resent": "Ako adresa može primiti poruku, poslali smo novu poveznicu."
+    },
+    "signIn": {
+      "organizationHint": "Za prijavu e-mailom organizacija nije potrebna.",
+      "error": "E-mail ili lozinka nisu točni.",
+      "register": "Nova organizacija?",
+      "registerLink": "Registriraj se"
+    },
+    "unconfirmed": {
+      "heading": "Potvrdi adresu e-pošte",
+      "body": "Prije prve prijave potvrdi adresu poveznicom iz poruke koju smo poslali.",
+      "resend": "Pošalji novu poveznicu",
+      "pending": "Slanje…",
+      "note": "Poruku potraži i u neželjenoj pošti. Poveznica vrijedi sat vremena.",
+      "back": "Natrag na prijavu"
+    },
+    "forgot": {
+      "emailHeading": "Prijavljuješ se e-mailom?",
+      "emailBody": "Pošaljemo ti poveznicu za novu lozinku.",
+      "emailLink": "Nova lozinka e-mailom",
+      "usernameHeading": "Prijavljuješ se korisničkim imenom?"
+    },
+    "recover": {
+      "heading": "Nova lozinka",
+      "lede": "Upiši adresu kojom se prijavljuješ. Poslat ćemo ti poveznicu za novu lozinku.",
+      "submit": "Pošalji poveznicu",
+      "pending": "Slanje…",
+      "username": "Prijavljuješ se korisničkim imenom? Lozinku postavlja administrator.",
+      "sent": "Ako adresa može primiti poruku, poslali smo poveznicu za novu lozinku.",
+      "typed": "Upisana adresa: {address}",
+      "error": {
+        "address": "Upiši adresu e-pošte."
+      }
+    },
+    "confirm": {
+      "heading": "Potvrdi adresu",
+      "lede": "Pritisni Potvrdi i nastavi na postavljanje organizacije.",
+      "submit": "Potvrdi",
+      "pending": "Potvrđivanje…",
+      "confirmed": "Adresa je potvrđena.",
+      "error": {
+        "unavailable": "Potvrda trenutačno nije moguća. Pokušaj ponovno."
+      }
+    },
+    "dead": {
+      "heading": "Poveznica više ne vrijedi",
+      "body": "Poveznica je već iskorištena ili je istekla.",
+      "next": "Prijavi se svojom adresom i lozinkom. Ako adresa još nije potvrđena, ponudit ćemo ti novu poveznicu.",
+      "signIn": "Prijava",
+      "recover": "Zatraži novu poveznicu"
+    },
+    "recovery": {
+      "heading": "Postavi novu lozinku",
+      "lede": "Nakon spremanja ostaješ u aplikaciji.",
+      "submit": "Spremi novu lozinku",
+      "pending": "Spremanje…",
+      "error": {
+        "notSaved": "Lozinka nije spremljena. Pokušaj ponovno.",
+        "refused": "Ta lozinka nije prihvaćena. Upiši drukčiju od dosadašnje, najviše 72 znaka (č, ć, đ, š i ž broje se kao dva)."
+      }
+    },
+    "setup": {
+      "heading": "Nova organizacija",
+      "signedInAs": "Prijavljuješ se adresom {email}.",
+      "body": "Stvaranje organizacije još nije dostupno. Vrati se uskoro.",
+      "signOut": "Odjava",
+      "signOutError": "Odjava trenutačno nije moguća. Pokušaj ponovno."
     }
   }
 }

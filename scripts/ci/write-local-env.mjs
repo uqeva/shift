@@ -56,6 +56,11 @@ export function renderEnvFiles(status) {
       `VITE_SUPABASE_URL=${apiUrl}`,
       `VITE_SUPABASE_PUBLISHABLE_KEY=${publishable}`,
       `VITE_VAPID_PUBLIC_KEY=${LOCAL_VAPID_PUBLIC_KEY}`,
+      // Story 19.2 (AD-21's third switch): the local stack's door is open
+      // (`config.toml`, `seed.sql`), so the dev server and the E2E suite show
+      // the signup screens. Never a deployed value: the deploy action's build
+      // reads only the checked repository variable.
+      'VITE_SIGNUP_ENABLED=true',
       '',
     ].join('\n'),
     functions: [

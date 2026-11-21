@@ -174,3 +174,102 @@ export function organizationOfAddress(email: string | null | undefined): string 
 
   return isOrganizationSlug(slug) ? slug : null;
 }
+
+// ------------------------------------------------------- the two identity kinds
+
+/**
+ * AD-12's predicate, the SPA's home of it (story 19.2). The other two homes are
+ * `private.address_kind` (0066) and the function rendered into Kong's mail
+ * route; all three run `test/fixtures/synthesized-addresses.json`.
+ *
+ * Normalization first, exactly as the other homes do it: trim ASCII white
+ * space (tab, line feed, vertical tab, form feed, carriage return, space) and
+ * lower-case ASCII letters ONLY (19.1's D5), so a Unicode case fold can never
+ * make the homes disagree. Malformed is no `@`, more than one `@`, a double or
+ * single quote, or an empty part. The domain loses one trailing `.`.
+ */
+export type AddressKind = 'synthesized' | 'email' | 'malformed';
+
+const ASCII_WHITESPACE = '\t\n\v\f\r ';
+
+/** Trims ASCII white space only: `String.prototype.trim` would also take a no-break space. */
+export function trimAsciiWhitespace(text: string): string {
+  let start = 0;
+  let end = text.length;
+  while (start < end && ASCII_WHITESPACE.includes(text.charAt(start))) start += 1;
+  while (end > start && ASCII_WHITESPACE.includes(text.charAt(end - 1))) end -= 1;
+
+  return text.slice(start, end);
+}
+
+/** Lower-cases A–Z and nothing else. */
+function asciiLower(text: string): string {
+  return text.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
+}
+
+/** The kind of an auth address: synthesized (a username identity), email, or malformed. */
+export function addressKind(address: string | null | undefined): AddressKind {
+  if (typeof address !== 'string') return 'malformed';
+
+  const normalized = asciiLower(trimAsciiWhitespace(address));
+
+  if (normalized.includes('"') || normalized.includes("'")) return 'malformed';
+
+  const parts = normalized.split('@');
+
+  if (parts.length !== 2) return 'malformed';
+
+  const local = parts[0] ?? '';
+  const rawDomain = parts[1] ?? '';
+  const domain = rawDomain.endsWith('.') ? rawDomain.slice(0, -1) : rawDomain;
+
+  if (local === '' || domain === '') return 'malformed';
+  if (domain === ADDRESS_DOMAIN || domain.endsWith(`.${ADDRESS_DOMAIN}`)) return 'synthesized';
+
+  return 'email';
+}
+
+/** Whether an address is a username identity's (AD-12). */
+export function isSynthesizedAddress(address: string | null | undefined): boolean {
+  return addressKind(address) === 'synthesized';
+}
+
+/**
+ * GoTrue v2.196.0's own address check, read from the pinned binary
+ * (`badoux/checkmail`'s pattern, ASCII-only and anchored), with the apostrophe
+ * taken out of the local part: every home refuses `'` (19.1's D9, kept by
+ * 19.2). GoTrue also refuses an address longer than 255.
+ */
+const GOTRUE_ADDRESS_PATTERN =
+  /^[a-zA-Z0-9.!#$%&*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+const GOTRUE_ADDRESS_MAX_LENGTH = 255;
+
+/**
+ * What a signup, resend, recovery or email sign-in sends: the address trimmed
+ * of ASCII white space, or `null` when the SPA must refuse it on the page.
+ *
+ * WHY REFUSE HERE. Kong answers every mail request `200 {}` (AD-22) and relays
+ * only an email identity's address in printable ASCII; GoTrue then refuses
+ * what its own pattern refuses, unseen. Anything this function lets through is
+ * an address the gateway relays and GoTrue accepts, so the masked answer never
+ * strands someone who typed something plausible (deferred-work, OWNER 19.2).
+ * A synthesized address is refused too: it is never a mailbox.
+ */
+export function signupAddressOf(typed: string): string | null {
+  const address = trimAsciiWhitespace(typed);
+
+  if (addressKind(address) !== 'email') return null;
+  if (address.length > GOTRUE_ADDRESS_MAX_LENGTH) return null;
+  if (!GOTRUE_ADDRESS_PATTERN.test(address)) return null;
+
+  return address;
+}
+
+/**
+ * Whether a sign-in entry is an email address (AD-12): it holds an `@`. A
+ * username never can (`members_username_check`), so the two kinds can never be
+ * confused.
+ */
+export function isEmailEntry(entry: string): boolean {
+  return entry.includes('@');
+}

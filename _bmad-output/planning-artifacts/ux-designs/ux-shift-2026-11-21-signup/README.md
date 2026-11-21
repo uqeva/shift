@@ -54,7 +54,7 @@ The steps 2–6 mockups sketch where the shipped sections sit, under one explain
 
 ## Open items for the founder
 
-- **O1. The pilot literal on *Prijava*.** `auth.organization.placeholder` reads `npr. dvd-kastel-novi`, and every stranger meets it after confirming. Recommended: `npr. naziv-organizacije`, which changes what the pilot sees too. This is outside 19.4's `signup`/`onboarding` sweep, so 19.2 should take it.
+- **O1. The pilot literal on *Prijava*.** `auth.organization.placeholder` reads `npr. dvd-kastel-novi`, and every stranger meets it after confirming. Recommended: `npr. naziv-organizacije`, which changes what the pilot sees too. This is outside 19.4's `signup`/`onboarding` sweep, so 19.2 should take it. **Taken by 19.2 (2026-11-21):** the placeholder reads `npr. naziv-organizacije`.
 - **O2. Terms and privacy on `/registracija`.** The review adds no checkbox and no link, because none exists in the product. Whether self-service signup needs a privacy notice or terms link before production (D-S5) is a founder and legal decision.
 - **O3. Defaults in shipped dialogs.** FR-97 says no onboarding step pre-selects a count, duration, boundary or name. 19.4's spec must check the shipped add dialogs embedded in steps 2–6 for anything selected by default and clear it: the shift type's kind and times, the rotation's *Vrijedi od*, and the new member's level. Because the dialogs are shared (D9), that changes them everywhere.
 - **Recorded, not open:**

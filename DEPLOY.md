@@ -2682,10 +2682,17 @@ founder's decision at D-S5, after the security review in
    `GOTRUE_SMTP_PASS`), then a restart of the auth resource. The ceilings
    (`accounts_per_day` 100, `organizations_per_day` 20,
    `attempts_per_account` 10) are changed the same way.
-3. **The SPA.** `VITE_SIGNUP_ENABLED` (from 19.2) renders the signup screens.
-   It is a cosmetic switch, not a control: `require-config.mjs` refuses it for
-   production, so production's deploy fails if the variable is set on that
-   environment to anything but `false`.
+3. **The SPA.** `VITE_SIGNUP_ENABLED` renders the signup screens
+   (`/registracija`, *Prijava*'s link to it, `/zaboravljena-lozinka`; story
+   19.2). It is a cosmetic switch, not a control: `require-config.mjs` refuses
+   it for production, so production's deploy fails if the variable is set on
+   that environment to anything but `false`. The deploy action's build reads
+   it only from its `signup-enabled` input, which each deploy job passes from
+   the same `vars.VITE_SIGNUP_ENABLED`, and refuses it again for production.
+   Set it to `true` on the `staging` environment when staging opens. Vite
+   inlines it at build time, so a change takes effect only with the next
+   deploy's build, opening or shutting alike; the GoTrue and SQL switches act
+   at once.
 
 **Production relays `/recover` to a GoTrue with no SMTP key.** Kong's mail
 routes are the same on every stack. On production no email identity exists,
@@ -2725,9 +2732,11 @@ a plain 404, never the SPA's `index.html`.
 - The templates are built from `hr.json`'s `signup.email` keys into the SPA's
   `dist/auth-email/` (confirmation, recovery, email change) and served from
   the app origin; GoTrue fetches them from `SHIFT_APP_URL`. Their subjects are
-  in the compose. Each link is `/potvrda?token_hash=…&type=…`, which 19.2
-  builds. Locally the CLI's default templates and its mail catcher stay in
-  place until then.
+  in the compose. Each link is `/potvrda?token_hash=…&type=…` (story 19.2),
+  which verifies only when the person presses *Potvrdi* or *Spremi novu
+  lozinku*. Locally the CLI sends the same templates, committed under
+  `supabase/templates/auth-email/` (`node scripts/auth-email-templates.mjs`
+  rewrites them after a copy change), into its mail catcher.
 - `SHIFT_AUTH_EMAIL_PER_HOUR` (10 on staging) caps GoTrue's mail for the whole
   stack; Resend's daily allowance is shared with `notify` (checklist A9).
 
@@ -2778,6 +2787,26 @@ screens: set the inputs above in Coolify (`SHIFT_DISABLE_SIGNUP=false`,
 redeploy, check `supabase-auth`'s log shows no `auth-entrypoint:` refusal,
 then open `signup_settings` by SQL. Closing is the reverse: the SQL first
 (immediate), then the environment.
+
+**The enumeration probe (story 19.2, checklist B1, B2, B5, B8).** On 20.1's
+rehearsal stack (§9.5) and then on staging, run
+`scripts/probe/signup-enumeration.mjs` from the operator's machine with
+`SHIFT_PROBE_API` (the stack's API origin), `SHIFT_PROBE_KEY` (its publishable
+key), `SHIFT_PROBE_KNOWN_CONFIRMED` and `SHIFT_PROBE_KNOWN_UNCONFIRMED` (two
+test accounts' addresses) and `SHIFT_PROBE_NEW_DOMAIN` (a domain whose mail the
+operator receives) in the environment. A full run sends more mail requests
+than Kong's per-address limit allows, so raise `SHIFT_LIMIT_MAIL_HOUR` and
+`SHIFT_LIMIT_MAIL_DAY` for the window, redeploy, run, and restore them. It
+exits 0 only when every mail route gives one status, body and header set and
+the medians sit inside one timing class (50 ms), and when the password grant
+answers an unknown address and a wrong password alike; it reports the grant's
+timing difference for the founder (B8). It prints no address. Never run it
+against the CLI's Kong. It leaves one unconfirmed account per sample (each
+counts against `accounts_per_day`) and sends real mail; afterwards, over the
+tailnet, `delete from auth.users where email like 'probe-%@' || '<SHIFT_PROBE_NEW_DOMAIN>'
+and email_confirmed_at is null and not exists (select 1 from public.members m where
+m.auth_user_id = auth.users.id);`, with the run's own domain written in, removes
+them and no stranger's pending signup.
 
 **A dump carries the switch.** A staging dump holds
 `signup_settings.open = true`. Production restores only from production's own

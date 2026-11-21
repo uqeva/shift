@@ -140,6 +140,46 @@ describe('the Auth email templates (story 19.1)', () => {
     expect(() => emailCopyOf(closing)).toThrow(/signup\.email\.fallback holds a Go template delimiter/);
   });
 
+  it('gives the local stack the same templates and subjects, committed and current (story 19.2)', () => {
+    // The CLI reads `content_path` at `supabase start`, before any build, so
+    // the three files are committed under `supabase/templates/auth-email/`
+    // and must equal what the build emits from today's `hr.json`
+    // (`node scripts/auth-email-templates.mjs` rewrites them).
+    const config = readFileSync(join(repoRoot, 'supabase', 'config.toml'), 'utf8');
+    const section = (name: string): Map<string, string> => {
+      const at = config.indexOf(`[auth.email.template.${name}]`);
+      expect(at, `[auth.email.template.${name}] is missing`).toBeGreaterThan(-1);
+      const body = config.slice(at).split('\n').slice(1);
+      const end = body.findIndex((line) => line.startsWith('['));
+      return new Map(
+        (end === -1 ? body : body.slice(0, end))
+          .map((line) => /^(\w+) = "(.*)"$/.exec(line.trim()))
+          .filter((match): match is RegExpExecArray => match !== null)
+          .map((match): [string, string] => [match[1] ?? '', match[2] ?? '']),
+      );
+    };
+    const subjects = authEmailSubjects(resource);
+    const cli = {
+      'confirmation.html': ['confirmation', 'GOTRUE_MAILER_SUBJECTS_CONFIRMATION'],
+      'recovery.html': ['recovery', 'GOTRUE_MAILER_SUBJECTS_RECOVERY'],
+      'email-change.html': ['email_change', 'GOTRUE_MAILER_SUBJECTS_EMAIL_CHANGE'],
+    } as const;
+    for (const { file, html } of authEmailTemplates(resource)) {
+      const [name, subject] = cli[file as keyof typeof cli];
+      const values = section(name);
+      expect(values.get('content_path'), name).toBe(`./supabase/templates/${AUTH_EMAIL_DIRECTORY}/${file}`);
+      expect(values.get('subject'), name).toBe(subjects[subject]);
+      expect(
+        readFileSync(join(repoRoot, 'supabase', 'templates', AUTH_EMAIL_DIRECTORY, file), 'utf8'),
+        `supabase/templates/${AUTH_EMAIL_DIRECTORY}/${file} is stale: run node scripts/auth-email-templates.mjs`,
+      ).toBe(html);
+    }
+    expect(readdirSync(join(repoRoot, 'supabase', 'templates', AUTH_EMAIL_DIRECTORY)).sort()).toEqual(
+      AUTH_EMAIL_TEMPLATES.map(({ file }) => file).sort(),
+    );
+    expect(config.match(/^\[auth\.email\.template\.[a-z_]+\]$/gm)).toHaveLength(3);
+  });
+
   it.skipIf(notBuilt)('is emitted by the web build as exactly these files, which the worker never precaches', () => {
     const emitted = readdirSync(join(dist, AUTH_EMAIL_DIRECTORY)).sort();
     expect(emitted).toEqual(AUTH_EMAIL_TEMPLATES.map(({ file }) => file).sort());

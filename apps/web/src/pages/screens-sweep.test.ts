@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { SET_PASSWORD_SCREEN_EXEMPT } from '@/features/auth/set-password-screen.fixture';
 import { SIGN_IN_SCREEN_EXEMPT } from '@/features/auth/sign-in-screen.fixture';
+import { SIGNUP_SCREEN_EXEMPT } from '@/features/auth/signup-screens.fixture';
 import {
   CALENDAR_SCREEN_EXEMPT,
   CALENDAR_SCREEN_PARTS,
@@ -83,6 +84,7 @@ import {
   SET_PASSWORD_HOOK,
   SET_PASSWORD_PAGE,
   SET_PASSWORD_SCREEN,
+  SIGNUP_SCREEN,
   SETTINGS,
   SHARED_FILTER_BAR,
   SHARED_MONTH_NAV,
@@ -318,7 +320,8 @@ describe('the screen is read at all, so every sweep below means something', () =
     // THIRTY-EIGHT SINCE STORY 12.2: the swap proposal.
     // THIRTY-NINE SINCE STORY 12.4: the swap decision screen.
     // FORTY SINCE STORY 14.2: Povijest promjena.
-    expect(SCREENS).toHaveLength(40);
+    // FORTY-ONE SINCE STORY 19.2: the signup screens.
+    expect(SCREENS).toHaveLength(41);
     //
     // FORTY-NINE SINCE STORY 3.6b: `@/features/calendar/services/roster-write`.
     //
@@ -397,7 +400,8 @@ describe('the screen is read at all, so every sweep below means something', () =
     // NINETY-FIVE SINCE STORY 14.3: the change history export's rules.
     // NINETY-SIX SINCE STORY 18.3: the loan dialog's rules.
     // NINETY-SEVEN SINCE STORY 18.5: the loan marks' rules.
-    expect(KEY_SOURCES).toHaveLength(97);
+    // NINETY-NINE SINCE STORY 19.2: the signup screens and their rules.
+    expect(KEY_SOURCES).toHaveLength(99);
   });
 
   // Vacuous-pass guard. A renamed or moved file would make each "contains no"
@@ -1534,7 +1538,8 @@ describe('the screen is read at all, so every sweep below means something', () =
     // ANY `*.fixture.*`, which renders nothing, is left out by its shape.
     // STORY 7.8: the set-password step shares the feature, so the walk
     // answers to BOTH sets and both exemption lists.
-    const exemptions = [...SIGN_IN_SCREEN_EXEMPT, ...SET_PASSWORD_SCREEN_EXEMPT];
+    // STORY 19.2: and the signup screens, a third set.
+    const exemptions = [...SIGN_IN_SCREEN_EXEMPT, ...SET_PASSWORD_SCREEN_EXEMPT, ...SIGNUP_SCREEN_EXEMPT];
     const exempt = new Set(exemptions.map((entry) => join(AUTH_FEATURE, ...entry.file.split('/'))));
     const walked = readdirSync(AUTH_FEATURE, { recursive: true, encoding: 'utf8' })
       .filter(
@@ -1560,6 +1565,9 @@ describe('the screen is read at all, so every sweep below means something', () =
         'services/set-password.ts',
         'services/sign-in.ts',
         'services/sign-out.ts',
+        'signup-screens.fixture.ts',
+        'services/signup.ts',
+        'services/session-destination.ts',
       ]
         .map((file) => join(AUTH_FEATURE, ...file.split('/')))
         .sort(),
@@ -1614,6 +1622,7 @@ describe('the screen is read at all, so every sweep below means something', () =
       [
         ...SCREEN.filter((file) => file !== SIGN_IN_PAGE),
         ...SET_PASSWORD_SCREEN.filter((file) => file !== SET_PASSWORD_PAGE),
+        ...SIGNUP_SCREEN.filter((file) => !file.startsWith(join(srcRoot, 'pages'))),
       ].sort(),
     );
   });
@@ -1639,7 +1648,8 @@ describe('the screen is read at all, so every sweep below means something', () =
       expect(source(SIGN_IN_HOOK), `${name} is not created in the hook`).toContain(`const ${name} = useRef`);
     }
     // FIVE SINCE RETRO 10 A5: the offer's own in-flight flag, in its hook.
-    expect(occurrences(source(SCREEN), '= useRef'), 'a ref is created besides the three fields and the two in-flight flags').toBe(5);
+    // SIX SINCE STORY 19.2: an unconfirmed sign-in's resend flag, in the hook.
+    expect(occurrences(source(SCREEN), '= useRef'), 'a ref is created besides the three fields and the three in-flight flags').toBe(6);
     expect(source(SIGN_IN_SWITCH_HOOK), 'the offer\'s in-flight ref is not in its hook').toContain('const leaving = useRef(false);');
     expect(source(SIGN_IN_HOOK), 'the in-flight ref is not in the hook').toContain('const exchanging = useRef(false);');
   });
@@ -1680,11 +1690,14 @@ describe('the screen is read at all, so every sweep below means something', () =
     // password's show/hide toggle, `Prijava`, and the `Zaboravljena lozinka?`
     // disclosure. Exactly one is `type="submit"`.
     expect(inputElements(source(SIGN_IN_FORM))).toHaveLength(3);
-    expect(buttonElements(source(SIGN_IN_FORM))).toHaveLength(4);
+    // FIVE SINCE STORY 19.2: the forgot panel's *Nova lozinka e-mailom*, a
+    // link drawn as a button (no `type`).
+    expect(buttonElements(source(SIGN_IN_FORM))).toHaveLength(5);
     expect(inputElements(source(SCREEN))).toHaveLength(3);
     // SIX SINCE RETRO 10 A5: the other-organization offer's switch and stay,
-    // both `type="button"`, drawn in place of the form.
-    expect(buttonElements(source(SCREEN))).toHaveLength(6);
+    // both `type="button"`, drawn in place of the form. NINE SINCE STORY
+    // 19.2: that link, and an unconfirmed sign-in's two buttons.
+    expect(buttonElements(source(SCREEN))).toHaveLength(9);
     expect(occurrences(source(SIGN_IN_FORM), 'type="submit"'), 'not exactly one submit button').toBe(1);
     expect(occurrences(source(SIGN_IN_FORM), 'type="button"'), 'a non-submit button would submit').toBe(3);
   });

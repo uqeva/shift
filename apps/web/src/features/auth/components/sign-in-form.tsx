@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
 
 import { OfflineWriteNote } from '@/components/offline-write-note';
@@ -102,6 +103,8 @@ export function SignInForm({ screen }: { readonly screen: SignInScreenState }): 
             spellCheck={false}
             required
             autoFocus={!organizationFirst}
+            defaultValue={screen.entryDefault}
+            onInput={screen.usernameInput}
             aria-describedby={failure === null ? undefined : 'sign-in-error'}
             className="h-11"
           />
@@ -185,17 +188,45 @@ export function SignInForm({ screen }: { readonly screen: SignInScreenState }): 
         >
           {t('auth.forgot.trigger')}
         </Button>
+        {/* STORY 19.2 (UX-DR64): with AD-21's SPA switch open the panel has
+            both paths, the email one first; a username identity's text is
+            today's, unchanged. */}
         <Callout id="forgot-password" hidden={!forgotOpen}>
-          <CalloutBody>
-            <IconTile variant="primary">
-              <Key />
-            </IconTile>
-            <div className="min-w-0">
-              <CalloutTitle>{t('auth.forgot.heading')}</CalloutTitle>
-              <CalloutDescription>{t('auth.forgot.body')}</CalloutDescription>
-            </div>
-          </CalloutBody>
+          {/* ONE child, stacked, so the panel's row layout never sets the
+              two paths side by side. */}
+          <div className="grid min-w-0 flex-1 gap-4">
+            {screen.signupOffered ? (
+              <div className="grid gap-2">
+                <p className="text-sm font-medium">{t('signup.forgot.emailHeading')}</p>
+                <p className="text-sm text-muted-foreground">{t('signup.forgot.emailBody')}</p>
+                <Button asChild variant="outline" className="h-11 w-full">
+                  <Link to="/zaboravljena-lozinka">{t('signup.forgot.emailLink')}</Link>
+                </Button>
+                <p className="mt-2 text-sm font-medium">{t('signup.forgot.usernameHeading')}</p>
+              </div>
+            ) : null}
+            <CalloutBody>
+              <IconTile variant="primary">
+                <Key />
+              </IconTile>
+              <div className="min-w-0">
+                <CalloutTitle>{t('auth.forgot.heading')}</CalloutTitle>
+                <CalloutDescription>{t('auth.forgot.body')}</CalloutDescription>
+              </div>
+            </CalloutBody>
+          </div>
         </Callout>
+        {/* UX-DR62: only on bare `/prijava`, so a member who followed their
+            organization's link is never offered a new organization. The
+            link is a 44 px target like every control (CI of 19.2). */}
+        {screen.registerOffered ? (
+          <p className="flex flex-wrap items-center gap-x-1 text-sm">
+            <span>{t('signup.signIn.register')}</span>
+            <Link to="/registracija" className="inline-flex min-h-11 items-center font-medium underline underline-offset-4">
+              {t('signup.signIn.registerLink')}
+            </Link>
+          </p>
+        ) : null}
       </div>
     </form>
   );
@@ -224,8 +255,12 @@ function OrganizationValue({ screen }: { readonly screen: SignInScreenState }): 
     failure,
     changeOrganization,
     organizationInput,
+    emailEntry,
   } = screen;
 
+  // STORY 19.2 (UX-DR62): while the entry is an address, the organization
+  // stays where it is — nothing above the cursor moves — dimmed, not required
+  // and not sent, and the hint says why.
   if (organizationEditable) {
     return (
       <div className="grid gap-2">
@@ -235,7 +270,7 @@ function OrganizationValue({ screen }: { readonly screen: SignInScreenState }): 
             rather than `organization`: the WHATWG token names the
             organization's NAME, and this field takes its slug, so autofill
             would supply a value the slug rule always refuses. */}
-        <InputGroup>
+        <InputGroup className={emailEntry ? 'opacity-50' : undefined}>
           <InputGroupIcon>
             <Buildings />
           </InputGroupIcon>
@@ -248,7 +283,12 @@ function OrganizationValue({ screen }: { readonly screen: SignInScreenState }): 
             autoCapitalize="none"
             autoCorrect="off"
             spellCheck={false}
-            required
+            required={!emailEntry}
+            // DIMMED, NOT `disabled` (the form disables nothing, B298's
+            // focus rule): read-only and marked inert while the entry is an
+            // address; the hook never reads it then.
+            readOnly={emailEntry}
+            aria-disabled={emailEntry}
             defaultValue={organizationDefault}
             placeholder={t('auth.organization.placeholder')}
             onInput={organizationInput}
@@ -262,10 +302,22 @@ function OrganizationValue({ screen }: { readonly screen: SignInScreenState }): 
         </InputGroup>
         {/* Says where the value came from only when this device supplied
             it, then how to find the slug at all. */}
-        <p id="organization-hint" className="text-sm text-muted-foreground">
-          {rememberedHere ? <span>{t('auth.organization.remembered')} </span> : null}
-          {t('auth.organization.hint')}
-        </p>
+        {/* THE HINT SAYS WHICH PATH IS IN FORCE (story 19.2, UX-DR62), and the
+            other path's text sits under it in the same cell, invisible and
+            hidden from assistive technology, so the cell is as tall as the
+            taller one and swapping them moves nothing below it: the username
+            field the cursor is in. */}
+        <div className="grid text-sm text-muted-foreground [&>p]:col-start-1 [&>p]:row-start-1">
+          <p id="organization-hint">
+            {emailEntry ? <span>{t('signup.signIn.organizationHint')}</span> : null}
+            {!emailEntry && rememberedHere ? <span>{t('auth.organization.remembered')} </span> : null}
+            {emailEntry ? null : t('auth.organization.hint')}
+          </p>
+          <p aria-hidden className="invisible">
+            {emailEntry && rememberedHere ? <span>{t('auth.organization.remembered')} </span> : null}
+            {emailEntry ? t('auth.organization.hint') : t('signup.signIn.organizationHint')}
+          </p>
+        </div>
       </div>
     );
   }
@@ -282,13 +334,18 @@ function OrganizationValue({ screen }: { readonly screen: SignInScreenState }): 
         role="group"
         aria-labelledby="organization-label"
         aria-describedby={failure === null ? undefined : 'sign-in-error'}
-        className="flex min-w-0 items-center gap-3 rounded-md border-[1.5px] border-input bg-muted/40 pl-3"
+        className={
+          emailEntry
+            ? 'flex min-w-0 items-center gap-3 rounded-md border-[1.5px] border-input bg-muted/40 pl-3 opacity-50'
+            : 'flex min-w-0 items-center gap-3 rounded-md border-[1.5px] border-input bg-muted/40 pl-3'
+        }
       >
         <Buildings aria-hidden className="size-4 shrink-0 text-muted-foreground" />
         <span className="min-w-0 flex-1 truncate font-medium">{shownSlug}</span>
         {/* The organization in the FORM DATA too, so the `method="post"`
             fallback and anything reading the form carry it in both modes.
-            Hidden, so it is no control and needs no label. */}
+            Hidden, so it is no control and needs no label. An email sign-in
+            ignores it (story 19.2): the hook never reads it for an address. */}
         <input type="hidden" name="organization" value={shownSlug} />
         {/* The group's description is not announced while tabbing, since a
             group is not focusable: the one focusable thing in the row carries

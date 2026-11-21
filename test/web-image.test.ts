@@ -170,6 +170,17 @@ describe('the shift-web image (story 20.3): the nginx config', () => {
     return found ?? { head, body: '' };
   };
 
+  it('logs a request with a query as its path and ?[redacted]: /potvrda carries an Auth token (security review of 19.2)', () => {
+    expect(config).toMatch(/map \$request_uri \$shift_web_logged_uri \{\s+"~\^\(\?<shift_web_path>\[\^\?\]\*\)\[\?\]" "\$shift_web_path\?\[redacted\]";\s+default \$request_uri;\s+\}/);
+    expect(config).toContain(
+      `log_format shift_web_redacted '$remote_addr - [$time_local] "$request_method $shift_web_logged_uri $server_protocol" $status $body_bytes_sent $request_time "$http_user_agent"';`,
+    );
+    expect(directives.filter((line) => line.startsWith('access_log '))).toEqual([
+      'access_log /var/log/nginx/access.log shift_web_redacted;',
+    ]);
+    expect(config).not.toMatch(/\$request[^_]|\$args|\$query_string/);
+  });
+
   it('listens on 8080 over IPv4 only, names no version and makes relative redirects', () => {
     expect(directives.filter((line) => line.startsWith('listen '))).toEqual(['listen 8080;']);
     expect(directives).toContain('server_tokens off;');

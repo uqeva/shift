@@ -2,13 +2,15 @@
 title: '19.1 The signup door opens safely on staging'
 type: 'feature'
 created: '2026-11-21'
-status: 'review'
+status: 'done'
 baseline_commit: '6baf5ff7d13bc2e52b1ec56fb44e05bf2fe9b17c'
 review_loop_iteration: 0
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-19-context.md'
   - '{project-root}/_bmad-output/planning-artifacts/architecture/architecture-shift-2026-09-02/SECURITY-REVIEW-EPIC-19.md'
 ---
+
+Status: done. Merged as #341, squashed to `5771967ceb69cecf4218cc9f22ada328d1234925` (2026-11-21), with `CI passed` green on run 44911565621 (head `9b4ba40`). Both CI runs of the branch were green (44909368408 on `2169359`, then 44911565621); no fix was pushed only for CI.
 
 Baseline: `origin/main` at #338 (AP2). Touches the hot file `hr.json` (and `test/resource-hygiene.test.ts`'s key list); story 16.2, built in parallel, does not touch them. Migration `0065` was the next free number at the time of writing; story 16.2 (PR #339) took `0065` (`0065_member_schedule_inputs.sql`), so this story's migration is renumbered `0066_signup_door.sql`.
 
@@ -179,7 +181,7 @@ Decisions taken while building (decide and record):
 **Commands:**
 - `pnpm exec vitest run test/resource-hygiene.test.ts test/supabase-scaffold.test.ts test/self-hosted-stack.test.ts test/key-hygiene.test.ts test/functions-router.test.ts test/coolify-deploy.test.ts test/ci-scripts.test.ts test/auth-email.test.ts` -- pass
 - `pnpm --filter ./apps/web test`, `pnpm typecheck`, `pnpm lint`, `pnpm build` -- pass
-- `test/claimless-account.test.ts` -- DB-connecting, not run locally (STRICT DATABASE RULE). CI is its first run, and locally it skips with no stack.
+- `test/claimless-account.test.ts` -- DB-connecting, not run locally (STRICT DATABASE RULE). CI ran it green on its first run (run 44909368408) and again on the merged head (run 44911565621, `Test (Vitest, local Supabase)`).
 
 **Results (2026-11-21, build):**
 - `pnpm typecheck`, `pnpm lint` -- clean.
@@ -204,7 +206,7 @@ Decisions taken while building (decide and record):
 **The templates (A GENERATED FILE IS OPENED).** The three built files were read back from `dist/auth-email/`: Croatian copy from `hr.json`, two links each of the form `{{ .SiteURL }}/potvrda?token_hash={{ .TokenHash }}&amp;type=<signup|recovery|email_change>`, inline styles only, no image, script or remote resource. They were not rasterized: this machine's Chromium lacks its shared libraries (`libatk`), so how a mail client draws them is unseen; 19.2 receives a real one in the mail catcher.
 
 **Residual risks:**
-- `test/claimless-account.test.ts` has never run. Its function sweep is generic (every `public` function `authenticated` may execute, called twice), so CI may find a function whose answer depends on its argument rather than on a row (a false positive) or a refusal code that differs between a real and an absent id; either is a finding to read, not to silence. The live-API cases assume the CLI's GoTrue answers a hook refusal at `/signup` as 403 with `SIGNUP_REFUSED` in the body.
+- (Settled by CI, runs 44909368408 and 44911565621: `test/claimless-account.test.ts` passed, so the sweep found no false positive and the CLI's GoTrue answered the hook refusal at `/signup` as the cases assume.) Before CI: `test/claimless-account.test.ts` had never run. Its function sweep is generic (every `public` function `authenticated` may execute, called twice), so CI may find a function whose answer depends on its argument rather than on a row (a false positive) or a refusal code that differs between a real and an absent id; either is a finding to read, not to silence. The live-API cases assume the CLI's GoTrue answers a hook refusal at `/signup` as 403 with `SIGNUP_REFUSED` in the body.
 - The CLI's local stack now has signup and confirmations on; the CI test job runs without the mail catcher (`mailpit` is excluded), so a local `/signup` of an email address there would fail to send. No test signs up an email address.
 - GoTrue's own template fetch at mail time, and Resend's delivery, are unexercised until staging (20.5).
 
@@ -213,7 +215,7 @@ Decisions taken while building (decide and record):
 - The eight allowed DB-free root files plus `test/static-hosting.test.ts` (DB-free; it opens no connection and starts nothing) -- 9 files, 2310 passed. The stack test now RUNS every rendered Kong chunk in fengari behind a Lua stand-in for the PDK, ngx, `cjson.safe` and `resty.http` (mail relays and their bodies, verify, `PUT /user`, the REST guard, every raw-path guard and its variants), refuses Lua 5.3-only syntax in every chunk, and drives the closed-path list through the Lua; the auth wrapper's retry (a stub `wget` that fails five times, then answers) and the mail checks on a shut stack with a key are tested.
 - The Kong rehearsal was run again on the pinned image with the `pre-function` guards: every earlier row held; the five path variants sent WITHOUT a key answered 404 (before key-auth); the admin variants (`//`, `;`, `%75`, `./`, `../`), PATCH and an admin preflight answered 404; a `pkce_` hash answered 400; the untrusted peer was still seen as itself. The auth wrapper was run again under the GoTrue image's busybox: the retry loop and `$((…))` work there (a missing template refused after the six tries).
 - NOT RUN locally: `test/claimless-account.test.ts` (rewritten: 42501 or zero rows only, real-id counting, unswept functions named, repeatable read), `test/provisioning.test.ts`, `test/web-image.test.ts` (the `/auth-email/` location pins: DB-free, but not on this run's allowed list), `scripts/ci/probe-web-image.sh` (needs docker), `smoke/deployment.spec.ts`, e2e. gitleaks not run (no commit; its container is outside this run's rules).
-- Residual: the claimless sweep's stricter refusal rule may meet a BEFORE trigger or a constraint that answers before row-level security on some table (an SQLSTATE other than 42501); CI is where that is read. The hook's non-ASCII-capital refusal follows the database's `lower()`, exactly as `members_username_check` does, so it is locale-bound by design and asserted only in PGlite here.
+- Residual (settled by CI's green Test job on runs 44909368408 and 44911565621: no table answered with another SQLSTATE): the claimless sweep's stricter refusal rule may meet a BEFORE trigger or a constraint that answers before row-level security on some table (an SQLSTATE other than 42501); CI is where that is read. The hook's non-ASCII-capital refusal follows the database's `lower()`, exactly as `members_username_check` does, so it is locale-bound by design and asserted only in PGlite here.
 
 ## Suggested Review Order
 

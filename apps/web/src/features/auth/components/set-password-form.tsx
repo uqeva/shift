@@ -169,7 +169,7 @@ export function SetPasswordForm({ screen }: { readonly screen: SetPasswordScreen
 
 /** One live check: a tick or a cross, the state in words for assistive
  *  technology, and the rule. */
-function Rule({
+export function Rule({
   id,
   met,
   children,

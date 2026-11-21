@@ -49,6 +49,8 @@ Each row needs evidence: a test that runs in CI, a probe run on the local stack 
 | C5 | No session can change its sign-in address (B4b), so neither kind can become the other | probe |
 | C6 | Email links use `token_hash` and are verified by POST, on a click. No session token appears in a URL. Opening a link with a GET, or loading `/potvrda`, consumes nothing | probe |
 | C7 | The allow list and the site URL are the app origin only. A link cannot redirect anywhere else | config |
+| C8 | A confirmed signup holds only a password the confirming person chose. A stranger who signed the same address up first, unconfirmed, cannot leave their password on the account the owner confirms (GoTrue v2.196.0 keeps the first signup's password on a repeat signup). Added by the security review of 19.2; **open at high severity** until decided and built | DB or e2e test |
+| C9 | After a link is used, the page names the address now signed in before anything is created, so a forwarded link (login CSRF) or a device already signed in as another account is visible. Added by the security review of 19.2 | e2e |
 
 ## D. Creating an organization (AD-23)
 

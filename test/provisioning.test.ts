@@ -2768,6 +2768,9 @@ describe('the access-control layer runs as the owner and hands that power to nob
     { name: 'calendar_feed_inputs', argumentCount: 1 },
     { name: 'revoke_calendar_feed_on_status_change', argumentCount: 0, schema: 'private' },
     { name: 'record_calendar_feed_token_event', argumentCount: 0, schema: 'private' },
+    // STORY 19.2 (0068). The email identity's username trigger reads the
+    // member's `auth.users` address, which no session role may read.
+    { name: 'refuse_username_change_of_email_identity', argumentCount: 0, schema: 'private' },
   ];
 
   it.skipIf(noDatabase).each(ACCESS_CONTROL_FUNCTIONS)(
@@ -3009,6 +3012,10 @@ describe('the access-control layer runs as the owner and hands that power to nob
     // 19.3 `create_organization`), so no session role holds it.
     { name: 'address_kind', argumentCount: 1, expected: [], schema: 'private' },
     { name: 'is_synthesized_address', argumentCount: 1, expected: [], schema: 'private' },
+    // STORY 19.2 (0068). The username an email identity's address derives, and
+    // the trigger that holds it; their callers are the trigger and definers.
+    { name: 'email_identity_username', argumentCount: 1, expected: [], schema: 'private' },
+    { name: 'refuse_username_change_of_email_identity', argumentCount: 0, expected: [], schema: 'private' },
   ];
 
   it.skipIf(noDatabase).each([
@@ -3042,6 +3049,8 @@ describe('the access-control layer runs as the owner and hands that power to nob
     // STORY 19.1 (0066). AD-12's predicate reads nothing either.
     { name: 'address_kind', argumentCount: 1, schema: 'private' },
     { name: 'is_synthesized_address', argumentCount: 1, schema: 'private' },
+    // STORY 19.2 (0068). The derivation reads nothing either.
+    { name: 'email_identity_username', argumentCount: 1, schema: 'private' },
     // 0043's flag readers read and write only transaction-local settings,
     // and run as whichever trigger calls them (the owner).
     { name: 'notify_suppression', argumentCount: 0, schema: 'private' },

@@ -20,7 +20,11 @@ import { postaviLozinkuRoute } from '@/pages/postavi-lozinku';
 import { povijestPromjenaRoute } from '@/pages/povijest-promjena';
 import { postavkeRotacijeRoute } from '@/pages/postavke-rotacije';
 import { postavkeRotacijeTipSmjeneRoute } from '@/pages/postavke-rotacije.tipovi-smjena.$id';
+import { postavljanjeRoute } from '@/pages/postavljanje';
+import { potvrdaRoute } from '@/pages/potvrda';
 import { prijavaBareRoute, prijavaRoute } from '@/pages/prijava';
+import { registracijaRoute } from '@/pages/registracija';
+import { zaboravljenaLozinkaRoute } from '@/pages/zaboravljena-lozinka';
 import { rasporedCollisionRoute } from '@/pages/raspored.$memberId.$date.$teamId';
 import { rasporedRoute } from '@/pages/raspored';
 import { rootRoute } from '@/pages/__root';
@@ -144,6 +148,14 @@ const routeTree = rootRoute.addChildren([
   // because the layout's guard is what sends a flagged session here, and with
   // no chrome, because no destination is open to it yet.
   postaviLozinkuRoute,
+  // STORY 19.2 (AD-21, AD-22, AD-24). Signup, the link every Auth email opens,
+  // and email recovery, all reachable signed out; and `/postavljanje`, where a
+  // claimless email identity waits, outside the layout for the reason the
+  // set-password step is: the layout's guard is what sends it there.
+  registracijaRoute,
+  potvrdaRoute,
+  zaboravljenaLozinkaRoute,
+  postavljanjeRoute,
   appDestinations,
 ]);
 

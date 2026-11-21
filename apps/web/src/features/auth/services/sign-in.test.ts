@@ -2,8 +2,10 @@ import type { Session } from '@supabase/supabase-js';
 import { describe, expect, it } from 'vitest';
 
 import {
+  SIGN_IN_EMAIL_REFUSED,
   SIGN_IN_REFUSED,
   SIGN_IN_UNAVAILABLE,
+  SIGN_IN_UNCONFIRMED,
   signIn,
   signInMessageKey,
   type AuthFailure,
@@ -177,10 +179,13 @@ describe('three different refusals are one answer', () => {
     expect(sent[0]?.email).toBe('ivan.maric@dvd-kastel-novi.shift.invalid');
   });
 
+  // STORY 19.2 (AD-12): an entry with an `@` is no longer a username at all but
+  // an email sign-in, so the at-sign case is an unsendable ADDRESS now, refused
+  // locally with the email refusal (`an email sign-in` below).
   it.each([
-    ['a username that is only whitespace', { username: '   ' }],
-    ['a username carrying an at sign', { username: 'ivan@example.com' }],
-  ])('refuses %s locally, with the ordinary refusal', async (_case, overrides) => {
+    ['a username that is only whitespace', { username: '   ' }, SIGN_IN_REFUSED],
+    ['an entry with an at sign that is no address', { username: 'ivan@' }, SIGN_IN_EMAIL_REFUSED],
+  ])('refuses %s locally, with its kind’s one refusal', async (_case, overrides, code) => {
     let called = false;
     const auth: PasswordAuth = {
       signInWithPassword: () => {
@@ -192,7 +197,7 @@ describe('three different refusals are one answer', () => {
 
     const outcome = await signIn(auth, { ...CREDENTIALS, ...overrides });
 
-    expect(outcome).toEqual({ ok: false, code: SIGN_IN_REFUSED });
+    expect(outcome).toEqual({ ok: false, code });
     expect(called, 'an unbuildable username still reached the auth service').toBe(false);
   });
 
@@ -320,5 +325,99 @@ describe('each failure names its own message, and the pairing is executed', () =
 
     expect(new Set(keys).size, 'the three refusals render more than one message').toBe(1);
     expect(keys[0]).toBe('auth.error.credentials');
+  });
+});
+
+describe('an email sign-in (story 19.2, AD-12, UX-DR62)', () => {
+  const PASSWORD = 'p'.repeat(12);
+
+  function recording(answer: { session: Session | null; error: AuthFailure | null }) {
+    const calls: { email: string; password: string }[] = [];
+    const auth: PasswordAuth = {
+      signInWithPassword: (credentials) => {
+        calls.push(credentials);
+        return Promise.resolve({ data: { session: answer.session }, error: answer.error });
+      },
+    };
+    return { auth, calls };
+  }
+
+  it('makes the password grant on the address as typed, trimmed, and ignores the organization', async () => {
+    const { auth, calls } = recording({ session: SESSION, error: null });
+
+    expect(await signIn(auth, { username: ' Ana@Example.com ', password: PASSWORD, slug: 'not a slug' })).toEqual({
+      ok: true,
+      session: SESSION,
+    });
+    expect(calls).toEqual([{ email: 'Ana@Example.com', password: PASSWORD }]);
+  });
+
+  it('gives every refusal one email code, and never the username one', async () => {
+    const unknown = await signIn(recording({ session: null, error: UNKNOWN_USERNAME }).auth, {
+      username: 'ana@example.com',
+      password: PASSWORD,
+      slug: '',
+    });
+    const banned = await signIn(recording({ session: null, error: DEACTIVATED_ACCOUNT }).auth, {
+      username: 'ana@example.com',
+      password: PASSWORD,
+      slug: '',
+    });
+    const hookRefused = await signIn(
+      recording({ session: null, error: { name: 'AuthApiError', status: 403, code: 'unexpected_failure' } }).auth,
+      { username: 'ana@example.com', password: PASSWORD, slug: '' },
+    );
+
+    expect(unknown).toEqual({ ok: false, code: SIGN_IN_EMAIL_REFUSED });
+    expect(banned).toEqual(unknown);
+    expect(hookRefused).toEqual(unknown);
+    expect(signInMessageKey(SIGN_IN_EMAIL_REFUSED)).toBe('signup.signIn.error');
+  });
+
+  it('refuses locally, with no request, a synthesized or malformed address and an empty password', async () => {
+    for (const username of ['ivan@DVD.Shift.Invalid', 'ana@@example.com', "o'brien@example.com"]) {
+      const { auth, calls } = recording({ session: SESSION, error: null });
+      expect(await signIn(auth, { username, password: PASSWORD, slug: 'dvd-kastel-novi' })).toEqual({
+        ok: false,
+        code: SIGN_IN_EMAIL_REFUSED,
+      });
+      expect(calls).toEqual([]);
+    }
+    const { auth, calls } = recording({ session: SESSION, error: null });
+    expect(await signIn(auth, { username: 'ana@example.com', password: '', slug: '' })).toEqual({
+      ok: false,
+      code: SIGN_IN_EMAIL_REFUSED,
+    });
+    expect(calls).toEqual([]);
+  });
+
+  it('says an unconfirmed address is unconfirmed, which needs the right password', async () => {
+    const outcome = await signIn(
+      recording({ session: null, error: { name: 'AuthApiError', status: 400, code: 'email_not_confirmed' } }).auth,
+      { username: 'ana@example.com', password: PASSWORD, slug: '' },
+    );
+
+    expect(outcome).toEqual({ ok: false, code: SIGN_IN_UNCONFIRMED });
+    expect(signInMessageKey(SIGN_IN_UNCONFIRMED)).toBe('signup.unconfirmed.body');
+  });
+
+  it('reads the transport as the transport', async () => {
+    expect(await signIn(throwing(), { username: 'ana@example.com', password: PASSWORD, slug: '' })).toEqual({
+      ok: false,
+      code: SIGN_IN_UNAVAILABLE,
+    });
+    expect(
+      await signIn(recording({ session: null, error: { name: 'AuthApiError', status: 429 } }).auth, {
+        username: 'ana@example.com',
+        password: PASSWORD,
+        slug: '',
+      }),
+    ).toEqual({ ok: false, code: SIGN_IN_UNAVAILABLE });
+  });
+
+  it('keeps an answer with no session and no error a refusal', async () => {
+    expect(
+      await signIn(recording({ session: null, error: null }).auth, { username: 'ana@example.com', password: PASSWORD, slug: '' }),
+    ).toEqual({ ok: false, code: SIGN_IN_EMAIL_REFUSED });
   });
 });

@@ -74,14 +74,32 @@ enable_signup = true
 # confirmations are on wherever the door can open. Every account the system
 # creates itself is confirmed at creation (`admin-auth`'s `email_confirm`, the
 # seed, the operator scripts), so no username sign-in waits for a mail. Locally
-# the CLI's mail catcher receives the mail, with the CLI's default templates:
-# the Croatian ones link to `/potvrda`, which 19.2 builds (deferred-work.md).
+# the CLI's mail catcher receives the mail, in the Croatian templates below
+# (story 19.2), whose links open `/potvrda`.
 enable_confirmations = true
 double_confirm_changes = true
 # AD-22: a link's `token_hash` is the only thing `/auth/v1/verify` accepts, but
 # the code a mail could carry is bounded too: an hour, and 10 characters.
 otp_expiry = 3600
 otp_length = 10
+
+# Story 19.2 (AD-21, D-S4): the local stack sends staging's Croatian mail. The
+# three files are built from `hr.json` by `apps/web/src/lib/auth-email.ts`,
+# the function the web build emits `dist/auth-email/*.html` with, and are
+# committed because the CLI reads them at `supabase start`, before any build
+# (`node scripts/auth-email-templates.mjs` rewrites them). Each subject is
+# `hr.json`'s word for word. `test/auth-email.test.ts` pins all six values.
+[auth.email.template.confirmation]
+subject = "Potvrdi adresu e-pošte za Shift"
+content_path = "./supabase/templates/auth-email/confirmation.html"
+
+[auth.email.template.recovery]
+subject = "Nova lozinka za Shift"
+content_path = "./supabase/templates/auth-email/recovery.html"
+
+[auth.email.template.email_change]
+subject = "Potvrdi novu adresu e-pošte za Shift"
+content_path = "./supabase/templates/auth-email/email-change.html"
 
 [auth.sms]
 enable_signup = false
@@ -99,6 +117,11 @@ enable_confirmations = false
 [auth.rate_limit]
 sign_in_sign_ups = 1000
 token_refresh = 1000
+# Story 19.2: the stack-wide mail budget, raised from the CLI's 2 an hour for
+# the same reason. The signup suites (`test/signup-account.test.ts`, the
+# signup E2E) send real mail into the catcher; staging's budget is the
+# compose's `SHIFT_AUTH_EMAIL_PER_HOUR` (AD-21), untouched by this table.
+email_sent = 1000
 
 # AD-10: `organization_id` rides in a JWT claim, and this hook is the only thing
 # that puts it there. The function is created by
