@@ -4,7 +4,11 @@ import { useEffect } from 'react';
 import { AppChrome } from '@/features/navigation/components/chrome';
 import { reconcileThisPushDevice } from '@/features/notifications/services/page-push';
 import { returnSearchFor } from '@/features/auth/services/return-target';
-import { SETUP_DESTINATION, sessionDestination } from '@/features/auth/services/session-destination';
+import {
+  SETUP_DESTINATION,
+  SIGN_OUT_DESTINATION,
+  sessionDestination,
+} from '@/features/auth/services/session-destination';
 import { mustSetPassword } from '@/features/auth/services/set-password';
 import { rootRoute } from '@/pages/__root';
 import { readsOffline } from '@/lib/offline/readable-paths';
@@ -152,8 +156,20 @@ export const appLayoutRoute = createRoute({
 
       // STORY 19.2 (AD-24's one router): a claimless EMAIL identity, signed
       // up and confirmed with no organization yet, reads nothing here; it
-      // waits at `/postavljanje`, outside this layout, until it founds one.
-      if (sessionDestination(session) === SETUP_DESTINATION) throw redirect({ to: '/postavljanje' });
+      // goes to `/postavljanje`, outside this layout, to found one. STORY
+      // 19.3 (D7): the location travels with it, so founding lands where the
+      // link pointed.
+      const destination = sessionDestination(session);
+
+      if (destination === SETUP_DESTINATION) throw redirect({ to: '/postavljanje', search: carried });
+
+      // STORY 19.3 (D6): a claimless USERNAME identity has lost its `members`
+      // row and reads nothing anywhere. It is signed out on this device and
+      // sent to *Prijava*, carrying nothing.
+      if (destination === SIGN_OUT_DESTINATION) {
+        await context.endLocalSession?.();
+        throw redirect({ to: '/prijava' });
+      }
 
       return;
     }

@@ -14,7 +14,9 @@ import { rootRoute } from '@/pages/__root';
  * every Auth email links. It acts only on a press, so loading it, by a person
  * or a mail scanner, consumes nothing. Not behind AD-21's SPA switch: it
  * holds no form a stranger could use without a mail, and a recovery link
- * sent before a switch was shut still works. Composes only.
+ * sent before a switch was shut still works. Since story 19.3 (C8, D2) a
+ * signup's link takes the password form too: *Potvrdi i spremi lozinku*
+ * verifies and saves in one press. Composes only.
  */
 export function MailLinkScreen(): ReactNode {
   const search = potvrdaRoute.useSearch();
@@ -40,20 +42,20 @@ function MailLinkCard({ screen }: { readonly screen: MailLinkScreenState }): Rea
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <DeadLinkPanel recovery={screen.recovery} canRecover={signupEnabled()} />
+          <DeadLinkPanel recovery={screen.setsPassword} canRecover={signupEnabled()} />
         </CardContent>
       </>
     );
   }
 
-  if (screen.recovery) {
+  if (screen.setsPassword) {
     return (
       <>
         <CardHeader>
           <CardTitle asChild>
-            <h1>{t('signup.recovery.heading')}</h1>
+            <h1>{screen.recovery ? t('signup.recovery.heading') : t('signup.confirm.heading')}</h1>
           </CardTitle>
-          <CardDescription>{t('signup.recovery.lede')}</CardDescription>
+          <CardDescription>{screen.recovery ? t('signup.recovery.lede') : t('signup.confirm.lede')}</CardDescription>
         </CardHeader>
         <CardContent>
           <RecoveryForm screen={screen} />

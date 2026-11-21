@@ -2,20 +2,22 @@ import { addressKind } from '@/features/auth/services/address';
 import { claimedOrganizationOf } from '@/lib/supabase/claims';
 
 /**
- * Where a signed-in session goes (AD-24, as far as story 19.2 needs it).
+ * Where a signed-in session goes (AD-24, as story 19.3 leaves it).
  *
- * ONE FUNCTION, so the `_app` guard, `/postavljanje`'s guard and the sign-in
- * screen can never disagree. 19.2 is where the first claimless EMAIL identity
- * exists: an account that signed up, confirmed its address and has no
- * `members` row yet. Its token carries no `organization_id` (AD-10), so every
- * destination would read nothing; it is sent to `/postavljanje` instead, where
- * 19.3 builds the create-organization form.
+ * ONE FUNCTION, so the `_app` guard, `/postavljanje`'s guard and step 1's
+ * refresh-and-route can never disagree. It takes the session, reads its claim
+ * from the token and AD-12's kind from its address, and answers:
  *
- * What it answers, in 19.2:
- * - `app`: a session whose token names an organization, as today. A claimless
- *   USERNAME identity (it lost its `members` row, which no session can delete)
- *   also stays `app` in 19.2, as today; AD-24's sign-out for it is 19.3's.
- * - `setup`: a claimless session whose address is an email identity's (AD-12).
+ * - `app`: a session whose token names an organization. A claimed session
+ *   that asks for `/postavljanje` goes to the app too, until 19.4 builds steps
+ *   2–7 (D6).
+ * - `setup`: a claimless session whose address is an email identity's: a
+ *   verified signup with no organization yet. It goes to step 1, the
+ *   create-organization form (AD-23).
+ * - `signOut`: a claimless USERNAME identity, or an address the predicate
+ *   cannot read. A username identity without a claim has lost its `members`
+ *   row (no session can delete one), so it can read nothing anywhere; the
+ *   guard ends the session on this device and sends it to *Prijava*.
  *
  * The claim is read from the session's own token, never queried, and trusted
  * for nothing: a wrong answer here routes a screen, and the database refuses
@@ -23,8 +25,9 @@ import { claimedOrganizationOf } from '@/lib/supabase/claims';
  */
 export const APP_DESTINATION = 'app';
 export const SETUP_DESTINATION = 'setup';
+export const SIGN_OUT_DESTINATION = 'signOut';
 
-export type SessionDestination = typeof APP_DESTINATION | typeof SETUP_DESTINATION;
+export type SessionDestination = typeof APP_DESTINATION | typeof SETUP_DESTINATION | typeof SIGN_OUT_DESTINATION;
 
 /** As much of a session as the decision reads. */
 export interface DestinedSession {
@@ -35,5 +38,5 @@ export interface DestinedSession {
 export function sessionDestination(session: DestinedSession): SessionDestination {
   if (claimedOrganizationOf(session.access_token) !== null) return APP_DESTINATION;
 
-  return addressKind(session.user.email) === 'email' ? SETUP_DESTINATION : APP_DESTINATION;
+  return addressKind(session.user.email) === 'email' ? SETUP_DESTINATION : SIGN_OUT_DESTINATION;
 }

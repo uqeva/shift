@@ -86,10 +86,12 @@ begin
   -- or `right/` alias would be accepted by one side and refused, or read
   -- differently, by the other, and the timezone cannot be changed in the
   -- product afterwards. A missing one is left to the schema's `not null`.
+  --
+  -- STORY 19.3 (AD-23 step 3): the rule is `private.is_known_timezone`, one
+  -- function that `create_organization` calls too (0071). The operator runs
+  -- this file as the owner, who holds EXECUTE on it.
   if organization_timezone is not null
-     and (organization_timezone !~ '^[A-Za-z]+(/[A-Za-z0-9_+-]+)+$'
-          or organization_timezone ~ '^(posix|right)/'
-          or not exists (select 1 from pg_catalog.pg_timezone_names where name = organization_timezone))
+     and not private.is_known_timezone(organization_timezone)
   then
     raise exception using
       errcode = 'check_violation',

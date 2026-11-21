@@ -38,7 +38,9 @@ import { zaOdlukuSwapRoute } from '@/pages/za-odluku.zamjena.$requestId';
 import { zaOdlukuRoute } from '@/pages/za-odluku';
 import { routeMemberRole } from '@/features/navigation/services/role';
 import { knownPathOf } from '@/features/auth/services/return-target';
-import { currentSession } from '@/lib/supabase/client';
+import { localSessionEnd } from '@/features/auth/services/sign-out';
+import { currentSession, supabaseClient } from '@/lib/supabase/client';
+import { pageSignOutFallback } from '@/lib/supabase/local-sign-out';
 import { currentSessionForReads } from '@/lib/supabase/offline-session';
 
 /**
@@ -222,9 +224,22 @@ function isKnownPath(pathname: string): boolean {
  * still say "signed out" at exactly that moment and bounce the person who just
  * signed in straight back to the form.
  */
+/**
+ * STORY 19.3 (AD-24, D6): the guards' local sign-out for a claimless username
+ * identity, bound here as the readers are, so the guards stay executable from
+ * the node suite with a stand-in.
+ */
+export const endLocalSession = localSessionEnd(() => supabaseClient().auth, pageSignOutFallback);
+
 export const router = createRouter({
   routeTree,
-  context: { currentSession, sessionForReads: currentSessionForReads, currentMemberRole: routeMemberRole, isKnownPath },
+  context: {
+    currentSession,
+    sessionForReads: currentSessionForReads,
+    currentMemberRole: routeMemberRole,
+    isKnownPath,
+    endLocalSession,
+  },
   defaultPendingComponent: RoutePending,
   defaultPendingMs: ROUTE_PENDING_MS,
 });

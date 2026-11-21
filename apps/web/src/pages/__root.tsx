@@ -83,6 +83,15 @@ export interface AppRouterContext {
    * arrives here instead, bound to the real router in `router.ts`.
    */
   readonly isKnownPath: (pathname: string) => boolean;
+  /**
+   * Ends the session on this device (story 19.3, AD-24's `signOut`): a
+   * claimless username identity has lost its `members` row and reads nothing,
+   * so the `_app` and `/postavljanje` guards end it before sending it to
+   * *Prijava*. A local sign-out, bound in `router.ts` to
+   * `@/features/auth/services/sign-out`'s `localSessionEnd`; it never throws.
+   * Optional, so a guard's node test supplies it only where it asserts it.
+   */
+  readonly endLocalSession?: () => Promise<void>;
 }
 
 function AppShell() {

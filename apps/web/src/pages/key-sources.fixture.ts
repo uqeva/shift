@@ -92,6 +92,7 @@ import {
   SET_PASSWORD_SCREEN,
   SIGNUP_KEYS,
   SIGNUP_SCREEN,
+  CREATE_ORGANIZATION_KEYS,
   SETTINGS,
   SHIFT_TYPE_EDIT,
   SHIFT_TYPE_LIST,
@@ -146,8 +147,11 @@ export const KEY_SOURCES = [
   // (`ruleStateMessageKey`).
   { name: 'the set-password rules', file: SET_PASSWORD_KEYS, keys: messageKeyUnions, strings: 8 },
   // STORY 19.2: the signup screens, and their rules' message unions.
-  { name: 'the signup screens', file: SIGNUP_SCREEN, keys: translationKeys, strings: 53 },
+  // EIGHTY-EIGHT SINCE STORY 19.3: step 1's form and frame, and the signup link's password form.
+  { name: 'the signup screens', file: SIGNUP_SCREEN, keys: translationKeys, strings: 88 },
   { name: 'the signup rules', file: SIGNUP_KEYS, keys: messageKeyUnions, strings: 10 },
+  // STORY 19.3: step 1's rules, seven local refusals, three failures, and the two notices after an answer (review of 19.3).
+  { name: 'the create-organization rules', file: CREATE_ORGANIZATION_KEYS, keys: messageKeyUnions, strings: 12 },
   { name: 'the not-found component', file: NOT_FOUND, keys: translationKeys, strings: 2 },
   // A148. THREE on the error screen: the heading, the lede and the retry.
   { name: 'the error screen', file: ERROR_SCREEN, keys: translationKeys, strings: 3 },

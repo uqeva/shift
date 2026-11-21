@@ -5,9 +5,9 @@ import { useEndSession } from '@/features/auth/hooks/use-end-session';
 import { SIGN_OUT_FAILED } from '@/features/auth/services/sign-out';
 
 /**
- * The `/postavljanje` placeholder's one action (story 19.2): *Odjava*, through
- * the one session end the chrome and the set-password step use. 19.3 replaces
- * the page's body with step 1, the create-organization form (AD-23).
+ * `/postavljanje`'s *Odjava* (stories 19.2, 19.3), through the one session end
+ * the chrome and the set-password step use. Step 1's form is
+ * `use-create-organization.ts`'s; this is only the way out beside it.
  */
 export function useSetupHolding() {
   const navigate = useNavigate();

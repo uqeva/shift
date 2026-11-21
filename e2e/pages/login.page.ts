@@ -149,9 +149,72 @@ export class LoginPage extends BasePage {
     return this.page.getByRole('button', { name: hr.signup.sent.correct, exact: true });
   }
 
-  /** `/potvrda`'s one press. */
+  /** `/potvrda`'s press on a signup's link: *Potvrdi i spremi lozinku* (story 19.3, C8). */
   get confirmButton(): Locator {
     return this.page.getByRole('button', { name: hr.signup.confirm.submit, exact: true });
+  }
+
+  /** `/potvrda`'s password form, on a signup's and a recovery link (story 19.3, C8). */
+  get linkPasswordInput(): Locator {
+    return this.page.getByLabel(hr.auth.setPassword.password, { exact: true });
+  }
+
+  get linkRepeatInput(): Locator {
+    return this.page.getByLabel(hr.auth.setPassword.repeat, { exact: true });
+  }
+
+  /** A field of `/postavljanje` step 1, by its label (story 19.3, UX-DR66). */
+  setupField(label: string): Locator {
+    return this.page.getByLabel(label, { exact: true });
+  }
+
+  /** *Stvori organizaciju*. */
+  get setupSubmit(): Locator {
+    return this.page.getByRole('button', { name: hr.signup.setup.submit, exact: true });
+  }
+
+  /** The device zone's *Potvrdi*. */
+  get setupConfirmZone(): Locator {
+    return this.page.getByRole('button', { name: hr.signup.setup.timezoneConfirm, exact: true });
+  }
+
+  /** *Koristi prijedlog*, after `SLUG_UNAVAILABLE`. */
+  get setupUseProposal(): Locator {
+    return this.page.getByRole('button', { name: hr.signup.setup.useProposal, exact: true });
+  }
+
+  /** Fills step 1 with neutral values; the zone is confirmed, or chosen when the device names none. */
+  async fillSetup(values: { readonly name: string; readonly slug: string }): Promise<void> {
+    const { setup } = hr.signup;
+    await this.setupField(setup.name).fill(values.name);
+    await this.setupField(setup.slug).fill(values.slug);
+    await this.setupField(setup.type).fill('Udruga');
+    if (await this.setupConfirmZone.isVisible()) {
+      await this.setupConfirmZone.click();
+    } else {
+      await this.setupField(setup.timezone).selectOption('Europe/Zagreb');
+    }
+    await this.setupField(setup.leaveDay).selectOption('1');
+    await this.setupField(setup.leaveMonth).selectOption('1');
+    await this.setupField(setup.adminName).fill('Ivana Horvat');
+    await this.setupField(setup.allowance).fill('20');
+  }
+
+  /** A recovery link's press, *Spremi novu lozinku*. */
+  get saveRecoveryButton(): Locator {
+    return this.page.getByRole('button', { name: hr.signup.recovery.submit, exact: true });
+  }
+
+  /** An unconfirmed sign-in's *Pošalji novu poveznicu*. */
+  get unconfirmedResendButton(): Locator {
+    return this.page.getByRole('button', { name: hr.signup.unconfirmed.resend, exact: true });
+  }
+
+  /** `/potvrda`'s password form, filled and pressed (a signup's link, or `recovery`). */
+  async setPasswordOnLink(password: string, link: 'signup' | 'recovery' = 'signup'): Promise<void> {
+    await this.linkPasswordInput.fill(password);
+    await this.linkRepeatInput.fill(password);
+    await (link === 'signup' ? this.confirmButton : this.saveRecoveryButton).click();
   }
 
   /** The real sign-in from bare `/prijava`, through GoTrue. Leaves the page

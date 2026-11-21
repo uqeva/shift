@@ -12,7 +12,7 @@ function tokenWith(claims: Record<string, unknown>): string {
 const CLAIMED = tokenWith({ sub: 'a', organization_id: '00000000-0000-4000-8000-000000000001' });
 const CLAIMLESS = tokenWith({ sub: 'a' });
 
-describe('sessionDestination (story 19.2, AD-24)', () => {
+describe('sessionDestination (stories 19.2 and 19.3, AD-24)', () => {
   it('sends a claimed session to the app, whatever its kind', () => {
     expect(sessionDestination({ access_token: CLAIMED, user: { email: 'ivan.maric@dvd.shift.invalid' } })).toBe('app');
     expect(sessionDestination({ access_token: CLAIMED, user: { email: 'ana@example.com' } })).toBe('app');
@@ -23,10 +23,10 @@ describe('sessionDestination (story 19.2, AD-24)', () => {
     expect(sessionDestination({ access_token: CLAIMLESS, user: { email: ' Ana@Example.COM ' } })).toBe('setup');
   });
 
-  it('leaves a claimless username identity, or an unreadable address, where it was (19.3 decides)', () => {
-    expect(sessionDestination({ access_token: CLAIMLESS, user: { email: 'ivan@dvd.SHIFT.invalid' } })).toBe('app');
-    expect(sessionDestination({ access_token: CLAIMLESS, user: {} })).toBe('app');
-    expect(sessionDestination({ access_token: CLAIMLESS, user: { email: 'a@@b' } })).toBe('app');
+  it('signs out a claimless username identity, or an unreadable address (story 19.3, D6)', () => {
+    expect(sessionDestination({ access_token: CLAIMLESS, user: { email: 'ivan@dvd.SHIFT.invalid' } })).toBe('signOut');
+    expect(sessionDestination({ access_token: CLAIMLESS, user: {} })).toBe('signOut');
+    expect(sessionDestination({ access_token: CLAIMLESS, user: { email: 'a@@b' } })).toBe('signOut');
   });
 
   it('treats an unreadable token as claimless', () => {

@@ -6540,3 +6540,217 @@ describe('the reminder job (0070, story 17.2)', () => {
     expect(sql, 'a migration writes a Vault secret').not.toMatch(/vault\.(create|update)_secret|insert into vault\./);
   });
 });
+
+describe('a verified account creates its organization (0071, story 19.3)', () => {
+  const MIGRATION = '0071_create_organization.sql';
+  const migration = (): string => stripLineComments(readFileSync(join(supabaseRoot, 'migrations', MIGRATION), 'utf8'));
+  /** One `create [or replace] function <name>(…` through its closing `$$;`. */
+  const bodyOf = (name: string): string =>
+    new RegExp(`create (?:or replace )?function ${name.replace('.', '\\.')}\\([\\s\\S]*?\\$\\$;`).exec(migration())?.[0] ?? '';
+  const SIGNATURE = 'public.create_organization(text, text, text, text, integer, integer, text, integer)';
+  const RESERVED = ['admin', 'api', 'app', 'auth', 'postavljanje', 'prijava', 'registracija', 'shift', 'staging', 'www'];
+
+  it('takes no id and no address, runs as a definer with an empty search path, and is authenticated’s alone (D1, D7)', () => {
+    const sql = migration();
+    const rpc = bodyOf('public.create_organization');
+    expect(rpc).toMatch(
+      /create function public\.create_organization\(\s+p_name text,\s+p_slug text,\s+p_organization_type text,\s+p_timezone text,\s+p_leave_year_start_month integer,\s+p_leave_year_start_day integer,\s+p_admin_name text,\s+p_admin_leave_allowance_days integer\s+\) returns jsonb\s+language plpgsql\s+volatile\s+security definer\s+set search_path = ''/,
+    );
+    const parameters = /create function public\.create_organization\(([\s\S]*?)\) returns/.exec(rpc)?.[1] ?? '';
+    expect(parameters).not.toMatch(/uuid|_id\b|email|address/i);
+    // The caller is `auth.uid()` alone.
+    expect(rpc).toContain('caller        uuid := auth.uid();');
+    // D7: no dynamic SQL.
+    expect(rpc).not.toMatch(/\bexecute\b|\bformat\(/i);
+    for (const role of ['public', 'anon', 'service_role']) {
+      expect(sql, `${role} may execute it`).toContain(`revoke execute on function ${SIGNATURE} from ${role};`);
+    }
+    const grants = [...migrationStatements().matchAll(/grant execute on function public\.create_organization\([^)]*\) to (\w+)/gi)].map(
+      (match) => match[1],
+    );
+    expect(grants).toEqual(['authenticated']);
+  });
+
+  it('runs AD-23’s steps in order: lock, state, input, serialize, the attempt, the slug, the write', () => {
+    const rpc = bodyOf('public.create_organization');
+    const at = (needle: string): number => {
+      const index = rpc.indexOf(needle);
+      expect(index, `the definer lacks ${needle}`).toBeGreaterThan(-1);
+      return index;
+    };
+    const order = [
+      at('request_path <> own_path then'),
+      at('for update;'),
+      at('account.email_confirmed_at is null'),
+      at("detail = 'name'"),
+      at("message = 'ORGANIZATION_TIMEZONE_UNKNOWN'"),
+      at('pg_catalog.pg_advisory_xact_lock(lock_namespace, lock_key)'),
+      at('insert into private.organization_attempts (auth_user_id) values (caller);'),
+      at('if not found or not settings.open then'),
+      at('insert into public.organizations ('),
+      at("perform pg_catalog.set_config('shift.founding_account', caller::text, true);"),
+      at('insert into public.members ('),
+      at("'code', 'ORGANIZATION_CREATED'"),
+    ];
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    // Every refusal of the caller's state is the one code.
+    for (const fact of [
+      'account.banned_until > pg_catalog.now()',
+      'account.deleted_at is not null',
+      "private.address_kind(account.email) <> 'email'",
+      "coalesce(account.raw_app_meta_data ->> 'must_set_password', '') = 'true'",
+      'exists (select 1 from public.members as m where m.auth_user_id = caller)',
+    ]) {
+      expect(rpc, `step 2 does not check ${fact}`).toContain(fact);
+    }
+    // A limit is RETURNED, never raised, so its attempt row commits.
+    // Three limits, and the proposal's bounded search (review of 19.3).
+    expect(rpc.match(/return pg_catalog\.jsonb_build_object\('code', 'TRY_LATER'\);/g)).toHaveLength(4);
+    expect(rpc).toContain('for tries in 1..20 loop');
+    expect(rpc).not.toMatch(/raise[^;]*TRY_LATER/);
+    expect(rpc).toContain('if recent_attempts > settings.attempts_per_account then');
+    expect(rpc).toContain('if recent_organizations >= settings.organizations_per_day then');
+    expect(rpc).toMatch(/where o\.founded_by is not null\s+and o\.created_at > pg_catalog\.now\(\) - interval '24 hours'/);
+    // The input refusals are 22023, named by field (D10).
+    expect(new Set([...rpc.matchAll(/detail = '(\w+)'/g)].map((match) => match[1]))).toEqual(
+      new Set(['name', 'slug', 'organization_type', 'leave_year_start', 'admin_name', 'admin_leave_allowance_days']),
+    );
+    expect(rpc).toContain("if not (org_slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$' and pg_catalog.length(org_slug) <= 63) then");
+    expect(rpc).toContain('if not private.is_known_timezone(org_timezone) then');
+  });
+
+  it('answers a taken and a reserved slug alike, by constraint name, and a founded_by race as not creatable (B6, D3)', () => {
+    const rpc = bodyOf('public.create_organization');
+    expect(rpc).toContain('when unique_violation or check_violation then');
+    expect(rpc).toContain("if violated = 'organizations_founded_by_key' then");
+    expect(rpc).toContain(
+      "if violated is distinct from 'organizations_slug_key' and violated is distinct from 'organizations_slug_not_reserved' then",
+    );
+    expect(rpc.match(/'code', 'SLUG_UNAVAILABLE'/g)).toHaveLength(1);
+    expect(rpc).toContain("return pg_catalog.jsonb_build_object('code', 'SLUG_UNAVAILABLE', 'proposal', proposal);");
+    expect(rpc).toContain('for n in 2..9 loop');
+    // The reserved list is AD-23's, checked before the constraint is added.
+    const sql = migration();
+    const lists = [...sql.matchAll(/slug (?:not )?in \(([^)]*)\)/g)].map((match) =>
+      (match[1] ?? '').split(',').map((slug) => slug.trim().replace(/^'|'$/g, '')),
+    );
+    expect(lists).toHaveLength(2);
+    for (const list of lists) expect(list).toEqual(RESERVED);
+    expect(sql).toMatch(/add constraint organizations_slug_not_reserved check \(/);
+  });
+
+  it('writes the operator script’s domain rows and the shipped locale, and nothing else (checklist D5, NFR-8)', () => {
+    const rpc = bodyOf('public.create_organization');
+    expect(rpc).toMatch(
+      /insert into public\.organizations \(\s+slug, name, organization_type, timezone, locale,\s+leave_year_start_month, leave_year_start_day, founded_by\s+\)/,
+    );
+    expect(rpc).toMatch(
+      /insert into public\.members \(\s+organization_id, auth_user_id, name, username, email, role, leave_allowance_days\s+\) values \(\s+new_organization_id, caller, admin_name, private\.email_identity_username\(account\.email\),\s+account\.email, 'admin', p_admin_leave_allowance_days::smallint\s+\)/,
+    );
+    expect(rpc.match(/\binsert into\b/g), 'a write beyond the attempt, the organization and its admin').toHaveLength(3);
+    expect(rpc).not.toMatch(/\b(update|delete from)\s+(public|private|auth)\./);
+    // The locale constant is the one shipped resource file (NFR-8).
+    const locales = readdirSync(join(repoRoot, 'apps', 'web', 'src', 'lib', 'i18n', 'locales'))
+      .filter((name) => name.endsWith('.json'))
+      .map((name) => name.replace(/\.json$/, ''));
+    expect(locales).toHaveLength(1);
+    expect(rpc).toContain(`shipped_locale constant text := '${locales[0] ?? ''}';`);
+    // The trim class is name_key's (and the operator script's).
+    const list = /white_space constant text := U&'((?:\\[0-9A-Fa-f]{4})+)';/.exec(rpc)?.[1];
+    const operator = /white_space constant text := U&'((?:\\[0-9A-Fa-f]{4})+)';/.exec(
+      readFileSync(join(operatorRoot, 'provision-organization.sql'), 'utf8'),
+    )?.[1];
+    expect(list).toBeDefined();
+    expect(list).toBe(operator);
+  });
+
+  it('keeps founded_by unique, unwritable by every session, and the attempts table nobody’s (E4, D3)', () => {
+    const sql = migration();
+    expect(sql).toContain('alter table public.organizations add column founded_by uuid;');
+    expect(sql).toContain('create unique index organizations_founded_by_key on public.organizations (founded_by);');
+    expect(sql).not.toMatch(/founded_by uuid[^;]*references/i);
+    expect(migrationStatements()).not.toMatch(/grant [^;]*\bfounded_by\b[^;]* on table public\.organizations/i);
+    expect(sql).toMatch(
+      /create table private\.organization_attempts \(\s+auth_user_id uuid not null,\s+attempted_at timestamptz not null default now\(\)\s+\);/,
+    );
+    expect(sql).toContain('alter table private.organization_attempts enable row level security;');
+    for (const role of ['public', 'anon', 'authenticated', 'service_role']) {
+      expect(sql).toContain(`revoke all on table private.organization_attempts from ${role};`);
+    }
+    const all = migrationStatements();
+    expect(all).not.toMatch(/grant [^;]* on (table )?private\.organization_attempts\b/i);
+    expect(all).not.toMatch(/create policy [^;]* on private\.organization_attempts\b/i);
+  });
+
+  it('moves the operator’s timezone rule into one function both call (AD-23 step 3)', () => {
+    const rule = bodyOf('private.is_known_timezone');
+    expect(rule).toMatch(/returns boolean\s+language sql\s+stable\s+parallel safe\s+set search_path = ''/);
+    expect(rule).toContain("zone ~ '^[A-Za-z]+(/[A-Za-z0-9_+-]+)+$'");
+    expect(rule).toContain("zone !~ '^(posix|right)/'");
+    expect(rule).toContain("zone !~ '^Etc/'");
+    expect(rule).toContain('from pg_catalog.pg_timezone_names as z where z.name = zone');
+    for (const role of ['public', 'anon', 'authenticated', 'service_role']) {
+      expect(migration()).toContain(`revoke execute on function private.is_known_timezone(text) from ${role};`);
+    }
+    const operator = stripLineComments(readFileSync(join(operatorRoot, 'provision-organization.sql'), 'utf8'));
+    expect(operator).toContain('and not private.is_known_timezone(organization_timezone)');
+    expect(operator).not.toContain('pg_timezone_names');
+  });
+
+  it('refuses through any PostgREST path but its own, so rpc/graphql cannot go around Kong (D4)', () => {
+    const rpc = bodyOf('public.create_organization');
+    expect(rpc).toContain("own_path constant text := '/rpc/create_organization';");
+    expect(rpc).toContain("request_path  text := pg_catalog.current_setting('request.path', true);");
+  });
+
+  it('holds an email identity’s member insert to the founding definer (D5)', () => {
+    const trigger = bodyOf('private.refuse_username_change_of_email_identity');
+    expect(trigger).toContain(
+      "or pg_catalog.current_setting('shift.founding_account', true) is distinct from new.auth_user_id::text)",
+    );
+    // Only the definer sets the setting: once to the caller, once cleared.
+    expect([...migrationStatements().matchAll(/set_config\('shift\.founding_account'/g)]).toHaveLength(2);
+  });
+
+  it('lets the Founding Admin’s insert past the stale-admin re-check, and keeps 0064’s branches (review of 19.3)', () => {
+    // The re-check runs for `authenticated` at trigger depth 1, which a
+    // definer called through PostgREST still is; without this exit every
+    // ORGANIZATION_CREATED would be refused 42501.
+    const definitions = readdirSync(join(supabaseRoot, 'migrations'))
+      .filter((name) => MIGRATION_NAME.test(name))
+      .sort()
+      .flatMap((name) => {
+        const sql = stripLineComments(readFileSync(join(supabaseRoot, 'migrations', name), 'utf8'));
+        const found = /create or replace function public\.refuse_write_by_stale_admin\(\)[\s\S]*?\$\$;/.exec(sql)?.[0];
+        return found === undefined ? [] : [[name, found] as const];
+      });
+    const [latestName, latest] = definitions[definitions.length - 1] ?? ['', ''];
+    expect(latestName).toBe(MIGRATION);
+    expect(latest).toMatch(
+      /if tg_op = 'INSERT' and tg_table_name = 'members' then\s+if new\.auth_user_id::text = pg_catalog\.current_setting\('shift\.founding_account', true\) then\s+return new;/,
+    );
+    // The exit comes before 0023's gate, and 0064's team_loans branch stays.
+    expect(latest.indexOf("tg_table_name = 'members'")).toBeLessThan(latest.indexOf("current_setting('role') <> 'authenticated'"));
+    expect(latest).toContain('private.team_loan_team_refused(new.organization_id, new.member_id, new.team_id, new.during)');
+    expect(latest).toContain("tg_table_name in ('team_membership_versions', 'rotation_assignments')");
+    expect(latest).toContain("tg_table_name = 'rotation_steps'");
+    for (const role of ['public', 'anon', 'authenticated', 'service_role']) {
+      expect(migration()).toContain(`revoke execute on function public.refuse_write_by_stale_admin() from ${role};`);
+    }
+  });
+
+  it('forgets the password at an email identity’s confirmation, in GoTrue’s own UPDATE (C8)', () => {
+    const sql = migration();
+    const forget = bodyOf('private.forget_password_on_confirmation');
+    expect(forget).toMatch(/returns trigger\s+language plpgsql\s+security definer\s+set search_path = ''/);
+    expect(forget).toMatch(
+      /if old\.email_confirmed_at is null\s+and new\.email_confirmed_at is not null\s+and new\.encrypted_password is not distinct from old\.encrypted_password\s+and private\.address_kind\(new\.email\) <> 'synthesized'\s+then\s+new\.encrypted_password := null;/,
+    );
+    expect(sql).toMatch(
+      /create trigger users_forget_password_on_confirmation\s+before update of email_confirmed_at on auth\.users\s+for each row\s+execute function private\.forget_password_on_confirmation\(\);/,
+    );
+    for (const role of ['public', 'anon', 'authenticated', 'service_role']) {
+      expect(sql).toContain(`revoke execute on function private.forget_password_on_confirmation() from ${role};`);
+    }
+  });
+});

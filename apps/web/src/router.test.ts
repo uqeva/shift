@@ -4,7 +4,7 @@ import { isRedirect } from '@tanstack/react-router';
 import type { Session } from '@supabase/supabase-js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ROUTE_PENDING_MS, router } from '@/router';
+import { ROUTE_PENDING_MS, endLocalSession, router } from '@/router';
 import {
   knownPathOf,
   returnSearchOf,
@@ -28,7 +28,7 @@ import {
 } from '@/features/navigation/services/role';
 import { currentSession, SESSION_UNRESOLVED } from '@/lib/supabase/client';
 import { sessionEnded } from '@/lib/supabase/session-cache';
-import { SESSION } from '@/lib/supabase/session.fixture';
+import { CLAIMED_TOKEN, SESSION } from '@/lib/supabase/session.fixture';
 import { AppLayout, appLayoutRoute } from '@/pages/_app';
 import {
   OFFLINE_READABLE_PATHS,
@@ -539,7 +539,10 @@ describe('the shell route tree', () => {
   });
 
   describe('the signup routes’ guards (story 19.2, AD-21, AD-24)', () => {
-    type Guard = (options: { context: { currentSession: () => Promise<Session | null> } }) => unknown;
+    type Guard = (options: {
+      context: { currentSession: () => Promise<Session | null>; isKnownPath?: (path: string) => boolean; endLocalSession?: () => Promise<void> };
+      search?: Record<string, unknown>;
+    }) => unknown;
     const tokenOf = (claims: Record<string, unknown>): string =>
       `e30.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.signature`;
     const claimless = {
@@ -551,13 +554,27 @@ describe('the shell route tree', () => {
       user: { id: 'founder', email: 'ana@example.com', app_metadata: {} },
     } as unknown as Session;
 
-    async function outcomeOf(route: { options: unknown }, session: Session | null): Promise<unknown> {
+    async function outcomeOf(
+      route: { options: unknown },
+      session: Session | null,
+      extra: { endLocalSession?: () => Promise<void>; search?: Record<string, unknown> } = {},
+    ): Promise<unknown> {
       const guard = (route.options as { beforeLoad?: Guard }).beforeLoad;
       if (typeof guard !== 'function') throw new Error('the route has no guard');
       try {
-        return { returned: await guard({ context: { currentSession: () => Promise.resolve(session) } }) };
+        return {
+          returned: await guard({
+            context: {
+              currentSession: () => Promise.resolve(session),
+              isKnownPath: KNOWN_PATH,
+              ...(extra.endLocalSession === undefined ? {} : { endLocalSession: extra.endLocalSession }),
+            },
+            search: extra.search ?? {},
+          }),
+        };
       } catch (thrown) {
-        return { to: (thrown as { options?: { to?: string } }).options?.to };
+        const options = (thrown as { options?: { to?: string; href?: string } }).options;
+        return options?.href === undefined ? { to: options?.to } : { href: options.href };
       }
     }
 
@@ -580,8 +597,32 @@ describe('the shell route tree', () => {
 
     it('holds only a claimless email identity at /postavljanje', async () => {
       expect(await outcomeOf(postavljanjeRoute, null)).toEqual({ to: '/prijava' });
-      expect(await outcomeOf(postavljanjeRoute, claimed)).toEqual({ to: '/' });
+      expect(await outcomeOf(postavljanjeRoute, claimed)).toEqual({ href: '/' });
       expect(await outcomeOf(postavljanjeRoute, claimless)).toEqual({ returned: { email: 'ana@example.com' } });
+      // STORY 19.3 (D6): a claimless username identity is signed out, through the context's stand-in.
+      const orphan = { ...claimless, user: { id: 'ivan', email: 'ivan@dvd.shift.invalid', app_metadata: {} } } as unknown as Session;
+      const ended: string[] = [];
+      expect(
+        await outcomeOf(postavljanjeRoute, orphan, {
+          endLocalSession: () => {
+            ended.push('local');
+            return Promise.resolve();
+          },
+        }),
+      ).toEqual({ to: '/prijava' });
+      expect(ended).toEqual(['local']);
+    });
+
+    it('sends a claimed session to the carried return target, validated (story 19.3, D7)', async () => {
+      expect(await outcomeOf(postavljanjeRoute, claimed, { search: { povratak: '/kalendar?tim=2' } })).toEqual({ href: '/kalendar?tim=2' });
+      expect(await outcomeOf(postavljanjeRoute, claimed, { search: { povratak: '//evil.example' } })).toEqual({ href: '/' });
+      expect(await outcomeOf(postavljanjeRoute, claimed, { search: { povratak: '/ne-postoji' } })).toEqual({ href: '/' });
+    });
+
+    it('keeps the confirmation line and the return target in its search (story 19.3, D7)', () => {
+      const validate = (postavljanjeRoute.options as { validateSearch?: (search: Record<string, unknown>) => unknown }).validateSearch;
+      expect(validate?.({ potvrdeno: 'true', povratak: '/kalendar', other: 1 })).toEqual({ potvrdeno: true, povratak: '/kalendar' });
+      expect(validate?.({})).toEqual({});
     });
   });
 
@@ -1291,6 +1332,15 @@ describe('the deployed root resolves both ways and is never a blank page', () =>
     ).toBe(routeMemberRole);
   });
 
+  it('binds the guards’ local sign-out into the context, by identity (story 19.3, D6)', () => {
+    // Every guard case supplies its own stand-in, so only naming the shipped
+    // binding catches an inline `async () => undefined` here.
+    const context = (router.options as { context?: { endLocalSession?: unknown } }).context;
+
+    expect(context?.endLocalSession).toBe(endLocalSession);
+    expect(endLocalSession).toBeTypeOf('function');
+  });
+
   it('binds the real tree as the known-path question (C512, E853)', () => {
     // Executed rather than named: the predicate is a closure over the router,
     // and an inline `() => true` here would follow any same-origin target into
@@ -1366,7 +1416,7 @@ describe('a slug that cannot be one never reaches the credential form', () => {
   }) => unknown;
 
   /** Enough of a session to be distinguishable from `null`. */
-  const SIGNED_IN = { access_token: 'token', user: { id: 'member' } } as unknown as Session;
+  const SIGNED_IN = { access_token: CLAIMED_TOKEN, user: { id: 'member' } } as unknown as Session;
 
   async function guard(slug: string, session: Session | null = null): Promise<unknown> {
     const run = (prijavaRoute.options as unknown as { beforeLoad?: SlugBeforeLoad }).beforeLoad;
@@ -1988,7 +2038,7 @@ describe('the signed-in layout guards every destination once, and is pathless', 
     // no destination until they have set their own: the typed `/kalendar` deep
     // link below lands on the step, not the calendar.
     const flagged = {
-      access_token: 'token',
+      access_token: CLAIMED_TOKEN,
       user: { id: 'member', app_metadata: { must_set_password: true } },
     } as unknown as Session;
     const thrown = thrownBy(await beforeLoad(() => Promise.resolve(flagged)));
@@ -2021,6 +2071,47 @@ describe('the signed-in layout guards every destination once, and is pathless', 
     expect(await beforeLoad(() => Promise.resolve(claimed))).toEqual({ returned: undefined });
   });
 
+  it('carries the location to /postavljanje, and signs a claimless username identity out (story 19.3, D6, D7)', async () => {
+    const tokenOf = (claims: Record<string, unknown>): string =>
+      `e30.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.signature`;
+    const claimless = {
+      access_token: tokenOf({ sub: 'founder' }),
+      user: { id: 'founder', email: 'ana@example.com', app_metadata: {} },
+    } as unknown as Session;
+    const held = thrownBy(await beforeLoad(() => Promise.resolve(claimless))) as {
+      options: { to?: string; search?: unknown };
+    };
+    expect(held.options.to).toBe('/postavljanje');
+    expect(held.options.search).toEqual({ povratak: '/kalendar?tim=2#tjedan' });
+
+    const orphan = {
+      access_token: tokenOf({ sub: 'ivan' }),
+      user: { id: 'ivan', email: 'ivan@dvd.shift.invalid', app_metadata: {} },
+    } as unknown as Session;
+    const ended: string[] = [];
+    let thrown: unknown = null;
+    try {
+      await guard()({
+        location: DEEP_LINK,
+        context: {
+          currentSession: () => Promise.resolve(orphan),
+          currentMemberRole: REFUSES_ROLE,
+          isKnownPath: KNOWN_PATH,
+          endLocalSession: () => {
+            ended.push('local');
+            return Promise.resolve();
+          },
+        },
+      });
+    } catch (caught) {
+      thrown = caught;
+    }
+    expect(isRedirect(thrown)).toBe(true);
+    expect((thrown as { options: { to?: string; search?: unknown } }).options.to).toBe('/prijava');
+    expect((thrown as { options: { search?: unknown } }).options.search).toBeUndefined();
+    expect(ended).toEqual(['local']);
+  });
+
   it('drops the location when the bounce is the re-guard for a session change (C516)', async () => {
     // A sign-out or expiry in another tab, or another account taking over:
     // the next person to sign in on this device is probably not the one who
@@ -2035,7 +2126,7 @@ describe('the signed-in layout guards every destination once, and is pathless', 
 
     sessionEnded.mark();
     const flagged = {
-      access_token: 'token',
+      access_token: CLAIMED_TOKEN,
       user: { id: 'member', app_metadata: { must_set_password: true } },
     } as unknown as Session;
     const held = thrownBy(await beforeLoad(() => Promise.resolve(flagged))) as {
@@ -2060,7 +2151,7 @@ describe('the signed-in layout guards every destination once, and is pathless', 
   it('lets a session through once its flag is cleared, or when it never had one', async () => {
     for (const metadata of [{ must_set_password: false }, {}]) {
       const cleared = {
-        access_token: 'token',
+        access_token: CLAIMED_TOKEN,
         user: { id: 'member', app_metadata: metadata },
       } as unknown as Session;
 
@@ -3046,7 +3137,7 @@ describe('the set-password step opens only to a flagged session (story 7.8)', ()
   const STEP = { href: '/postavi-lozinku' };
 
   function sessionWith(metadata: Readonly<Record<string, unknown>>): Session {
-    return { access_token: 'token', user: { id: 'member', app_metadata: metadata } } as unknown as Session;
+    return { access_token: CLAIMED_TOKEN, user: { id: 'member', app_metadata: metadata } } as unknown as Session;
   }
 
   async function outcomeOf(
