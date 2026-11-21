@@ -613,7 +613,14 @@ describe('deploy-images.sh: the image half of a deploy (story 20.6)', () => {
       (match) => (match[1] ?? '').split(/\s+/),
     );
     expect(copied.length).toBeGreaterThan(2);
-    for (const path of copied) {
+    // A package's built `dist` (story 16.4) is hashed by what builds it, its
+    // package's sources (the next case), never as itself: it is untracked.
+    const built = copied.filter((path) => /^packages\/[a-z]+\/dist\/$/.test(path));
+    expect(built.sort()).toEqual(['packages/domain/dist/', 'packages/ics/dist/']);
+    for (const path of built) {
+      expect(sources, path).toContain(path.replace(/dist\/$/, 'src'));
+    }
+    for (const path of copied.filter((one) => !built.includes(one))) {
       expect(
         sources.some((source) => path === source || path.startsWith(`${source.replace(/\/$/, '')}/`)),
         `${path} is not in FUNCTIONS_SOURCES`,
@@ -629,6 +636,12 @@ describe('deploy-images.sh: the image half of a deploy (story 20.6)', () => {
         'packages/domain/package.json',
         'packages/domain/tsconfig.json',
         'packages/domain/tsconfig.test.json',
+        // Story 16.4: the serializer calendar-feed bundles, on the same terms.
+        'packages/ics/src',
+        'packages/ics/package.json',
+        'packages/ics/tsconfig.json',
+        'packages/ics/tsconfig.test.json',
+        'supabase/functions/calendar-feed',
         'tsconfig.base.json',
         'pnpm-lock.yaml',
       ]),
@@ -932,6 +945,25 @@ describe('the pipeline deploys through Coolify (story 20.6)', () => {
     expect(pipeline.jobs['smoke-staging']?.needs).toBe('deploy-staging');
   });
 
+  it('builds both packages before anything copies or serves their dist, and deploys only after runtime parity (story 16.4)', () => {
+    // AD-7: the functions image holds the domain's rules now.
+    expect(pipeline.jobs['deploy-staging']?.needs).toEqual(expect.arrayContaining(['test', 'e2e', 'runtime-parity']));
+    const build = 'pnpm --filter @shift/domain --filter @shift/ics build';
+    const before = (job: string, marker: RegExp): void => {
+      const runs = (pipeline.jobs[job]?.steps ?? []).map((step) => step.run ?? '');
+      const built = runs.findIndex((run) => run.includes(build));
+      const used = runs.findIndex((run) => marker.test(run));
+      expect(built, `${job} builds the packages`).toBeGreaterThan(-1);
+      expect(used, `${job} uses them`).toBeGreaterThan(built);
+    };
+    before('functions-image', /docker build .*deploy\/functions\/Dockerfile/);
+    before('e2e', /serve-admin-auth\.sh/);
+    const steps = action.runs.steps.map((step) => step.run ?? '');
+    const built = steps.findIndex((run) => run.includes(build));
+    expect(built).toBeGreaterThan(-1);
+    expect(steps.findIndex((run) => run.includes('deploy-images.sh functions-image'))).toBeGreaterThan(built);
+  });
+
   it('reads secrets only in jobs bound to an Environment, besides the optional Slack hook', () => {
     for (const [name, job] of Object.entries(pipeline.jobs)) {
       const text = JSON.stringify(job).replace('${{ secrets.SLACK_WEBHOOK_URL }}', '');
@@ -1039,6 +1071,8 @@ describe('the pipeline deploys through Coolify (story 20.6)', () => {
       'No source map is published',
       'Build shift-web and probe it offline',
       'Log in to GHCR',
+      // Story 16.4: the image copies both packages' built dist.
+      'Build @shift/domain and @shift/ics',
       'shift-functions (build and probe, or reuse)',
       'Push shift-web',
       'Join the tailnet',

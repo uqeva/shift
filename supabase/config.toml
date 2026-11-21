@@ -141,8 +141,9 @@ uri = "pg-functions://postgres/public/before_user_created_hook"
 enabled = true
 policy = "oneshot"
 
-# AD-14 (amended by story 10.1): exactly two Edge Functions exist. A third one
-# amends AD-14 again.
+# AD-14 (amended by Architect pass 1) names exactly four Edge Functions:
+# `admin-auth`, `notify`, `calendar-feed` (story 16.4) and `remind` (17.2, not
+# yet here). A fifth one amends AD-14 again.
 #
 # `admin-auth` is the privileged auth boundary (AD-16): every caller is a
 # signed-in session, so the gateway verifies the JWT before the handler runs.
@@ -158,3 +159,14 @@ verify_jwt = true
 [functions.notify]
 enabled = true
 verify_jwt = false
+
+# `calendar-feed` serves a member's own shifts to their calendar app (story
+# 16.4; D-S1, D-S8). A calendar app sends a URL and nothing else, so the token
+# in the path is the credential and the gateway checks no JWT; the function
+# holds the publishable key only and reads through `calendar_feed_inputs`
+# alone. Its `deno.json` maps `@shift/domain` and `@shift/ics` onto their
+# built `dist` (AD-7): build both packages before `functions serve` starts.
+[functions.calendar-feed]
+enabled = true
+verify_jwt = false
+import_map = "./functions/calendar-feed/deno.json"

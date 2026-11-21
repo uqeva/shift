@@ -2456,3 +2456,167 @@ describe('two notify runs at once claim disjoint outbox rows (0042)', () => {
     });
   });
 });
+
+/**
+ * Story 16.4 (the 16.3 security review's open item): 0067 serializes every
+ * write of a member's feed token on ONE advisory lock per member,
+ * `private.lock_calendar_feed_tokens` (`shift.calendar_feed_tokens:<member>`),
+ * taken by the creation, both revokes and the status trigger. With two real
+ * connections: two regenerations leave one live token and never a raw 23505
+ * from `calendar_feed_tokens_one_live`; a creation racing a deactivation in
+ * effect leaves none, whichever comes first. Written unrun; CI is its first run.
+ */
+describe('a member’s feed token writes wait for each other (0067, story 16.4)', () => {
+  /** Whether backend `pid` waits for this MEMBER's feed-token key (the bigint key 0067 computes). */
+  async function memberKeyWaiting(observer: Client, pid: number, member: string): Promise<boolean> {
+    const { rows } = await observer.query<{ found: boolean }>(
+      `with k as (
+         select pg_catalog.hashtextextended('shift.calendar_feed_tokens:' || $2::uuid::text, 0) as key
+       )
+       select exists (
+         select 1
+           from pg_locks l, k
+          where l.pid = $1
+            and l.locktype = 'advisory'
+            and not l.granted
+            and l.objsubid = 1
+            and l.classid::text::bigint = ((k.key >> 32) & 4294967295)
+            and l.objid::text::bigint = (k.key & 4294967295)
+       ) as found`,
+      [pid, member],
+    );
+    return rows[0]?.found === true;
+  }
+
+  async function untilWaitingOnMember(observer: Client, pid: number, member: string, write: Pending): Promise<void> {
+    const deadline = Date.now() + BLOCK_DEADLINE_MS;
+    for (;;) {
+      if (await memberKeyWaiting(observer, pid, member)) return;
+      if (write.settled()) throw new Error(`T2 finished without waiting on the member's lock: ${JSON.stringify(await write.outcome)}`);
+      if (Date.now() > deadline) throw new Error("T2 neither waited on the member's lock nor finished");
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+  }
+
+  /** The member's own creation, as their request session; the token text is the only row value read. */
+  async function createToken(client: Client): Promise<{ rowCount: number | null; token?: string }> {
+    const result = await client.query<{ token: string }>('select public.create_calendar_feed_token() as token');
+    const token = result.rows[0]?.token;
+    return token === undefined ? { rowCount: result.rowCount } : { rowCount: result.rowCount, token };
+  }
+
+  /** Read as the owner: the member's live tokens' hashes, hex. */
+  async function liveHashes(member: string): Promise<string[]> {
+    return fixture(async (client) => {
+      const { rows } = await client.query<{ hash: string }>(
+        `select encode(token_hash, 'hex') as hash from calendar_feed_tokens
+          where member_id = $1 and removed_at is null`,
+        [member],
+      );
+      return rows.map((row) => row.hash);
+    });
+  }
+
+  const sha256Hex = async (text: string): Promise<string> =>
+    [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))]
+      .map((byte) => byte.toString(16).padStart(2, '0'))
+      .join('');
+
+  it.skipIf(noDatabase)('leaves one live token, the later one, after two regenerations race', async () => {
+    const { organization, member } = await fixture(async (client) => {
+      const organization = await addOrganization(client);
+      return { organization, member: await addAccount(client, organization, 'member_role') };
+    });
+
+    let secondToken: string | undefined;
+    await race(async (t1, t2, observer) => {
+      await t1.query('begin');
+      await actAs(t1, member, organization);
+      expect((await createToken(t1)).token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+
+      const pid = await backendPid(t2);
+      await t2.query('begin');
+      await actAs(t2, member, organization);
+      let token: string | undefined;
+      const second = pending(
+        createToken(t2).then((result) => {
+          token = result.token;
+          return result;
+        }),
+      );
+      await untilWaitingOnMember(observer, pid, member.id, second);
+
+      await t1.query('commit');
+      // Not 23505 from `calendar_feed_tokens_one_live`: T2 saw T1's token after the lock and revoked it.
+      expect(await second.outcome).toEqual({ ok: true, rowCount: 1 });
+      await t2.query('commit');
+      secondToken = token;
+    });
+
+    expect(secondToken).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(await liveHashes(member.id)).toEqual([await sha256Hex(secondToken ?? '')]);
+  });
+
+  it.skipIf(noDatabase)('leaves no live token when a creation waits behind a deactivation in effect', async () => {
+    const { organization, admin, member } = await fixture(async (client) => {
+      const organization = await addOrganization(client);
+      return {
+        organization,
+        admin: await addAccount(client, organization, 'admin'),
+        member: await addAccount(client, organization, 'member_role'),
+      };
+    });
+    const today = await fixture((client) => organizationDay(client, organization, 0));
+
+    await race(async (t1, t2, observer) => {
+      // T1: the admin deactivates the member from today; the status trigger holds the member's lock.
+      await t1.query('begin');
+      await actAs(t1, admin, organization);
+      expect((await insertStatus(t1, { organization, member: member.id, active: false, from: today })).rowCount).toBe(1);
+
+      const pid = await backendPid(t2);
+      await t2.query('begin');
+      await actAs(t2, member, organization);
+      const creation = pending(createToken(t2));
+      await untilWaitingOnMember(observer, pid, member.id, creation);
+
+      await t1.query('commit');
+      // The access check runs after the lock, on a snapshot that sees the deactivation.
+      expect(await creation.outcome).toMatchObject({ ok: false, code: '42501', message: 'CALENDAR_FEED_REFUSED' });
+    });
+
+    expect(await liveHashes(member.id)).toEqual([]);
+  });
+
+  it.skipIf(noDatabase)('revokes a creation that a deactivation in effect waited behind', async () => {
+    const { organization, admin, member } = await fixture(async (client) => {
+      const organization = await addOrganization(client);
+      return {
+        organization,
+        admin: await addAccount(client, organization, 'admin'),
+        member: await addAccount(client, organization, 'member_role'),
+      };
+    });
+    const today = await fixture((client) => organizationDay(client, organization, 0));
+
+    await race(async (t1, t2, observer) => {
+      // T1: the member creates a token and holds the member's lock.
+      await t1.query('begin');
+      await actAs(t1, member, organization);
+      expect((await createToken(t1)).token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+
+      // T2: the admin's deactivation; its trigger waits for the member's lock.
+      const pid = await backendPid(t2);
+      await t2.query('begin');
+      await actAs(t2, admin, organization);
+      const deactivation = pending(insertStatus(t2, { organization, member: member.id, active: false, from: today }));
+      await untilWaitingOnMember(observer, pid, member.id, deactivation);
+
+      await t1.query('commit');
+      expect(await deactivation.outcome).toEqual({ ok: true, rowCount: 1 });
+      await t2.query('commit');
+    });
+
+    expect(await liveHashes(member.id)).toEqual([]);
+  });
+});

@@ -321,6 +321,36 @@ describe('secret key hygiene: key material', () => {
 });
 
 /**
+ * AD-17, amended by Architect pass 1 (story 16.4): `calendar-feed` is public
+ * and must never hold the secret key. It reads through its one anon RPC with
+ * the publishable key, and the router gives its worker that and the
+ * gateway's address alone. Nothing under its directory names a secret, and
+ * the Resend and VAPID names stay `notify`'s.
+ */
+describe('calendar-feed holds no secret (story 16.4)', () => {
+  const directory = join(repoRoot, 'supabase', 'functions', 'calendar-feed');
+  const files = collectFiles(directory, () => true);
+
+  it('names no secret key, invoke secret, Resend or VAPID key anywhere in its directory', () => {
+    expect(files.length, 'calendar-feed has no files').toBeGreaterThan(2);
+    for (const file of files) {
+      // Comment-blind, as a key value would be: not even its documentation names one.
+      const text = readFileSync(file, 'utf8');
+      expect(text, relative(repoRoot, file)).not.toMatch(
+        /SHIFT_SECRET_KEY|SUPABASE_SECRET_KEY|SERVICE_ROLE|sb_secret_|INVOKE_SECRET|RESEND_API_KEY|VAPID_/,
+      );
+    }
+  });
+
+  it('reads exactly the gateway’s address and the publishable key', () => {
+    const handler = readFileSync(join(directory, 'handler.ts'), 'utf8');
+    const reads = [...handler.matchAll(/\bread\('([A-Z][A-Z0-9_]*)'\)/g)].map((match) => match[1]);
+    expect(reads.sort()).toEqual(['SHIFT_PUBLISHABLE_KEY', 'SUPABASE_URL']);
+    expect(readFileSync(join(directory, 'index.ts'), 'utf8')).not.toMatch(/env\.toObject|env\.get\('/);
+  });
+});
+
+/**
  * AD-17, amended by story 10.1: the email provider key, the notify invoke
  * secret and the VAPID private key live only in `notify`'s environment.
  *

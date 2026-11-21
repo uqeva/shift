@@ -14,8 +14,17 @@ export default defineConfig({
   // (`rls-isolation.test.ts` → `features/leave/services/leave-write.ts`, which
   // reads dates through `@/lib/i18n/format`; `schedule-inputs-parity.test.ts`
   // → the calendar snapshot, the leave list and the schedule-inputs adapter).
+  //
+  // Story 16.4: `calendar-feed`'s handler imports `@shift/domain` and
+  // `@shift/ics` by their bare specifiers (its `deno.json` maps them onto the
+  // built `dist` under Deno), so `test/calendar-feed.test.ts` reads both from
+  // source here, as `tsconfig.json` types them. Exact matches only.
   resolve: {
-    alias: { '@': fileURLToPath(new URL('./apps/web/src', import.meta.url)) },
+    alias: [
+      { find: /^@shift\/domain$/, replacement: fileURLToPath(new URL('./packages/domain/src/index.ts', import.meta.url)) },
+      { find: /^@shift\/ics$/, replacement: fileURLToPath(new URL('./packages/ics/src/index.ts', import.meta.url)) },
+      { find: '@', replacement: fileURLToPath(new URL('./apps/web/src', import.meta.url)) },
+    ],
   },
   test: {
     environment: 'node',

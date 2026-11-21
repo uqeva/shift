@@ -2,14 +2,14 @@
 title: "16.3 A member's feed token is a revocable secret"
 type: 'feature'
 created: '2026-11-21'
-status: 'in-review'
+status: 'done'
 baseline_commit: '7e4604216a2530adbbf4ce17860b33fb03a9ef31'
 review_loop_iteration: 2
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-16-context.md'
 ---
 
-Status: built, CI pending. Baseline: `main` at #339 (16.2); rebased onto `main` at #341 (19.1, `0066`), so `0067` follows with no gap. Touches no hot file.
+Status: done. Merged as #342, squash `e5f6b7f` (2026-11-21), after `CI passed` went green on `c168eb0` (run 44913637699, the PR's only run). Baseline: `main` at #339 (16.2); rebased onto `main` at #341 (19.1, `0066`), so `0067` follows with no gap. Touches no hot file.
 
 **After the rebase onto 19.1 (2026-11-21):** 19.1's claimless-account sweep (`test/claimless-account.test.ts`) now reaches 0067. The table: `authenticated` holds no privilege on `calendar_feed_tokens`, so its read, insert, update and delete each end 42501, which the sweep accepts. The functions: the five `authenticated`-executable ones each read the `organization_id` claim first, and a claimless session has none, so each raises 42501 `CALENDAR_FEED_REFUSED` before any read or write that depends on an argument: the three with no uuid argument answer a refusal ("says nothing"), and the two admin ones answer the same refusal for a real and an absent member id. `calendar_feed_inputs` is `anon`'s alone and is not swept. No exception (`UNSWEPT_ALLOWED`, `ALLOWED_TO_SUCCEED`) is needed.
 
@@ -63,8 +63,8 @@ Status: built, CI pending. Baseline: `main` at #339 (16.2); rebased onto `main` 
 - `supabase/migrations/0067_calendar_feed_tokens.sql` (new) -- everything above.
 - Reuse: `public.organization_today` (0008:138), `public.member_active_on` (0008:169), `public.current_member_access()` (0003/0008), `private.member_schedule_inputs` (0065), 0045's definer/claim/advisory-lock pattern (`register_push_subscription`), 0064's admin gate (`remove_team_loan`; no organization lock: the token table takes none), 0041's AFTER INSERT trigger on `member_status_versions`, 0061's `private.record_audit_event` (copied, not replaced: the scaffold forbids `create or replace` of it).
 - `test/supabase-scaffold.test.ts` -- `auditCoverage` learns a table audited by its own recorder (`calendar_feed_tokens`); new describe for 0067's source pins.
-- `test/provisioning.test.ts` -- RLS table list, definer inventory, exact grantees and the sweep gain the new table/functions (unrun).
-- `test/calendar-feed-tokens.test.ts` (new) -- DB suite, rolled-back transactions, claims injection (no GoTrue, so no PostgREST warm-up needed), unrun.
+- `test/provisioning.test.ts` -- RLS table list, definer inventory, exact grantees and the sweep gain the new table/functions (written unrun; green in CI, #342).
+- `test/calendar-feed-tokens.test.ts` (new) -- DB suite, rolled-back transactions, claims injection (no GoTrue, so no PostgREST warm-up needed), written unrun; green in CI (#342).
 - `e2e/utils/database-helper.ts` -- deliberately unchanged: the member and organization keys cascade (as 0045), so every cleanup that deletes a member deletes its tokens in the same statement.
 - Mappers (rule A11): no existing row gains a column; `packages/domain/src/history.ts` reads the new table as `other` (generic, never a failed read), deliberately left to 16.5.
 - Spine: AD-14 and AD-11 `Amended 2026-11-21 (16.3)` clauses.
@@ -110,7 +110,7 @@ Decisions (founder: decide and record):
 
 **Results (2026-11-21):** `pnpm typecheck`, `pnpm lint`, `pnpm build` pass; `pnpm --filter @shift/domain test` 20 files, 950 tests pass; the seven root files: 2470 tests, all pass but one, "numbers migrations 0001, 0002, … with no gaps", which fails by design while `0066` (19.1, PR #341) is not on `main` (deferred-work, numbering entry).
 
-**Residual risk (CI settles):** 0067, `test/calendar-feed-tokens.test.ts` and the provisioning entries have never run against a database (STRICT DATABASE RULE); the exact `pg_get_triggerdef` text the suite pins for the WHEN clause was written from expectation. No two-connection race test of the per-member lock (security review entry). CI's `CI passed` stays red on the numbering pin until this branch is rebased onto 19.1 or renumbered.
+**Residual risk, settled by CI (#342):** 0067, `test/calendar-feed-tokens.test.ts` (the `pg_get_triggerdef` WHEN-clause pin included) and the provisioning entries ran on CI's fresh stack in run 44913637699 on `c168eb0`, the rebase onto 19.1 (`0066`), and every job passed, `Test (Vitest, local Supabase)` and `CI passed` included; no fix was pushed for CI. The numbering pin passed after that rebase. Still open, and not CI's to settle: the two-connection race test of the per-member lock, written by 16.4 in `test/concurrent-writes.test.ts` (its CI is 16.4's), and the epic's `security-review` before production (deferred-work).
 
 **Review 1 (five layers):** patched — every refusal followed by more work now uses a savepoint (`refusedThenContinue`); status versions are inserted with 0008's four granted columns (`created_by` from its default); `tokensOf` orders revoked first (both tokens share one `now()`); cases added for a deactivated admin and a claimless caller on both admin functions, an inactive member on all three own functions, an admin's no-op revoke and the unknown/null member; the member rule now includes the account clause; spec, spine and deferred-work text corrected. Rejected: the reactivation branch for a same-date active version (one version per member per date, 0008); a malformed `organization_id` claim answering 22P02 (every definer in the repository casts it so); exporting the digest (an independent pin, as 16.2's); `test/rls-isolation.test.ts`'s `AUDITED_TABLES` (used only for its truncate sweep; this suite sweeps TRUNCATE itself).
 
@@ -153,7 +153,7 @@ Decisions (founder: decide and record):
 - Source pins for 0067.
   [`supabase-scaffold.test.ts:5934`](../../test/supabase-scaffold.test.ts#L5934)
 
-- DB suite (unrun): deactivation, scheduled date, reactivation.
+- DB suite (green in CI, run 44913637699): deactivation, scheduled date, reactivation.
   [`calendar-feed-tokens.test.ts:466`](../../test/calendar-feed-tokens.test.ts#L466)
 
 **Review 2 (security review; five layers):**

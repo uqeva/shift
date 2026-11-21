@@ -48,8 +48,11 @@ export default defineConfig({
     {
       // The function answers 401 without a JWT once it is served, which
       // Playwright counts as up. The stack check first, because web servers
-      // start before globalSetup.
-      command: 'node e2e/utils/require-stack.ts && pnpm exec supabase functions serve admin-auth',
+      // start before globalSetup. `functions serve` serves every function, and
+      // `calendar-feed` (story 16.4) loads both packages' built `dist` through
+      // its `deno.json`, so they are built before it starts (AD-7).
+      command:
+        'node e2e/utils/require-stack.ts && pnpm --filter @shift/domain --filter @shift/ics build && pnpm exec supabase functions serve admin-auth',
       url: 'http://127.0.0.1:54321/functions/v1/admin-auth',
       reuseExistingServer: true,
       timeout: 120_000,

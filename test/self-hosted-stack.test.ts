@@ -666,9 +666,9 @@ describe('the self-hosted stack (story 20.1): keys and secrets (AD-17)', () => {
   });
 
   it('gives the functions every variable their configuration reads, from the right source', () => {
-    // The names `readConfiguration` reads in both handlers
-    // (`supabase/functions/{admin-auth,notify}/handler.ts`), and where each
-    // comes from on this stack.
+    // The names `readConfiguration` reads in every handler
+    // (`supabase/functions/{admin-auth,notify,calendar-feed}/handler.ts`), and
+    // where each comes from on this stack.
     const functions = environment('supabase-edge-functions');
     const expected: Readonly<Record<string, RegExp>> = {
       // The router's own (story 20.2): GoTrue on the stack's network.
@@ -693,7 +693,7 @@ describe('the self-hosted stack (story 20.1): keys and secrets (AD-17)', () => {
     // And the handlers still read exactly these names, so a rename on either
     // side fails here.
     const read = new Set<string>();
-    for (const handler of ['admin-auth', 'notify']) {
+    for (const handler of ['admin-auth', 'notify', 'calendar-feed']) {
       const text = readFileSync(join(repoRoot, 'supabase', 'functions', handler, 'handler.ts'), 'utf8');
       for (const match of text.matchAll(/\b(?:read|getEnv)\('([A-Z][A-Z0-9_]*)'\)/g)) read.add(match[1] ?? '');
     }
@@ -836,6 +836,16 @@ describe('the self-hosted stack (story 20.2): the functions route, its CORS and 
     }
     // No brace form, which Coolify would read as its own variable.
     expect(logRedaction).not.toMatch(/\$\{/);
+  });
+
+  it('writes no error-log line below crit, where nginx prints a request line with the feed’s token (story 16.4)', () => {
+    // Kong 2.8.1 has one level for every error log; `error` and some `warn`
+    // lines carry `request: "GET /functions/v1/calendar-feed/<token> …"`.
+    expect(environment('supabase-kong').get('KONG_LOG_LEVEL')).toBe('crit');
+    for (const name of Object.keys(compose.services)) {
+      if (name === 'supabase-kong') continue;
+      expect(environment(name).has('KONG_LOG_LEVEL'), name).toBe(false);
+    }
   });
 
   it('redacts a function’s path after its name, and every query string', () => {

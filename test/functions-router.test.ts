@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -284,9 +284,11 @@ describe('the functions router (story 20.2): the table is config.toml’s', () =
       expect(enabled, `${name} is disabled in config.toml`).toBe(true);
       expect(FUNCTIONS.get(name)?.verifyJwt, `${name} verify_jwt`).toBe(verifyJwt);
     }
-    // The epic's two, as AD-14 counts them.
+    // As AD-14 counts them (remind joins in 17.2).
     expect(FUNCTIONS.get('admin-auth')?.verifyJwt).toBe(true);
     expect(FUNCTIONS.get('notify')?.verifyJwt).toBe(false);
+    // Story 16.4: public, the token in the path is the credential.
+    expect(FUNCTIONS.get('calendar-feed')?.verifyJwt).toBe(false);
   });
 
   it('gives each worker exactly the variables its own handler reads, and nothing of the other’s', () => {
@@ -302,6 +304,33 @@ describe('the functions router (story 20.2): the table is config.toml’s', () =
     expect(FUNCTIONS.get('admin-auth')?.environment).not.toContain('NOTIFY_INVOKE_SECRET');
     expect(FUNCTIONS.get('admin-auth')?.environment).not.toContain('VAPID_PRIVATE_KEY');
     expect(FUNCTIONS.get('notify')?.environment).not.toContain('SHIFT_PUBLISHABLE_KEY');
+    // AD-17 (story 16.4): the feed reads past `anon`'s one grant with nothing.
+    expect(FUNCTIONS.get('calendar-feed')?.environment).toEqual(['SUPABASE_URL', 'SHIFT_PUBLISHABLE_KEY']);
+  });
+
+  it('maps every function that imports a workspace package onto its built dist, where the image copies it (AD-7)', () => {
+    for (const name of FUNCTIONS.keys()) {
+      const directory = join(repoRoot, 'supabase', 'functions', name);
+      const imports = existsSync(join(directory, 'deno.json'))
+        ? (JSON.parse(read('supabase', 'functions', name, 'deno.json')) as { imports?: Record<string, string> }).imports ?? {}
+        : {};
+      for (const [specifier, target] of Object.entries(imports)) {
+        expect(specifier, name).toMatch(/^@shift\/(?:domain|ics)$/);
+        expect(target, name).toBe(`../../../packages/${specifier.slice('@shift/'.length)}/dist/index.js`);
+        // From /home/deno/functions/<name>/ the map lands in /home/packages/.
+        expect(new URL(target, `file:///home/deno/functions/${name}/`).pathname).toBe(
+          `/home/packages/${specifier.slice('@shift/'.length)}/dist/index.js`,
+        );
+      }
+      const bare = new Set(
+        [...read('supabase', 'functions', name, 'handler.ts').matchAll(/\bfrom\s+'(@shift\/[a-z]+)'/g)].map((match) => match[1] ?? ''),
+      );
+      expect([...bare].sort(), `${name} imports a package its deno.json does not map`).toEqual(Object.keys(imports).sort());
+    }
+    expect(Object.keys(JSON.parse(read('supabase', 'functions', 'calendar-feed', 'deno.json')).imports)).toEqual([
+      '@shift/domain',
+      '@shift/ics',
+    ]);
   });
 });
 
@@ -322,6 +351,10 @@ describe('the shift-functions image (story 20.2)', () => {
   it('copies the router and exactly the routed functions, and bundles each at build time', () => {
     const copies = instructions.filter((line) => line.startsWith('COPY '));
     expect(copies).toEqual([
+      // Story 16.4 (AD-7): where `calendar-feed/deno.json`'s
+      // `../../../packages/<name>/dist/index.js` lands from /home/deno/functions/<name>/.
+      'COPY packages/domain/dist/ /home/packages/domain/dist/',
+      'COPY packages/ics/dist/ /home/packages/ics/dist/',
       'COPY deploy/functions/main/router.ts deploy/functions/main/workers.ts deploy/functions/main/index.ts /home/deno/functions/main/',
       ...[...FUNCTIONS.keys()].map((name) => `COPY supabase/functions/${name}/ /home/deno/functions/${name}/`),
     ]);

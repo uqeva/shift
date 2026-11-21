@@ -135,6 +135,30 @@ curl -s -X POST http://127.0.0.1:54321/functions/v1/notify \
 flag is needed. `supabase start` printed the local keys; `SUPABASE_URL` is
 injected for you.
 
+`supabase functions serve` serves every function, `calendar-feed` (story 16.4)
+included, which loads `@shift/domain` and `@shift/ics` from their built
+`dist` through its `deno.json` (AD-7). Build both before serving, and again
+after changing either (a `dist` module added while it runs needs a restart):
+
+```bash
+pnpm --filter @shift/domain --filter @shift/ics build
+```
+
+The feed is public: a calendar app GETs
+`http://127.0.0.1:54321/functions/v1/calendar-feed/<token>.ics` with no
+header at all, and every unknown, revoked, replaced, deactivated or malformed
+token answers the same `404 {"code":"FEED_NOT_FOUND"}`, never sooner than
+250 ms after it arrived (the timing class, D-S8: a slow 404 is by design).
+Its other answers say where to look: `405 METHOD_NOT_ALLOWED` (a client sent
+anything but GET or HEAD);
+`503 FEED_UNAVAILABLE`, logged as `calendar-feed: FEED_UNAVAILABLE` (the
+function is misconfigured, logged at start as `calendar-feed is misconfigured:
+<code>`, or the lookup through the gateway failed, timed out or answered
+something else: check Kong and PostgREST); `500 FEED_FAILED` (the member's
+assembly broke a domain rule: a data problem, never the token). A token is made by
+`create_calendar_feed_token()` as the member's own session (16.5's screen);
+never paste one into a shell history or an issue.
+
 `createUser` and `updateUserById` are implemented (story 1.5b). Both authorize
 against the database before they act — the caller must be an active admin of the
 target member's own organization, read through `current_member_access()` as the
@@ -2275,22 +2299,30 @@ session. On our stack that is the **router**, `deploy/functions/main`: the
 
 `notify` (`verify_jwt = false`) is forwarded as it came: its own invoke secret
 check answers the cron job, and anyone else gets
-`401 {"code":"INVOKE_SECRET_REFUSED"}`. A function added later (v2's
-`calendar-feed`, `remind`) is added to `config.toml`, the router's table and
-the Dockerfile together, or the test fails.
+`401 {"code":"INVOKE_SECRET_REFUSED"}`. `calendar-feed` (`verify_jwt = false`,
+story 16.4) is forwarded as it came too: the token in its path is the
+credential, and its worker holds `SUPABASE_URL` and `SHIFT_PUBLISHABLE_KEY`
+only. A function added later (v2's `remind`) is added to `config.toml`, the
+router's table and the Dockerfile together, or the test fails.
 
 **The image.** `deploy/functions/Dockerfile` builds `shift-functions` from the
 repository root: base `supabase/edge-runtime:v1.74.3` (the CLI's pin), the
 router, both functions, and each function **bundled at build time** into an
-eszip with its npm dependencies inside (`edge-runtime bundle`). The router
+eszip with its npm dependencies inside (`edge-runtime bundle`).
+`calendar-feed` bundles the built `dist` of `@shift/domain` and `@shift/ics`,
+which the Dockerfile copies to `/home/packages/`, where its `deno.json` map
+lands (story 16.4, AD-7): whatever builds the image runs
+`pnpm --filter @shift/domain --filter @shift/ics build` first. The router
 starts each worker from its bundle with remote modules disallowed, so a cold
 start reads a local file and fetches nothing; a missing bundle is
 `500 {"code":"FUNCTION_UNAVAILABLE"}`, never a fall-back to source. The image
 holds code only: no key, no secret, no address. CI's `functions-image` job
 builds it on every run (never pushed) and probes it on an `--internal`
 network beside a stand-in GoTrue (`scripts/ci/probe-functions-image.sh`):
-both workers start from their bundles, and `admin-auth`'s handler answers
-`PAYLOAD_INVALID`. The staging deploy job builds and probes it the same way
+every worker starts from its bundle, `admin-auth`'s handler answers
+`PAYLOAD_INVALID`, and `calendar-feed` answers an unknown and a malformed
+token with one identical `404 FEED_NOT_FOUND` and the pinned vector (served
+by a stand-in RPC) with a calendar. The staging deploy job builds and probes it the same way
 and pushes that very image to GHCR (story 20.6, §8.1). The compose names it
 per environment as `SHIFT_FUNCTIONS_IMAGE`, set once to the channel tag
 `ghcr.io/<owner>/shift-functions:<environment>`, which the pipeline moves to
@@ -2314,8 +2346,14 @@ and the referer is not logged. Two logs this file cannot redact, both checked
 on the host by story 20.5 (`deferred-work.md`):
 
 - **Kong's error log** prints the request line when an upstream fails
-  (`request: "GET /functions/v1/...`). Read it only on the host; before 16.4
-  ships `calendar-feed`, decide whether to raise Kong's log level or accept it.
+  (`request: "GET /functions/v1/...`). Story 16.4 set `KONG_LOG_LEVEL=crit`,
+  so no `error` or `warn` line is written: every lesser gateway diagnostic is
+  given up with it, and outages are seen through the uptime check (20.8).
+  To diagnose a gateway failure before 20.8 exists, raise the level on the
+  host for the session only (`KONG_LOG_LEVEL=error`, redeploy), set it back
+  to `crit`, and delete what was written meanwhile: those lines may hold a
+  feed token. 20.5 still searches the host's Kong and functions logs for
+  `calendar-feed/`.
 - **Traefik's access log** is Coolify's proxy, off by default. Keep it off; if
   it is ever turned on, drop the request path and query fields.
 

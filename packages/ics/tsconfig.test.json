@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"],
+    // CI type-checks before it builds, so the domain is read from its source
+    // here; the build (`tsconfig.json`) reads its built `dist`, which
+    // `pnpm -r build` makes first (the workspace dependency orders it).
+    "paths": {
+      "@shift/domain": ["../domain/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts", "vitest.config.ts"]
+}

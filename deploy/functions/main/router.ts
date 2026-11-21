@@ -66,6 +66,15 @@ export const FUNCTIONS: ReadonlyMap<string, FunctionEntry> = new Map([
       ],
     },
   ],
+  [
+    // Story 16.4 (AD-14, AD-17): public, the token in the path is the
+    // credential; the publishable key and the gateway's address, nothing else.
+    'calendar-feed',
+    {
+      verifyJwt: false,
+      environment: ['SUPABASE_URL', 'SHIFT_PUBLISHABLE_KEY'],
+    },
+  ],
 ]);
 
 /** No such function: any name not in `FUNCTIONS`. */
