@@ -254,6 +254,11 @@ jobs:
       # secret key from `supabase status`, not only Postgres. Migrations and
       # seed.sql are applied by start. A runner of its own, so the E2E job's
       # organizations never meet this job's organization counts.
+      # Story 16.4: `supabase start` bundles every function, and `calendar-feed`
+      # imports the packages' dist through its deno.json map, so build them first.
+      - name: Build the packages the functions import
+        run: pnpm --filter @shift/domain --filter @shift/ics build
+
       - name: Start local Supabase
         run: bash scripts/ci/start-supabase.sh "$SUPABASE_UNUSED_SERVICES"
 
