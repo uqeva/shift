@@ -4,7 +4,7 @@
 
 ## Goal
 
-Let an organization start using Shift with nobody at Shift involved. A stranger creates an account, verifies the email, founds an organization as its first admin (the Founding Admin), and is walked through hour bands, teams, shift types, a rotation with its coverage preview, and members. Nothing is pre-filled and there is no billing. Signup is a second way into the same provisioning that operators already use, and operator provisioning keeps working unchanged. The epic ships to staging only. Opening production is a separate founder decision (D-S5), taken after a security review of 19.1–19.5 against `SECURITY-REVIEW-EPIC-19.md`. The founder ratified D-S1–D-S10 at their defaults on 2026-11-21, and Architect pass 2 is done.
+Let an organization start using Shift with nobody at Shift involved. A stranger creates an account, verifies the email, founds an organization as its first admin (the Founding Admin), and is walked through hour bands, teams, shift types, a rotation with its coverage preview, and members. Nothing is pre-filled and there is no billing. Signup is a second way into the same tenant shape that operator provisioning produces, and operator provisioning keeps working unchanged. The epic ships to staging only. Opening production is a separate founder decision (D-S5), taken after a security review of 19.1–19.5 against `SECURITY-REVIEW-EPIC-19.md`. D-S1–D-S10 are ratified at their defaults and Architect pass 2 is done. The 2026-11-21 signup UX review (`ux-designs/ux-shift-2026-11-21-signup/`, UX-DR62–70) is done but still waits for founder acceptance. Until the founder accepts it, 19.4's spec cannot freeze.
 
 ## Stories
 
@@ -16,91 +16,104 @@ Let an organization start using Shift with nobody at Shift involved. A stranger 
 
 ## Requirements & Constraints
 
-- **Verification first.** The email is verified before any organization exists. One account founds at most one organization.
-- **No enumeration (Q28).** Signup, resend, recovery, email sign-in and organization creation never reveal whether an address, account or organization exists. They give the same status, body, headers and timing class. Slugs are not secret, but no surface lists them or answers an anonymous caller.
-- **Isolation (Q29).** A self-provisioned organization passes the full `test/rls-isolation.test.ts` suite. An authenticated account with no `members` row reads nothing and writes nothing, across every table, RPC, Storage path and Edge Function.
-- **Abuse limits (Q30).** Limits apply per address and per network. A global ceiling caps organizations created per day (default 20, an operator setting) and refuses with a neutral "try later". There is no captcha and no disposable-address blocklist.
-- **Nothing pre-filled.** A new organization holds only the annual-leave absence type. No pilot or fire-department literal (`Dan`/`Noć`, four teams, 12 hours) may appear in the `signup` or `onboarding` copy.
-- **Housekeeping.** Unconfirmed accounts are deleted after 7 days. Confirmed accounts with no organization are deleted after 30 days. An account with a `members` row is never deleted. Only the operator can suspend or unsuspend an organization.
-- **Repository and docs.** The repository is public. Docs never contain hosts, CIDRs, keys or tokens. All copy is Croatian and lives in `hr.json`. Each story updates the DESIGN.md, EXPERIENCE.md and UX-DR lines it changes.
+- **Verification first.** An address is verified before any organization exists. One account founds at most one organization.
+- **No enumeration.** Signup, resend, recovery, email sign-in and organization creation never reveal whether an address, account or organization exists. Each gives one status, one body, one header set and one timing class (a 50 ms window between medians). Slugs are not secret, but no surface lists them or answers an anonymous caller.
+- **Isolation.** A self-provisioned organization passes the full `test/rls-isolation.test.ts` suite. A confirmed account with no `members` row reads nothing and writes nothing, across every table, RPC, Storage path and all four Edge Functions.
+- **Abuse limits.** Limits apply per address, per account and per network. A global ceiling caps organizations created per rolling 24 h (default 20, an operator setting) and refuses with a neutral "try later". There is no captcha and no disposable-address blocklist.
+- **Nothing pre-filled.** A new organization holds only the annual-leave absence type: no team, shift type, pattern, hour band or setting. The `signup` and `onboarding` copy, and the fresh-organization empty-state keys, must not contain fire-department terms, `Dan`/`Noć`/`Slobodno` used as shift names, four teams or 12 hours. No add dialog pre-selects a count, duration, boundary or name.
+- **Housekeeping.** Unconfirmed accounts are deleted after 7 days. Confirmed accounts with no organization are deleted after 30 days. An account with a `members` row is never deleted. Only the operator suspends or unsuspends an organization.
+- **Repository and docs.** The repository is public, so docs carry no hosts, CIDRs, keys or tokens. All copy is Croatian and lives in `hr.json` (the `signup` and `onboarding` namespaces). Each story updates the DESIGN.md, EXPERIENCE.md and UX-DR lines it changes.
 
 ## Technical Decisions
 
-- **Three switches open the door (AD-21).** All three are shut by default:
-  - GoTrue's environment: `SHIFT_DISABLE_SIGNUP` and `SHIFT_MAILER_AUTOCONFIRM` both default to `true`. Staging sets them to `false`. `production.env.example` keeps them `true`.
-  - The database: the singleton `private.signup_settings` (`open`, `accounts_per_day` 100, `organizations_per_day` 20, `attempts_per_account` 10). No session holds any privilege on it, and closing it is the circuit breaker.
-  - The SPA: `VITE_SIGNUP_ENABLED`, which only changes what is shown. `require-config.mjs` refuses it for production.
-- **The auth entrypoint refuses a half-built door.** The wrapper accepts only the exact booleans `true` and `false`. With signup open, it also requires all of these: autoconfirm off, SMTP set, the before-user-created hook on, `GOTRUE_RATE_LIMIT_HEADER`, OTP expiry of 3600 or less, OTP length 10, and template URLs that serve `token_hash`. Its test runs it under `sh`.
-- **The before-user-created hook (AD-21).** `public.before_user_created_hook` is a definer that only `supabase_auth_admin` may execute, and it writes nothing. It gives one refusal, `SIGNUP_REFUSED`, for each of these: the door is closed, the address is synthesized or malformed, the local part would fail `members_username_check`, or the 24-hour accounts ceiling is reached. It does not run for `POST /admin/users`, so `admin-auth` is unaffected.
-- **Kong is the anti-enumeration boundary (AD-22).** The SPA is not.
-  - `/auth/v1/` is an allow-list, so every other path and every path variant answers 404.
-  - `signup`, `recover` and `resend` answer `200 {}` at once, then relay to GoTrue from a timer. Synthesized and malformed addresses are not relayed. If Kong's sandbox cannot relay, use the header/body-filter fallback, which leaves the timing to founder decision F1.
-  - `POST /verify` passes only `{token_hash, type}`, and a `GET` on it is 404. `PUT /user` with `email` or `phone` answers 422.
-  - `KONG_HEADERS=off`.
-  - Kong's `rate-limiting` (`limit_by: ip`, `policy: local`) sits on the mail routes, `/token`, `/verify` and `rpc/create_organization`. Traefik labels are never used for this.
-  - Trusted proxy: `KONG_TRUSTED_IPS` is set from `SHIFT_PROXY_CIDR`, never `0.0.0.0/0`. GoTrue gets `GOTRUE_RATE_LIMIT_HEADER=X-Real-IP`.
+- **The door: three switches, all shut by default (AD-21).**
+  - GoTrue's environment: `SHIFT_DISABLE_SIGNUP` and `SHIFT_MAILER_AUTOCONFIRM` default to `true`. Staging sets them `false`; `production.env.example` keeps them `true`.
+  - The database: the singleton `private.signup_settings` (`open`, plus per-day limits 100/20/10). No session has a privilege on it, and closing it is the circuit breaker.
+  - The SPA: `VITE_SIGNUP_ENABLED` only changes what is shown, and `require-config.mjs` refuses it for production.
+  - The auth entrypoint refuses non-exact booleans. With mail possible, it also requires SMTP, the hook, `GOTRUE_RATE_LIMIT_HEADER`, an OTP of length 10 lasting at most 3600 s, and templates that serve `token_hash`.
+  - The before-user-created hook writes nothing and answers one `SIGNUP_REFUSED` for every cause. It is on in every environment.
+  - Per-IP limits are Kong `rate-limiting` on the mail routes, `/token`, `/verify` and `rpc/create_organization`. The limits are `SHIFT_LIMIT_*` variables. Traefik labels are never used for limits.
+- **The gateway is the boundary (AD-22).**
+  - Kong's `/auth/v1/` is an allow-list. Each route's pre-function refuses any other raw spelling of its path with a 404.
+  - `signup`, `recover` and `resend` answer `200 {}` at once, then relay a rebuilt body from a timer. That relay is built, so F1 did not open.
+  - `/verify` accepts only `{token_hash, type}`, and a `GET` on it is 404. `PUT /user` with `email` or `phone` is 422. `KONG_HEADERS=off`.
+  - The SPA never reads the mail routes' bodies. It checks the address shape and the 10-character floor before sending.
+  - The enumeration probe is `scripts/probe/signup-enumeration.mjs`. Its runs on the rehearsal stack and on staging belong to story 20.5.
 - **Two identity kinds (AD-12).**
-  - **The predicate.** An account is a username identity exactly when its address is synthesized (`shift.invalid` or a subdomain of it). Every other account is an email identity. No column stores the kind.
-  - **Three homes, one vector file.** The predicate lives in `isSynthesizedAddress` (SPA), `private.is_synthesized_address` (SQL) and Kong's rendered Lua. All three run `test/fixtures/synthesized-addresses.json`.
-  - **Sign-in.** An entry containing `@` is an email sign-in with no slug. Any other entry is a username plus the slug.
-  - **The Founding Admin's username** is the trimmed address's local part, lower-cased ASCII-only (`translate` over A–Z, as 0066's hook derives it; deferred-work, OWNER 19.3), not `lower()`. The trigger `members_username_follows_email_identity` (23514 `SIGN_IN_IS_EMAIL`) holds it to the address.
-  - **Recovery** goes through `/recover` and is for email identities only.
-  - **Email links** are `/potvrda?token_hash=…&type=…`, verified by `verifyOtp` only when the user clicks.
-- **`admin-auth` (AD-16).** `updateUserById` maps the trigger's refusal to 409 `SIGN_IN_IS_EMAIL` and makes no auth call. `resetPassword` never sends `email`. `clearMustSetPassword` is harmless for an account with no claim. No new Edge Function is added, so the count stays four.
-- **`create_organization` (AD-23)** is a SQL `SECURITY DEFINER` with `search_path = ''`, executable by `authenticated` only. It takes no organization id, member id or address. Its steps, in order:
+  - An account is a username identity exactly when its address is synthesized (`shift.invalid` or a subdomain of it). Every other account is an email identity.
+  - The predicate lives in three homes: SPA, SQL and Kong Lua. All three run one vector file, and all lower-case ASCII only.
+  - The Founding Admin's username is the trimmed local part, lower-cased ASCII-only. The hook derives it the same way.
+  - Email links go to `/potvrda?token_hash=…&type=…`.
+- **`create_organization` (AD-23).** It is a definer with `search_path = ''`, executable by `authenticated` only, and it takes no id or address. Its steps, in order:
   1. Lock the caller's `auth.users` row.
-  2. Refuse with `ORGANIZATION_NOT_CREATABLE` unless the caller is confirmed, not banned or deleted, an email identity, without `must_set_password`, and without a `members` row.
-  3. Validate the input, including `private.is_known_timezone`.
-  4. Take an advisory lock.
-  5. Write a `private.organization_attempts` row and apply the limits. A limit is returned as `TRY_LATER`, never raised.
-  6. Answer a taken or reserved slug with `SLUG_UNAVAILABLE` plus a proposal (`-2`…`-9`, else 4 random characters). Reserved slugs are a check constraint.
-  7. Insert the organization (`founded_by` unique, no foreign key) and the Founding Admin in one transaction.
-  8. Answer `ORGANIZATION_CREATED`. The SPA then calls `refreshSession()`.
-- **AD-10, accounts with no claim.** An account with no `members` row has no claim, and the hook is unchanged. 19.1's sweep enumerates every table and function from the catalog rather than from a list.
-- **AD-10, suspension.** `organizations.suspended` is read only through `private.organization_live`, and a pin enforces that. Its callers are:
-  - `current_member_access`;
-  - the token hook (`SIGN_IN_REFUSED`);
-  - `calendar_feed_inputs` (404);
-  - the reminder and notify paths, which write or send nothing. Queued rows settle `ORGANIZATION_SUSPENDED`.
+  2. Refuse with 42501 `ORGANIZATION_NOT_CREATABLE` unless the caller is confirmed, not banned or deleted, an email identity, without `must_set_password`, and without a `members` row.
+  3. Validate the input, timezone through `private.is_known_timezone` (`ORGANIZATION_TIMEZONE_UNKNOWN`).
+  4. Take the advisory lock.
+  5. Write the `private.organization_attempts` row. A limit returns `TRY_LATER` and is never raised.
+  6. Answer a taken or reserved slug with `SLUG_UNAVAILABLE` and a proposal (`-2`…`-9`, else 4 random characters). Reserved slugs are the check constraint `organizations_slug_not_reserved`.
+  7. Insert the organization (`founded_by` unique, no FK) and the Founding Admin in one transaction.
+  8. Answer `ORGANIZATION_CREATED`. The SPA then refreshes the session.
+
+  GraphQL exposure of the RPC is a 19.3 deferral.
 - **Onboarding (AD-24).**
-  - `sessionDestination` in `features/auth/services` is the one router that every guard uses.
-  - Progress is derived from rows by one hook, `use-onboarding-progress.ts`, reading each surface's own query keys. Only `organizations.onboarding_dismissed` is stored.
-  - Each wizard step composes the shipped feature's components and hooks. No second write path exists.
-  - "Invitation" means the shipped credential hand-off. No email invitation is built (founder decision F2).
-- **Housekeeping (AD-25).** pg_cron `housekeeping` runs daily at 03:15 UTC and calls `private.delete_abandoned_accounts()`, which no session role can execute. It uses `for update skip locked`, then checks again that no `members` row exists. It also purges attempts older than 30 days. Its operator scripts live in `supabase/operator/`: `suspend-`/`unsuspend-organization.sql` and `signup-report.sql`.
-- **Secrets (AD-17).**
-  - GoTrue sends over SMTP through Resend with its own sending-only key, `GOTRUE_SMTP_PASS`. That key lives only in the Coolify auth environment. The compose names it as `${GOTRUE_SMTP_PASS:-}`.
-  - Croatian templates are built from `hr.json`'s `signup.email` keys into `dist/auth-email/*.html`.
-  - `config.toml` pins the local and staging auth values. Production's closed door lives in `production.env.example`.
-- **Audit (AD-11).** The new `organizations` columns are audited:
-  - `founded_by` is hidden.
-  - `suspended` and `onboarding_dismissed` are boolean fields.
-  - Operator writes have a null actor.
-  - `signup_settings` and `organization_attempts` are excluded from the audit and named as such in `test/supabase-scaffold.test.ts`.
+  - `sessionDestination` (`features/auth/services`) is the one router for every guard.
+  - Each step composes the shipped feature's components and hooks. There is no second write path, and `features/onboarding` imports no other feature's services.
+  - Progress is derived from rows by `use-onboarding-progress.ts`, under each surface's own query keys. The five fact steps are done when: a band exists; a team is not archived; a shift type is not archived; a rotation assignment exists; there is more than one member.
+  - Only `organizations.onboarding_dismissed` is stored.
+  - "Invitation" means the shipped credential hand-off (F2).
+- **Housekeeping and suspension (AD-25, AD-10).**
+  - pg_cron `housekeeping` runs at 03:15 UTC and calls `private.delete_abandoned_accounts()`. It uses `skip locked`, then checks again that no `members` row exists.
+  - The operator scripts are `supabase/operator/{suspend,unsuspend}-organization.sql` and `signup-report.sql`.
+  - `organizations.suspended` is read only through `private.organization_live`. It is checked by member access, the token hook, the calendar feed and the reminder and notify paths.
+- **Secrets and audit (AD-17, AD-11).**
+  - Auth mail goes over SMTP through Resend with its own key, held only in the auth environment. Croatian templates are built from `hr.json`'s `signup.email` keys.
+  - The new `organizations` columns are audited, with `founded_by` hidden. `signup_settings` and `organization_attempts` are excluded from the audit.
 
 ## UX & Interaction Patterns
 
-- **Signup (UX-DR60).** `/registracija` takes email and password. It notes that this creates a new organization rather than joining one, and links to *Prijava*. Every submit leads to one neutral screen (`Ako adresa može primiti poruku, poslali smo poveznicu za potvrdu.`), and resend is throttled. The SPA checks the address shape and the 10-character password floor before sending, and it never reads the mail routes' bodies. *Prijava* accepts an email address and offers `Nova organizacija? Registriraj se`.
-- **Create organization (UX-DR61, step 1).** `/postavljanje` step 1 takes:
-  - name;
-  - slug, proposed from the name and editable;
-  - a free Organization Type label;
-  - timezone, proposed from the browser and confirmed by the user;
-  - locale, read-only;
-  - Leave Year start, required, with nothing selected;
-  - the Founding Admin's name and allowance, required and empty.
-- **Wizard (UX-DR61, steps 2–7).** The steps show a rail (`korak 3 od 7`) and *Preskoči za sada*. While setup is unfinished and not dismissed, an active admin of a signup-founded organization sees a *Danas* card, `Postavljanje: još N koraka`. The card sits outside the *Danas* freshness keys and never holds the skeleton. Empty states use examples that fit any organization.
-- **UX review.** Story 19.4 needs a UX review with mockups (phone and desktop) before its spec freezes.
+- ***Prijava*** **(UX-DR62, 19.2).**
+  - One field, *Korisničko ime ili e-mail*. While the entry holds `@`, Organizacija is dimmed and not sent, and the layout does not move.
+  - Each identity kind has one failure message for every cause.
+  - `Nova organizacija? Registriraj se` appears only on `/prijava` without a slug.
+- **`/registracija` and `/potvrda` (UX-DR60, 63, 19.2).**
+  - `/registracija` has a lede saying signup creates a new organization, and a Callout for existing users. It has one password field with show/hide and the live 10-character check.
+  - Every valid submit lands on *Provjeri e-poštu*, which shows the typed address and *Ispravi adresu*. *Pošalji ponovno* is disabled for 60 s after each send.
+  - The only other answer is the per-IP 429 alert.
+  - `/potvrda` verifies only on a press of *Potvrdi*, then goes to step 1. A dead link names no address.
+- **Recovery (UX-DR64, 19.2).**
+  - *Zaboravljena lozinka?* shows both paths. Email identities go to `/zaboravljena-lozinka`, which gives the same neutral answer and the same throttle.
+  - `/potvrda?type=recovery` sets the password on *Spremi novu lozinku*.
+- **Step 1, *Nova organizacija* (UX-DR61, 66, 19.3).**
+  - No app shell.
+  - The slug is proposed from the typed name.
+  - The device timezone is shown and must be confirmed or changed, because it is locked afterwards.
+  - Locale is read-only. Leave-year start, admin name and allowance start empty.
+  - `SLUG_UNAVAILABLE` offers *Koristi prijedlog* and never says who holds the slug. `TRY_LATER` keeps every value. `ORGANIZATION_NOT_CREATABLE` is never a screen: the SPA refreshes and routes.
+- **Setup frame, steps 2–7 (UX-DR65, 67, 68, 19.4).**
+  - No app shell. There is a top bar with *Izađi iz postavljanja*.
+  - A rail headed `Korak {n} od 7` names each step's state in words. Below 640 px it becomes a progress card with a *Svi koraci* sheet.
+  - The forward control reads *Preskoči za sada* until the step's fact exists, then *Dalje: {step}*. Steps open in any order.
+  - Each unfinished step shows one Callout with neutral examples (`Ekipa 1`, `Jutarnja`/`Odmor`).
+  - Step 5 lists its missing prerequisites as links.
+  - Step 7 summarizes all steps, with no celebration.
+- ***Danas*** **card and empty states (UX-DR69, 70, 19.4).**
+  - `Postavljanje: još {n} koraka` is the first card, above *Treba tebe*, and shows only under AD-24's conditions.
+  - *Sakrij* asks one neutral confirmation and hides the card for every admin.
+  - The card is never the skeleton.
+  - In a fresh organization, empty states name setup as the reason.
+- **Open items (founder).**
+  - O1 is done in 19.2: the placeholder now reads `npr. naziv-organizacije`.
+  - O2: whether `/registracija` needs a terms or privacy link before production.
+  - O3: 19.4 must clear pre-selected defaults in the shared add dialogs (shift-type kind and times, rotation *Vrijedi od*, member level), which changes them everywhere.
 
 ## Cross-Story Dependencies
 
-- **Story order.** 19.1 → 19.2 → 19.3, and both 19.4 and 19.5 follow 19.3.
-- **Staging.** 19.1 is ready to build, but applying it on staging waits for 20.5. The Kong and GoTrue work builds on 20.1's compose (`deploy/coolify/supabase/`) and on `test/self-hosted-stack.test.ts`.
-- **Probes.** 19.1's rehearsal must prove that Kong's sandbox can relay from a timer, or else founder decision F1 opens. 19.2's enumeration probe runs on 20.1's rehearsal stack (DEPLOY.md §9.5), then on staging, and never on the CLI's Kong.
+- **Story order.** 19.1 → 19.2 → 19.3. Both 19.4 and 19.5 follow 19.3. 19.4 also needs the founder to accept the UX review.
+- **Staging (epic 20).** The Kong and GoTrue work builds on 20.1's compose (`deploy/coolify/supabase/`) and `test/self-hosted-stack.test.ts`. Applying the epic on staging, the probe runs, and the IPv4/IPv6 client-address checks belong to 20.5.
+- **Shipped surfaces.** The wizard reuses the shipped hour-band, team, shift-type, rotation and member surfaces. 19.5 extends the feed, reminder and notify paths from epics 16 and 17 for suspension.
 - **Before production.** These must be recorded first:
-  - founder decision F1 (the mail routes' timing, if Kong cannot relay);
-  - founder decision F2 (confirming that "invitation" means the shipped credential hand-off);
-  - review row A10 (the accepted denial of service);
-  - review row B8 (the password-timing residual);
-  - the second-factor decision for email identities.
-- **Ties to other features.** 19.5 extends AD-14's feed, reminder and notify paths from epics 16 and 17 for suspension. The wizard reuses the shipped hour-band, team, shift-type, rotation and member surfaces.
+  - F2 (what "invitation" means);
+  - review rows A10 (the accepted denial of service) and B8 (the password-timing residual);
+  - the second-factor decision for email identities;
+  - O2;
+  - the D-S5 checklist (section H of `SECURITY-REVIEW-EPIC-19.md`).

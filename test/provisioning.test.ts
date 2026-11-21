@@ -2818,6 +2818,11 @@ describe('the access-control layer runs as the owner and hands that power to nob
     { name: 'reminder_inputs', argumentCount: 0 },
     { name: 'enqueue_shift_reminders', argumentCount: 1 },
     { name: 'invoke_remind', argumentCount: 0, schema: 'private' },
+    // STORY 19.3 (0071). AD-23's one definer founds an organization past the
+    // insert policies no session has; C8's trigger on `auth.users` reads the
+    // predicate in `private`, which GoTrue's role may not reach.
+    { name: 'create_organization', argumentCount: 8 },
+    { name: 'forget_password_on_confirmation', argumentCount: 0, schema: 'private' },
   ];
 
   it.skipIf(noDatabase).each(ACCESS_CONTROL_FUNCTIONS)(
@@ -3074,6 +3079,11 @@ describe('the access-control layer runs as the owner and hands that power to nob
     { name: 'invoke_remind', argumentCount: 0, expected: [], schema: 'private' },
     { name: 'reminder_lead_on', argumentCount: 3, expected: [], schema: 'private' },
     { name: 'reminder_starts_at', argumentCount: 1, expected: [], schema: 'private' },
+    // STORY 19.3 (0071). `create_organization` is `authenticated`'s alone
+    // (AD-23, D1); the timezone rule and C8's trigger function are nobody's.
+    { name: 'create_organization', argumentCount: 8, expected: ['authenticated'] },
+    { name: 'is_known_timezone', argumentCount: 1, expected: [], schema: 'private' },
+    { name: 'forget_password_on_confirmation', argumentCount: 0, expected: [], schema: 'private' },
   ];
 
   it.skipIf(noDatabase).each([
@@ -3135,6 +3145,9 @@ describe('the access-control layer runs as the owner and hands that power to nob
     // caller, always a definer owned by the migration role.
     { name: 'reminder_lead_on', argumentCount: 3, schema: 'private' },
     { name: 'reminder_starts_at', argumentCount: 1, schema: 'private' },
+    // STORY 19.3 (0071). The timezone rule reads `pg_timezone_names` only, as
+    // its caller: `create_organization` or the operator script.
+    { name: 'is_known_timezone', argumentCount: 1, schema: 'private' },
   ] as { name: string; argumentCount: number; schema?: string }[])('runs $name as the caller, with an empty search_path', async ({ name, argumentCount, schema }) => {
     // INVOKER, the opposite of the helper and the hook. They are reached from
     // the helper, the hook and the zero-admins function as the owner, and from
@@ -3328,6 +3341,84 @@ describe('the operator provisioning script', () => {
     });
   });
 
+  it.skipIf(noDatabase)(
+    'leaves a self-provisioned organization the same non-empty tables as an operator-provisioned one (story 19.3, AD-23)',
+    async () => {
+      // AD-23's test: `create_organization` writes exactly the operator
+      // script's domain rows. Compared table by table over every public table
+      // with an `organization_id`, so a row either path adds and the other
+      // does not is found. Both organizations live only in this transaction.
+      const slug = `${THROWAWAY_SLUG}-operator-twin`;
+      const selfSlug = `${THROWAWAY_SLUG}-self-twin`;
+
+      await inRolledBackTransaction(async (client) => {
+        await parameterize(client, { ...organizationParameters(slug), ...adminParameters });
+        await client.query(provisioningScript);
+
+        // The founder, as the OWNER, before acting as it.
+        await client.query('update private.signup_settings set open = true where id');
+        const founder = crypto.randomUUID();
+        await client.query(
+          `insert into auth.users (
+             instance_id, id, aud, role, email, email_confirmed_at,
+             raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+             confirmation_token, recovery_token, email_change, email_change_token_new
+           ) values (
+             '00000000-0000-0000-0000-000000000000', $1, 'authenticated', 'authenticated', $2, now(),
+             '{}'::jsonb, '{}'::jsonb, now(), now(), '', '', '', ''
+           )`,
+          [founder, `founder.${founder}@example.com`],
+        );
+        await client.query('select set_config($1, $2, true)', [
+          'request.jwt.claims',
+          JSON.stringify({ sub: founder, role: 'authenticated' }),
+        ]);
+        await client.query('set local role authenticated');
+        const { rows: answers } = await client.query<{ answer: { code: string } }>(
+          'select public.create_organization($1, $2, $3, $4, $5, $6, $7, $8) as answer',
+          [
+            'Provisioned Organization',
+            selfSlug,
+            'Provisioned Type',
+            'Europe/Zagreb',
+            1,
+            1,
+            'Provisioned Admin',
+            20,
+          ],
+        );
+        await client.query('reset role');
+        expect(answers[0]?.answer.code).toBe('ORGANIZATION_CREATED');
+
+        const { rows: tables } = await client.query<{ name: string }>(
+          `select c.relname as name
+             from pg_class c
+             join pg_attribute a on a.attrelid = c.oid and a.attname = 'organization_id' and not a.attisdropped
+            where c.relnamespace = 'public'::regnamespace and c.relkind in ('r', 'p')
+            order by c.relname`,
+        );
+        expect(tables.length).toBeGreaterThanOrEqual(25);
+        const nonEmpty = async (organizationSlug: string): Promise<string[]> => {
+          const id = await organizationId(client, organizationSlug);
+          const found: string[] = [];
+          for (const { name } of tables) {
+            // `name` is a catalog relation name, never input.
+            const { rows } = await client.query<{ n: number }>(
+              `select count(*)::int as n from public.${name} where organization_id = $1`,
+              [id],
+            );
+            if ((rows[0]?.n ?? 0) > 0) found.push(name);
+          }
+          return found;
+        };
+
+        const operator = await nonEmpty(slug);
+        expect(operator).toContain('members');
+        expect(await nonEmpty(selfSlug)).toEqual(operator);
+      });
+    },
+  );
+
   it.skipIf(noDatabase || authEndpoint === undefined)(
     'issues a credential that actually authenticates',
     async () => {
@@ -3468,6 +3559,9 @@ describe('the operator provisioning script', () => {
     { timezone: 'posix/Europe/Zagreb', why: 'a posix/ alias' },
     { timezone: 'europe/zagreb', why: 'not the canonical spelling' },
     { timezone: 'Europe/Nowhere', why: 'not a zone the database knows' },
+    // STORY 19.3 (0071's `private.is_known_timezone`): POSIX's inverted signs.
+    { timezone: 'Etc/UTC', why: 'an Etc/ zone' },
+    { timezone: 'Etc/GMT+1', why: 'an Etc/ zone, whose sign is inverted' },
   ])('refuses $timezone as the timezone, $why', async ({ timezone }) => {
     const slug = `${THROWAWAY_SLUG}-timezone`;
 
@@ -3485,7 +3579,7 @@ describe('the operator provisioning script', () => {
     });
   });
 
-  it.skipIf(noDatabase).each(['Europe/Zagreb', 'America/Argentina/Buenos_Aires', 'Etc/UTC'])(
+  it.skipIf(noDatabase).each(['Europe/Zagreb', 'America/Argentina/Buenos_Aires', 'Pacific/Auckland'])(
     'accepts %s as the timezone',
     async (timezone) => {
       const slug = `${THROWAWAY_SLUG}-timezone`;

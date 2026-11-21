@@ -933,6 +933,8 @@ describe('the build being read reflects the current localization source', () => 
       [
         'hooks/use-end-session.ts',
         'services/address.ts',
+        // STORY 19.3: step 1's rules.
+        'services/create-organization.ts',
         'services/last-organization.ts',
         'services/organization-switch.ts',
         'services/return-target.ts',
@@ -952,7 +954,8 @@ describe('the build being read reflects the current localization source', () => 
     // TWENTY-SEVEN SINCE STORY 19.2: the unconfirmed sign-in's panel, the
     // signup screens' five hooks and five parts, and their two rules
     // (`signup.ts`, `session-destination.ts`).
-    expect(parts, 'the auth feature grew or lost a module').toHaveLength(27);
+    // THIRTY SINCE STORY 19.3: step 1's hook, form and rules.
+    expect(parts, 'the auth feature grew or lost a module').toHaveLength(30);
     expect(SOURCES, `${SIGN_IN_PAGE} is not in SOURCES`).toContain(SIGN_IN_PAGE);
     expect(SOURCES, `${SET_PASSWORD_PAGE} is not in SOURCES`).toContain(SET_PASSWORD_PAGE);
     expect(SIGNUP_PAGES, 'the signup set lost a page').toHaveLength(4);

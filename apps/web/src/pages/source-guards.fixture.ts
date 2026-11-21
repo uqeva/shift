@@ -123,6 +123,9 @@ export const SIGNUP_SCREEN: readonly string[] = Object.values(SIGNUP_PARTS).map(
 /** Their rules: the mail, link and refusal messages, off `\w*MessageKey` unions. */
 export const SIGNUP_KEYS = join(srcRoot, 'features', 'auth', 'services', 'signup.ts');
 
+/** Story 19.3: step 1's rules, the local refusals and the definer's failures, off `\w*MessageKey` unions. */
+export const CREATE_ORGANIZATION_KEYS = join(srcRoot, 'features', 'auth', 'services', 'create-organization.ts');
+
 /** Its rules: the local refusals, the save's failures and the live checks' state, off `\w*MessageKey` unions. */
 export const SET_PASSWORD_KEYS = join(srcRoot, 'features', 'auth', 'services', 'set-password.ts');
 
@@ -867,7 +870,12 @@ export const SCREENS = [
   // *Ispravi adresu* and *Pošalji ponovno*; the recovery request's submit;
   // `/potvrda`'s *Potvrdi*, the recovery toggle and *Spremi novu lozinku*,
   // and the dead link's two ways on; the placeholder's *Odjava*.
-  { name: 'the signup screens', file: SIGNUP_SCREEN, expectedFields: 5, expectedButtons: 11 },
+  // STORY 19.3: THIRTEEN fields, with step 1's eight (name, slug, type, the
+  // zone list, day, month, admin name, allowance); FIFTEEN buttons, with
+  // step 1's *Koristi prijedlog*, the zone's *Potvrdi* and *Odaberi drugu*,
+  // and *Stvori organizaciju* (a signup's link takes the recovery form's
+  // toggle and press, so `/potvrda` adds none).
+  { name: 'the signup screens', file: SIGNUP_SCREEN, expectedFields: 13, expectedButtons: 15 },
   { name: 'the not-found component', file: NOT_FOUND, expectedFields: 0, expectedButtons: 1 },
   // A148. ONE on the error screen: *Pokušaj ponovno*. It shows nothing of the
   // error itself, which the literal sweeps below hold it to.

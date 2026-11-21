@@ -1,6 +1,6 @@
 /**
  * Story 19.2's screens (UX-DR63, UX-DR64, AD-24): `/registracija`,
- * `/potvrda`, `/zaboravljena-lozinka` and the `/postavljanje` placeholder, as
+ * `/potvrda`, `/zaboravljena-lozinka` and `/postavljanje` step 1 (story 19.3), as
  * ONE file set under the auth feature, disjoint from the sign-in and
  * set-password sets, and read as one source by the page sweeps. The four
  * pages come first (the registration page is read first), then their hooks,
@@ -18,11 +18,13 @@ export const SIGNUP_PARTS = {
   linkHook: ['features', 'auth', 'hooks', 'use-mail-link.ts'],
   recoverHook: ['features', 'auth', 'hooks', 'use-recover-request.ts'],
   setupHook: ['features', 'auth', 'hooks', 'use-setup-holding.ts'],
+  createHook: ['features', 'auth', 'hooks', 'use-create-organization.ts'],
   form: ['features', 'auth', 'components', 'signup-form.tsx'],
   sentCard: ['features', 'auth', 'components', 'sent-card.tsx'],
   sentPanel: ['features', 'auth', 'components', 'mail-sent-panel.tsx'],
   recoverForm: ['features', 'auth', 'components', 'recover-request-form.tsx'],
   linkPanels: ['features', 'auth', 'components', 'mail-link-panels.tsx'],
+  createForm: ['features', 'auth', 'components', 'create-organization-form.tsx'],
 } as const;
 
 /** The auth files the signup screens use and render nothing of: each a key source or a rule. */
@@ -34,6 +36,10 @@ export const SIGNUP_SCREEN_EXEMPT: readonly { readonly file: string; readonly wh
   {
     file: 'services/signup.ts',
     why: 'the mail outcomes, the local refusals, the throttle, the link and the SPA switch; a key source of its own, executed by signup.test.ts',
+  },
+  {
+    file: 'services/create-organization.ts',
+    why: 'story 19.3: step 1’s input rules, the slug proposal, the zones, the answer mapping and the refresh; a key source of its own, executed by create-organization.test.ts',
   },
   {
     file: 'services/session-destination.ts',

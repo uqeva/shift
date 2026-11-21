@@ -207,6 +207,20 @@ export function isRenderableTimeZone(timeZone: string): boolean {
   }
 }
 
+/**
+ * Every zone the runtime lists (story 19.3, step 1's *Odaberi drugu*), or none
+ * where `Intl.supportedValuesOf` is missing. Which of them an organization may
+ * take is the auth feature's rule (`create-organization.ts`), and the
+ * database's (`private.is_known_timezone`).
+ */
+export function supportedTimeZones(): readonly string[] {
+  try {
+    return Intl.supportedValuesOf('timeZone');
+  } catch {
+    return [];
+  }
+}
+
 /** The zone a date falls back to when the organization's cannot be rendered —
  *  the same fallback `0008`'s `organization_today` makes, so the two agree. */
 const FALLBACK_TIME_ZONE = 'UTC';

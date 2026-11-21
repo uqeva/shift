@@ -49,7 +49,7 @@ Each row needs evidence: a test that runs in CI, a probe run on the local stack 
 | C5 | No session can change its sign-in address (B4b), so neither kind can become the other | probe |
 | C6 | Email links use `token_hash` and are verified by POST, on a click. No session token appears in a URL. Opening a link with a GET, or loading `/potvrda`, consumes nothing | probe |
 | C7 | The allow list and the site URL are the app origin only. A link cannot redirect anywhere else | config |
-| C8 | A confirmed signup holds only a password the confirming person chose. A stranger who signed the same address up first, unconfirmed, cannot leave their password on the account the owner confirms (GoTrue v2.196.0 keeps the first signup's password on a repeat signup). Added by the security review of 19.2; **open at high severity** until decided and built | DB or e2e test |
+| C8 | A confirmed signup holds only a password the confirming person chose. A stranger who signed the same address up first, unconfirmed, cannot leave their password on the account the owner confirms (GoTrue v2.196.0 keeps the first signup's password on a repeat signup). Added by the security review of 19.2. **Decided and built by 19.3** (founder decision 2026-11-21: confirmation forgets the password; see the 19.3 rows below), CI pending | DB or e2e test |
 | C9 | After a link is used, the page names the address now signed in before anything is created, so a forwarded link (login CSRF) or a device already signed in as another account is visible. Added by the security review of 19.2 | e2e |
 
 ## D. Creating an organization (AD-23)
@@ -63,6 +63,23 @@ Each row needs evidence: a test that runs in CI, a probe run on the local stack 
 | D5 | The new organization holds no team, shift type, pattern, hour band or setting beyond FR-74's annual leave. Its row set equals an operator-provisioned organization's | DB test |
 | D6 | A self-provisioned fixture organization passes all of `test/rls-isolation.test.ts`, in both directions against the pilot fixture | DB suite |
 | D7 | `search_path = ''` and every name is qualified. No dynamic SQL | source pin |
+
+### Story 19.3's evidence (as built 2026-11-21; every DB and e2e case written unrun, CI is its first run)
+
+| # | Evidence |
+|---|---|
+| B6 | `test/create-organization.test.ts` "answers a taken and a reserved slug alike": one shape, one proposal, both counted. The per-IP limit is Kong's route (A7); the per-account limit is the "past the account's attempts" case. Source pin: `test/supabase-scaffold.test.ts` (0071 block) |
+| B7 | `test/create-organization.test.ts` catalog case: `anon` executes none of 0071's functions, no session role holds a privilege on `private.organization_attempts`. `create_organization` answers only `auth.uid()`'s own state and lists nothing |
+| C8 | 0071's `private.forget_password_on_confirmation` (a hash the confirming UPDATE leaves unchanged only, so a password set in the same update is kept). Recorded edges: autoconfirm would forget every signup password (the AD-21 entrypoint refuses autoconfirm with signup open; `config.toml` pins confirmations on); an identity unlink resets `email_confirmed_at` (`/user/identities` is not on Kong's allow-list). Also (BEFORE UPDATE OF `email_confirmed_at` on `auth.users`), read against GoTrue v2.196.0's `User.Confirm`, `User.Authenticate` and `PUT /user`. `test/signup-account.test.ts`: the stranger's first password and the owner's repeat signup's are both refused after the confirmation, the password set with `PUT /user` signs in; the database case nulls only a first, non-synthesized confirmation. `/potvrda`'s signup link is the password form (`e2e/tests/auth/signup.spec.ts`). Security review 2 of 19.3 read every `email_confirmed_at` writer in GoTrue v2.196.0 (all through `User.Confirm`, two columns, so no route confirms and sets a hash in one UPDATE; admin `updateUserById` keeps its password by a later UPDATE, admin `createUser` of a real address loses it), its migrations (none recreates `auth.users` or its triggers), and existing accounts (only the null-to-set transition acts, so confirmed accounts, the founder's and the pilot's included, keep their passwords) |
+| C9 | Not decided here (19.3 D3): step 1 names the signed-in address (`Prijavljuješ se adresom …`) and shows it beside *Odjava* before anything is created (`e2e/tests/auth/signup.spec.ts`). Whether a forwarded link is acceptable stays with D-S5 |
+| D1 | `test/create-organization.test.ts` catalog case: the eight argument names, definer, `search_path=""`, `authenticated` only. Source pin: no id or address parameter |
+| D2 | `test/create-organization.test.ts`: unconfirmed, username identity, `must_set_password`, banned, already a member and no account all answer 42501 `ORGANIZATION_NOT_CREATABLE`, with no attempt row |
+| D3 | `organizations_founded_by_key` (unique); `test/create-organization.test.ts`: two concurrent calls from one account found one organization (committed, cleaned up) |
+| D4 | `test/create-organization.test.ts`: a shut door, the per-account attempts and the 24-hour ceiling each answer `TRY_LATER` with the attempt row kept. Under concurrency the advisory lock serializes the count (source pin); a two-account concurrent ceiling case is not written |
+| D5 | `test/provisioning.test.ts`: a self-provisioned and an operator-provisioned organization leave the same non-empty tables; `test/create-organization.test.ts`: the rows written, annual leave only |
+| D6 | **Deferred to the D-S5 review** (19.3's Epic AC Deviations, `deferred-work.md`). Narrowed evidence: `test/create-organization.test.ts`'s sweep of every public table with an `organization_id`, both directions against the pilot |
+| D7 | `test/supabase-scaffold.test.ts`: `search_path = ''`, no `execute` or `format(`, every write qualified |
+| E4 | `authenticated` holds no UPDATE on `founded_by` (0004's column grants never name it; scaffold pin, catalog case). `anon` keeps Supabase's default table grant and meets no update policy, so row level security refuses it; `service_role` is the secret key's trusted role (AD-17), past row level security for every column. No policy inserts an organization; `signup_settings` and `organization_attempts` grant nothing |
 
 ## E. An account with no organization, and suspension (AD-10)
 

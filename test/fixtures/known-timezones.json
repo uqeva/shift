@@ -1,0 +1,32 @@
+{
+  "$comment": "Story 19.3 (AD-23 step 3): the parity vector of `private.is_known_timezone` (0071, the operator script's rule) and the SPA's `zoneUsable` (features/auth/services/create-organization.ts). Every accepted zone is accepted by both and usable by `Intl`; every refused one is refused by both. Read by test/create-organization.test.ts (the SQL home, in CI) and create-organization.test.ts in the web suite. Etc/… is refused (inverted POSIX signs; review of 19.3).",
+  "accepted": [
+    "Europe/Zagreb",
+    "Europe/London",
+    "America/New_York",
+    "America/Argentina/Buenos_Aires",
+    "America/Port-au-Prince",
+    "Asia/Kolkata",
+    "Asia/Tokyo",
+    "Australia/Sydney",
+    "Pacific/Auckland",
+    "Africa/Johannesburg"
+  ],
+  "refused": [
+    "",
+    "UTC",
+    "GMT",
+    "CET",
+    "Zulu",
+    "CET-1CEST",
+    "posix/Europe/Zagreb",
+    "right/Europe/Zagreb",
+    "Europe/Nowhere",
+    "Europe/Zagreb ",
+    "../Europe/Zagreb",
+    "Europe//Zagreb",
+    "Etc/UTC",
+    "Etc/GMT+1",
+    "Etc/GMT-14"
+  ]
+}

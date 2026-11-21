@@ -16,11 +16,15 @@ import { useWriteGate } from '@/lib/offline/use-write-gate';
 
 /**
  * `/potvrda`'s three bodies (story 19.2, UX-DR63, UX-DR64): the one *Potvrdi*
- * button, the recovery form whose *Spremi novu lozinku* is the press that
- * verifies, and the dead link. Each is drawn under the page's card title.
+ * button (an email-change link), the password form whose press verifies and
+ * saves (recovery, and since 19.3 a signup: C8), and the dead link. Each is drawn under the page's card title.
  */
 
-/** A confirmation link: one button, and nothing sent until it is pressed. */
+/**
+ * An email-change link (since 19.3 the only link without the password form):
+ * one button, and nothing sent until it is pressed. Its own words (review 2 of
+ * 19.3): a signup's lede and press now name the password.
+ */
 export function ConfirmPanel({ screen }: { readonly screen: MailLinkScreenState }): ReactNode {
   const gate = useWriteGate();
 
@@ -38,13 +42,13 @@ export function ConfirmPanel({ screen }: { readonly screen: MailLinkScreenState 
           void screen.confirm();
         }}
       >
-        {screen.pending ? t('signup.confirm.pending') : t('signup.confirm.submit')}
+        {screen.pending ? t('signup.confirm.pending') : t('signup.confirm.changeSubmit')}
       </Button>
     </div>
   );
 }
 
-/** A recovery link: the set-password step's two fields and live checks. */
+/** A recovery or a signup link: the set-password step's two fields and live checks (C8). */
 export function RecoveryForm({ screen }: { readonly screen: MailLinkScreenState }): ReactNode {
   const { passwordField, repeatField, passwordShown, typed, longEnough, matches, refusal, failure, pending } = screen;
   const gate = useWriteGate();
@@ -138,10 +142,17 @@ export function RecoveryForm({ screen }: { readonly screen: MailLinkScreenState 
         aria-describedby={gate.describedBy()}
         aria-busy={pending}
       >
-        {pending ? t('signup.recovery.pending') : t('signup.recovery.submit')}
+        {submitLabel(screen.recovery, pending)}
       </Button>
     </form>
   );
+}
+
+/** The press's name: *Spremi novu lozinku* for recovery, *Potvrdi i spremi lozinku* for a signup (C8). */
+function submitLabel(recovery: boolean, pending: boolean): string {
+  if (recovery) return pending ? t('signup.recovery.pending') : t('signup.recovery.submit');
+
+  return pending ? t('signup.confirm.pending') : t('signup.confirm.submit');
 }
 
 /**

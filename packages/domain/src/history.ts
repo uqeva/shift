@@ -340,6 +340,9 @@ export const HISTORY_HIDDEN_COLUMNS: ReadonlySet<string> = new Set([
   'request_id',
   'auth_user_id',
   'leave_record_id',
+  // Story 19.3 (0071, AD-11): the founding account, an attribution like
+  // `created_by`, recorded and never shown.
+  'founded_by',
 ]);
 
 type FieldType =

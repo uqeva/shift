@@ -41,6 +41,7 @@ import {
   verifyLink,
   type MailAuth,
   type MailFailure,
+  setsPasswordOnLink,
 } from '@/features/auth/services/signup';
 
 /** A password over the floor, made here so no literal credential sits in the file. */
@@ -310,5 +311,15 @@ describe('the token leaves the address once read (security review of 19.2)', () 
     replaceState.mockClear();
     forgetLinkInAddress({ pathname: '/potvrda', search: '?type=signup' }, { state, replaceState });
     expect(replaceState).not.toHaveBeenCalled();
+  });
+});
+
+describe('which link takes the password form (story 19.3, C8, D2)', () => {
+  it('is a signup\'s and a recovery link, never an email change or anything else', () => {
+    expect(setsPasswordOnLink('signup')).toBe(true);
+    expect(setsPasswordOnLink('recovery')).toBe(true);
+    expect(setsPasswordOnLink('email_change')).toBe(false);
+    expect(setsPasswordOnLink(undefined)).toBe(false);
+    expect(setsPasswordOnLink('Signup')).toBe(false);
   });
 });

@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 14:26
-last_updated: 11-21-2026 23:00
+last_updated: 11-21-2026 23:59
 project: shift
 project_key: NOKEY
 tracking_system: file-system
@@ -708,7 +708,7 @@ development_status:
   epic-19: in-progress  # self-service signup (CAP-28); staging only; production opening is D-S5 (security review, then the founder's go)
   19-1-the-signup-door-opens-safely-on-staging: done  # #341
   19-2-a-stranger-creates-an-account: done  # #344
-  19-3-a-verified-account-creates-its-organization: backlog  # after 19.2 (AP2 done 2026-11-21)
+  19-3-a-verified-account-creates-its-organization: review  # built, security review 2 done, CI pending; migration 0071
   19-4-the-onboarding-wizard-guides-setup-and-pre-fills-nothing: backlog  # after 19.3; UX review with mockups done 2026-11-21 (ux-shift-2026-11-21-signup, UX-DR62–70), pending founder acceptance (AP2 done 2026-11-21)
   19-5-abandoned-signups-are-cleaned-up-and-the-operator-keeps-cont: backlog  # after 19.3 (AP2 done 2026-11-21)
   epic-19-retrospective: optional

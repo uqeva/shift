@@ -261,6 +261,9 @@ function parametersOf(source: string, name: string): string[] {
 // judgement or a calendar date out.
 const UNZONED_ENTRY_POINTS = [
   'formatNumber',
+  // Story 19.3: the runtime's list of zone NAMES for step 1's *Odaberi drugu*;
+  // it formats nothing and reads no instant.
+  'supportedTimeZones',
   // Story 13.5: a count of leave days, `0,5`, no instant at all.
   'formatLeaveDays',
   'compareText',
@@ -1022,9 +1025,19 @@ describe('the formatting module is the only Intl construction site', () => {
   });
 
   it('reaches for Intl in format.ts and nowhere else', () => {
+    // STORY 19.3 (UX-DR66, D11): step 1 proposes the DEVICE's zone for the
+    // organization to confirm, the one legitimate read of the ambient zone in
+    // the application. It may not live in format.ts (which never asks the
+    // runtime for it, below), so it is the one named exception: one
+    // `DateTimeFormat`, read for its `resolvedOptions().timeZone` only.
+    const DEVICE_ZONE_READER = join(srcRoot, 'features', 'auth', 'services', 'create-organization.ts');
+    expect(intlValueUses(stripped(DEVICE_ZONE_READER)), 'the device zone reader reaches for more than its one read').toEqual([
+      `${INTL}.DateTimeFormat`,
+    ]);
+    expect(stripped(DEVICE_ZONE_READER)).toContain(`${INTL}.DateTimeFormat().resolved${'Options'}().timeZone`);
     const offenders: string[] = [];
     for (const file of files()) {
-      if (file === FORMATTING_MODULE) continue;
+      if (file === FORMATTING_MODULE || file === DEVICE_ZONE_READER) continue;
       for (const use of intlValueUses(stripped(file))) {
         offenders.push(`${relative(webRoot, file)} uses ${use}`);
       }

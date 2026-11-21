@@ -378,6 +378,15 @@ export function isRecoveryLink(type: unknown): boolean {
   return type === 'recovery';
 }
 
+/**
+ * Whether a link's press also saves a password: recovery's, and since story
+ * 19.3 a signup's (C8, D2). Confirmation forgets the password the account was
+ * created with (0071), so the confirming person sets the only one it holds.
+ */
+export function setsPasswordOnLink(type: unknown): boolean {
+  return type === 'recovery' || type === 'signup';
+}
+
 /** Whether a confirmed link goes on to setup (a signup) rather than the app. */
 export function confirmsSignup(link: MailLink): boolean {
   return link.type === 'signup';

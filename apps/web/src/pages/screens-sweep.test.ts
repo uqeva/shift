@@ -412,7 +412,8 @@ describe('the screen is read at all, so every sweep below means something', () =
     // page's card, and their two rules modules.
     // A HUNDRED AND FOUR SINCE ITS REVIEW: the month download's rules.
     // A HUNDRED AND FIVE SINCE STORY 17.1: the reminder settings rules.
-    expect(KEY_SOURCES).toHaveLength(105);
+    // A HUNDRED AND SIX SINCE STORY 19.3: step 1's rules.
+    expect(KEY_SOURCES).toHaveLength(106);
   });
 
   // Vacuous-pass guard. A renamed or moved file would make each "contains no"
@@ -1602,6 +1603,8 @@ describe('the screen is read at all, so every sweep below means something', () =
         'signup-screens.fixture.ts',
         'services/signup.ts',
         'services/session-destination.ts',
+        // STORY 19.3: step 1's rules.
+        'services/create-organization.ts',
       ]
         .map((file) => join(AUTH_FEATURE, ...file.split('/')))
         .sort(),

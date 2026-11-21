@@ -10,7 +10,8 @@ import { FIXTURES, connect, inRolledBackTransaction, localApiEndpoint, localSecr
 
 /**
  * STORY 19.2 (AD-12, AD-21, AD-22; checklist A5, B5, C2, C6; deferred-work's
- * live probe): a stranger creates an account on the local stack, through the
+ * live probe), and STORY 19.3's C8 (confirmation forgets the password) and D5
+ * (only `create_organization` inserts an email identity's member row): a stranger creates an account on the local stack, through the
  * CLI's GoTrue with 0066's before-user-created hook on, and an email identity's
  * username cannot be renamed away from its address (0068).
  *
@@ -196,7 +197,24 @@ describe('a stranger creates an account through the hook (story 19.2, live probe
         const again = await auth('verify', { token_hash: tokenHash, type: 'signup' });
         expect(again.status).toBeGreaterThanOrEqual(400);
 
-        // B5: an unknown address and a wrong password answer alike.
+        // STORY 19.3 (C8, 0071): confirmation forgot the signup's password, so
+        // it signs nothing in now, with the one neutral refusal.
+        const forgotten = await auth('token?grant_type=password', { email: address, password: secret });
+        expect(forgotten.status).toBe(400);
+        expect(forgotten.body['error_code'] ?? forgotten.body['code']).toBe('invalid_credentials');
+
+        // `/potvrda` sets the first password with `PUT /user` on the verified
+        // session: no current password is asked for, because none is held.
+        const chosen = password();
+        const set = await fetch(`${endpoint().url}/auth/v1/user`, {
+          method: 'PUT',
+          headers: { apikey: endpoint().key, authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+          body: JSON.stringify({ password: chosen }),
+        });
+        expect(set.status, await set.clone().text()).toBe(200);
+
+        // B5: an unknown address and a wrong password answer alike, the wrong one
+        // compared against a hash the account now holds (review of 19.3).
         const unknown = await auth('token?grant_type=password', {
           email: `nobody-${randomUUID()}@example.com`,
           password: password(),
@@ -207,8 +225,8 @@ describe('a stranger creates an account through the hook (story 19.2, live probe
         expect(wrong.body['error_code'] ?? wrong.body['code']).toBe(unknown.body['error_code'] ?? unknown.body['code']);
         expect(unknown.body['error_code'] ?? unknown.body['code']).toBe('invalid_credentials');
 
-        // And the right one now signs the email identity in, as typed in another case.
-        const signedIn = await auth('token?grant_type=password', { email: address.toUpperCase(), password: secret });
+        // And that one signs the email identity in, as typed in another case.
+        const signedIn = await auth('token?grant_type=password', { email: address.toUpperCase(), password: chosen });
         expect(signedIn.status, JSON.stringify(signedIn.body)).toBe(200);
       } finally {
         await removeAccounts(address);
@@ -218,6 +236,122 @@ describe('a stranger creates an account through the hook (story 19.2, live probe
     // the live siblings' budget (claimless-account.test.ts), not vitest's 5 s.
     60_000,
   );
+
+  it.skipIf(noAdminApi)(
+    "leaves a stranger's earlier signup password nothing to sign in with once the owner confirms (C8)",
+    async () => {
+      // GoTrue v2.196.0 keeps the FIRST signup's password on a repeat signup
+      // of an unconfirmed address. The stranger signs up first; the owner
+      // signs up again (answered or throttled, either way), confirms from the
+      // mail and sets a password on `/potvrda`.
+      const address = `signup-${randomUUID()}@example.com`;
+      const stranger = password();
+      const owner = password();
+      try {
+        const first = await auth('signup', { email: address, password: stranger });
+        expect(first.status, JSON.stringify(first.body)).toBe(200);
+        await auth('signup', { email: address, password: owner });
+        expect(await accountsAt(address)).toHaveLength(1);
+
+        const mail = await mailTo(address);
+        const tokenHash = /\/potvrda\?token_hash=([0-9a-f]+)&amp;type=signup/.exec(mail.html)?.[1] ?? '';
+        const verified = await auth('verify', { token_hash: tokenHash, type: 'signup' });
+        expect(verified.status, JSON.stringify(verified.body)).toBe(200);
+        const token = String(verified.body['access_token'] ?? '');
+
+        // The hash is gone, in GoTrue's own confirming UPDATE.
+        const client = await connect();
+        try {
+          const { rows } = await client.query<{ hashed: boolean }>(
+            "select coalesce(encrypted_password, '') <> '' as hashed from auth.users where lower(email) = lower($1)",
+            [address],
+          );
+          expect(rows[0]?.hashed).toBe(false);
+        } finally {
+          await client.end();
+        }
+        for (const tried of [stranger, owner]) {
+          const refused = await auth('token?grant_type=password', { email: address, password: tried });
+          expect(refused.status).toBe(400);
+          expect(refused.body['error_code'] ?? refused.body['code']).toBe('invalid_credentials');
+        }
+
+        const chosen = password();
+        const set = await fetch(`${endpoint().url}/auth/v1/user`, {
+          method: 'PUT',
+          headers: { apikey: endpoint().key, authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+          body: JSON.stringify({ password: chosen }),
+        });
+        expect(set.status, await set.clone().text()).toBe(200);
+        expect((await auth('token?grant_type=password', { email: address, password: chosen })).status).toBe(200);
+        expect((await auth('token?grant_type=password', { email: address, password: stranger })).status).toBe(400);
+      } finally {
+        await removeAccounts(address);
+      }
+    },
+    60_000,
+  );
+});
+
+describe('confirmation forgets the password, in the database (story 19.3, 0071, C8)', () => {
+  async function account(client: Client, address: string, confirmed: boolean): Promise<string> {
+    const id = randomUUID();
+    await client.query(
+      `insert into auth.users (
+         instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+         raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+         confirmation_token, recovery_token, email_change, email_change_token_new
+       ) values (
+         '00000000-0000-0000-0000-000000000000', $1, 'authenticated', 'authenticated', $2,
+         extensions.crypt($3, extensions.gen_salt('bf', 4)), case when $4::boolean then now() end,
+         '{}'::jsonb, '{}'::jsonb, now(), now(), '', '', '', ''
+       )`,
+      [id, address.replace('<id>', id), password(), confirmed],
+    );
+    return id;
+  }
+
+  async function hashed(client: Client, id: string): Promise<boolean> {
+    const { rows } = await client.query<{ hashed: boolean }>(
+      'select encrypted_password is not null as hashed from auth.users where id = $1',
+      [id],
+    );
+    return rows[0]?.hashed ?? false;
+  }
+
+  it.skipIf(noDatabase)("nulls an email identity's hash when it is first confirmed, and nothing else", async () => {
+    await inRolledBackTransaction(async (client) => {
+      const fresh = await account(client, 'owner.<id>@example.com', false);
+      const synthesized = await account(client, `ivan.<id>@${PILOT.slug}.shift.invalid`, false);
+      const confirmed = await account(client, 'member.<id>@example.com', true);
+
+      await client.query('update auth.users set email_confirmed_at = now() where id = any($1::uuid[])', [[fresh, synthesized, confirmed]]);
+
+      expect(await hashed(client, fresh), 'a first confirmation kept the hash').toBe(false);
+      expect(await hashed(client, synthesized), "a username identity's confirmation lost its hash").toBe(true);
+      expect(await hashed(client, confirmed), 'a re-confirmation lost the hash').toBe(true);
+
+      // A password set after confirmation stays.
+      await client.query("update auth.users set encrypted_password = extensions.crypt($2, extensions.gen_salt('bf', 4)) where id = $1", [
+        fresh,
+        password(),
+      ]);
+      await client.query('update auth.users set email_confirmed_at = now() where id = $1', [fresh]);
+      expect(await hashed(client, fresh)).toBe(true);
+
+      // An UPDATE that confirms AND sets a password (an admin's
+      // `updateUserById({ password, email_confirm })`) keeps the one it sets.
+      const both = await account(client, 'both.<id>@example.com', false);
+      const { rows: before } = await client.query<{ hash: string }>('select encrypted_password as hash from auth.users where id = $1', [both]);
+      await client.query(
+        "update auth.users set email_confirmed_at = now(), encrypted_password = extensions.crypt($2, extensions.gen_salt('bf', 4)) where id = $1",
+        [both, password()],
+      );
+      const { rows: after } = await client.query<{ hash: string | null }>('select encrypted_password as hash from auth.users where id = $1', [both]);
+      expect(after[0]?.hash, 'a password set while confirming was forgotten').not.toBeNull();
+      expect(after[0]?.hash).not.toBe(before[0]?.hash);
+    });
+  });
 });
 
 // ------------------------------------------------------------------ 0068, C2
@@ -240,12 +374,16 @@ async function emailIdentityMember(client: Client, organization: string): Promis
      )`,
     [id, address],
   );
+  // STORY 19.3 (D5, 0071): only `create_organization` inserts an email
+  // identity's row, and it names the account in this setting first, as here.
+  await client.query("select set_config('shift.founding_account', $1, true)", [id]);
   const { rows } = await client.query<{ id: string }>(
     `insert into public.members (organization_id, auth_user_id, name, username, role, leave_allowance_days)
      values ($1, $2::uuid, 'Founder Probe', $3, 'member_role', 20)
      returning id`,
     [organization, id, `founder.${id}`],
   );
+  await client.query("select set_config('shift.founding_account', '', true)");
   const member = rows[0]?.id;
   if (member === undefined) throw new Error('members insert returned no row');
   return { member, address };
@@ -331,6 +469,8 @@ describe("an email identity's username follows its address (story 19.2, 0068, C2
          )`,
         [id, `Other.${id}@Example.com`],
       );
+      // The founding setting names it, so the refusal below is the username's.
+      await client.query("select set_config('shift.founding_account', $1, true)", [id]);
       expect(
         await refusal(
           client,
@@ -339,6 +479,34 @@ describe("an email identity's username follows its address (story 19.2, 0068, C2
           [organization, id, `not.derived.${id}`],
         ),
       ).toEqual({ code: '23514', message: 'SIGN_IN_IS_EMAIL' });
+    });
+  });
+
+  it.skipIf(noDatabase)("refuses an admin's insert of an email identity's row, and the owner's without the founding setting (story 19.3, D5)", async () => {
+    await inRolledBackTransaction(async (client) => {
+      const organization = await organizationId(client, PILOT.slug);
+      // The scene, as the owner: a confirmed stranger's email account.
+      const id = randomUUID();
+      await client.query(
+        `insert into auth.users (
+           instance_id, id, aud, role, email, email_confirmed_at,
+           raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+           confirmation_token, recovery_token, email_change, email_change_token_new
+         ) values (
+           '00000000-0000-0000-0000-000000000000', $1, 'authenticated', 'authenticated', $2, now(),
+           '{}'::jsonb, '{}'::jsonb, now(), now(), '', '', '', ''
+         )`,
+        [id, `stranger.${id}@example.com`],
+      );
+      const insert = `insert into public.members (organization_id, auth_user_id, name, username, role, leave_allowance_days)
+                      values ($1, $2::uuid, 'Stranger', $3, 'member_role', 20)`;
+
+      // The owner, with the derived username and no founding setting.
+      expect(await refusal(client, insert, [organization, id, `stranger.${id}`])).toEqual({ code: '23514', message: 'SIGN_IN_IS_EMAIL' });
+
+      // The pilot's admin, adopting the stranger.
+      await actAsAdmin(client, organization, PILOT.admin);
+      expect(await refusal(client, insert, [organization, id, `stranger.${id}`])).toEqual({ code: '23514', message: 'SIGN_IN_IS_EMAIL' });
     });
   });
 

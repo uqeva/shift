@@ -6,6 +6,7 @@ import {
   SIGN_OUT_LOCAL,
   SIGN_OUT_LOCAL_UNAVAILABLE,
   SIGN_OUT_OFFLINE,
+  localSessionEnd,
   signOut,
   type SessionAuth,
   type SignOutFailureShape,
@@ -388,5 +389,64 @@ describe('a sign-out the global revocation cannot finish falls back to a local o
     const { auth } = expiredOffline();
 
     expect(await signOut(auth)).toEqual({ ok: false, code: SIGN_OUT_FAILED });
+  });
+});
+
+describe('the route guard\'s local sign-out (story 19.3, D6)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('ends the session on this device only, and never throws', async () => {
+    const calls: unknown[] = [];
+    const end = localSessionEnd(() => ({
+      signOut: (options) => {
+        calls.push(options);
+        return Promise.resolve({ error: null });
+      },
+    }));
+
+    await end();
+    expect(calls).toEqual([{ scope: 'local' }]);
+  });
+
+  it('logs a refusal and a rejection, and still resolves', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await localSessionEnd(() => ({ signOut: () => Promise.resolve({ error: { status: 500 } }) }))();
+    await localSessionEnd(() => ({ signOut: () => Promise.reject(new Error('offline')) }))();
+    await localSessionEnd(() => {
+      throw new Error('SUPABASE_ENVIRONMENT_MISSING');
+    })();
+
+    expect(logged.mock.calls.map((call) => call[0])).toEqual([SIGN_OUT_FAILED, SIGN_OUT_FAILED, SIGN_OUT_FAILED]);
+  });
+
+  it('clears the stored session through the fallback on a refusal or past its budget, so the guards cannot loop (review of 19.3)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const removed: string[] = [];
+    const fallback: LocalFallback = {
+      online: () => true,
+      store: () => ({
+        storageKey: 'sb-shift-auth-token',
+        storage: {
+          removeItem: (key: string) => {
+            removed.push(key);
+          },
+        },
+      }),
+      budgetMs: 20,
+    };
+
+    await localSessionEnd(() => ({ signOut: () => Promise.resolve({ error: { status: 500 } }) }), fallback)();
+    expect(removed).toEqual(['sb-shift-auth-token', 'sb-shift-auth-token-code-verifier', 'sb-shift-auth-token-user']);
+
+    removed.length = 0;
+    await localSessionEnd(() => ({ signOut: () => new Promise<never>(() => undefined) }), fallback)();
+    expect(removed).toHaveLength(3);
+
+    removed.length = 0;
+    await localSessionEnd(() => ({ signOut: () => Promise.resolve({ error: null }) }), fallback)();
+    expect(removed, 'a clean sign-out touched the storage').toEqual([]);
   });
 });

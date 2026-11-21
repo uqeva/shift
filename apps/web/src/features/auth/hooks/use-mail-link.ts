@@ -22,6 +22,7 @@ import {
   mailLinkOf,
   passwordFits,
   saveRecoveredPassword,
+  setsPasswordOnLink,
   verifyLink,
 } from '@/features/auth/services/signup';
 import { writesOnline } from '@/lib/offline/use-write-gate';
@@ -33,10 +34,12 @@ import { supabaseClient } from '@/lib/supabase/client';
  * scanner that opens the page, even one that runs its script, consumes
  * nothing (AD-12, AD-22).
  *
- * A confirmation goes on to `/postavljanje` with `Adresa je potvrđena.`, on
- * whichever device opened the link. A recovery link's press verifies and then
- * saves the new password, and the session continues; a save that fails after
- * the verify is retried as a save only, because the link is spent.
+ * A signup's link and a recovery link both carry the password form (C8,
+ * story 19.3): the press verifies and then saves the password; a save that
+ * fails after the verify is retried as a save only, because the link is
+ * spent. A signup then goes on to `/postavljanje` with `Adresa je potvrđena.`,
+ * on whichever device opened the link; a recovery continues in the app. Only
+ * an email-change link keeps the one *Potvrdi* press.
  */
 export function useMailLink(search: { readonly token_hash?: string | undefined; readonly type?: string | undefined }) {
   const navigate = useNavigate();
@@ -135,7 +138,10 @@ export function useMailLink(search: { readonly token_hash?: string | undefined; 
       const outcome = result.outcome;
 
       if (outcome === RECOVERY_SAVED) {
-        await navigate({ to: '/', replace: true });
+        // A signup's link (C8, D2) goes on to step 1, as *Potvrdi* did.
+        await (confirmsSignup(link)
+          ? navigate({ to: '/postavljanje', search: { potvrdeno: true }, replace: true })
+          : navigate({ to: '/', replace: true }));
 
         return;
       }
@@ -161,6 +167,9 @@ export function useMailLink(search: { readonly token_hash?: string | undefined; 
 
   return {
     recovery: isRecoveryLink(link?.type ?? search.type),
+    // C8 (founder decision 2026-11-21, D2): a signup's link sets the password
+    // too, because confirmation forgets every password chosen before it (0071).
+    setsPassword: setsPasswordOnLink(link?.type ?? search.type),
     dead,
     pending,
     failure,

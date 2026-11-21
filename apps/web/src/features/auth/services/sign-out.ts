@@ -315,3 +315,51 @@ export async function signOut(auth: SessionAuth, fallback?: LocalFallback): Prom
 
   return { ok: true };
 }
+
+/**
+ * STORY 19.3 (AD-24, D6): the route guard's local sign-out, for a session
+ * `sessionDestination` answers `signOut` (a claimless username identity: it
+ * lost its `members` row and can read nothing). The guard ends the session
+ * on this device and sends it to *Prijava*, with no message: the next sign-in
+ * is refused with the existing neutral one. Local, never global: the guard
+ * runs before any screen, the account is already unusable, and a revocation
+ * would wait on the network for nothing.
+ *
+ * BOUNDED, AND IT ALWAYS LEAVES THE DEVICE SIGNED OUT (review of 19.3): the
+ * call runs within the fallback's budget ({@link LOCAL_SIGN_OUT_BUDGET_MS});
+ * on a refusal, a rejection or the budget running out, the stored session, its
+ * PKCE verifier and its user copy are removed through the fallback's store, so
+ * `/prijava`'s guard cannot find the session and send it back to `/`, which
+ * would loop. It never throws; each failure is logged.
+ */
+export function localSessionEnd(auth: () => Pick<SessionAuth, 'signOut'>, fallback?: LocalFallback): () => Promise<void> {
+  return async () => {
+    const budget = fallback?.budgetMs ?? LOCAL_SIGN_OUT_BUDGET_MS;
+    let failure: unknown = null;
+
+    try {
+      const answered = await within(() => auth().signOut({ scope: 'local' }), budget);
+
+      if (answered === TIMED_OUT) failure = TIMED_OUT;
+      else if (answered.error !== null) failure = answered.error;
+    } catch (cause) {
+      failure = cause;
+    }
+
+    if (failure === null) return;
+
+    console.error(SIGN_OUT_FAILED, failure);
+
+    const store = fallback === undefined ? null : storeOf(fallback);
+
+    if (store === null) return;
+
+    try {
+      for (const key of [store.storageKey, `${store.storageKey}-code-verifier`, `${store.storageKey}-user`]) {
+        await store.storage.removeItem(key);
+      }
+    } catch (cause) {
+      console.error(SIGN_OUT_FAILED, cause);
+    }
+  };
+}

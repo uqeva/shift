@@ -721,6 +721,15 @@ describe('a claimless session at the API (story 19.1, AD-10, AD-16)', () => {
     });
     const user = (await created.json()) as Record<string, unknown>;
     expect(created.status, JSON.stringify(user)).toBe(200);
+    // STORY 19.3 (C8, 0071): GoTrue's `createUser` confirms by an UPDATE
+    // after its INSERT, and confirmation forgets an email identity's password.
+    // So the password is set again, by an update that confirms nothing.
+    const reset = await fetch(`${endpoint.url}/auth/v1/admin/users/${String(user['id'])}`, {
+      method: 'PUT',
+      headers: { apikey: key, Authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ password }),
+    });
+    expect(reset.status, await reset.clone().text()).toBe(200);
     const granted = await fetch(`${endpoint.url}/auth/v1/token?grant_type=password`, {
       method: 'POST',
       headers: { apikey: endpoint.key, 'content-type': 'application/json' },
