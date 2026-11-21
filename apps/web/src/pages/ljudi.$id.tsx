@@ -1,6 +1,7 @@
 import { Link, createRoute, useLocation } from '@tanstack/react-router';
 
 import { OfflineNote } from '@/components/offline-note';
+import { MemberFeedCard } from '@/features/calendar-feed/components/member-feed-card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from '@/components/ui/icon';
 import { PageHeader } from '@/components/ui/page-header';
@@ -21,10 +22,12 @@ import { appLayoutRoute } from '@/pages/_app';
  * `/ljudi/$id` — one member's page (story 1.5b; facts and dialogs since story
  * 7.11). Headed by the person's name, it reads as fact cards in the order of
  * the approved mockup — *Osnovni podaci*, *Smjena*, *Godišnji odmor*,
- * *Status* and *Prijava* — and each card's header button opens its own small
- * dialog. This file composes the screen; its state, reads and handlers are
- * `useMemberEdit`, its cards are components in `@/features/members/components`,
- * and every rule is `@/features/members/services/write`'s.
+ * *Status*, *Kalendar na mobitelu* (story 16.5) and *Prijava* — and each
+ * card's header button opens its own small dialog. This file composes the
+ * screen; its state, reads and handlers are `useMemberEdit`, its cards are
+ * components in `@/features/members/components`, and every rule is
+ * `@/features/members/services/write`'s. The *Kalendar na mobitelu* card is
+ * `@/features/calendar-feed`'s, with its own read and write.
  *
  * THIS IS NOT A DESTINATION. The way back to the list is a link that says so.
  *
@@ -95,6 +98,10 @@ export function LjudiMemberScreen() {
       />
       {/* STORY 1.6. */}
       <MemberStatusCard edit={edit} />
+      {/* STORY 16.5 (UX-DR55): whether the member's calendar link is on, and
+          its turn-off; its own read and write, never a URL. Keyed by the
+          member, as the leave card is. */}
+      <MemberFeedCard key={id} memberId={id} />
       <MemberResetCard edit={edit} />
     </main>
   );

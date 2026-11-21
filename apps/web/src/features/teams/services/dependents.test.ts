@@ -30,6 +30,7 @@ import { SESSION_SUBJECT_KEY } from '@/features/members/services/write';
 import { MEMBER_NAME_KEY } from '@/features/navigation/services/profile';
 import { MEMBER_ROLE_KEY } from '@/features/navigation/services/role';
 import { NOTIFICATION_SETTINGS_KEY } from '@/features/notifications/services/settings';
+import { CALENDAR_FEED_KEY, MEMBER_CALENDAR_FEED_KEY } from '@/features/calendar-feed/services/feed';
 import { ORGANIZATION_SNAPSHOT_KEY } from '@/features/organization/services/snapshot';
 import { ACTING_ADMINS_KEY } from '@/features/conflicts/services/resolved-conflicts';
 import { ROTATION_KEY } from '@/features/rotation/services/list';
@@ -130,6 +131,11 @@ const CLASSIFIED: Readonly<Record<string, readonly QueryKey[]>> = {
   // write re-reads it (`saveEmailNotifications`), and each visit to
   // `/obavijesti` reads it again.
   NOTIFICATION_SETTINGS_KEY: [NOTIFICATION_SETTINGS_KEY],
+  // Story 16.5: the viewer's calendar link state and an admin's read of a
+  // member's. No other write names either: each is read again on every
+  // visit, and the link's own writes re-read it themselves.
+  CALENDAR_FEED_KEY: [CALENDAR_FEED_KEY],
+  MEMBER_CALENDAR_FEED_KEY: [MEMBER_CALENDAR_FEED_KEY('member-a')],
   // Story 12.3: the viewer's own swaps, which a swap write and (0049) a membership write name.
   MY_SWAP_REQUESTS_KEY: [MY_SWAP_REQUESTS_KEY],
   // Story 12.4: every swap of the organization, which Za odluku, Odlučeno and the admin's Danas read.

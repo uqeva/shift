@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogHeader } from '@/components/ui/dialog';
 import {
   Bell,
+  CalendarPlus,
   CaretDown,
   CaretLineLeft,
   CaretLineRight,
@@ -25,6 +26,7 @@ import { t } from '@/lib/i18n';
 import {
   destinationsFor,
   groupDestinations,
+  CALENDAR_FEED_PATH,
   isCurrentDestination,
   NOTIFICATIONS_PATH,
   phoneNavigationFor,
@@ -211,6 +213,26 @@ export interface AppChromeProps {
 /** Where the one link renders. Numbers, not words: a place is never text. */
 const PLACE = { sidebar: 0, tab: 1, sheet: 2 } as const;
 type Place = (typeof PLACE)[keyof typeof PLACE];
+
+/**
+ * The fixed rows after *Prikaz*, in order: their path, icon, name and
+ * one-line description, each said through `t()` at render. *Kalendar na
+ * mobitelu*'s copy is the `feed` namespace's (story 16.5).
+ */
+const FIXED_ROWS = [
+  {
+    path: NOTIFICATIONS_PATH,
+    Icon: Bell,
+    name: () => t('shell.notifications'),
+    description: () => t('shell.notificationsDescription'),
+  },
+  {
+    path: CALENDAR_FEED_PATH,
+    Icon: CalendarPlus,
+    name: () => t('feed.nav.name'),
+    description: () => t('feed.nav.description'),
+  },
+] as const;
 
 const THEME_GLYPHS: Record<ThemePreference, IconComponent> = {
   system: Monitor,
@@ -714,58 +736,63 @@ export function AppChrome({ children }: AppChromeProps) {
   }
 
   /**
-   * *Obavijesti* (story 10.3): the person's own notification settings, for
-   * every role, as a fixed row like *Instaliraj* — never a destination. In
-   * the *Više* sheet after *Prikaz*, and in the profile menu, the desktop's
-   * *Više*. DRAWN AS THE DESTINATION ROWS ARE: in the sheet, a one-line
-   * description under the name and *Ovdje si* on the current page; in the
-   * menu, the name alone. A press closes the sheet or the menu even on
-   * `/obavijesti` itself, where no pathname change would.
+   * The FIXED ROWS: *Obavijesti* (story 10.3) and *Kalendar na mobitelu*
+   * (story 16.5), each the person's own and for every role — never a
+   * destination. In the *Više* sheet after *Prikaz*, and in the profile menu,
+   * the desktop's *Više*, in that order. DRAWN AS THE DESTINATION ROWS ARE: in
+   * the sheet, a one-line description under the name and *Ovdje si* on the
+   * current page; in the menu, the name alone. A press closes the sheet or the
+   * menu even on the row's own page, where no pathname change would. ONE
+   * `<Link>` for both, over {@link FIXED_ROWS}, as the destinations are one.
    */
-  function renderNotifications(place: typeof PLACE.sidebar | typeof PLACE.sheet): ReactNode {
-    const current = isCurrentDestination(pathname, NOTIFICATIONS_PATH);
+  function renderFixedRows(place: typeof PLACE.sidebar | typeof PLACE.sheet): ReactNode {
     const row = place === PLACE.sheet;
 
-    return (
-      <Link
-        to={NOTIFICATIONS_PATH}
-        aria-current={current ? 'page' : undefined}
-        aria-labelledby={row ? rowNameId + NOTIFICATIONS_PATH : undefined}
-        aria-describedby={row ? rowDescriptionId + NOTIFICATIONS_PATH : undefined}
-        onClick={row ? closeMore : closeProfile}
-        // The destination rows' classes; in the sheet its wrapper gives it
-        // their taller row, as the groups' sections give theirs.
-        className="shell-entry flex h-11 w-full min-w-0 shrink-0 items-center justify-center gap-2 rounded-md px-3 text-sm font-normal sm:justify-start"
-      >
-        <Bell aria-hidden className="size-4 shrink-0" />
-        {row ? (
-          <>
-            <span className="grid min-w-0 flex-1 text-left">
-              <span id={rowNameId + NOTIFICATIONS_PATH} className="truncate">
-                {t('shell.notifications')}
-              </span>
-              <span>
-                <span
-                  id={rowDescriptionId + NOTIFICATIONS_PATH}
-                  className="inline-block max-w-full truncate align-top text-xs font-normal opacity-80"
-                >
-                  {t('shell.notificationsDescription')}
+    return FIXED_ROWS.map(({ path, Icon, name, description }) => {
+      const current = isCurrentDestination(pathname, path);
+
+      return (
+        <Link
+          key={path}
+          to={path}
+          aria-current={current ? 'page' : undefined}
+          aria-labelledby={row ? rowNameId + path : undefined}
+          aria-describedby={row ? rowDescriptionId + path : undefined}
+          onClick={row ? closeMore : closeProfile}
+          // The destination rows' classes; in the sheet its wrapper gives it
+          // their taller row, as the groups' sections give theirs.
+          className="shell-entry flex h-11 w-full min-w-0 shrink-0 items-center justify-center gap-2 rounded-md px-3 text-sm font-normal sm:justify-start"
+        >
+          <Icon aria-hidden className="size-4 shrink-0" />
+          {row ? (
+            <>
+              <span className="grid min-w-0 flex-1 text-left">
+                <span id={rowNameId + path} className="truncate">
+                  {name()}
+                </span>
+                <span>
+                  <span
+                    id={rowDescriptionId + path}
+                    className="inline-block max-w-full truncate align-top text-xs font-normal opacity-80"
+                  >
+                    {description()}
+                  </span>
                 </span>
               </span>
-            </span>
-            {current ? (
-              <span aria-hidden className="shrink-0">
-                <span className="inline-block rounded-full border border-current px-2 text-xs font-semibold">
-                  {t('shell.moreHere')}
+              {current ? (
+                <span aria-hidden className="shrink-0">
+                  <span className="inline-block rounded-full border border-current px-2 text-xs font-semibold">
+                    {t('shell.moreHere')}
+                  </span>
                 </span>
-              </span>
-            ) : null}
-          </>
-        ) : (
-          <span>{t('shell.notifications')}</span>
-        )}
-      </Link>
-    );
+              ) : null}
+            </>
+          ) : (
+            <span>{name()}</span>
+          )}
+        </Link>
+      );
+    });
   }
 
   /**
@@ -850,7 +877,7 @@ export function AppChrome({ children }: AppChromeProps) {
             className="shell-entries-opaque absolute bottom-full left-0 z-10 mb-2 flex w-full min-w-48 flex-col gap-2 rounded-lg border bg-popover p-2 text-popover-foreground shadow-sh-lg group-data-[collapsed=true]/sidebar:bottom-0 group-data-[collapsed=true]/sidebar:left-full group-data-[collapsed=true]/sidebar:mb-0 group-data-[collapsed=true]/sidebar:ml-3 group-data-[collapsed=true]/sidebar:w-auto"
           >
             {renderThemeSegments()}
-            {renderNotifications(PLACE.sidebar)}
+            {renderFixedRows(PLACE.sidebar)}
             {renderInstall(PLACE.sidebar)}
             {renderSignOut()}
           </div>
@@ -1004,7 +1031,7 @@ export function AppChrome({ children }: AppChromeProps) {
           {renderThemeSegments()}
         </section>
         <div className="grid *:justify-start [&>a]:h-auto [&>a]:min-h-12 [&>a]:py-1">
-          {renderNotifications(PLACE.sheet)}
+          {renderFixedRows(PLACE.sheet)}
         </div>
         {renderInstall(PLACE.sheet)}
         {renderSignOut()}

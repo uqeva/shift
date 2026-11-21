@@ -6,6 +6,7 @@ import { godisnjiRoute } from '@/pages/godisnji';
 import { godisnjiZatraziRoute } from '@/pages/godisnji.zatrazi';
 import { indexRoute } from '@/pages/index';
 import { kalendarRoute } from '@/pages/kalendar';
+import { kalendarNaMobiteluRoute } from '@/pages/kalendar-na-mobitelu';
 import { kalendarZamjenaRoute } from '@/pages/kalendar.zamjena';
 import { ljudiMemberRoute } from '@/pages/ljudi.$id';
 import { ljudiNoviRoute } from '@/pages/ljudi.novi';
@@ -129,6 +130,11 @@ const appDestinations = appLayoutRoute.addChildren([
   // *Više* and in the profile menu opens it. No role guard: each reads and
   // writes only their own row (`0044`).
   obavijestiRoute,
+  // STORY 16.5. The person's own calendar link and month download, for EVERY
+  // role, on 10.3's terms: nested under the layout and absent from the
+  // destinations — a fixed row in *Više* and in the profile menu opens it. No
+  // role guard: each reads and writes only their own link (0067).
+  kalendarNaMobiteluRoute,
 ]);
 
 /**

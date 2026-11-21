@@ -23,6 +23,8 @@ export default defineConfig({
       '@shift/domain': fileURLToPath(
         new URL('../../packages/domain/src/index.ts', import.meta.url),
       ),
+      // STORY 16.5. The calendar serializer, read from source as the domain is.
+      '@shift/ics': fileURLToPath(new URL('../../packages/ics/src/index.ts', import.meta.url)),
       // STORY 8.1. The PWA plugin's virtual module exists only in a Vite
       // build that runs `VitePWA`; the suite stands in a worker-free fixture.
       'virtual:pwa-register/react': fileURLToPath(

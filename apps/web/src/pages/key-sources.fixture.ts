@@ -54,6 +54,11 @@ import {
   NOT_FOUND,
   NOTIFICATIONS,
   NOTIFICATIONS_KEYS,
+  CALENDAR_FEED,
+  CALENDAR_FEED_COPY_KEYS,
+  CALENDAR_FEED_DOWNLOAD_KEYS,
+  CALENDAR_FEED_KEYS,
+  MEMBER_FEED_CARD,
   ORGANIZATION_HOURS_KEYS,
   PUSH_KEYS,
   ORGANIZATION_MESSAGE_KEYS,
@@ -1180,8 +1185,9 @@ export const KEY_SOURCES = [
     // 150 SINCE ITS REVIEW: a rotation step's ordinal label, and the two
     // marks on sides that differ but read alike.
     // 151 SINCE STORY 18.5: the loan record's word, `Posudba`.
+    // 152 SINCE STORY 16.5: the calendar link's record, `Kalendar na mobitelu`.
     keys: (text: string) => [...translationKeys(text), ...messageKeyUnions(text)],
-    strings: 151,
+    strings: 152,
   },
   {
     // STORY 14.3: the PDF's words — the title (the caption), the header's
@@ -1325,6 +1331,58 @@ export const KEY_SOURCES = [
     file: NOTIFICATIONS,
     keys: translationKeys,
     strings: 26,
+  },
+  {
+    // STORY 16.5. On *Kalendar na mobitelu*: the heading, the link card's
+    // heading, loading words, unavailable line and retry, the no-link lede and
+    // *Izradi poveznicu*, the live line, the revisit note, *Izradi novu
+    // poveznicu* and *Isključi*, each confirmation's prompt, cancel and confirm,
+    // the turned-off line, the two fixed notes; the created link's heading,
+    // warning title and text, its label, *Prikaži* and *Sakrij*, *Kopiraj*,
+    // each calendar's heading, add link and steps, Google's new-tab hint
+    // (review 2); the download's heading,
+    // lede, unavailable line, retry, *Preuzmi*, failure and saved lines. The
+    // last fetch, the copy's status and the write failure come through the
+    // rules entries below.
+    name: 'the calendar link screen',
+    file: CALENDAR_FEED,
+    keys: translationKeys,
+    strings: 47,
+  },
+  {
+    // STORY 16.5 (UX-DR55): the member card's heading, loading words,
+    // *Isključi poveznicu*, unavailable line and retry, the prompt, cancel and
+    // confirm, the turned-off line. Its on/off line comes off
+    // `memberFeedLineMessageKey`, its read failures off
+    // `memberFeedReadMessageKey` (review 1: eight).
+    name: 'the member calendar link card',
+    file: MEMBER_FEED_CARD,
+    keys: translationKeys,
+    strings: 8,
+  },
+  {
+    // STORY 16.5: the three last-fetch lines, the admin's on and off, the
+    // three write failures and the admin card's three read failures, off
+    // four unions (review 1).
+    name: 'the calendar link rules',
+    file: CALENDAR_FEED_KEYS,
+    keys: messageKeyUnions,
+    strings: 11,
+  },
+  {
+    // STORY 16.5 (review 1): the download's empty month and its failure, off
+    // `monthDownloadMessageKey`.
+    name: 'the month download rules',
+    file: CALENDAR_FEED_DOWNLOAD_KEYS,
+    keys: messageKeyUnions,
+    strings: 2,
+  },
+  {
+    // STORY 16.5: the copy's two status lines, off `linkCopyMessageKey`.
+    name: 'the calendar link copy',
+    file: CALENDAR_FEED_COPY_KEYS,
+    keys: messageKeyUnions,
+    strings: 2,
   },
   {
     // STORY 10.4: the push section's two saved lines, off `pushStatusMessageKey`.
@@ -1954,7 +2012,10 @@ export const KEY_SOURCES = [
   // TWENTY with story 8.4: *Instaliraj* and its iOS steps.
   // TWENTY-FOUR SINCE STORY 10.3: the fixed *Obavijesti* row — its name
   // (in the sheet and in the menu), its description, and *Ovdje si*.
-  { name: 'the navigation chrome', file: CHROME, keys: translationKeys, strings: 24 },
+  // TWENTY-FIVE SINCE STORY 16.5: the two fixed rows are one table, each
+  // name and description said once — *Obavijesti*'s two (its name was said
+  // twice before) and *Kalendar na mobitelu*'s two.
+  { name: 'the navigation chrome', file: CHROME, keys: translationKeys, strings: 25 },
   {
     // TWO, for three role codes and one sign-out code. The collapse is the
     // decision `messages.test.ts` executes; what this count pins is that there

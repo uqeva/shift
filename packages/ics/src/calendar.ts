@@ -8,6 +8,12 @@
  * from the same assembly. Each event says only WHEN the member works and the
  * shift type and team it is: no description, location, attendee, organizer,
  * leave, absence type, hours or other member.
+ *
+ * A start or end whose local time falls in a DST gap or a repeated hour is
+ * written as its nominal wall time (16.5): RFC 5545 §3.3.5 reads a skipped
+ * time with the offset before the gap and a repeated one as its first
+ * occurrence, which is `zone.ts`'s own `instantOf` rule, so a client and the
+ * app place it at the same instant.
  */
 
 import { daysBetween, type AtWorkShift, type ScheduleInputs } from '@shift/domain';
@@ -26,6 +32,13 @@ export const CALENDAR_NAME = 'Shift';
 export const PRODUCT_ID = '-//Shift//calendar-feed//HR';
 /** Between the shift type's name and the team's in an event's SUMMARY. */
 export const SUMMARY_SEPARATOR = ' · ';
+/**
+ * How often a subscribing client is asked to poll the feed (AD-20, amended by
+ * 16.5): `REFRESH-INTERVAL` (RFC 7986) and `X-PUBLISHED-TTL`, which Apple and
+ * Outlook read. Google ignores both and polls on its own schedule. The feed
+ * carries them; the month download, a one-off import, carries neither.
+ */
+export const REFRESH_INTERVAL = 'PT1H';
 
 /** An IANA zone name as it may stand in a TZID: no character a parameter or value would have to quote. */
 const ZONE_SHAPE = /^[A-Za-z0-9_+\-/]+$/;
@@ -68,6 +81,9 @@ export function calendarOf(request: CalendarRequest): string {
     `NAME:${escapeText(CALENDAR_NAME)}`,
     `X-WR-CALNAME:${escapeText(CALENDAR_NAME)}`,
     `X-WR-TIMEZONE:${zone}`,
+    ...(uidDomain === FEED_UID_DOMAIN
+      ? [`REFRESH-INTERVAL;VALUE=DURATION:${REFRESH_INTERVAL}`, `X-PUBLISHED-TTL:${REFRESH_INTERVAL}`]
+      : []),
     ...timeZoneLines(zone, window.from, window.to),
   ];
 

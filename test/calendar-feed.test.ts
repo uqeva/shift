@@ -223,6 +223,9 @@ describe('calendar-feed: a live token (AD-14, AD-20)', () => {
     const unfolded = lines(text);
     expect(unfolded.filter((line) => line === 'BEGIN:VEVENT')).toHaveLength(shifts.length);
     expect(unfolded).toContain('X-WR-TIMEZONE:Europe/Zagreb');
+    // AD-20 amended by 16.5: the feed asks Apple and Outlook to poll hourly.
+    expect(unfolded).toContain('REFRESH-INTERVAL;VALUE=DURATION:PT1H');
+    expect(unfolded).toContain('X-PUBLISHED-TTL:PT1H');
     expect(unfolded.filter((line) => line.startsWith('DTSTAMP:'))[0]).toBe('DTSTAMP:20261121T123456Z');
     expect(text).not.toMatch(/DESCRIPTION|LOCATION|ATTENDEE|ORGANIZER/);
     expect(logged).toEqual([]);

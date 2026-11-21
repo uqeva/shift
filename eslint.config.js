@@ -180,6 +180,9 @@ export const FEATURE_PUBLIC = {
     'components/modifier-glyphs', // today
     'services/marks', // today
     'services/snapshot', // conflicts, hours, leave, members, pages, rotation, swaps, teams, today
+    // Story 16.5: the month download builds R12's inputs through the browser's
+    // one adapter (AD-19), never a second one.
+    'services/schedule-inputs', // calendar-feed
     'services/snapshot-skew', // conflicts, hours, today
     'utils/day-detail', // conflicts, swaps
     'utils/empty-day', // today
@@ -308,6 +311,10 @@ export const FEATURE_PUBLIC = {
     'services/my-leave', // today
     // Story 9.4: the decision screen's heading id, which names the page's main
     // region; since retro 8–9 (P1) in its own ids file, not a service.
+    'utils/element-ids', // pages
+  ],
+  // Story 16.5: `/kalendar-na-mobitelu` names its main region by the page's one heading id.
+  'calendar-feed': [
     'utils/element-ids', // pages
   ],
   // Story 6.1b: *Danas*'s leave tile reads the viewer's allowance, as *Godišnji* does.

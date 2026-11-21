@@ -3,7 +3,9 @@ import type { APIResponse } from '@playwright/test';
 import {
   API_URL,
   createCalendarFeedTokenInSql,
+  holdCalendarFeed,
   revokeCalendarFeedTokenInSql,
+  type RotationHold,
 } from '../../utils/database-helper.ts';
 import { expect, test } from '../../utils/custom-fixtures.ts';
 
@@ -42,6 +44,25 @@ async function missOf(send: () => Promise<APIResponse>) {
     floorKept: elapsed >= MISS_FLOOR_MS,
   };
 }
+
+
+/**
+ * The member's ONE link, held for each case ({@link holdCalendarFeed}): `kalendar-na-mobitelu.spec.ts` (16.5)
+ * creates and revokes the same member's link, in another worker.
+ */
+let feedHold: RotationHold | null = null;
+
+test.beforeEach(async ({ fixture }) => {
+  // Waiting for the other holder may take a while.
+  test.slow();
+  feedHold = holdCalendarFeed(fixture.slug);
+  await feedHold.ready;
+});
+
+test.afterEach(async () => {
+  await feedHold?.release();
+  feedHold = null;
+});
 
 test.describe('a member’s calendar feed (story 16.4)', () => {
   test('serves the member’s calendar to a client with no session, and one 404 once the link is gone', async ({ request, fixture }) => {

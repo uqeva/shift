@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { atWorkShiftsOf, type AtWorkShift, type ScheduleInputs } from '@shift/domain';
+import { atWorkShiftsOf, instantOf, type AtWorkShift, type ScheduleInputs } from '@shift/domain';
 
 import { PARITY_FIXTURES, inputsOf } from '../../domain/parity/fixtures.js';
 import {
@@ -11,6 +11,7 @@ import {
   CRLF,
   DOWNLOAD_UID_DOMAIN,
   FEED_UID_DOMAIN,
+  REFRESH_INTERVAL,
   SUMMARY_SEPARATOR,
   calendarOf,
   type CalendarRequest,
@@ -113,7 +114,7 @@ describe('the calendar (AD-20, D-S2)', () => {
       shifts: [shift('2026-11-02', TEAM_A, DAN, 420, 1140)],
     });
     const unfolded = lines(text);
-    expect(unfolded.slice(0, 8)).toEqual([
+    expect(unfolded.slice(0, 11)).toEqual([
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
       'PRODID:-//Shift//calendar-feed//HR',
@@ -122,7 +123,12 @@ describe('the calendar (AD-20, D-S2)', () => {
       `NAME:${CALENDAR_NAME}`,
       `X-WR-CALNAME:${CALENDAR_NAME}`,
       'X-WR-TIMEZONE:Europe/Zagreb',
+      // AD-20 amended by 16.5: the poll hints, the feed's alone.
+      'REFRESH-INTERVAL;VALUE=DURATION:PT1H',
+      'X-PUBLISHED-TTL:PT1H',
+      'BEGIN:VTIMEZONE',
     ]);
+    expect(REFRESH_INTERVAL).toBe('PT1H');
     expect(unfolded.at(-1)).toBe('END:VCALENDAR');
     expect(text).not.toMatch(/DESCRIPTION|LOCATION|ATTENDEE|ORGANIZER|RRULE|URL[:;]/);
     const event = unfolded.slice(unfolded.indexOf('BEGIN:VEVENT'), unfolded.indexOf('END:VEVENT') + 1);
@@ -163,6 +169,42 @@ describe('the calendar (AD-20, D-S2)', () => {
     expect(uid(lines(calendarOf({ ...request, stamp: STAMP, uidDomain: DOWNLOAD_UID_DOMAIN })))).toBe(
       `UID:2026-11-02-${TEAM_A}-${MEMBER}@shift-download`,
     );
+  });
+
+  it('gives the month download (16.5) no refresh hints: a one-off import, not a subscription', () => {
+    const request = {
+      inputs: NAMED,
+      window: { from: '2026-11-01', to: '2026-11-30' },
+      stamp: STAMP,
+      shifts: [shift('2026-11-02', TEAM_A, DAN, 420, 1140)],
+    };
+    const feed = lines(calendarOf({ ...request, uidDomain: FEED_UID_DOMAIN }));
+    const download = lines(calendarOf({ ...request, uidDomain: DOWNLOAD_UID_DOMAIN }));
+    expect(download.join('\n')).not.toMatch(/REFRESH-INTERVAL|X-PUBLISHED-TTL/);
+    expect(download[8]).toBe('BEGIN:VTIMEZONE');
+    // The same calendar otherwise, line for line, but the UIDs' domain.
+    expect(feed.filter((line) => !/^(?:REFRESH-INTERVAL|X-PUBLISHED-TTL)[:;]/.test(line))).toEqual(
+      download.map((line) => line.replace('@shift-download', '@shift')),
+    );
+  });
+
+  it('writes a start in a DST gap or a repeated hour as its nominal wall time, which a client reads as zone.ts does (16.5)', () => {
+    // 2026-03-29 02:30 never happens in Zagreb (02:00 → 03:00); 2026-10-25 02:30 happens twice.
+    const text = calendarOf({
+      inputs: NAMED,
+      window: { from: '2026-03-01', to: '2026-10-31' },
+      stamp: STAMP,
+      uidDomain: FEED_UID_DOMAIN,
+      shifts: [shift('2026-03-29', TEAM_A, DAN, 150, 600), shift('2026-10-25', TEAM_A, DAN, 150, 600)],
+    });
+    const unfolded = lines(text);
+    expect(unfolded).toContain('DTSTART;TZID=Europe/Zagreb:20260329T023000');
+    expect(unfolded).toContain('DTSTART;TZID=Europe/Zagreb:20261025T023000');
+    // RFC 5545 §3.3.5: a skipped time takes the offset before the gap (+01:00,
+    // so 01:30Z); a repeated one is its first occurrence (+02:00, so 00:30Z).
+    // The app's one conversion says the same instants.
+    expect(instantOf('2026-03-29', 150, 'Europe/Zagreb')).toBe(Date.UTC(2026, 2, 29, 1, 30));
+    expect(instantOf('2026-10-25', 150, 'Europe/Zagreb')).toBe(Date.UTC(2026, 9, 25, 0, 30));
   });
 
   it('refuses what R12 never gives: a shift outside the window, an unknown team or type, a repeated UID, a reversed interval', () => {

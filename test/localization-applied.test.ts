@@ -724,6 +724,18 @@ const SOURCES = [
   join(webRoot, 'src', 'features', 'notifications', 'hooks', 'use-push-settings.ts'),
   join(webRoot, 'src', 'features', 'notifications', 'components', 'push-settings-card.tsx'),
   join(webRoot, 'src', 'features', 'notifications', 'services', 'push.ts'),
+  // Story 16.5: *Kalendar na mobitelu* — the page, its two hooks and cards,
+  // the member page's card and hook, and the rules and copy modules.
+  join(webRoot, 'src', 'pages', 'kalendar-na-mobitelu.tsx'),
+  join(webRoot, 'src', 'features', 'calendar-feed', 'hooks', 'use-calendar-feed.ts'),
+  join(webRoot, 'src', 'features', 'calendar-feed', 'hooks', 'use-month-download.ts'),
+  join(webRoot, 'src', 'features', 'calendar-feed', 'hooks', 'use-member-calendar-feed.ts'),
+  join(webRoot, 'src', 'features', 'calendar-feed', 'components', 'feed-card.tsx'),
+  join(webRoot, 'src', 'features', 'calendar-feed', 'components', 'month-download-card.tsx'),
+  join(webRoot, 'src', 'features', 'calendar-feed', 'components', 'member-feed-card.tsx'),
+  join(webRoot, 'src', 'features', 'calendar-feed', 'services', 'feed.ts'),
+  join(webRoot, 'src', 'features', 'calendar-feed', 'utils', 'copy.ts'),
+  join(webRoot, 'src', 'features', 'calendar-feed', 'services', 'month-download.ts'),
   // Story 5.3b: *Za odluku*'s conflicts queue — its hook, components and rules
   // module. `za-odluku.tsx` is listed with the destinations above.
   join(webRoot, 'src', 'features', 'conflicts', 'hooks', 'use-conflicts-queue.ts'),

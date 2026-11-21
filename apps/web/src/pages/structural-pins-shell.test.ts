@@ -250,11 +250,21 @@ describe('the chrome the layout wraps every destination in', () => {
     //
     // STORY 10.3: the one other `<Link>` is the fixed *Obavijesti* row, which
     // is not a destination; the destinations' element stays the first.
+    //
+    // STORY 16.5: that one other `<Link>` draws BOTH fixed rows, *Obavijesti*
+    // and *Kalendar na mobitelu*, over one table in that order — never a
+    // second element per row.
     const links = linkElements(source(CHROME));
+    const chrome = source(CHROME);
 
     expect(links, 'the chrome renders its destinations from more than one place').toHaveLength(2);
     expect(links[0]).toContain('to={destination.path}');
-    expect(links[1]).toContain('to={NOTIFICATIONS_PATH}');
+    expect(links[1]).toContain('to={path}');
+    expect(chrome).toContain('FIXED_ROWS.map(');
+    const table = chrome.slice(chrome.indexOf('const FIXED_ROWS = ['), chrome.indexOf('] as const;', chrome.indexOf('const FIXED_ROWS = [')));
+    expect(table.indexOf('path: NOTIFICATIONS_PATH')).toBeGreaterThan(-1);
+    expect(table.indexOf('path: CALENDAR_FEED_PATH')).toBeGreaterThan(table.indexOf('path: NOTIFICATIONS_PATH'));
+    expect(table).toContain('Icon: CalendarPlus');
   });
 
   it('puts the destinations in both bars and the exit in both layouts, not merely somewhere', () => {
