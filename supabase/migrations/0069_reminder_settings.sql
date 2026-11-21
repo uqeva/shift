@@ -49,8 +49,8 @@ create table public.reminder_settings (
 
   member_id uuid not null,
 
-  -- At most two distinct leads, from the closed set, in its order: the second
-  -- conjunct of the check is the order (strictly increasing, so distinct too).
+  -- At most two distinct leads, from the closed set, in its order: the check's
+  -- last conjunct is the order (strictly increasing, so distinct too).
   leads text[] not null default '{}',
 
   -- The reminder email switch, off by default (D-S6).

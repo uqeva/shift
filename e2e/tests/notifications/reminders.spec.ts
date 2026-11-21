@@ -84,7 +84,8 @@ test.describe('a member on a phone', () => {
       for (const label of [lead.h1, lead.h3, lead.h6, lead.h12]) {
         await expect(notificationsPage.reminderLead(label)).toHaveAttribute('aria-disabled', 'true');
       }
-      await notificationsPage.reminderLead(lead.h1).click();
+      // Forced: Playwright waits for an `aria-disabled` switch to be enabled.
+      await notificationsPage.reminderLead(lead.h1).click({ force: true });
       await expect(notificationsPage.reminderLead(lead.h1)).not.toBeChecked();
       expect(await reminderSettingsOf(fixture.slug, fixture.member.username)).toEqual({
         leads: ['H2', 'EVENING_BEFORE'],

@@ -2541,7 +2541,9 @@ export async function restoreReminderSettingsInSql(held: HeldReminderSettings): 
 export interface HeldPushDevices {
   readonly rows: readonly {
     readonly organizationId: string;
+    readonly id: string;
     readonly memberId: string;
+    readonly createdAt: string;
     readonly endpoint: string;
     readonly p256dh: string;
     readonly auth: string;
@@ -2560,7 +2562,8 @@ export async function holdPushDevicesInSql(slug: string, username: string): Prom
         using members m, organizations o
         where m.organization_id = s.organization_id and m.id = s.member_id
           and o.id = m.organization_id and o.slug = $1 and m.username = $2
-        returning s.organization_id::text as "organizationId", s.member_id::text as "memberId",
+        returning s.organization_id::text as "organizationId", s.id::text as id,
+                  s.member_id::text as "memberId", s.created_at::text as "createdAt",
                   s.endpoint, s.p256dh, s.auth`,
       [slug, username],
     );
@@ -2576,9 +2579,9 @@ export async function restorePushDevicesInSql(held: HeldPushDevices): Promise<vo
   try {
     for (const row of held.rows) {
       await client.query(
-        `insert into push_subscriptions (organization_id, member_id, endpoint, p256dh, auth)
-         values ($1, $2, $3, $4, $5) on conflict (endpoint) do nothing`,
-        [row.organizationId, row.memberId, row.endpoint, row.p256dh, row.auth],
+        `insert into push_subscriptions (organization_id, id, member_id, created_at, endpoint, p256dh, auth)
+         values ($1, $2, $3, $4::timestamptz, $5, $6, $7) on conflict do nothing`,
+        [row.organizationId, row.id, row.memberId, row.createdAt, row.endpoint, row.p256dh, row.auth],
       );
     }
   } finally {

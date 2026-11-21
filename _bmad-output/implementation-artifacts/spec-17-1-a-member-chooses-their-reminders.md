@@ -4,12 +4,12 @@ type: 'feature'
 created: '2026-11-21'
 status: 'in-review'
 baseline_commit: '83804393643bf966769d014f75be7f5b9190c459'
-review_loop_iteration: 0
+review_loop_iteration: 2
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-17-context.md'
 ---
 
-Status: review (built, review 1's patches applied, CI pending). DONE MEANS MERGED WITH GREEN CI: the frontmatter stays `in-review` and the sprint status `review` until the PR merges green. ~2.1k tokens, kept whole: one user goal across layers. Approved unattended under the founder's standing instruction (decide and record, no questions). Baseline: `main` at #345 (16.5), which touched `hr.json` and the structural pins; nothing else that changes them runs beside it. Migration `0069`. Residual risks: the DB suites (`test/reminder-settings.test.ts`, the edited `provisioning` and `rls-isolation` cases, the claimless sweep over `0069`) and both e2e specs have never run (CI is their first run); the card's phone and desktop layout has not been looked at in a browser (headless Chromium cannot start on this machine), only rendered to static markup.
+Status: review (built, reviews 1 and 2's patches applied, CI pending). DONE MEANS MERGED WITH GREEN CI: the frontmatter stays `in-review` and the sprint status `review` until the PR merges green. ~2.1k tokens, kept whole: one user goal across layers. Approved unattended under the founder's standing instruction (decide and record, no questions). Baseline: `main` at #345 (16.5), which touched `hr.json` and the structural pins; nothing else that changes them runs beside it. Migration `0069`. Residual risks: the DB suites (`test/reminder-settings.test.ts`, the edited `provisioning` and `rls-isolation` cases, the claimless sweep over `0069`) and both e2e specs have never run (CI is their first run); the card's phone and desktop layout was looked at in headless Chromium in review 2 (fixture states, not the live screen).
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 
@@ -109,6 +109,8 @@ None.
 
 ## Spec Change Log
 
+- **2026-11-21 (review 2) — patches applied.** No change to the frozen block. See Review Findings (review 2): the e2e forced press on a held switch; held and offline switches dimmed; no channel refetch on focus or reconnect; a second cancel before the landed write; `channelNoneEmailOn` and `limit` reworded; retry rereads the channels; failed writes refresh the channel line; the silent-refusal unit cases; device hold keeps `id` and `created_at`; a `0069` comment.
+
 - **2026-11-21 (review 1) — patches applied.** No change to the frozen block.
   - Copy: the card's retry and save failure are `reminders.retry` and `reminders.saveFailed` (every string of the card in `reminders`); a fifth channel line, `reminders.channelNoneEmailOn`, replaces `channelNone` while the reminder email switch is on, so the member is never told to turn on what is on (`channelMessageKey(channels, emailSwitchOn)`, unit-tested).
   - Lines: the channel line and the email-unreachable reason show only while a lead is on, no write is in flight and the channels read is not under way (the hook answers `null` while it refetches after an invalidation), so no stale line flashes; no reason is drawn while the *E-pošta* view is loading (`emailUnreachableMessageKey` answers `null`).
@@ -119,6 +121,39 @@ None.
   - `0069`: a comment on `reminder_settings_leads_check` says the order clause holds order and distinctness only because the maximum is 2, and must be rewritten with any change to `MAX_REMINDER_LEADS`.
   - DB test (unrun): "is off with no row" now sets the organization's switch on and removes the member's email row, so the missing reminder row is the only reason email is off; the label "a device does not count as push" is corrected; a new case deactivates the member today (the admin's own RLS insert of a status version, as `calendar-feed-tokens.test.ts` builds it, with the row stored as the owner first) and holds that they read zero rows, change nothing, are refused an insert (42501) and refused `reminder_channels()` (42501 `REMINDER_SETTINGS_REFUSED`). There is no shared helper in `test/`; the 16.3 file's local helper is copied.
   - e2e (unrun): the channel case holds the member's devices (`holdPushDevicesInSql`, restored after), the address with no email row, and the organization's switch on; it then turns *E-pošta* off in its own card on the same page and asserts `channelNoneEmailOn` and the `emailOff` reason without a reload (pins the invalidation). A new offline case: the section's offline note, every switch `aria-disabled="true"`, a forced press sends nothing.
+
+**Results (review 2, 2026-11-21).**
+- `pnpm typecheck`, `pnpm lint`, `pnpm build`: clean. `pnpm --filter @shift/domain test`: 958 passed. `pnpm --filter ./apps/web test`: 183 files, 6830 passed (two assertions added inside an existing case). The eight allowed DB-free root files after the build: 3002 passed.
+- **Looked at in a browser.** Playwright's bundled headless Chromium ran with `LD_LIBRARY_PATH` pointing at libraries extracted to the scratchpad (no install, no Docker). A DB-free Vite harness (scratchpad, not committed) rendered the real `ReminderSettingsCard` with the real `index.css` and `hr.json`, in seven states: never opened; two on, both channels, saved; one on, no channel, email switch on, no address; one on, push only, failed save; a write in flight; loading; unavailable. It ran at 390 px and 1280 px, and each card was screenshotted and looked at. There is no horizontal scroll (`scrollWidth` equals `clientWidth` at both widths), every switch row is 44 px, labels and lines wrap inside the card, and the notices sit under the lines. One defect was seen and patched: a held switch looked exactly like an available off switch (only `disabled:` is styled), so held and offline switches now draw at half opacity with `cursor-not-allowed`. A write in flight does not dim them, so the rows do not flash on each press.
+- **Still unrun, by the STRICT DATABASE RULE:** the DB suites and both e2e specs. Review 2's Unrun DB Test Auditor found nothing in them that would fail on a first run, apart from the e2e press on a held switch, patched below.
+
+## Review Findings (review 2, 2026-11-21)
+
+Layers: Blind Hunter, Edge Case Hunter, Verification Gap, Acceptance + Epic AC Auditor, and Unrun DB Test Auditor, each a fresh-context subagent given `git diff origin/main...HEAD` as a file. The Artifact Renderer reported no generated file. The reviewer rendered the card itself (see Results, review 2). Epic ACs: all met, no unlisted deviation.
+
+- [x] [Review][Patch] The e2e press on a held switch had no `force`. Playwright waits for an `aria-disabled` `role="switch"` to become enabled, so the case would have timed out on its first run [e2e/tests/notifications/reminders.spec.ts:88]
+- [x] [Review][Patch] Held switches had no visual cue: they looked like available off switches. Held and offline switches are now drawn at `opacity-50` and `cursor-not-allowed` (seen in the browser) [reminder-settings-card.tsx]
+- [x] [Review][Patch] The channel line blanked on every window focus or reconnect (`isFetching` → `null`). The channels query no longer refetches on focus or reconnect; it is read on the visit, after an invalidation and on retry [use-reminder-settings.ts]
+- [x] [Review][Patch] A settings refetch that began while a write was in flight (focus, reconnect) could land over the write's answer. The read is cancelled again before `setQueryData` [use-reminder-settings.ts]
+- [x] [Review][Patch] `channelNoneEmailOn` said "see the reason below", but no reason is drawn while *E-pošta* loads, and only a generic one when that view is unavailable. Reworded so it stands alone: no device has notifications on, email reminders are not sent, turn on device notifications or check *E-pošta* [hr.json]
+- [x] [Review][Patch] Croatian: `reminders.limit` read "at most two reminders are on". It now reads "two reminders are on, the most possible; turn one off to turn on another" [hr.json]
+- [x] [Review][Patch] Retry skipped the channels while the settings read was fetching. Each read is now refetched unless it is already in flight [use-reminder-settings.ts]
+- [x] [Review][Patch] A failed reminder write, and a push write that failed or was denied part way, did not refresh the channel line. Both now invalidate `REMINDER_CHANNELS_KEY`; the push hook does it in `finally` [use-reminder-settings.ts, use-push-settings.ts]
+- [x] [Review][Patch] The policy's silent refusal (an insert answering no row, and the retry after a lost race matching none) was untested, although the case's title named it. Both are now asserted REFUSED; `console.error` spies are restored after each case [services/reminders.test.ts]
+- [x] [Review][Patch] The e2e device hold restored devices with new ids and timestamps. It now carries `id` and `created_at` through [e2e/utils/database-helper.ts]
+- [x] [Review][Patch] A `0069` comment called the order clause the check's "second conjunct"; it is the last [0069_reminder_settings.sql:52]
+- Rejected, with reasons:
+  - The reason line shows only while a lead is on. This is deliberate (review 1): with no lead on nothing is sent, and the card says reminders are off.
+  - Push counts as "a device anywhere", not this browser's switch. This is the spec's Design Note 3 and AD-18 as amended, and the copy says "tvoje uređaje".
+  - `reminder_channels()` ignores suspension. `private.organization_live` does not exist yet (0067's note), and suspension of reminders is 17.2's and the suspension story's, at write and send time.
+  - Gate the channels RPC with `enabled` while no lead is on. With focus refetch off, it is one cheap read per visit, and gating it would delay the line on the first lead.
+  - The touch trigger reuses 0044's function. The spec chose this: the body names no table, and AD-11's amendment records it.
+  - `firstRow` and the error constants are copied from `settings.ts`. The spec says to mirror them, and sharing them would touch the email path's hot module for no behaviour.
+  - The docs differ on the filter (reminder switch vs the predicate) and the owner (17.2 vs 17.2/17.3). They are not in conflict: the existing filter already drops on the other three conjuncts, and 17.2 owns the entry and amends the filter, as `epic-17-context.md` says.
+  - Gaps in e2e and DB coverage: the push half of the cross-card refresh (needs the stubbed PushManager of `settings.spec.ts`), a resync after a failed write that differs from the cache, an admin's own row, a desktop viewport, a 42501 from the database in e2e, and a render test of the hook and card. These were not added: each would be one more unrun case for CI's first run. The behaviour is covered by the code paths reviewed here, the DB suite's role-agnostic own-row policy cases, the browser render above, and the email half of the refresh, which is pinned in e2e.
+  - The channel line may count a device about to be dropped by the next signed-in cleanup. This is pre-existing device housekeeping, and the line corrects itself on the next read.
+  - A refetch of the settings that fails after a good read swaps the switches for the unavailable alert. This is the same as the *E-pošta* card's read (`readNotificationSettings` never throws either), not introduced here.
+- Dismissed: 0 beyond the above. Deferred: none (nothing out of scope).
 
 ## Suggested Review Order
 

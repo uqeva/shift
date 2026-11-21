@@ -50,6 +50,11 @@ export function useReminderSettings() {
     queryKey: REMINDER_CHANNELS_KEY,
     queryFn: () => readReminderChannels(backend()),
     retry: false,
+    // Read on the visit, after an invalidation and on retry only: a refetch
+    // on focus or reconnect would blank the line (null while fetching) for
+    // nothing.
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   const saving = useRef(false);
@@ -79,9 +84,14 @@ export function useReminderSettings() {
         // Read the row again, so the switches return to what the database
         // holds now (another tab may have written it: the last write wins).
         void queryClient.invalidateQueries({ queryKey: REMINDER_SETTINGS_KEY, exact: true });
+        void queryClient.invalidateQueries({ queryKey: REMINDER_CHANNELS_KEY });
         return;
       }
 
+      // A refetch begun while the write was in flight (focus, reconnect) may
+      // hold the row as it was before it: cancelled, so it cannot land over
+      // this answer.
+      await queryClient.cancelQueries({ queryKey: REMINDER_SETTINGS_KEY, exact: true });
       const landed: ReminderSettingsOutcome = { ok: true, settings: { ...outcome.settings, ...written.choice } };
       queryClient.setQueryData(REMINDER_SETTINGS_KEY, landed);
       setSaved(true);
@@ -93,8 +103,8 @@ export function useReminderSettings() {
   }
 
   async function retry(): Promise<void> {
-    if (read.isFetching) return;
-    await Promise.all([read.refetch(), channels.refetch()]);
+    // The channels are read again even while the settings read is under way.
+    await Promise.all([read.isFetching ? null : read.refetch(), channels.isFetching ? null : channels.refetch()]);
   }
 
   return {

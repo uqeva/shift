@@ -1,5 +1,5 @@
 import type { Session } from '@supabase/supabase-js';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   REMINDER_SETTINGS_REFUSED,
@@ -63,6 +63,11 @@ function backendOf(member: Answer, settings: SettingsTable, channels: Answer = r
 }
 
 const session = () => Promise.resolve({ user: { id: 'auth-1' } } as Session);
+
+// The silenced `console.error` of a failure case never leaks into the next.
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('the reminder read', () => {
   it('is off, email off, with no row', async () => {
@@ -157,6 +162,21 @@ describe('the reminder write', () => {
         leads: ['H1'],
         email: false,
       }),
+    ).toEqual(refused);
+    // The policy's silent refusal: an insert answering no row, and the retry
+    // after a lost race matching none.
+    expect(
+      await writeReminderSettings(backendOf(rows(MEMBER), settingsTable(rows(), { update: [rows()], insert: [rows()] })), OWN, {
+        leads: ['H1'],
+        email: false,
+      }),
+    ).toEqual(refused);
+    expect(
+      await writeReminderSettings(
+        backendOf(rows(MEMBER), settingsTable(rows(), { update: [rows(), rows()], insert: [failure('23505')] })),
+        OWN,
+        { leads: ['H1'], email: false },
+      ),
     ).toEqual(refused);
     const log = { updated: [] as unknown[], inserted: [] as unknown[] };
     expect(

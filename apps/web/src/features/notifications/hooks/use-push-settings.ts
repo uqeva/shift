@@ -97,8 +97,6 @@ export function usePushSettings() {
       if (written.ok) {
         setDevice(deviceAfter(written.on));
         setSaved(written.on);
-        // Story 17.1: the reminders' channel line follows this device.
-        void queryClient.invalidateQueries({ queryKey: REMINDER_CHANNELS_KEY });
         return;
       }
       if (written.code === PUSH_DENIED) {
@@ -111,6 +109,10 @@ export function usePushSettings() {
     } finally {
       saving.current = false;
       setPending(null);
+      // Story 17.1: the reminders' channel line follows this member's
+      // devices, also after a write that failed part way (a device row may
+      // have been written or removed before the failure).
+      void queryClient.invalidateQueries({ queryKey: REMINDER_CHANNELS_KEY });
     }
   }
 

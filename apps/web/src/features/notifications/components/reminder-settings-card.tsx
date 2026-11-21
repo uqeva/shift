@@ -150,6 +150,9 @@ function ReminderControl({
                     switchLead(lead, on);
                   }}
                   aria-disabled={inert || held ? true : undefined}
+                  // Held or offline, the switch looks unavailable too (not
+                  // while a write is in flight: that would flash every row).
+                  className={held || !gate.online ? 'cursor-not-allowed opacity-50' : undefined}
                   aria-describedby={gate.describedBy(held ? NOTIFICATIONS_REMINDERS_LIMIT_ID : null, failure)}
                 />
                 <Label htmlFor={id} className="min-w-0 break-words">
@@ -170,6 +173,7 @@ function ReminderControl({
             checked={shown.email}
             onCheckedChange={switchEmail}
             aria-disabled={inert ? true : undefined}
+            className={gate.online ? undefined : 'cursor-not-allowed opacity-50'}
             aria-describedby={gate.describedBy(failure)}
           />
           <Label htmlFor={NOTIFICATIONS_REMINDERS_EMAIL_SWITCH_ID} className="min-w-0 break-words">
