@@ -76,6 +76,12 @@ if (!/^https?:\/\/[^/]+$/.test(api)) {
   console.error('signup-enumeration: SHIFT_PROBE_API is not a bare http(s) origin');
   process.exit(2);
 }
+// The key, the known addresses and the password grants never travel in clear
+// text off this host (19.2's security review): plain http is for loopback only.
+if (!/^https:\/\//.test(api) && !/^http:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/.test(api)) {
+  console.error('signup-enumeration: SHIFT_PROBE_API must be https unless it is loopback');
+  process.exit(2);
+}
 if (!Number.isInteger(samples) || samples < 1 || !Number.isFinite(timingClass) || timingClass <= 0) {
   console.error('signup-enumeration: SHIFT_PROBE_SAMPLES or SHIFT_PROBE_TIMING_CLASS_MS is not a positive number');
   process.exit(2);
@@ -101,14 +107,23 @@ function bodyOf(route, email) {
 
 async function send(path, body) {
   const started = performance.now();
-  const response = await fetch(`${api}/auth/v1/${path}`, {
-    method: 'POST',
-    headers: { apikey: key, 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-    // A hung request fails the run instead of blocking it.
-    signal: AbortSignal.timeout(20_000),
-  });
-  const text = await response.text();
+  let response;
+  let text;
+  try {
+    response = await fetch(`${api}/auth/v1/${path}`, {
+      method: 'POST',
+      headers: { apikey: key, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+      // A hung request fails the run instead of blocking it.
+      signal: AbortSignal.timeout(20_000),
+    });
+    text = await response.text();
+  } catch (cause) {
+    // A transport failure is not an answer: the run stops and says so, and
+    // never reads as an assertion about the gateway.
+    console.error(`FAIL ${path.split('?')[0]}: transport failure (${cause instanceof Error ? cause.name : 'unknown'}); nothing was measured`);
+    process.exit(1);
+  }
   const ms = performance.now() - started;
   const headers = [...response.headers.entries()]
     .filter(([name]) => !VARYING_HEADERS.has(name.toLowerCase()))
@@ -116,6 +131,16 @@ async function send(path, body) {
     .sort()
     .join('\n');
   return { status: response.status, text, headers, ms };
+}
+
+/** Fisher–Yates: every order of the kinds equally likely. */
+function shuffled(values) {
+  const out = [...values];
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
 }
 
 function median(values) {
@@ -132,7 +157,7 @@ for (const route of ROUTES) {
   // kind happened to go first (review of 19.2).
   const answers = new Map(KINDS.map((kind) => [kind, []]));
   for (let sample = 0; sample < samples; sample += 1) {
-    const order = [...KINDS].sort(() => Math.random() - 0.5);
+    const order = shuffled(KINDS);
     for (const kind of order) {
       const answer = await send(route, bodyOf(route, addressOf(kind)));
       if (answer.status === 429) {
@@ -162,10 +187,20 @@ for (const route of ROUTES) {
 }
 
 // B5 and B8: the password grant.
+// A 429 here is Kong's or GoTrue's sign-in limit, not an answer: two limited
+// kinds would agree and prove nothing, so the run stops (19.2's security review).
+async function grant(body) {
+  const answer = await send('token?grant_type=password', body);
+  if (answer.status === 429) {
+    console.error('signup-enumeration: token answered 429 (the sign-in limit); wait for the window and run again');
+    process.exit(1);
+  }
+  return answer;
+}
 const grants = { unknown: [], wrong: [] };
 for (let sample = 0; sample < samples; sample += 1) {
-  grants.unknown.push(await send('token?grant_type=password', { email: addressOf('new'), password: password() }));
-  grants.wrong.push(await send('token?grant_type=password', { email: known.confirmed, password: password() }));
+  grants.unknown.push(await grant({ email: addressOf('new'), password: password() }));
+  grants.wrong.push(await grant({ email: known.confirmed, password: password() }));
 }
 const codeOf = (answer) => {
   try {

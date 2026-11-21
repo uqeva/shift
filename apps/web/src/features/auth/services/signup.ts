@@ -81,11 +81,18 @@ export const SIGNUP_PASSWORD_TOO_SHORT = 'SIGNUP_PASSWORD_TOO_SHORT';
 export const SIGNUP_PASSWORD_TOO_LONG = 'SIGNUP_PASSWORD_TOO_LONG';
 
 /**
- * GoTrue v2.196.0 refuses a password longer than 72 characters (bcrypt's
- * limit) with a 422. Behind Kong that refusal is masked as `200 {}`, so the
- * page refuses it itself, as it refuses the floor.
+ * GoTrue v2.196.0 refuses a password longer than 72 BYTES of UTF-8 (bcrypt's
+ * limit; Go's `len`) with a 422. Behind Kong that refusal is masked as
+ * `200 {}`, so the page refuses it itself, as it refuses the floor. Bytes, not
+ * characters (security review of 19.2): `č`, `ć`, `đ`, `š` and `ž` are two
+ * each, so forty of them would pass a character count and strand the signup.
  */
 export const PASSWORD_MAX_LENGTH = 72;
+
+/** The password's length as GoTrue and bcrypt count it: UTF-8 bytes. */
+export function passwordBytes(password: string): number {
+  return new TextEncoder().encode(password).length;
+}
 
 export type SignupRefusal =
   | typeof SIGNUP_ADDRESS_INVALID
@@ -94,7 +101,7 @@ export type SignupRefusal =
 
 /** Whether a password fits GoTrue's floor and ceiling. */
 export function passwordFits(password: string): boolean {
-  return password.length >= PASSWORD_MIN_LENGTH && password.length <= PASSWORD_MAX_LENGTH;
+  return password.length >= PASSWORD_MIN_LENGTH && passwordBytes(password) <= PASSWORD_MAX_LENGTH;
 }
 
 /** What `/registracija` refuses on the page, with no request: both at once, address first. */
@@ -103,7 +110,7 @@ export function signupRefusalsOf(email: string, password: string): readonly Sign
 
   if (signupAddressOf(email) === null) refusals.push(SIGNUP_ADDRESS_INVALID);
   if (password.length < PASSWORD_MIN_LENGTH) refusals.push(SIGNUP_PASSWORD_TOO_SHORT);
-  if (password.length > PASSWORD_MAX_LENGTH) refusals.push(SIGNUP_PASSWORD_TOO_LONG);
+  if (passwordBytes(password) > PASSWORD_MAX_LENGTH) refusals.push(SIGNUP_PASSWORD_TOO_LONG);
 
   return refusals;
 }
@@ -220,6 +227,31 @@ export function potvrdaSearchOf(search: Record<string, unknown>): { token_hash?:
   if (typeof search['type'] === 'string') out.type = search['type'];
 
   return out;
+}
+
+/**
+ * `/potvrda`'s address with the token taken out, or `null` when it carries
+ * none (security review of 19.2). The page reads the link once into memory;
+ * the address bar, the history entry (and a synced history) then keep only
+ * `type`, so an unused recovery link cannot be replayed from them. A reload
+ * shows the dead-link page; the mail's link still works.
+ */
+export function addressWithoutToken(pathname: string, search: string): string | null {
+  const parameters = new URLSearchParams(search);
+  if (!parameters.has('token_hash')) return null;
+  parameters.delete('token_hash');
+  const rest = parameters.toString();
+
+  return rest === '' ? pathname : `${pathname}?${rest}`;
+}
+
+/** Takes the token out of the address bar and the current history entry, if it is there. */
+export function forgetLinkInAddress(
+  location: Pick<Location, 'pathname' | 'search'>,
+  history: Pick<History, 'state' | 'replaceState'>,
+): void {
+  const scrubbed = addressWithoutToken(location.pathname, location.search);
+  if (scrubbed !== null) history.replaceState(history.state, '', scrubbed);
 }
 
 /** `/potvrda`'s remount key: a new link, a new screen. */

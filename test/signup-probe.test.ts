@@ -148,4 +148,28 @@ describe('the gateway enumeration probe (story 19.2, B1, B2, B5)', () => {
     expect(missing.code).toBe(2);
     expect(missing.stderr).toContain('SHIFT_PROBE_API is not set');
   });
+
+  it('stops on the sign-in limit, and on a transport failure, rather than counting either as an answer', async () => {
+    const limited = await probe(
+      await gateway((path, body) =>
+        path.startsWith('/auth/v1/token') ? { status: 429, body: '{"message":"API rate limit exceeded"}' } : MASKED(path, body),
+      ),
+    );
+    expect(limited.code).toBe(1);
+    expect(limited.stderr).toContain('token answered 429 (the sign-in limit)');
+
+    // A port nothing listens on: closed at once after it is chosen.
+    const closed = await gateway(MASKED);
+    await new Promise<void>((resolve) => server?.close(() => resolve()));
+    server = undefined;
+    const unreachable = await probe(closed);
+    expect(unreachable.code).toBe(1);
+    expect(unreachable.stderr).toContain('FAIL signup: transport failure');
+  });
+
+  it('refuses plain http to anything but loopback (the key and the grants never travel in clear text)', async () => {
+    const remote = await probe('http://staging.example.com');
+    expect(remote.code).toBe(2);
+    expect(remote.stderr).toContain('SHIFT_PROBE_API must be https unless it is loopback');
+  });
 });

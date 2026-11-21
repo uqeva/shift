@@ -13,7 +13,12 @@ import { Notice } from '@/components/ui/notice';
 import { Rule } from '@/features/auth/components/set-password-form';
 import type { SignupScreenState } from '@/features/auth/hooks/use-signup';
 import { PASSWORD_MIN_LENGTH } from '@/features/auth/services/set-password';
-import { SIGNUP_ADDRESS_INVALID, SIGNUP_PASSWORD_TOO_SHORT, signupRefusalMessageKey } from '@/features/auth/services/signup';
+import {
+  SIGNUP_ADDRESS_INVALID,
+  SIGNUP_PASSWORD_TOO_LONG,
+  SIGNUP_PASSWORD_TOO_SHORT,
+  signupRefusalMessageKey,
+} from '@/features/auth/services/signup';
 import { t } from '@/lib/i18n';
 import { useWriteGate } from '@/lib/offline/use-write-gate';
 
@@ -33,7 +38,7 @@ export function SignupForm({ screen }: { readonly screen: SignupScreenState }): 
   const { emailField, passwordField, emailDefault, typed, passwordShown, refusals, failure, pending } = screen;
   const gate = useWriteGate();
   const addressRefused = refusals.includes(SIGNUP_ADDRESS_INVALID);
-  const passwordRefused = refusals.includes(SIGNUP_PASSWORD_TOO_SHORT);
+  const passwordRefused = refusals.includes(SIGNUP_PASSWORD_TOO_SHORT) || refusals.includes(SIGNUP_PASSWORD_TOO_LONG);
 
   return (
     <form

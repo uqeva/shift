@@ -145,6 +145,11 @@ runs:
           echo "::error title=Refused variable::VITE_SIGNUP_ENABLED is set for production (AD-21)"
           exit 1
         fi
+        # Fail closed (19.2's security review): production's bundle is built
+        # with the switch explicitly off, so no .env file can turn it on.
+        if [ "$ENVIRONMENT" = production ]; then
+          export VITE_SIGNUP_ENABLED=false
+        fi
         pnpm --filter "@shift/web..." build
 
     # AD-17 on the bundle about to ship: no sb_secret_ key, no JWT whose role

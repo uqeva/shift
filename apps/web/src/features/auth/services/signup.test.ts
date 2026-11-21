@@ -9,6 +9,8 @@ import {
   MAIL_THROTTLED,
   MAIL_UNAVAILABLE,
   PASSWORD_MAX_LENGTH,
+  addressWithoutToken,
+  forgetLinkInAddress,
   RECOVERY_NOT_SAVED,
   RECOVERY_PASSWORD_REFUSED,
   RECOVERY_SAVED,
@@ -244,6 +246,10 @@ describe('review of 19.2: the ceiling, a refused password, and the link helpers'
     expect(passwordFits('x'.repeat(73))).toBe(false);
     expect(signupRefusalsOf('ana@example.com', 'x'.repeat(73))).toEqual([SIGNUP_PASSWORD_TOO_LONG]);
     expect(signupRefusalMessageKey(SIGNUP_PASSWORD_TOO_LONG)).toBe('signup.form.error.passwordLong');
+    // GoTrue counts UTF-8 bytes (security review of 19.2): 40 letters `č` are 80.
+    expect(passwordFits('č'.repeat(36))).toBe(true);
+    expect(passwordFits('č'.repeat(37))).toBe(false);
+    expect(signupRefusalsOf('ana@example.com', 'č'.repeat(40))).toEqual([SIGNUP_PASSWORD_TOO_LONG]);
     const auth = mailAuth();
     expect(await requestSignup(auth, 'ana@example.com', 'x'.repeat(73))).toBe(MAIL_UNAVAILABLE);
     expect(auth.signUp).not.toHaveBeenCalled();
@@ -279,5 +285,25 @@ describe('the SPA switch (AD-21)', () => {
   it('opens on exactly true', () => {
     expect(signupEnabledFrom('true')).toBe(true);
     for (const value of [undefined, '', 'false', 'TRUE', '1', 'yes', true]) expect(signupEnabledFrom(value)).toBe(false);
+  });
+});
+
+describe('the token leaves the address once read (security review of 19.2)', () => {
+  it('drops token_hash and keeps type, and leaves an address without a token alone', () => {
+    expect(addressWithoutToken('/potvrda', `?token_hash=${'a'.repeat(56)}&type=recovery`)).toBe('/potvrda?type=recovery');
+    expect(addressWithoutToken('/potvrda', `?token_hash=${'a'.repeat(56)}`)).toBe('/potvrda');
+    expect(addressWithoutToken('/potvrda', '?type=signup')).toBeNull();
+    expect(addressWithoutToken('/potvrda', '')).toBeNull();
+  });
+
+  it('replaces the current entry, keeping its state, only when a token is there', () => {
+    const replaceState = vi.fn();
+    const state = { key: 'router' };
+    forgetLinkInAddress({ pathname: '/potvrda', search: `?token_hash=${'b'.repeat(56)}&type=signup` }, { state, replaceState });
+    expect(replaceState).toHaveBeenCalledWith(state, '', '/potvrda?type=signup');
+
+    replaceState.mockClear();
+    forgetLinkInAddress({ pathname: '/potvrda', search: '?type=signup' }, { state, replaceState });
+    expect(replaceState).not.toHaveBeenCalled();
   });
 });

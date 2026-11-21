@@ -2402,7 +2402,7 @@
       "error": {
         "address": "Upiši ispravnu adresu e-pošte, npr. ime@domena.hr.",
         "password": "Lozinka mora imati najmanje 10 znakova.",
-        "passwordLong": "Lozinka može imati najviše 72 znaka."
+        "passwordLong": "Lozinka je preduga: najviše 72 znaka, a č, ć, đ, š i ž broje se kao dva."
       }
     },
     "error": {
@@ -2475,7 +2475,7 @@
       "pending": "Spremanje…",
       "error": {
         "notSaved": "Lozinka nije spremljena. Pokušaj ponovno.",
-        "refused": "Ta lozinka nije prihvaćena. Upiši drukčiju od dosadašnje, najviše 72 znaka."
+        "refused": "Ta lozinka nije prihvaćena. Upiši drukčiju od dosadašnje, najviše 72 znaka (č, ć, đ, š i ž broje se kao dva)."
       }
     },
     "setup": {

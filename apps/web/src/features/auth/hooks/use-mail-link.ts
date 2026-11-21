@@ -1,5 +1,5 @@
 import { useNavigate } from '@tanstack/react-router';
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { flushSync } from 'react-dom';
 
 import {
@@ -16,6 +16,7 @@ import {
   RECOVERY_PASSWORD_REFUSED,
   RECOVERY_SAVED,
   confirmsSignup,
+  forgetLinkInAddress,
   isRecoveryLink,
   linkFailureMessageKey,
   mailLinkOf,
@@ -40,6 +41,13 @@ import { supabaseClient } from '@/lib/supabase/client';
 export function useMailLink(search: { readonly token_hash?: string | undefined; readonly type?: string | undefined }) {
   const navigate = useNavigate();
   const [link] = useState(() => mailLinkOf(search.token_hash, search.type));
+
+  // The token leaves the address bar and the history entry as soon as it is in
+  // memory (security review of 19.2). Outside the router on purpose: a router
+  // navigation would change the remount key and drop the link just read.
+  useEffect(() => {
+    forgetLinkInAddress(window.location, window.history);
+  }, []);
   const [dead, setDead] = useState(link === null);
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<ReturnType<typeof linkFailureMessageKey> | null>(null);

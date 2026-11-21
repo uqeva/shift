@@ -22,9 +22,12 @@
 -- (deferred-work, OWNER 19.3).
 --
 -- A USERNAME IDENTITY'S RENAME IS UNCHANGED: the trigger reads the member's
--- auth address and refuses only when it is an email identity's (0066's
--- `private.address_kind`). A member with no account, or an account whose
--- address is synthesized or malformed, is let through as before.
+-- auth address and lets it through only when it is synthesized (0066's
+-- `private.address_kind`). FAIL CLOSED (security review of 19.2): an address
+-- the predicate calls malformed, or none at all, is held as an email
+-- identity's, so an account made outside the hook and `admin-auth` can never
+-- be renamed into a synthesized address. No such member exists: every
+-- `admin-auth` account is synthesized, and the hook refuses a malformed one.
 
 create function private.email_identity_username(address text) returns text
 language sql
@@ -54,7 +57,9 @@ revoke execute on function private.email_identity_username(text) from service_ro
 -- new value other than the derived one"). `admin-auth`'s rename writes the row
 -- first and then ALWAYS rewrites the auth address to the synthesized one, so a
 -- rename to the derived value itself would have passed the row and still
--- turned the account into a username identity. So, for an email identity:
+-- turned the account into a username identity. So, for any account whose
+-- address is not synthesized (an email identity, or fail-closed, a malformed
+-- or missing address):
 -- - an UPDATE that names `username` or `auth_user_id` is refused, whatever
 --   the value (the address can then never be rewritten by `admin-auth`, and a
 --   row can neither be re-pointed to nor away from an email identity);
@@ -74,7 +79,7 @@ begin
   end if;
 
   if tg_op = 'INSERT' then
-    if private.address_kind(address) = 'email'
+    if private.address_kind(address) <> 'synthesized'
        and new.username is distinct from private.email_identity_username(address) then
       raise exception using errcode = '23514', message = 'SIGN_IN_IS_EMAIL';
     end if;
@@ -85,7 +90,7 @@ begin
     select u.email into previous from auth.users u where u.id = old.auth_user_id;
   end if;
 
-  if private.address_kind(address) = 'email' or private.address_kind(previous) = 'email' then
+  if private.address_kind(address) <> 'synthesized' or private.address_kind(previous) <> 'synthesized' then
     raise exception using errcode = '23514', message = 'SIGN_IN_IS_EMAIL';
   end if;
 

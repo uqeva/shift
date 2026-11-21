@@ -2803,9 +2803,10 @@ answers an unknown address and a wrong password alike; it reports the grant's
 timing difference for the founder (B8). It prints no address. Never run it
 against the CLI's Kong. It leaves one unconfirmed account per sample (each
 counts against `accounts_per_day`) and sends real mail; afterwards, over the
-tailnet, `delete from auth.users where email like 'probe-%' and email_confirmed_at is null
-and not exists (select 1 from public.members m where m.auth_user_id = auth.users.id);`
-removes them.
+tailnet, `delete from auth.users where email like 'probe-%@' || '<SHIFT_PROBE_NEW_DOMAIN>'
+and email_confirmed_at is null and not exists (select 1 from public.members m where
+m.auth_user_id = auth.users.id);`, with the run's own domain written in, removes
+them and no stranger's pending signup.
 
 **A dump carries the switch.** A staging dump holds
 `signup_settings.open = true`. Production restores only from production's own

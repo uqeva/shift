@@ -82,19 +82,28 @@ test('a valid signup lands on the one neutral screen, with the resend throttled'
 });
 
 test('Potvrda sends nothing on load, and a dead link names no address', async ({ page, loginPage }) => {
-  let verified = 0;
-  await page.route('**/auth/v1/verify', async (route) => {
-    verified += 1;
+  // Every verify, with or without a query (a GET `…/verify?token=…` too), and
+  // how it was sent. A preflight is not a verify.
+  const verifies: { method: string; body: string }[] = [];
+  await page.route(/\/auth\/v1\/verify(\?|$)/, async (route) => {
+    const request = route.request();
+    if (request.method() !== 'OPTIONS') verifies.push({ method: request.method(), body: request.postData() ?? '' });
     await route.continue();
   });
 
-  await page.goto(`/potvrda?token_hash=${'0'.repeat(56)}&type=signup`);
+  const tokenHash = '0'.repeat(56);
+  await page.goto(`/potvrda?token_hash=${tokenHash}&type=signup`);
   await expect(loginPage.confirmButton).toBeVisible();
-  expect(verified, 'the page verified on load').toBe(0);
+  await page.waitForLoadState('networkidle');
+  expect(verifies, 'the page verified on load').toEqual([]);
+  // The token left the address bar and the history entry once read (security review of 19.2).
+  expect(page.url()).not.toContain('token_hash');
 
   await loginPage.confirmButton.click();
   await expect(loginPage.heading(hr.signup.dead.heading)).toBeVisible();
-  expect(verified).toBe(1);
+  expect(verifies).toHaveLength(1);
+  expect(verifies[0]?.method).toBe('POST');
+  expect(verifies[0]?.body).toContain(tokenHash);
 
   await page.goto('/potvrda');
   await expect(loginPage.heading(hr.signup.dead.heading)).toBeVisible();

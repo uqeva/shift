@@ -1044,6 +1044,11 @@ describe('the pipeline deploys through Coolify (story 20.6)', () => {
     expect(action).toMatch(
       /if \[ "\$ENVIRONMENT" = production \] && \[ -n "\$VITE_SIGNUP_ENABLED" \] && \[ "\$VITE_SIGNUP_ENABLED" != false \]; then\s+echo "::error title=Refused variable::VITE_SIGNUP_ENABLED is set for production \(AD-21\)"\s+exit 1/,
     );
+    // 19.2's security review: production builds with the switch forced off,
+    // before the build, so no .env file under apps/web can turn it on.
+    expect(action).toMatch(
+      /if \[ "\$ENVIRONMENT" = production \]; then\s+export VITE_SIGNUP_ENABLED=false\s+fi\s+pnpm --filter "@shift\/web\.\.\." build/,
+    );
   });
 
   it('reads no hosted-platform credential and no runtime secret from GitHub (AD-17 as amended)', () => {

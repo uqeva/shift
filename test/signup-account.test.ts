@@ -130,7 +130,7 @@ describe('a stranger creates an account through the hook (story 19.2, live probe
     } finally {
       await client.end();
     }
-  });
+  }, 30_000);
 
   it.skipIf(noAdminApi)('refuses a mixed-case .shift.invalid address with SIGNUP_REFUSED, and creates nothing', async () => {
     const address = `ana-${randomUUID()}@DVD.Shift.Invalid`;
@@ -143,7 +143,7 @@ describe('a stranger creates an account through the hook (story 19.2, live probe
     } finally {
       await removeAccounts(address);
     }
-  });
+  }, 30_000);
 
   it.skipIf(noAdminApi)(
     'creates an unconfirmed claimless account, mails a Croatian /potvrda link, and confirms only on its POST',
@@ -214,6 +214,9 @@ describe('a stranger creates an account through the hook (story 19.2, live probe
         await removeAccounts(address);
       }
     },
+    // Six GoTrue round trips, the mail catcher's poll and the token warm-up:
+    // the live siblings' budget (claimless-account.test.ts), not vitest's 5 s.
+    60_000,
   );
 });
 
@@ -364,6 +367,48 @@ describe("an email identity's username follows its address (story 19.2, 0068, C2
       expect(
         await refusal(client, 'update public.members set username = $2 where id = $1', [bystander, `${PILOT.bystander}.2`]),
       ).toBeNull();
+      // A policy's silent refusal also raises nothing: read the rename back.
+      const renamed = await client.query<{ username: string }>('select username from public.members where id = $1', [bystander]);
+      expect(renamed.rows[0]?.username).toBe(`${PILOT.bystander}.2`);
+    });
+  });
+
+  it.skipIf(noDatabase)('refuses re-pointing a row to an email identity, or away from one, even as the owner', async () => {
+    // Security review of 19.2: the `auth_user_id` half of the trigger's column list.
+    await inRolledBackTransaction(async (client) => {
+      const organization = await organizationId(client, PILOT.slug);
+      const { member } = await emailIdentityMember(client, organization);
+      const account = async (address: string): Promise<string> => {
+        const id = randomUUID();
+        await client.query(
+          `insert into auth.users (
+             instance_id, id, aud, role, email, email_confirmed_at,
+             raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+             confirmation_token, recovery_token, email_change, email_change_token_new
+           ) values (
+             '00000000-0000-0000-0000-000000000000', $1, 'authenticated', 'authenticated', $2, now(),
+             '{}'::jsonb, '{}'::jsonb, now(), now(), '', '', '', ''
+           )`,
+          [id, address.replace('<id>', id)],
+        );
+        return id;
+      };
+      const { rows } = await client.query<{ id: string }>(
+        'select id from public.members where organization_id = $1 and username = $2',
+        [organization, PILOT.bystander],
+      );
+      const bystander = rows[0]?.id ?? '';
+      const claimlessEmail = await account('stranger.<id>@example.com');
+      const freshSynthesized = await account(`moved.<id>@${PILOT.slug}.shift.invalid`);
+
+      // A username identity's row onto a stranger's email account.
+      expect(
+        await refusal(client, 'update public.members set auth_user_id = $2::uuid where id = $1', [bystander, claimlessEmail]),
+      ).toEqual({ code: '23514', message: 'SIGN_IN_IS_EMAIL' });
+      // An email identity's row onto a synthesized account.
+      expect(
+        await refusal(client, 'update public.members set auth_user_id = $2::uuid where id = $1', [member, freshSynthesized]),
+      ).toEqual({ code: '23514', message: 'SIGN_IN_IS_EMAIL' });
     });
   });
 });
