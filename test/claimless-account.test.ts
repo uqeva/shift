@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,6 +19,11 @@ import {
   type PostgrestAnswer,
   type PrivilegedAccounts,
 } from '../supabase/functions/admin-auth/operations.ts';
+import {
+  FEED_NOT_FOUND,
+  createHandler as createFeedHandler,
+  readConfiguration as readFeedConfiguration,
+} from '../supabase/functions/calendar-feed/handler.ts';
 import { INVOKE_SECRET_REFUSED, readConfiguration as readNotifyConfiguration } from '../supabase/functions/notify/handler.ts';
 import { createHandler as createNotifyHandler } from '../supabase/functions/notify/run.ts';
 
@@ -772,6 +777,31 @@ describe('a claimless session at the API (story 19.1, AD-10, AD-16)', () => {
             [session.id, MUST_SET_PASSWORD],
           );
           expect(rows).toEqual([{ flag: false }]);
+        },
+        'calendar-feed': async () => {
+          // Story 16.4: public and keyless. A claimless session's bearer opens nothing: an unknown
+          // token, sent with that bearer, gets the one identical miss, over the real lookup.
+          const endpoint = apiEndpoint;
+          if (endpoint === undefined) throw new Error('unreachable: gated by skipIf');
+          const handle = createFeedHandler(
+            readFeedConfiguration((name) => ({ SUPABASE_URL: endpoint.url, SHIFT_PUBLISHABLE_KEY: endpoint.key })[name]),
+            {
+              fetch: (url, init) => fetch(url, init),
+              now: () => Date.now(),
+              sleep: (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
+              digest: (data) => crypto.subtle.digest('SHA-256', data),
+              log: () => undefined,
+              timeout: (milliseconds) => AbortSignal.timeout(milliseconds),
+            },
+          );
+          const token = `${randomBytes(32).toString('base64url').slice(0, 42)}A`;
+          const response = await handle(
+            new Request(`http://localhost/functions/v1/calendar-feed/${token}.ics`, {
+              headers: { Authorization: `Bearer ${session.token}` },
+            }),
+          );
+          expect(response.status).toBe(404);
+          expect(await response.json()).toMatchObject({ code: FEED_NOT_FOUND });
         },
         notify: async () => {
           // The session's own token is no invoke secret: refused before any client exists.
