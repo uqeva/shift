@@ -3,7 +3,9 @@
  * everything a server projection computes, over the parity fixture, for
  * both fixtures — R12 for every member over the parity window, the month
  * schedule and every member's hours of every month of that window, `zone.ts`'s
- * conversions and transitions, and a WebCrypto SHA-256 of the token vector.
+ * conversions and transitions, every reminder lead's due instant on the
+ * transition dates and the reminders due around them (story 17.2), and a
+ * WebCrypto SHA-256 of the token vector.
  *
  * The same probe runs twice and the two answers must be byte-identical:
  * `test/runtime-parity.test.ts` runs it under Node over the built `dist`, and
@@ -35,6 +37,22 @@ function hexOf(buffer: ArrayBuffer): string {
 
 /** Local minutes probed on each transition date: midnight, the gap and the overlap, and a night shift's end. */
 const PROBED_MINUTES = [0, 59, 60, 119, 120, 150, 179, 180, 1439, 1440 + 420];
+
+/** The four transition dates of Europe/Zagreb in 2026 and 2027. */
+const TRANSITION_DATES = ['2026-03-29', '2026-10-25', '2027-03-28', '2027-10-31'];
+
+/** Worked start minutes probed for every lead: midnight, the gap, the morning, the evening, and a night's second half. */
+const REMINDER_MINUTES = [0, 120, 150, 180, 360, 420, 1140, 1320, 1500];
+
+/** The clocks the selection is probed at (UTC date and minute), each with its window, the date either side. */
+const REMINDER_CLOCKS = [
+  { date: '2026-03-29', utcMinute: 120, from: '2026-03-28', to: '2026-03-30' },
+  { date: '2026-03-28', utcMinute: 1140, from: '2026-03-27', to: '2026-03-29' },
+  { date: '2026-10-25', utcMinute: 180, from: '2026-10-24', to: '2026-10-26' },
+  { date: '2026-10-25', utcMinute: 1020, from: '2026-10-24', to: '2026-10-26' },
+  { date: '2027-03-27', utcMinute: 1140, from: '2027-03-26', to: '2027-03-28' },
+  { date: '2027-10-31', utcMinute: 0, from: '2027-10-30', to: '2027-11-01' },
+];
 
 /**
  * The probe's JSON, as one string. Throws whatever the domain throws: a
@@ -109,7 +127,40 @@ export async function runtimeParityProbe(
     };
   });
 
+  // Story 17.2 (AD-6): every lead's due instant on both transition dates of
+  // both years, and the reminders due around them for every member of both
+  // fixtures, at six clocks on or the day before each of the four transitions.
+  const reminders = {
+    dueAt: ['Europe/Zagreb', 'Australia/Sydney', 'UTC'].map((zone) => ({
+      zone,
+      dates: TRANSITION_DATES.map((date) => ({
+        date,
+        minutes: REMINDER_MINUTES.map((minute) => ({
+          minute,
+          leads: domain.REMINDER_LEADS.map((lead) => {
+            const instant = domain.reminderDueAt(lead, date, minute, zone);
+            return { lead, instant, iso: domain.utcIsoOf(instant) };
+          }),
+        })),
+      })),
+    })),
+    due: PARITY_FIXTURES.map(({ fixture, organization }) => ({
+      fixture,
+      clocks: REMINDER_CLOCKS.map(({ date, utcMinute, from, to }) => {
+        // The clock as an instant through the domain itself: UTC has no transition.
+        const now = domain.instantOf(date, utcMinute, 'UTC');
+        return {
+          iso: domain.utcIsoOf(now),
+          members: organization.members.map((member) => ({
+            memberId: member.id,
+            reminders: domain.shiftRemindersDueOf(inputsOf(organization, member.id), domain.REMINDER_LEADS, { from, to }, now),
+          })),
+        };
+      }),
+    })),
+  };
+
   const tokenHash = hexOf(await subtle.digest('SHA-256', new TextEncoder().encode(PARITY_VECTOR)));
 
-  return JSON.stringify({ organizations, zones, token: { vector: PARITY_VECTOR, sha256: tokenHash } });
+  return JSON.stringify({ organizations, zones, reminders, token: { vector: PARITY_VECTOR, sha256: tokenHash } });
 }

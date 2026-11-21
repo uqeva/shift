@@ -5,6 +5,7 @@ import {
   checkTimeZone,
   instantOf,
   offsetMinutesAt,
+  reminderDueAt,
   utcIsoOf,
   zoneTransitionsOf,
 } from '../src/index.js';
@@ -128,5 +129,49 @@ describe('utcIsoOf', () => {
     expect(utcIsoOf(0)).toBe('1970-01-01T00:00:00Z');
     expect(utcIsoOf(Date.UTC(2026, 10, 21, 9, 5, 7, 999))).toBe('2026-11-21T09:05:07Z');
     expect(utcIsoOf(-1000)).toBe('1969-12-31T23:59:59Z');
+  });
+});
+
+describe('reminderDueAt (story 17.2)', () => {
+  const due = (lead: Parameters<typeof reminderDueAt>[0], date: string, minute: number, zone = ZAGREB): string =>
+    utcIsoOf(reminderDueAt(lead, date, minute, zone));
+
+  it('counts an hours lead back from the real start instant, winter and summer', () => {
+    expect(due('H2', '2026-01-15', 7 * 60)).toBe('2026-01-15T04:00:00Z');
+    expect(due('H1', '2026-07-15', 7 * 60)).toBe('2026-07-15T04:00:00Z');
+    expect(due('H12', '2026-01-15', 7 * 60)).toBe('2026-01-14T18:00:00Z');
+  });
+
+  it('counts real hours across both transitions of 2026 and 2027', () => {
+    // 07:00 CEST on the spring date is 05:00Z: three real hours before is 02:00Z.
+    expect(due('H3', '2026-03-29', 7 * 60)).toBe('2026-03-29T02:00:00Z');
+    expect(due('H3', '2026-10-25', 7 * 60)).toBe('2026-10-25T03:00:00Z');
+    // Six real hours before 07:00 reads 00:00 local in spring and 02:00 (CEST) in autumn, not 01:00.
+    expect(due('H6', '2026-03-29', 7 * 60)).toBe('2026-03-28T23:00:00Z');
+    expect(due('H6', '2026-10-25', 7 * 60)).toBe('2026-10-25T00:00:00Z');
+    expect(due('H6', '2027-03-28', 7 * 60)).toBe('2027-03-27T23:00:00Z');
+    expect(due('H6', '2027-10-31', 7 * 60)).toBe('2027-10-31T00:00:00Z');
+  });
+
+  it('is 20:00 local on the day before for the evening lead, whatever the start', () => {
+    expect(due('EVENING_BEFORE', '2026-03-29', 7 * 60)).toBe('2026-03-28T19:00:00Z');
+    expect(due('EVENING_BEFORE', '2026-03-30', 7 * 60)).toBe('2026-03-29T18:00:00Z');
+    expect(due('EVENING_BEFORE', '2026-10-26', 19 * 60)).toBe('2026-10-25T19:00:00Z');
+    expect(due('EVENING_BEFORE', '2026-01-01', 0)).toBe('2025-12-31T19:00:00Z');
+    // A night's worked second half (from 01:00 the next day) still belongs to its start date.
+    expect(due('EVENING_BEFORE', '2026-01-01', 1500)).toBe('2025-12-31T19:00:00Z');
+  });
+
+  it("counts from a night's worked second half after midnight", () => {
+    // Minute 1500 of 2026-01-01 is 01:00 local on 2026-01-02, 00:00Z.
+    expect(due('H1', '2026-01-01', 1500)).toBe('2026-01-01T23:00:00Z');
+  });
+
+  it("refuses what is not a lead, and instantOf's preconditions", () => {
+    expect(() => reminderDueAt('H4' as never, '2026-01-01', 420, ZAGREB)).toThrow(RangeError);
+    expect(() => reminderDueAt('H1', '2026-02-30', 420, ZAGREB)).toThrow(RangeError);
+    expect(() => reminderDueAt('H1', '2026-01-01', 2880, ZAGREB)).toThrow(RangeError);
+    expect(() => reminderDueAt('EVENING_BEFORE', '2026-01-01', -1, ZAGREB)).toThrow(RangeError);
+    expect(() => reminderDueAt('H1', '2026-01-01', 420, 'Mars/Olympus')).toThrow(RangeError);
   });
 });

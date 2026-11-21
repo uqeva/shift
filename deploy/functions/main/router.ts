@@ -75,6 +75,15 @@ export const FUNCTIONS: ReadonlyMap<string, FunctionEntry> = new Map([
       environment: ['SUPABASE_URL', 'SHIFT_PUBLISHABLE_KEY'],
     },
   ],
+  [
+    // Story 17.2 (AD-14, AD-17): the cron job's invoke secret is its bearer;
+    // the secret key for its two `service_role` RPCs, and nothing else.
+    'remind',
+    {
+      verifyJwt: false,
+      environment: ['SUPABASE_URL', 'SHIFT_SECRET_KEY', 'REMIND_INVOKE_SECRET'],
+    },
+  ],
 ]);
 
 /** No such function: any name not in `FUNCTIONS`. */

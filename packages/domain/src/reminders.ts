@@ -13,6 +13,14 @@
  * means reminders are off: there is no separate flag.
  *
  * Codes only (AD-8): the label of each lead is the web app's copy.
+ *
+ * Story 17.2: what each lead MEANS is here too, as numbers, so `zone.ts`'s
+ * `reminderDueAt` reads it without a cycle (this module imports nothing):
+ * an `H<n>` lead is {@link REMINDER_LEAD_HOURS} real hours before the
+ * shift's real start instant, and `EVENING_BEFORE` is
+ * {@link EVENING_BEFORE_MINUTE} local on the day before the shift's date.
+ * `enqueue_shift_reminders` (0070) derives `leadHours` as
+ * `substr(lead, 2)::integer`, pinned equal to this map by a root test.
  */
 
 /** Every reminder lead, in canonical order: shortest first, the evening last. */
@@ -40,3 +48,18 @@ export function reminderLeadsOf(value: unknown): readonly ReminderLead[] | null 
   const leads = REMINDER_LEADS.filter((lead) => items.includes(lead));
   return leads.length > MAX_REMINDER_LEADS ? null : leads;
 }
+
+/** The leads counted in real hours before the shift's start instant. */
+export type ReminderHoursLead = Exclude<ReminderLead, 'EVENING_BEFORE'>;
+
+/** How many real hours before the shift's real start instant each `H<n>` lead falls due. */
+export const REMINDER_LEAD_HOURS: Readonly<Record<ReminderHoursLead, number>> = {
+  H1: 1,
+  H2: 2,
+  H3: 3,
+  H6: 6,
+  H12: 12,
+};
+
+/** The local minute `EVENING_BEFORE` falls due at, on the day before the shift's date: 20:00. */
+export const EVENING_BEFORE_MINUTE = 20 * 60;

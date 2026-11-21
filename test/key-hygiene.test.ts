@@ -16,7 +16,7 @@ import {
 
 /**
  * AD-17 — the secret key exists only in the Edge Functions' per-environment
- * env (admin-auth, and notify for its two RPCs).
+ * env (admin-auth, notify for its RPCs, and from story 17.2 remind for its two).
  *
  * Two different fears, so two different scans:
  *
@@ -347,6 +347,49 @@ describe('calendar-feed holds no secret (story 16.4)', () => {
     const reads = [...handler.matchAll(/\bread\('([A-Z][A-Z0-9_]*)'\)/g)].map((match) => match[1]);
     expect(reads.sort()).toEqual(['SHIFT_PUBLISHABLE_KEY', 'SUPABASE_URL']);
     expect(readFileSync(join(directory, 'index.ts'), 'utf8')).not.toMatch(/env\.toObject|env\.get\('/);
+  });
+});
+
+/**
+ * AD-17, amended by story 17.2: the secret key is named by exactly three
+ * functions, `admin-auth`, `notify` and `remind`. `remind` holds it for its two
+ * `service_role` RPCs only, beside the gateway's address and its own invoke
+ * secret: no Resend, VAPID or publishable key, and not notify's invoke secret.
+ */
+describe('the secret key is three functions’ (story 17.2)', () => {
+  const functionsRoot = join(repoRoot, 'supabase', 'functions');
+  const remind = join(functionsRoot, 'remind');
+
+  it('is named in code by admin-auth, notify and remind alone', () => {
+    const readers = collectFiles(functionsRoot, byExtension('.ts')).filter(namesTheSecret);
+    const owners = new Set(readers.map((file) => relative(functionsRoot, file).split(/[\\/]/)[0]));
+    expect([...owners].sort()).toEqual(['admin-auth', 'notify', 'remind']);
+  });
+
+  it('names no Resend, VAPID or publishable key, nor notify’s invoke secret, anywhere in remind’s directory', () => {
+    const files = collectFiles(remind, () => true);
+    expect(files.length, 'remind has no files').toBeGreaterThan(2);
+    for (const file of files) {
+      // Comment-blind, as a key value would be.
+      expect(readFileSync(file, 'utf8'), relative(repoRoot, file)).not.toMatch(
+        /RESEND_API_KEY|VAPID_|SHIFT_PUBLISHABLE_KEY|sb_publishable_|NOTIFY_INVOKE_SECRET|SERVICE_ROLE/,
+      );
+    }
+  });
+
+  it('gives its worker exactly three variables, read by its handler alone', () => {
+    const handler = readFileSync(join(remind, 'handler.ts'), 'utf8');
+    const reads = [...handler.matchAll(/\bread\('([A-Z][A-Z0-9_]*)'\)/g)].map((match) => match[1]);
+    expect(reads.sort()).toEqual(['REMIND_INVOKE_SECRET', 'SHIFT_SECRET_KEY', 'SUPABASE_URL']);
+    expect(readFileSync(join(remind, 'index.ts'), 'utf8')).not.toMatch(/env\.toObject|env\.get\('/);
+  });
+
+  it('keeps its invoke secret out of every migration: the cron job reads it from Vault by name', () => {
+    const migration = join(repoRoot, 'supabase', 'migrations', '0070_shift_reminders.sql');
+    const code = stripComments(migration, readFileSync(migration, 'utf8'));
+    expect(code).toContain("s.name = 'remind_url'");
+    expect(code).toContain("s.name = 'remind_invoke_secret'");
+    expect(code).not.toMatch(/vault\.(create|update)_secret/);
   });
 });
 

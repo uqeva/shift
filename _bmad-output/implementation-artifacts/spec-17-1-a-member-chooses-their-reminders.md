@@ -2,14 +2,14 @@
 title: "17.1 A member chooses their reminders"
 type: 'feature'
 created: '2026-11-21'
-status: 'in-review'
+status: 'done'
 baseline_commit: '83804393643bf966769d014f75be7f5b9190c459'
 review_loop_iteration: 2
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-17-context.md'
 ---
 
-Status: review (built, reviews 1 and 2's patches applied, CI pending). DONE MEANS MERGED WITH GREEN CI: the frontmatter stays `in-review` and the sprint status `review` until the PR merges green. ~2.1k tokens, kept whole: one user goal across layers. Approved unattended under the founder's standing instruction (decide and record, no questions). Baseline: `main` at #345 (16.5), which touched `hr.json` and the structural pins; nothing else that changes them runs beside it. Migration `0069`. Residual risks: the DB suites (`test/reminder-settings.test.ts`, the edited `provisioning` and `rls-isolation` cases, the claimless sweep over `0069`) and both e2e specs have never run (CI is their first run); the card's phone and desktop layout was looked at in headless Chromium in review 2 (fixture states, not the live screen).
+Status: done. Merged as #347 (squash `e82bb39`, 2026-11-21) with `CI passed` green in run 44947329555 (head `9b910dd`); the earlier run 44946444733 on `787e39e` was cancelled by the push of review 2's patches, not failed, and no commit was pushed only for CI. Residual risks, rewritten from CI: the DB suites (`test/reminder-settings.test.ts`, the edited `provisioning` and `rls-isolation` cases, `claimless-account` over the new table and RPC) ran first in that run's `Test (Vitest, local Supabase)` job and passed; the e2e spec `e2e/tests/notifications/reminders.spec.ts` ran first in its four E2E shards and passed. ~2.1k tokens, kept whole: one user goal across layers. Approved unattended under the founder's standing instruction (decide and record, no questions). Baseline: `main` at #345 (16.5). Migration `0069`.
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 
@@ -99,12 +99,12 @@ None.
 
 **Manual checks:**
 - Render the card's states (phone and desktop) and look.
-- DB suites (`reminder-settings`, `provisioning`, `rls-isolation`, `claimless-account`) and e2e are unrun here: CI is their first run, on its fresh stack with `0069`.
+- DB suites (`reminder-settings`, `provisioning`, `rls-isolation`, `claimless-account`) and e2e were unrun here; CI ran them first, on its fresh stack with `0069`, and they passed (run 44947329555).
 
 **Results (implementation and review 1, 2026-11-21).**
 - `pnpm typecheck`, `pnpm lint`, `pnpm build`: clean. `pnpm --filter @shift/domain test`: 21 files, 958 passed. `pnpm --filter ./apps/web test`: 183 files, 6830 passed. The eight allowed DB-free root files (after the build): 3002 passed (2999 before review 1; the three new `reminders` keys). Re-run after review 1's patches; the static render below predates them.
 - **Rendered, not looked at.** No headless browser runs on this machine (Playwright's Chromium lacks `libatk-1.0`; no system browser, and Docker is off limits), so no screenshot was taken. The card was rendered instead to static markup with the real `hr.json`, through an uncommitted harness (deleted), in nine states: never opened, two on with the status line, one on with no channel, both channels, email on but no address, a failed save, a write in flight, loading, unavailable. Seen: six switches in lead order and the email switch, each labelled by its `Label`; with two on the other four `aria-disabled="true"` and described by the limit line; in flight every switch `aria-disabled`, the email one `aria-busy`; the failure notice named by every switch; the channel line and the no-address reason worded as `hr.json` has them; no `⟦key⟧`. Phone and desktop layout (no horizontal scroll, 44 px rows) is UNVERIFIED by eye: the rows are `min-h-11` flex rows with `min-w-0` and `break-words` labels, as 13.5's switch rows are.
-- **Unrun, by the STRICT DATABASE RULE:** `test/reminder-settings.test.ts` (new), the changed cases of `test/provisioning.test.ts` and `test/rls-isolation.test.ts`, `test/claimless-account.test.ts` over the new table and RPC (by reasoning: a claimless caller reads zero rows, its insert and delete are 42501, its update matches nothing, and `reminder_channels()` raises 42501 `REMINDER_SETTINGS_REFUSED`), and the e2e spec `e2e/tests/notifications/reminders.spec.ts` (new). CI is their first run.
+- **Unrun, by the STRICT DATABASE RULE:** `test/reminder-settings.test.ts` (new), the changed cases of `test/provisioning.test.ts` and `test/rls-isolation.test.ts`, `test/claimless-account.test.ts` over the new table and RPC (by reasoning: a claimless caller reads zero rows, its insert and delete are 42501, its update matches nothing, and `reminder_channels()` raises 42501 `REMINDER_SETTINGS_REFUSED`), and the e2e spec `e2e/tests/notifications/reminders.spec.ts` (new). CI was their first run, and they passed (run 44947329555, before the merge as #347).
 - **e2e lock.** `settings.spec.ts` and `reminders.spec.ts` set the same member's address, email row and devices, and run in parallel workers, so both now hold `holdNotificationSettings(slug)` (the bounded advisory lock 16.5's feed specs use) for every case.
 
 ## Spec Change Log
@@ -125,7 +125,7 @@ None.
 **Results (review 2, 2026-11-21).**
 - `pnpm typecheck`, `pnpm lint`, `pnpm build`: clean. `pnpm --filter @shift/domain test`: 958 passed. `pnpm --filter ./apps/web test`: 183 files, 6830 passed (two assertions added inside an existing case). The eight allowed DB-free root files after the build: 3002 passed.
 - **Looked at in a browser.** Playwright's bundled headless Chromium ran with `LD_LIBRARY_PATH` pointing at libraries extracted to the scratchpad (no install, no Docker). A DB-free Vite harness (scratchpad, not committed) rendered the real `ReminderSettingsCard` with the real `index.css` and `hr.json`, in seven states: never opened; two on, both channels, saved; one on, no channel, email switch on, no address; one on, push only, failed save; a write in flight; loading; unavailable. It ran at 390 px and 1280 px, and each card was screenshotted and looked at. There is no horizontal scroll (`scrollWidth` equals `clientWidth` at both widths), every switch row is 44 px, labels and lines wrap inside the card, and the notices sit under the lines. One defect was seen and patched: a held switch looked exactly like an available off switch (only `disabled:` is styled), so held and offline switches now draw at half opacity with `cursor-not-allowed`. A write in flight does not dim them, so the rows do not flash on each press.
-- **Still unrun, by the STRICT DATABASE RULE:** the DB suites and both e2e specs. Review 2's Unrun DB Test Auditor found nothing in them that would fail on a first run, apart from the e2e press on a held switch, patched below.
+- **Unrun here, by the STRICT DATABASE RULE:** the DB suites and both e2e specs. Review 2's Unrun DB Test Auditor found nothing in them that would fail on a first run, apart from the e2e press on a held switch, patched below. CI then ran them all, green (run 44947329555).
 
 ## Review Findings (review 2, 2026-11-21)
 

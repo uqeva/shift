@@ -667,7 +667,7 @@ describe('the self-hosted stack (story 20.1): keys and secrets (AD-17)', () => {
 
   it('gives the functions every variable their configuration reads, from the right source', () => {
     // The names `readConfiguration` reads in every handler
-    // (`supabase/functions/{admin-auth,notify,calendar-feed}/handler.ts`), and
+    // (`supabase/functions/{admin-auth,notify,calendar-feed,remind}/handler.ts`), and
     // where each comes from on this stack.
     const functions = environment('supabase-edge-functions');
     const expected: Readonly<Record<string, RegExp>> = {
@@ -680,6 +680,8 @@ describe('the self-hosted stack (story 20.1): keys and secrets (AD-17)', () => {
       SHIFT_APP_URL: /^\$\{SHIFT_APP_URL:\?\}$/,
       // 64 generated alphanumerics: `notify`'s /^[A-Za-z0-9_-]{32,}$/.
       NOTIFY_INVOKE_SECRET: /^\$\{SERVICE_PASSWORD_64_[A-Z]+\}$/,
+      // Story 17.2: `remind`'s own, on the same terms, and not notify's.
+      REMIND_INVOKE_SECRET: /^\$\{SERVICE_PASSWORD_64_REMINDINVOKE\}$/,
       NOTIFY_EMAIL_FROM: /^\$\{NOTIFY_EMAIL_FROM:\?\}$/,
       RESEND_API_KEY: /^\$\{RESEND_API_KEY:\?\}$/,
       VAPID_PUBLIC_KEY: /^\$\{VAPID_PUBLIC_KEY:\?\}$/,
@@ -693,11 +695,12 @@ describe('the self-hosted stack (story 20.1): keys and secrets (AD-17)', () => {
     // And the handlers still read exactly these names, so a rename on either
     // side fails here.
     const read = new Set<string>();
-    for (const handler of ['admin-auth', 'notify', 'calendar-feed']) {
+    for (const handler of ['admin-auth', 'notify', 'calendar-feed', 'remind']) {
       const text = readFileSync(join(repoRoot, 'supabase', 'functions', handler, 'handler.ts'), 'utf8');
       for (const match of text.matchAll(/\b(?:read|getEnv)\('([A-Z][A-Z0-9_]*)'\)/g)) read.add(match[1] ?? '');
     }
     expect(read.size, 'the handlers read no variable').toBeGreaterThan(10);
+    expect(functions.get('REMIND_INVOKE_SECRET'), 'remind shares notify\'s invoke secret').not.toBe(functions.get('NOTIFY_INVOKE_SECRET'));
     for (const name of read) expect(Object.keys(expected), `${name} is read but not supplied`).toContain(name);
   });
 

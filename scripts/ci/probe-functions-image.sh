@@ -19,6 +19,12 @@
 # unknown token with the 404 (AD-14's probe), and the vector with a calendar
 # the bundled `@shift/domain` and `@shift/ics` wrote from the runtime's Intl.
 #
+# Story 17.2: the stand-in also answers `reminder_inputs`, sent by POST with
+# the secret key, with the database's clock and one member whose assembly has
+# no shift, so `remind` with its own invoke secret runs the bundled domain and
+# answers 200 `REMIND_RAN` with nothing due (no write). Without the secret, or
+# with notify's, it refuses 401 before any call.
+#
 # CI only (job `functions-image`). Never run it against a shared machine's
 # Docker: it starts containers.
 set -euo pipefail
@@ -35,6 +41,7 @@ repeat() { printf "%${2}s" '' | tr ' ' "$1"; }
 secret_key="sb_secret_$(repeat x 40)"
 publishable_key="sb_publishable_$(repeat y 40)"
 invoke_secret="$(repeat i 64)"
+remind_secret="$(repeat r 64)"
 # AD-19's pinned token vector (packages/domain/parity/fixtures.ts) and its
 # SHA-256, which the SQL suite pins too; and a canonical token no row holds.
 feed_vector='shift-parity-vector_0123456789abcdefghijklA'
@@ -43,6 +50,9 @@ feed_unknown="$(repeat x 42)A"
 # One member on no team, over a window holding the spring transition of 2027:
 # a calendar with its VTIMEZONE and no event.
 feed_hit='{"window":{"from":"2026-11-01","to":"2027-05-31"},"inputs":{"organizationId":"o","timeZone":"Europe/Zagreb","memberId":"m","teams":[],"shiftTypes":[],"steps":[],"assignments":[],"assignmentStamps":[],"members":[{"id":"m","memberships":[],"statuses":[],"loans":[]}],"overrides":[],"rosterOverrides":[],"leave":[]}}'
+# The reminder read (story 17.2): the clock, and one member with H1 on whose
+# assembly is the empty one above.
+remind_inputs='{"now":1795000000000,"members":[{"memberId":"m","leads":["H1"],"window":{"from":"2026-11-20","to":"2026-11-22"},"inputs":{"organizationId":"o","timeZone":"Europe/Zagreb","memberId":"m","teams":[],"shiftTypes":[],"steps":[],"assignments":[],"assignmentStamps":[],"members":[{"id":"m","memberships":[],"statuses":[],"loans":[]}],"overrides":[],"rosterOverrides":[],"leave":[]}}]}'
 # The CGI script, with the expected request and the answers written in.
 rpc_stub="$(cat <<EOF
 #!/bin/sh
@@ -50,6 +60,7 @@ body="\$(head -c "\${CONTENT_LENGTH:-0}")"
 printf 'Content-Type: application/json\\r\\n\\r\\n'
 case "\$PATH_INFO|\$REQUEST_METHOD|\$HTTP_APIKEY|\$body" in
   '/rest/v1/rpc/calendar_feed_inputs|POST|$publishable_key|{"p_token_hash":"$feed_vector_hash"}') printf '%s' '$feed_hit' ;;
+  '/rest/v1/rpc/reminder_inputs|POST|$secret_key|{}') printf '%s' '$remind_inputs' ;;
   *) printf 'null' ;;
 esac
 EOF
@@ -76,6 +87,7 @@ docker run -d --name "$name" --network "$network" \
   -e SHIFT_ALLOWED_ORIGINS=https://app.example.test \
   -e SHIFT_APP_URL=https://app.example.test \
   -e NOTIFY_INVOKE_SECRET="$invoke_secret" \
+  -e REMIND_INVOKE_SECRET="$remind_secret" \
   -e 'NOTIFY_EMAIL_FROM=Shift <probe@example.test>' \
   -e RESEND_API_KEY=re_probe \
   -e VAPID_PUBLIC_KEY= -e VAPID_PRIVATE_KEY= \
@@ -178,10 +190,19 @@ else
   failed=1
 fi
 
+# remind (story 17.2; AD-14, AD-17): the cron job's bearer or nothing, compared
+# by the handler, never notify's; with it, the bundled domain over the read.
+expect 401 INVOKE_SECRET_REFUSED POST /remind
+expect 401 INVOKE_SECRET_REFUSED POST /remind "Authorization: Bearer $invoke_secret\r\n"
+expect 405 METHOD_NOT_ALLOWED GET /remind "Authorization: Bearer $remind_secret\r\n"
+expect 200 REMIND_RAN POST /remind "Authorization: Bearer $remind_secret\r\n"
+
 # GoTrue gone: a token must be refused 503, never passed.
 docker rm -f "$gotrue" > /dev/null
 # And with it the stand-in RPC: the feed cannot be asked, which is no miss.
 expect 503 FEED_UNAVAILABLE GET "/calendar-feed/$feed_vector.ics"
+# And the reminder read cannot be asked: nothing is written.
+expect 503 REMINDER_INPUTS_UNAVAILABLE POST /remind "Authorization: Bearer $remind_secret\r\n"
 expect 503 AUTHORIZATION_UNVERIFIED POST /admin-auth 'Authorization: Bearer a.b.c\r\n'
 
 echo '--- container log'

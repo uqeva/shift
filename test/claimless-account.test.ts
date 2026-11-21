@@ -26,6 +26,11 @@ import {
 } from '../supabase/functions/calendar-feed/handler.ts';
 import { INVOKE_SECRET_REFUSED, readConfiguration as readNotifyConfiguration } from '../supabase/functions/notify/handler.ts';
 import { createHandler as createNotifyHandler } from '../supabase/functions/notify/run.ts';
+import {
+  INVOKE_SECRET_REFUSED as REMIND_REFUSED,
+  createHandler as createRemindHandler,
+  readConfiguration as readRemindConfiguration,
+} from '../supabase/functions/remind/handler.ts';
 
 import {
   FIXTURES,
@@ -831,6 +836,28 @@ describe('a claimless session at the API (story 19.1, AD-10, AD-16)', () => {
           );
           expect(response.status).toBe(401);
           expect(await response.json()).toMatchObject({ code: INVOKE_SECRET_REFUSED });
+        },
+        remind: async () => {
+          // Story 17.2: the session's own token is no invoke secret either: refused before any call.
+          const handle = createRemindHandler(
+            readRemindConfiguration((name) =>
+              ({
+                SUPABASE_URL: 'http://127.0.0.1:54321',
+                SHIFT_SECRET_KEY: 'sb_secret_claimless_probe',
+                REMIND_INVOKE_SECRET: 'r'.repeat(48),
+              })[name],
+            ),
+            {
+              fetch: () => Promise.reject(new Error('remind called an RPC for a claimless session')),
+              timeout: (milliseconds) => AbortSignal.timeout(milliseconds),
+              log: () => undefined,
+            },
+          );
+          const response = await handle(
+            new Request('http://localhost/functions/v1/remind', { method: 'POST', headers: { Authorization: `Bearer ${session.token}` } }),
+          );
+          expect(response.status).toBe(401);
+          expect(await response.json()).toMatchObject({ code: REMIND_REFUSED });
         },
       };
       expect(Object.keys(CALLS).sort(), 'an Edge Function is not swept as a claimless session').toEqual(EDGE_FUNCTIONS);

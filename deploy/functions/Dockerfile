@@ -18,7 +18,8 @@
 # From `/home/deno/functions/calendar-feed/` that lands in `/home/packages/`,
 # so both built `dist`s are copied there and bundled into its eszip. A missing
 # `dist` fails the COPY: build the packages first. The deploy's source hash
-# covers their sources, never `dist` (`FUNCTIONS_SOURCES`).
+# covers their sources, never `dist` (`FUNCTIONS_SOURCES`). Story 17.2:
+# `remind` maps `@shift/domain` the same way, onto the same copy.
 #
 # The image holds code only: no key, no secret, no address. Every value comes
 # from the container's environment in Coolify (AD-17 as amended).
@@ -31,13 +32,16 @@ COPY deploy/functions/main/router.ts deploy/functions/main/workers.ts deploy/fun
 COPY supabase/functions/admin-auth/ /home/deno/functions/admin-auth/
 COPY supabase/functions/notify/ /home/deno/functions/notify/
 COPY supabase/functions/calendar-feed/ /home/deno/functions/calendar-feed/
+COPY supabase/functions/remind/ /home/deno/functions/remind/
 
 RUN edge-runtime bundle --entrypoint /home/deno/functions/admin-auth/index.ts \
       --output /home/deno/functions/admin-auth/bundle.eszip \
  && edge-runtime bundle --entrypoint /home/deno/functions/notify/index.ts \
       --output /home/deno/functions/notify/bundle.eszip \
  && edge-runtime bundle --entrypoint /home/deno/functions/calendar-feed/index.ts \
-      --output /home/deno/functions/calendar-feed/bundle.eszip
+      --output /home/deno/functions/calendar-feed/bundle.eszip \
+ && edge-runtime bundle --entrypoint /home/deno/functions/remind/index.ts \
+      --output /home/deno/functions/remind/bundle.eszip
 
 EXPOSE 9000
 

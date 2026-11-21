@@ -26,6 +26,7 @@
 
 import { checkDate, civilDayNumber, dateOfCivilDay } from './calendar.js';
 import { MINUTES_PER_DAY } from './bands.js';
+import { EVENING_BEFORE_MINUTE, REMINDER_LEAD_HOURS, isReminderLead, type ReminderLead } from './reminders.js';
 
 const MS_PER_SECOND = 1000;
 const MS_PER_MINUTE = 60 * MS_PER_SECOND;
@@ -152,6 +153,29 @@ export function instantOf(date: string, minute: number, zone: string): number {
     .sort((left, right) => left - right);
   // Repeated: the earlier. Skipped: none matches, and the offset before the gap is used.
   return candidates[0] ?? local - before * MS_PER_MINUTE;
+}
+
+/**
+ * When a reminder of a shift falls due (AD-6 as amended by Architect pass 1;
+ * story 17.2), in epoch milliseconds: for `H<n>`, n REAL hours before the
+ * shift's real start instant (`instantOf(date, startMinute, zone)`), so a
+ * DST transition between the two is counted as the hour it is; for
+ * `EVENING_BEFORE`, 20:00 local on the day before `date`, whatever the start
+ * minute. `startMinute` is the WORKED start: past 1440 for a night's second
+ * half, which starts on the next date while `date` stays the shift's.
+ *
+ * @throws RangeError when `lead` is not a reminder lead, and on any
+ *   precondition of {@link instantOf} for `date` and `startMinute`.
+ */
+export function reminderDueAt(lead: ReminderLead, date: string, startMinute: number, zone: string): number {
+  if (!isReminderLead(lead)) throw new RangeError(`the reminder lead is ${JSON.stringify(lead)}, not one of the leads`);
+  const startsAt = instantOf(date, startMinute, zone);
+  if (lead === 'EVENING_BEFORE') {
+    const evening = dateOfCivilDay(civilDayNumber(date) - 1);
+    if (evening === null) throw new RangeError(`the date before ${date} is outside years 0001–9999`);
+    return instantOf(evening, EVENING_BEFORE_MINUTE, zone);
+  }
+  return startsAt - REMINDER_LEAD_HOURS[lead] * 60 * MS_PER_MINUTE;
 }
 
 /**

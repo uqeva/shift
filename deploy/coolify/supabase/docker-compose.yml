@@ -1658,6 +1658,10 @@ services:
       - SHIFT_APP_URL=${SHIFT_APP_URL:?}
       # Also stored in this stack's Vault as `notify_invoke_secret` (DEPLOY.md §3a).
       - NOTIFY_INVOKE_SECRET=${SERVICE_PASSWORD_64_NOTIFYINVOKE}
+      # Story 17.2: `remind`'s own bearer, stored in this stack's Vault as
+      # `remind_invoke_secret` when 17.3 arms the job (until then the cron
+      # job finds no `remind_url` and sends nothing).
+      - REMIND_INVOKE_SECRET=${SERVICE_PASSWORD_64_REMINDINVOKE}
       - NOTIFY_EMAIL_FROM=${NOTIFY_EMAIL_FROM:?}
       # Operator-set: no generator can make these.
       - RESEND_API_KEY=${RESEND_API_KEY:?}
