@@ -42,6 +42,7 @@ import { GodisnjiScreen, godisnjiRoute } from '@/pages/godisnji';
 import { GodisnjiZatraziScreen, godisnjiZatraziRoute } from '@/pages/godisnji.zatrazi';
 import { KalendarZamjenaScreen, kalendarZamjenaRoute } from '@/pages/kalendar.zamjena';
 import { ObavijestiScreen, obavijestiRoute } from '@/pages/obavijesti';
+import { KalendarNaMobiteluScreen, kalendarNaMobiteluRoute } from '@/pages/kalendar-na-mobitelu';
 import { indexRoute } from '@/pages/index';
 import { KalendarScreen, kalendarRoute } from '@/pages/kalendar';
 import { LjudiMemberScreen, ljudiMemberRoute } from '@/pages/ljudi.$id';
@@ -468,6 +469,9 @@ describe('the shell route tree', () => {
       // STORY 9.3. The member's leave request form, reached from Godišnji only.
       '/_app/godisnji/zatrazi',
       '/_app/kalendar',
+      // STORY 16.5. The person's own calendar link and month download, for
+      // every role, reached from a fixed row in *Više* and the profile menu only.
+      '/_app/kalendar-na-mobitelu',
       '/_app/kalendar/zamjena',
       '/_app/ljudi',
       // TWO ROUTES THAT ARE NOT DESTINATIONS (story 1.5b). Both nest under the
@@ -3001,6 +3005,30 @@ describe('the notification settings are not a destination and carry no guard of 
     expect(DESTINATION_ROUTES.map((destination) => destination.path)).not.toContain('/obavijesti');
     expect(ROLE_GUARDED_PATHS).not.toContain('/obavijesti');
     expect(LEVEL_GUARDED_ROUTES.map((guarded) => guarded.path)).not.toContain('/obavijesti');
+  });
+});
+
+describe('Kalendar na mobitelu is not a destination and carries no guard of its own (story 16.5)', () => {
+  it('resolves /kalendar-na-mobitelu inside the signed-in layout, to its own screen', () => {
+    expect(match('/kalendar-na-mobitelu').map((matched) => matched.routeId)).toEqual([
+      '__root__',
+      '/_app',
+      '/_app/kalendar-na-mobitelu',
+    ]);
+    expect((kalendarNaMobiteluRoute.options as { component?: unknown }).component).toBe(KalendarNaMobiteluScreen);
+  });
+
+  it('carries no beforeLoad: every role reads and writes only its own link (0067)', () => {
+    expect((kalendarNaMobiteluRoute.options as { beforeLoad?: unknown }).beforeLoad).toBeUndefined();
+  });
+
+  it('is in neither destination list, nor any guarded list', () => {
+    for (const role of MEMBER_ROLES) {
+      expect(destinationsFor(role).map((destination) => destination.path)).not.toContain('/kalendar-na-mobitelu');
+    }
+    expect(DESTINATION_ROUTES.map((destination) => destination.path)).not.toContain('/kalendar-na-mobitelu');
+    expect(ROLE_GUARDED_PATHS).not.toContain('/kalendar-na-mobitelu');
+    expect(LEVEL_GUARDED_ROUTES.map((guarded) => guarded.path)).not.toContain('/kalendar-na-mobitelu');
   });
 });
 

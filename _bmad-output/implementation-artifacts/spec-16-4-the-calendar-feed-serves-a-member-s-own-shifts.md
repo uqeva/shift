@@ -2,14 +2,14 @@
 title: "16.4 The calendar feed serves a member's own shifts"
 type: 'feature'
 created: '2026-11-21'
-status: 'in-review'
+status: 'done'
 baseline_commit: 'e5f6b7faf57ee53b94c37d8542b3befb2726102b'
 review_loop_iteration: 1
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-16-context.md'
 ---
 
-Status: built, CI pending (in review). Approved unattended under the orchestrator's standing instruction (~2.6k tokens, kept whole: one user goal across layers). Baseline: `main` at #342 (16.3). Touches the structural pin tests (`test/supabase-scaffold.test.ts`'s function list, `test/functions-router.test.ts`), so it runs after 16.3's merge and before any other story that changes them; no migration (19.2 may take `0068`).
+Status: done. Merged as #343, squash `e9634ee` (2026-11-21), after `CI passed` went green on `40d1599` (run 44932179182: 13 jobs passed, 5 skipped; E2E 145 + 144 + 144 + 145 passed). Before it: run 44928415431 on `172bff5` was cancelled by the push of the review fixes; run 44929455730 on `2184a11` failed in `Test (Vitest, local Supabase)` at *Start local Supabase* (`packages/ics/dist/index.js` missing: the CLI serves the functions' import maps, so the job must build both packages first), fixed for CI by `093c07b` (pipeline builds `@shift/domain` and `@shift/ics` before `supabase start`); run 44931023808 on `093c07b` failed one case, `test/claimless-account.test.ts` "every Edge Function gives it nothing but its own flag" (19.1's sweep did not know `calendar-feed`), fixed for CI by `40d1599` (the sweep calls it too). Baseline: `main` at #342 (16.3). Touched the structural pin tests; no migration.
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 
@@ -67,7 +67,7 @@ Status: built, CI pending (in review). Approved unattended under the orchestrato
 - `deploy/coolify/supabase/docker-compose.yml` -- `KONG_LOG_LEVEL=crit`.
 - `playwright.config.ts` (build both packages before `functions serve`), `e2e/tests/calendar/calendar-feed.spec.ts` (new), `e2e/utils/database-helper.ts` (`createCalendarFeedTokenInSql`, `revokeCalendarFeedTokenInSql`: 0067's definers as the member's own session) -- the CLI-served feed. No new table, so the cleanup is unchanged (tokens cascade with members).
 - `DEPLOY.md` -- local serve, the image, Kong's error log.
-- `test/calendar-feed.test.ts` (new) -- the handler matrix with the real packages; `test/concurrent-writes.test.ts` -- the two-connection lock races (unrun).
+- `test/calendar-feed.test.ts` (new) -- the handler matrix with the real packages; `test/concurrent-writes.test.ts` -- the two-connection lock races (written unrun; green in CI, #343).
 - Pins: `test/functions-router.test.ts`, `test/key-hygiene.test.ts`, `test/coolify-deploy.test.ts`, `test/self-hosted-stack.test.ts`, `test/supabase-scaffold.test.ts` (three functions), `vitest.config.ts`, `tsconfig.json`, `eslint.config.js` (ics purity).
 - Mappers (rule A11): no row gains a column.
 
@@ -77,8 +77,8 @@ Status: built, CI pending (in review). Approved unattended under the orchestrato
 - [x] `packages/ics/**`, `pnpm-lock.yaml` -- the serializer, goldens, purity -- AD-20.
 - [x] `supabase/functions/calendar-feed/**`, `test/calendar-feed.test.ts` -- the function and its matrix (vector `PARITY_VECTOR`) -- AD-14, D-S8.
 - [x] `config.toml`, router, Dockerfile, `deploy-images.sh`, probe, pipeline, deploy action, compose and their pin tests -- AD-7, AD-14, AD-17.
-- [x] `e2e/**`, `playwright.config.ts` -- the CLI serves the map (written unrun).
-- [x] `test/concurrent-writes.test.ts` -- regeneration ×2; creation vs deactivation, both orders (unrun).
+- [x] `e2e/**`, `playwright.config.ts` -- the CLI serves the map (written unrun; green in CI, #343).
+- [x] `test/concurrent-writes.test.ts` -- regeneration ×2; creation vs deactivation, both orders (written unrun; green in CI, #343).
 - [x] `ARCHITECTURE-SPINE.md` -- `Amended 2026-11-21 (16.4)` on AD-7, AD-14, AD-17, AD-20.
 - [x] `deferred-work.md`, `sprint-status.yaml` -- entries marked; Outlook, timing, roles entries.
 
@@ -128,7 +128,7 @@ Decisions (founder: decide and record):
 - `pnpm --filter @shift/domain test` -- 20 files, 950 tests; `pnpm --filter ./apps/web test` -- 178 files, 6665 tests.
 - In `packages/ics`: `pnpm exec vitest run test/text.test.ts test/timezone.test.ts test/calendar.test.ts test/purity.test.ts` -- 4 files, 29 tests.
 - `pnpm exec vitest run test/resource-hygiene.test.ts test/supabase-scaffold.test.ts test/self-hosted-stack.test.ts test/key-hygiene.test.ts test/functions-router.test.ts test/coolify-deploy.test.ts test/ci-scripts.test.ts test/runtime-parity.test.ts test/calendar-feed.test.ts` -- 9 files pass (2 skipped are key-hygiene's built-bundle scans, as before).
-- Unrun by rule, CI's first run: `test/concurrent-writes.test.ts`'s three 0067 race cases; `e2e/tests/calendar/calendar-feed.spec.ts`.
+- Unrun locally by rule; CI ran and passed both (run 44932179182): `test/concurrent-writes.test.ts`'s three 0067 race cases; `e2e/tests/calendar/calendar-feed.spec.ts`.
 
 **Manual checks (no container started; the saved pinned `edge-runtime` v1.74.3 rootfs under `chroot`, `unshare -n` loopback only):**
 - The image layout (both `dist`s in `/home/packages/`, the three functions, the router) built as the Dockerfile's COPY lines; `edge-runtime bundle` of `calendar-feed` offline: 249 790 bytes (after review).
@@ -136,7 +136,7 @@ Decisions (founder: decide and record):
 - A real assembly (the pilot parity member, D2 window 2026-10-21…2027-05-22, 106 shifts, a transition inside) served by the router and the function behind a busybox CGI: 200 `text/calendar`, `private, max-age=900`; HEAD the same headers, no body; the body byte-identical to Node's `calendarOf` of the same assembly, `DTSTAMP` aside; the stub gone, 503; a malformed token 404 in 279 ms. The runtime's log held `calendar-feed: FEED_UNAVAILABLE` and nothing else.
 - The golden files opened: `zagreb-named.ics` (9 events, both transitions, a SUMMARY of Croatian letters folded over 2 lines and every escape), `tokyo.ics`, `parity-pilot.ics` (112 events over 2026-03-20…10-31; the runtime check's 106 are the same member over the D2 window). Each was read back by a reader of the file alone, in the test (an ICS library could not be fetched here): every event resolved through the file's own observances to an instant Node's tz database formats back to the written wall clock; the spring night is 11 h (18:00Z–05:00Z), the autumn night 13 h (17:00Z–06:00Z).
 
-**Residual risk:** the e2e spec (the CLI's `functions serve` over the map, the local gateway, the real lookup) and the race cases run first in CI; Outlook is unchecked (deferred-work, OWNER 20.5); the 404's timing end to end is the epic's `security-review`'s.
+**Residual risk (rewritten after the merge, from CI):** the e2e spec (`calendar-feed.spec.ts`: the CLI's `functions serve` over the map, the local gateway, the real lookup) and the three race cases in `test/concurrent-writes.test.ts` ran first in CI and passed in run 44932179182 (`concurrent-writes` 95 tests, `calendar-feed-tokens` 24, `calendar-feed` 20; every E2E shard green), once the job built both packages before `supabase start` (`093c07b`). Still open, not CI's: Outlook is unchecked (deferred-work, OWNER 20.5); the 404's timing end to end and the host's log checks are 20.5's.
 
 ## Suggested Review Order
 
@@ -193,8 +193,8 @@ Decisions (founder: decide and record):
 - The miss matrix with a fake clock and the real packages.
   [`calendar-feed.test.ts:249`](../../test/calendar-feed.test.ts#L249)
 
-- Two-connection lock races, written unrun.
+- Two-connection lock races, written unrun; green in CI (#343).
   [`concurrent-writes.test.ts:2469`](../../test/concurrent-writes.test.ts#L2469)
 
-- The CLI-served feed end to end, written unrun.
+- The CLI-served feed end to end, written unrun; green in CI (#343).
   [`calendar-feed.spec.ts:39`](../../e2e/tests/calendar/calendar-feed.spec.ts#L39)

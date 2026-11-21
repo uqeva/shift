@@ -15,6 +15,7 @@ import {
 import { HOURS_SCREEN_PARTS } from '@/features/hours/hours-screen.fixture';
 import { LEAVE_REQUEST_PARTS, LEAVE_SCREEN_PARTS } from '@/features/leave/leave-screen.fixture';
 import { NOTIFICATIONS_SCREEN_PARTS } from '@/features/notifications/notifications-screen.fixture';
+import { CALENDAR_FEED_SCREEN_PARTS, MEMBER_FEED_CARD_PARTS } from '@/features/calendar-feed/calendar-feed-screen.fixture';
 import { SWAP_PROPOSAL_PARTS } from '@/features/swaps/swaps-screen.fixture';
 import { TODAY_SCREEN_PARTS } from '@/features/today/today-screen.fixture';
 import {
@@ -336,6 +337,31 @@ export const NOTIFICATIONS_PAGE = join(srcRoot, 'pages', 'obavijesti.tsx');
 
 /** Story 10.3: the screen's rules, its saved lines off one `\w*MessageKey` union. */
 export const NOTIFICATIONS_KEYS = join(NOTIFICATIONS_FEATURE, 'services', 'settings.ts');
+
+/** Story 16.5: the calendar-feed feature, which holds `/kalendar-na-mobitelu` and the member page's card. */
+export const CALENDAR_FEED_FEATURE = join(srcRoot, 'features', 'calendar-feed');
+
+/** Story 16.5: `/kalendar-na-mobitelu`'s files, page first. */
+export const CALENDAR_FEED: readonly string[] = Object.values(CALENDAR_FEED_SCREEN_PARTS).map((parts) =>
+  join(srcRoot, ...parts),
+);
+
+/** Story 16.5: the page itself, which the set is read from first. */
+export const CALENDAR_FEED_PAGE = join(srcRoot, 'pages', 'kalendar-na-mobitelu.tsx');
+
+/** Story 16.5 (UX-DR55): the member page's *Kalendar na mobitelu* card and its hook. */
+export const MEMBER_FEED_CARD: readonly string[] = Object.values(MEMBER_FEED_CARD_PARTS).map((parts) =>
+  join(srcRoot, ...parts),
+);
+
+/** Story 16.5: the feed's rules — the last fetch, the admin's line and the write failure, off `\w*MessageKey` unions. */
+export const CALENDAR_FEED_KEYS = join(CALENDAR_FEED_FEATURE, 'services', 'feed.ts');
+
+/** Story 16.5: the month download's empty and failure lines, off `monthDownloadMessageKey`. */
+export const CALENDAR_FEED_DOWNLOAD_KEYS = join(CALENDAR_FEED_FEATURE, 'services', 'month-download.ts');
+
+/** Story 16.5: the copy's two status lines, off `linkCopyMessageKey`. */
+export const CALENDAR_FEED_COPY_KEYS = join(CALENDAR_FEED_FEATURE, 'utils', 'copy.ts');
 
 /** Story 10.4: the push section's rules, its saved lines off one `\w*MessageKey` union. */
 export const PUSH_KEYS = join(NOTIFICATIONS_FEATURE, 'services', 'push.ts');
@@ -1199,6 +1225,16 @@ export const SCREENS = [
   // never a field: the count is what notices an address input arriving.
   // Two buttons since story 10.4: each section's retry.
   { name: 'the notification settings screen', file: NOTIFICATIONS, expectedFields: 0, expectedButtons: 2 },
+  // STORY 16.5. On *Kalendar na mobitelu*, no field (the URL is shown, never
+  // an input) and TWELVE buttons, each written once: the link card's write
+  // (*Izradi poveznicu*, *Izradi novu poveznicu*, *Isključi*, one element),
+  // its retry, each confirmation's cancel and confirm (four), *Prikaži* (and
+  // *Sakrij*, one element) and *Kopiraj*, the two add links; the download's
+  // retry and *Preuzmi*. The month control is `MonthNav`'s, counted there.
+  { name: 'the calendar link screen', file: CALENDAR_FEED, expectedFields: 0, expectedButtons: 12 },
+  // STORY 16.5 (UX-DR55). The member page's card: *Isključi poveznicu*, the
+  // read's retry, and its confirmation's cancel and confirm. Never a field.
+  { name: 'the member calendar link card', file: MEMBER_FEED_CARD, expectedFields: 0, expectedButtons: 4 },
   // STORY 2.1b. FIVE on the band list: the link back to `Organizacija`, the
   // name `<Input>`, the start `<Input type="time">`, the add `<Button>`, and ONE
   // row link written once inside the map over the bands — the same count at

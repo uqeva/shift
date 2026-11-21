@@ -113,6 +113,9 @@ importers:
       '@shift/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@shift/ics':
+        specifier: workspace:*
+        version: link:../../packages/ics
       '@supabase/supabase-js':
         specifier: 2.113.0
         version: 2.113.0

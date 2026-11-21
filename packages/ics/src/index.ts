@@ -8,6 +8,7 @@ export {
   DOWNLOAD_UID_DOMAIN,
   FEED_UID_DOMAIN,
   PRODUCT_ID,
+  REFRESH_INTERVAL,
   SUMMARY_SEPARATOR,
   calendarOf,
   type CalendarRequest,

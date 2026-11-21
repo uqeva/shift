@@ -288,6 +288,7 @@ const RECORD_KEYS: Readonly<Record<HistoryRecord, ReturnType<typeof historyRecor
   'absence-type': 'history.record.absenceType',
   'leave-allowance': 'history.record.leaveAllowance',
   loan: 'history.record.loan',
+  'calendar-feed': 'history.record.calendarFeed',
   other: 'history.record.other',
 };
 
@@ -317,6 +318,7 @@ export function historyRecordMessageKey(
   | 'history.record.absenceType'
   | 'history.record.leaveAllowance'
   | 'history.record.loan'
+  | 'history.record.calendarFeed'
   | 'history.record.other' {
   return RECORD_KEYS[record];
 }

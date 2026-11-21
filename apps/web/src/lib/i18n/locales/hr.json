@@ -403,6 +403,7 @@
       "absenceType": "Vrsta odsutnosti",
       "leaveAllowance": "Pravo na godišnji",
       "loan": "Posudba",
+      "calendarFeed": "Kalendar na mobitelu",
       "other": "Zapis"
     },
     "action": {
@@ -2358,6 +2359,82 @@
     "own": "Moj raspored: {name} · {team}",
     "ownNoTeam": "Moj raspored: {name} · bez smjene",
     "printedAt": "Ispisano: {date} u {time}"
+  },
+  "feed": {
+    "nav": {
+      "name": "Kalendar na mobitelu",
+      "description": "Tvoj raspored u Google ili Apple kalendaru"
+    },
+    "heading": "Kalendar na mobitelu",
+    "linkHeading": "Poveznica za kalendar",
+    "lede": "Dodaj svoj raspored jednom u Google ili Apple kalendar na mobitelu i on se dalje sam osvježava.",
+    "create": "Izradi poveznicu",
+    "loading": "Učitavanje poveznice",
+    "unavailable": "Stanje poveznice trenutačno nije moguće prikazati.",
+    "retry": "Pokušaj ponovno",
+    "on": "Poveznica je uključena.",
+    "lastFetched": "Zadnje preuzimanje: {date} u {time}",
+    "neverFetched": "Još nije preuzeto.",
+    "fetched": "Poveznica je preuzeta.",
+    "revisitNote": "Poveznica se prikazuje samo jednom, kad je izradiš. Za drugi mobitel izradi novu poveznicu: stara tada odmah prestaje raditi.",
+    "created": "Tvoja nova poveznica",
+    "warningTitle": "Poveznica je osobna i tajna",
+    "warning": "Tko ima ovu poveznicu, vidi tvoj raspored. Ne šalji je nikome. Prikazuje se samo sada: kad napustiš ovu stranicu, više je nećeš moći vidjeti.",
+    "urlLabel": "Poveznica",
+    "masked": "Poveznica je skrivena.",
+    "show": "Prikaži poveznicu",
+    "hide": "Sakrij poveznicu",
+    "copy": "Kopiraj",
+    "copied": "Poveznica je kopirana.",
+    "copyFailed": "Kopiranje ovdje nije dostupno. Prikaži poveznicu, označi je i kopiraj ručno.",
+    "google": {
+      "heading": "Google kalendar",
+      "add": "Dodaj u Google kalendar",
+      "step1": "Kopiraj poveznicu ili pritisni Dodaj u Google kalendar.",
+      "step2": "Otvori calendar.google.com u pregledniku: aplikacija Google kalendar na mobitelu ne može dodati kalendar po poveznici.",
+      "step3": "Kod Ostali kalendari pritisni +, pa Iz URL-a.",
+      "step4": "Zalijepi poveznicu i pritisni Dodaj kalendar.",
+      "step5": "U aplikaciji se zatim pojavi kalendar Shift. Ako ga ne vidiš, u postavkama aplikacije uključi njegovu sinkronizaciju."
+    },
+    "apple": {
+      "heading": "Apple kalendar (iPhone)",
+      "add": "Dodaj u Apple kalendar",
+      "step1": "Na iPhoneu pritisni Dodaj u Apple kalendar i potvrdi s Pretplati se.",
+      "step2": "Ili otvori Postavke → Kalendar → Računi → Dodaj račun → Ostalo → Dodaj pretplaćeni kalendar i zalijepi poveznicu."
+    },
+    "googleLag": "Google kalendar osvježava pretplate rjeđe — promjene se mogu pojaviti i do dan kasnije. Shift je uvijek točan.",
+    "omits": "Kalendar sadrži samo dane kad radiš, s početkom i krajem. Ne sadrži godišnji odmor ni druge odsutnosti, ni druge osobe.",
+    "regenerate": "Izradi novu poveznicu",
+    "regeneratePrompt": "Izraditi novu poveznicu? Stara poveznica odmah prestaje raditi, a kalendar koji je koristi više se ne osvježava.",
+    "regenerateConfirm": "Potvrdi novu poveznicu",
+    "turnOff": "Isključi",
+    "turnOffPrompt": "Isključiti poveznicu? Odmah prestaje raditi, a kalendar koji je koristi više se ne osvježava. Pretplatu ukloni i iz tog kalendara.",
+    "turnOffConfirm": "Potvrdi isključivanje",
+    "turnedOff": "Poveznica je isključena. Kalendar koji ju je koristio više se ne osvježava: pretplatu ukloni i iz njega.",
+    "cancel": "Odustani",
+    "writeFailed": "Poveznicu trenutačno nije moguće promijeniti. Pokušaj ponovno.",
+    "refused": "Ovu poveznicu ne možeš promijeniti.",
+    "download": {
+      "heading": "Preuzmi mjesec",
+      "lede": "Jednokratna datoteka .ics s tvojim radnim danima u mjesecu, za uvoz u bilo koji kalendar. Ne osvježava se sama. Mjesec biraš do 12 mjeseci unatrag ili unaprijed.",
+      "action": "Preuzmi .ics",
+      "unavailable": "Raspored trenutačno nije moguće učitati.",
+      "failed": "Ovaj mjesec trenutačno nije moguće preuzeti.",
+      "empty": "U tom mjesecu nemaš radnih dana, pa nema što preuzeti.",
+      "started": "Preuzimanje je pokrenuto: {file}"
+    },
+    "member": {
+      "heading": "Kalendar na mobitelu",
+      "on": "Kalendar na mobitelu: uključen",
+      "off": "Kalendar na mobitelu: isključen",
+      "turnOff": "Isključi poveznicu",
+      "turnOffPrompt": "Isključiti poveznicu za kalendar ove osobe? Odmah prestaje raditi. Osoba može izraditi novu.",
+      "turnOffConfirm": "Potvrdi isključivanje",
+      "turnedOff": "Poveznica je isključena.",
+      "unavailable": "Stanje kalendara na mobitelu trenutačno nije moguće prikazati.",
+      "refused": "Stanje kalendara na mobitelu ove osobe ne možeš vidjeti.",
+      "unknown": "Ova osoba nije u tvojoj organizaciji."
+    }
   },
   "signup": {
     "email": {

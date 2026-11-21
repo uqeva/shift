@@ -217,6 +217,10 @@ export default defineConfig({
       '@shift/domain': fileURLToPath(
         new URL('../../packages/domain/src/index.ts', import.meta.url),
       ),
+      // STORY 16.5. The calendar serializer's SOURCE, on the domain's terms:
+      // the month download serializes with the feed's own `calendarOf`
+      // (AD-20), and no build of the package is needed to typecheck or test.
+      '@shift/ics': fileURLToPath(new URL('../../packages/ics/src/index.ts', import.meta.url)),
     },
   },
   build: {

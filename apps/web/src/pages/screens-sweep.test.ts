@@ -18,6 +18,7 @@ import {
 import { HOURS_SCREEN_EXEMPT, HOURS_SCREEN_PARTS } from '@/features/hours/hours-screen.fixture';
 import { LEAVE_SCREEN_EXEMPT, LEAVE_SCREEN_PARTS } from '@/features/leave/leave-screen.fixture';
 import { NOTIFICATIONS_SCREEN_EXEMPT } from '@/features/notifications/notifications-screen.fixture';
+import { CALENDAR_FEED_SCREEN_EXEMPT } from '@/features/calendar-feed/calendar-feed-screen.fixture';
 import { TODAY_SCREEN_EXEMPT } from '@/features/today/today-screen.fixture';
 import {
   HOUR_BAND_EDIT_PARTS,
@@ -62,6 +63,11 @@ import {
   NOTIFICATIONS_FEATURE,
   NOTIFICATIONS_KEYS,
   NOTIFICATIONS_PAGE,
+  CALENDAR_FEED,
+  CALENDAR_FEED_FEATURE,
+  CALENDAR_FEED_KEYS,
+  CALENDAR_FEED_PAGE,
+  MEMBER_FEED_CARD,
   MEMBER_CREATE,
   MEMBER_DIRECTORY,
   MEMBER_EDIT,
@@ -321,7 +327,8 @@ describe('the screen is read at all, so every sweep below means something', () =
     // THIRTY-NINE SINCE STORY 12.4: the swap decision screen.
     // FORTY SINCE STORY 14.2: Povijest promjena.
     // FORTY-ONE SINCE STORY 19.2: the signup screens.
-    expect(SCREENS).toHaveLength(41);
+    // FORTY-THREE SINCE STORY 16.5: *Kalendar na mobitelu* and the member page's card.
+    expect(SCREENS).toHaveLength(43);
     //
     // FORTY-NINE SINCE STORY 3.6b: `@/features/calendar/services/roster-write`.
     //
@@ -401,7 +408,10 @@ describe('the screen is read at all, so every sweep below means something', () =
     // NINETY-SIX SINCE STORY 18.3: the loan dialog's rules.
     // NINETY-SEVEN SINCE STORY 18.5: the loan marks' rules.
     // NINETY-NINE SINCE STORY 19.2: the signup screens and their rules.
-    expect(KEY_SOURCES).toHaveLength(99);
+    // A HUNDRED AND THREE SINCE STORY 16.5: *Kalendar na mobitelu*, the member
+    // page's card, and their two rules modules.
+    // A HUNDRED AND FOUR SINCE ITS REVIEW: the month download's rules.
+    expect(KEY_SOURCES).toHaveLength(104);
   });
 
   // Vacuous-pass guard. A renamed or moved file would make each "contains no"
@@ -724,6 +734,29 @@ describe('the screen is read at all, so every sweep below means something', () =
       'the Godišnji file set and the feature folders disagree',
       // The shared sortable heading and its glyphs live in `components/` (Epic 4 retro D2).
     ).toEqual(GODISNJI.filter((file) => file !== GODISNJI_PAGE && file.startsWith(LEAVE_FEATURE)).sort());
+  });
+
+  it('sweeps every part of Kalendar na mobitelu and its member card, so a new file cannot escape the sets', () => {
+    // STORY 16.5, on *Obavijesti*'s terms: an EQUALITY between the two sets
+    // and every non-test module under the calendar-feed feature, less the
+    // exempt ones.
+    const exempt = new Set(CALENDAR_FEED_SCREEN_EXEMPT.map((entry) => join(CALENDAR_FEED_FEATURE, entry.file)));
+    const found = readdirSync(CALENDAR_FEED_FEATURE, { recursive: true, encoding: 'utf8' })
+      .filter((name) => /\.tsx?$/.test(name) && !/\.test\.tsx?$/.test(name))
+      .map((name) => join(CALENDAR_FEED_FEATURE, name));
+
+    expect(found, 'the walk reaches services/').toContain(CALENDAR_FEED_KEYS);
+    for (const file of exempt) expect(found, `${file} is exempt and does not exist`).toContain(file);
+    for (const entry of CALENDAR_FEED_SCREEN_EXEMPT) expect(entry.why.length).toBeGreaterThan(20);
+    for (const file of [...CALENDAR_FEED, ...MEMBER_FEED_CARD]) {
+      expect(existsSync(file), `${file} is in a set and does not exist`).toBe(true);
+      expect(source(file).trim().length, `${file} is all but empty`).toBeGreaterThan(150);
+    }
+    expect(CALENDAR_FEED[0], 'the page is read first').toBe(CALENDAR_FEED_PAGE);
+    expect(
+      found.filter((file) => !exempt.has(file)).sort(),
+      'the calendar link file sets and the feature folder disagree',
+    ).toEqual([...CALENDAR_FEED.filter((file) => file !== CALENDAR_FEED_PAGE), ...MEMBER_FEED_CARD].sort());
   });
 
   it('sweeps every part of the notification settings screen, so a new file cannot escape the set', () => {

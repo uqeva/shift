@@ -12,6 +12,7 @@ import { RotationPage } from '../pages/rotation.page.ts';
 import { TeamsPage } from '../pages/teams.page.ts';
 import { TodayPage } from '../pages/today.page.ts';
 import { NotificationsPage } from '../pages/notifications.page.ts';
+import { CalendarFeedPage } from '../pages/calendar-feed.page.ts';
 import { holdRotation, type RotationHold } from './database-helper.ts';
 import { midnightWait } from './dates.ts';
 import { readFixture, RUN_TIMEZONE, type Fixture, type FixtureBand } from './run-fixture.ts';
@@ -33,6 +34,7 @@ export interface PageObjects {
   readonly rotationPage: RotationPage;
   readonly todayPage: TodayPage;
   readonly notificationsPage: NotificationsPage;
+  readonly calendarFeedPage: CalendarFeedPage;
 }
 
 /** Every page object at once, for a spec that picks the screen at run time. */
@@ -137,6 +139,9 @@ export const test = base.extend<
   notificationsPage: async ({ page }, use) => {
     await use(new NotificationsPage(page));
   },
+  calendarFeedPage: async ({ page }, use) => {
+    await use(new CalendarFeedPage(page));
+  },
   // The same objects the single fixtures hand out, gathered: never a second instance.
   pages: async (
     {
@@ -153,6 +158,7 @@ export const test = base.extend<
       rotationPage,
       todayPage,
       notificationsPage,
+      calendarFeedPage,
     },
     use,
   ) => {
@@ -170,6 +176,7 @@ export const test = base.extend<
       rotationPage,
       todayPage,
       notificationsPage,
+      calendarFeedPage,
     });
   },
   holdRotationForTeams: async ({ fixture }, use, testInfo) => {

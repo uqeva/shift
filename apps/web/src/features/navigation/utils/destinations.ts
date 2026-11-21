@@ -170,6 +170,14 @@ export function isCurrentDestination(pathname: string, path: string): boolean {
  */
 export const NOTIFICATIONS_PATH: RegisteredPath = '/obavijesti';
 
+/**
+ * *Kalendar na mobitelu* (story 16.5): the person's own calendar link and a
+ * month's `.ics`, for every role. A ROUTE, NEVER A DESTINATION, on
+ * *Obavijesti*'s terms: the chrome draws it as a fixed row after
+ * *Obavijesti*, in *Više* and the profile menu.
+ */
+export const CALENDAR_FEED_PATH: RegisteredPath = '/kalendar-na-mobitelu';
+
 /** The four paths a phone bar shows as tabs. Exactly four, by type. */
 type PhoneTabs = readonly [RegisteredPath, RegisteredPath, RegisteredPath, RegisteredPath];
 

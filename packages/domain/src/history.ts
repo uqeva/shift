@@ -76,6 +76,9 @@ export const HISTORY_RECORDS = [
   'leave-allowance',
   // Story 18.5: a Loan (`team_loans`, 0062).
   'loan',
+  // Story 16.5: a member's calendar link (`calendar_feed_tokens`, 0067),
+  // never its token or hash (the recorder drops both).
+  'calendar-feed',
   // A table this build does not know yet (an audited table added after it):
   // drawn as a generic record, its fields as raw operands, never a failed read.
   'other',
@@ -272,6 +275,7 @@ const RECORD_OF_TABLE: Readonly<Record<string, HistoryRecord>> = {
   absence_types: 'absence-type',
   leave_allowances: 'leave-allowance',
   team_loans: 'loan',
+  calendar_feed_tokens: 'calendar-feed',
 };
 
 /** The record an audited table holds, or `null` for a table this build does not know. */
@@ -304,6 +308,11 @@ const AMEND_KEYS: Readonly<Record<string, readonly string[]>> = {
   // Story 18.4 (0064's `amend_team_loan`): the replacement keeps the member;
   // its team and dates may change. Story 18.5 names the record `loan`.
   team_loans: ['member_id'],
+  // Story 16.5 (0067's `create_calendar_feed_token`): a regeneration revokes
+  // the live link and issues a new one in one transaction, so the pair reads
+  // as one *izmijenjeno* entry; a first creation stays *dodano*, a turn-off
+  // *uklonjeno*.
+  calendar_feed_tokens: ['member_id'],
 };
 
 // ---------------------------------------------------------------- fields

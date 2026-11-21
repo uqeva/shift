@@ -2,7 +2,7 @@
 title: '19.2 A stranger creates an account'
 type: 'feature'
 created: '2026-11-21'
-status: 'review'
+status: 'done'
 baseline_commit: '5771967ceb69cecf4218cc9f22ada328d1234925'
 review_loop_iteration: 0
 context:
@@ -11,7 +11,7 @@ context:
   - '{project-root}/_bmad-output/planning-artifacts/ux-designs/ux-shift-2026-11-21-signup/README.md'
 ---
 
-Status: review (built, security review 2 applied, CI pending). DONE MEANS MERGED WITH GREEN CI.
+Status: done. Merged as #344, squash `71837c9` (2026-11-21), after `CI passed` went green on `3e8e2c1` (run 44933475976: 13 jobs passed, 5 skipped). One run failed first, on `e331a87` (run 44931092764): `Test (Vitest, local Supabase)` (`localization-applied` ×3: the signup pages and auth modules unlisted, `lozinka` counted from a hard-coded literal; `provisioning` "refuses a member with no organization": 0068's trigger answered 23514 before NOT NULL's 23502) and E2E shards 1 and 2 (`/potvrda` remounting into the dead-link page after the token left the address; `createMember`'s Edge Function round trip). All were fixed by `3e8e2c1` ("fix(auth): CI of story 19.2", logged in the Spec Change Log); no other fix was pushed for CI.
 
 Baseline: `origin/main` at #341 (19.1 merged). Touches the hot files `hr.json` and the structural pins (`pages/*sweep*`, `source-guards.fixture.ts`); no other story in flight touches them. Migration `0068` (main holds 0066 and, since the rebase onto #342, 16.3's 0067), so the scaffold's no-gap case passes. The screens follow the epic 19 UX review (#340, UX-DR62–64), which the founder has **not yet accepted**: they are built to it because it is the current design, and they change with it if the acceptance changes it. Run unattended: the founder said decide and record; F2 stays at its default (admin-issued credentials, no email invitation).
 
@@ -68,9 +68,9 @@ Baseline: `origin/main` at #341 (19.1 merged). Touches the hot files `hr.json` a
 - `supabase/functions/admin-auth/operations.ts` + `apps/web/src/features/members/services/wire.ts` -- `SIGN_IN_IS_EMAIL` (409) and its message.
 - `supabase/config.toml`, `supabase/templates/auth-email/*.html`, `scripts/auth-email-templates.mjs`, `test/auth-email.test.ts` -- local Croatian templates.
 - `.github/actions/deploy/action.yml`, `.github/workflows/pipeline.yml`, `scripts/ci/write-local-env.mjs` -- `VITE_SIGNUP_ENABLED` from the checked variable only; mailpit back in CI.
-- `test/signup-account.test.ts` (new, DB, unrun) -- live hook probe, mail, verify, B5, the trigger.
+- `test/signup-account.test.ts` (new, DB, written unrun; green in CI, #344) -- live hook probe, mail, verify, B5, the trigger.
 - `scripts/probe/signup-enumeration.mjs` (new) -- AD-22's probe for the rehearsal stack and staging.
-- `e2e/tests/auth/signup.spec.ts` (new, unrun), `e2e/pages/login.page.ts`.
+- `e2e/tests/auth/signup.spec.ts` (new, written unrun; green in CI, #344), `e2e/pages/login.page.ts`.
 - Docs: spine AD-12/AD-22 applied clauses, EXPERIENCE.md, DESIGN.md, epics UX-DR33/60/62–64, deferred-work, sprint-status.
 
 ## Tasks & Acceptance
@@ -78,7 +78,7 @@ Baseline: `origin/main` at #341 (19.1 merged). Touches the hot files `hr.json` a
 **Execution:**
 - [x] SPA predicate, services, hooks, components, pages, router and fixtures, as mapped, with node tests for every service.
 - [x] Migration 0068, `admin-auth` mapping and the SPA message, with a DB-free stub test.
-- [x] Templates, config, CI wiring, write-local-env, probe script and the DB/e2e suites (unrun).
+- [x] Templates, config, CI wiring, write-local-env, probe script and the DB/e2e suites (written unrun; green in CI, #344).
 - [x] Docs, spine, deferred-work (19.2 entries RESOLVED, new deferrals), sprint-status.
 
 **Acceptance Criteria:**
@@ -168,11 +168,11 @@ Rejected, each with its reason:
 - **The ASCII-only derivation is not tested on a non-ASCII address.** The hook refuses non-ASCII addresses (19.1's D2 and the vectors).
 
 **Checklist coverage after review 2** (rows 19.2 owns):
-- **B5:** met in code and in the probe (`signup-probe.test.ts`, run). The DB half is `signup-account.test.ts`, which first runs in CI. The extended kinds are 20.5's.
+- **B5:** met in code and in the probe (`signup-probe.test.ts`, run). The DB half is `signup-account.test.ts`, which passed in CI (#344). The extended kinds are 20.5's.
 - **B6, B7:** 19.3's. 19.2 adds no anonymous path: both new functions are revoked from every session role (`provisioning.test.ts`).
 - **B8:** open. It gets measured on staging (20.5), and then the founder decides at D-S5.
 - **C1:** met (`address.test.ts`).
-- **C2:** met. The `admin-auth` 409 with no auth call is run (`email-identity-rename.test.ts`). Rename, insert, re-point and owner cases are in the DB file, which first runs in CI.
+- **C2:** met. The `admin-auth` 409 with no auth call is run (`email-identity-rename.test.ts`). Rename, insert, re-point and owner cases are in the DB file, which passed in CI (#344).
 - **C3:** met (`resetAttributes`, run).
 - **C4:** met, with the E2E pending in CI.
 - **C5:** 19.1's, unchanged.
@@ -245,8 +245,8 @@ Decisions (the founder said decide and record):
 - A static build with the switch on, in headless Chromium at 320 px: `/potvrda?token_hash=…&type=signup` keeps *Potvrdi* after the token leaves the address (before the fix: the dead-link page); *Registriraj se* 80 × 44 px.
 - NOT RUN locally (the database rule): `test/provisioning.test.ts`, `test/signup-account.test.ts` and the E2E. CI is their run.
 
-**Residual risks:**
-- `test/signup-account.test.ts` has never run. It assumes the CLI's GoTrue answers the hook's refusal as 403 with `SIGNUP_REFUSED` in the body (19.1's suite assumed the same), Mailpit's `/api/v1/search` and `/api/v1/message/{id}` on port 54324, and GoTrue's `error_code` field.
-- The signup E2E has never run; it relies on `VITE_SIGNUP_ENABLED=true` in the dev server's `.env.local`, written by `write-local-env.mjs` in CI (a developer's existing `.env.local` lacks it until rewritten).
-- `content_path` is read relative to the project root by CLI 2.116, as its own template documents; if not, `supabase start` fails loudly in CI.
-- The screens follow a UX review the founder has not accepted.
+**Residual risks (rewritten after the merge, from CI):**
+- `test/signup-account.test.ts` ran first in CI and passed in run 44933475976 on `3e8e2c1` (the CLI's GoTrue answered the hook's refusal as assumed, Mailpit's API on 54324 and GoTrue's `error_code` held); `test/provisioning.test.ts` and `test/admin-auth-boundary.test.ts` passed there too, after the 23502 fix.
+- The signup E2E ran in CI and passed in the same run, with `VITE_SIGNUP_ENABLED=true` written by `write-local-env.mjs`; a developer's existing `.env.local` still lacks it until rewritten (not CI's to settle).
+- `content_path` resolved from the project root: `supabase start` succeeded in CI.
+- Still open, not CI's: the screens follow a UX review the founder has not accepted; the enumeration probe against a real GoTrue (deferred-work, OWNER 20.5).
