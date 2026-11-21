@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 14:26
-last_updated: 11-21-2026 23:30
+last_updated: 11-21-2026 19:47
 project: shift
 project_key: NOKEY
 tracking_system: file-system
@@ -683,13 +683,13 @@ development_status:
   #         the founder's go.
   #   D-S1..D-S10 = proposal §6 founder decisions, ratified at the defaults 2026-11-21.
   # Ready now: 16.2 (AP1 done 2026-11-21) and 19.1 (AP2 done 2026-11-21); D-S1–D-S10 ratified by the founder 2026-11-21.
-  epic-16: in-progress  # calendar feed and print (CAP-25); D-S1, D-S2, D-S8 ratified 2026-11-21
+  epic-16: done  # accepted with open items, 2026-11-21 (retro): #335, #339, #342, #343, #345 merged with CI green; founder items open (retro A1 sign-off of 16.5's accepted token risks, A2 the feed's per-IP limit, A3 promotion of 0065/0067); production waits on 20.5's checks (A4)
   16-1-the-month-prints: done  # #335
   16-2-the-domain-package-runs-on-the-server: done  # #339
   16-3-a-member-s-feed-token-is-a-revocable-secret: done  # #342
   16-4-the-calendar-feed-serves-a-member-s-own-shifts: done  # #343
-  16-5-a-member-subscribes-from-kalendar-na-mobitelu: review  # built, CI pending
-  epic-16-retrospective: optional
+  16-5-a-member-subscribes-from-kalendar-na-mobitelu: done  # #345
+  epic-16-retrospective: done
 
   epic-17: backlog  # shift reminders (CAP-26); reuses 16.2; D-S6
   17-1-a-member-chooses-their-reminders: backlog  # after 16.2 (D-S6 ratified 2026-11-21)
@@ -1320,3 +1320,53 @@ action_items:
     owner: "Perolipotic (process); dev for the spec edits"
     status: done  # specs 18.1-18.4 rewritten to the CI facts; bmad-build.toml facts and an unrun-DB-test review layer (build and code-review) on test/epic-18-retro-a4-a5-a7
     ref: "_bmad-output/implementation-artifacts/epic-18-retro-2026-11-21.md"
+  - id: "epic-16-retro-item-79-a1-sign-off-or-reverse-16-5-accepted-ris"
+    epic: 16
+    action: "A1 Sign off or reverse 16.5 accepted risks: the feed token in the Google
+      cid href and in the OS clipboard (retro S2; deferred-work :2007)"
+    owner: "Perolipotic (founder)"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-16-retro-2026-11-21.md"
+  - id: "epic-16-retro-item-80-a2-confirm-the-calendar-feed-per-ip-rate"
+    epic: 16
+    action: "A2 Confirm the calendar-feed per-IP rate limit: proposed Kong rate-limiting
+      120/min per client IP on that route only, via the 19.1 client-IP chain, or accept
+      unthrottled at pilot scale; 20.5 applies it (deferred-work :1925)"
+    owner: "Perolipotic (founder); 20.5 applies"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-16-retro-2026-11-21.md"
+  - id: "epic-16-retro-item-81-a3-approve-promoting-0065-and-0067-past"
+    epic: 16
+    action: "A3 Approve promoting 0065 and 0067 past local/staging, in the queue with
+      epic 14 A2 (0061) and epic 18 A3 (0062-0064)"
+    owner: "Perolipotic (founder)"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-16-retro-2026-11-21.md"
+  - id: "epic-16-retro-item-82-a4-before-production-20-5-runs-the-check"
+    epic: 16
+    action: "A4 Before production, 20.5 runs the checks deferred from the 16.3/16.4
+      security reviews: Outlook (VTIMEZONE, SEQUENCE), real devices (Google, iPhone
+      webcal, iPhone .ics download, DST-gap start), an ICS library parse, pg_read_all_data/rolsuper/rolbypassrls
+      roles, no RPC argument in PostgREST/Postgres logs, the 404 timing end to end,
+      Kong crit vs 20.8, PGRST303 on first read"
+    owner: "20.5 (dev/operator); production go is the founder"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-16-retro-2026-11-21.md"
+  - id: "epic-16-retro-item-83-a5-hygiene-rewrite-spec-16-1-as-merged-w"
+    epic: 16
+    action: "A5 Hygiene: rewrite spec 16.1 as merged with its CI facts (runs 44883730290,
+      44884807614, fixes 17fa33d, 9f48916, green 44886766058); update deferred-work
+      :1838 and :1907 (CI halves settled in 44932179182); mark :2001 with the retro
+      disposition; mark 16.2 spec :137 superseded"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-16-retro-2026-11-21.md"
+  - id: "epic-16-retro-item-84-a6-process-theme-root-files-run-locally"
+    epic: 16
+    action: "A6 Process: theme root files run locally for any index.css/token change;
+      review checks every stack-starting CI job and the 19.1 claimless sweep when
+      an Edge Function is added; the last story of an epic gets its spec rewritten
+      when set done"
+    owner: "Perolipotic (process); dev for checklist edits"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-16-retro-2026-11-21.md"
