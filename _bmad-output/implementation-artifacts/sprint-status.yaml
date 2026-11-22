@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 14:26
-last_updated: 11-21-2026 23:59
+last_updated: 11-22-2026 00:45
 project: shift
 project_key: NOKEY
 tracking_system: file-system
@@ -691,11 +691,11 @@ development_status:
   16-5-a-member-subscribes-from-kalendar-na-mobitelu: done  # #345
   epic-16-retrospective: done
 
-  epic-17: in-progress  # shift reminders (CAP-26); reuses 16.2; D-S6
+  epic-17: done  # accepted with open items, 2026-11-22 (retro): #347, #348, #350 merged with CI green; founder items open (retro A1 promotion of 0069/0070/0072, A3 the Vault-arming log risk and banned-account reminders at the D-S5 review); real delivery waits on the first staging/production deploy (A2)
   17-1-a-member-chooses-their-reminders: done  # #347
   17-2-the-remind-job-writes-reminders-that-fall-due: done  # #348
-  17-3-reminders-reach-the-member-by-push-or-email: review  # built, CI pending
-  epic-17-retrospective: optional
+  17-3-reminders-reach-the-member-by-push-or-email: done  # #350
+  epic-17-retrospective: done
 
   epic-18: done  # accepted with open items, 2026-11-21 (retro): #323, #325, #328, #330, #332 merged with CI green; founder decisions open (retro A1 member-wide loan read, A2 tim/Smjena, A3 promotion check)
   18-1-the-loan-rule-in-the-domain: done  # #323
@@ -1370,3 +1370,56 @@ action_items:
     owner: "Perolipotic (process); dev for checklist edits"
     status: open
     ref: "_bmad-output/implementation-artifacts/epic-16-retro-2026-11-21.md"
+  - id: "epic-17-retro-item-85-a1-approve-promoting-0069-0070-and-0072"
+    epic: 17
+    action: "A1 Approve promoting 0069, 0070 and 0072 past local/staging, in the queue
+      with epic 14 A2 (0061), epic 18 A3 (0062-0064) and epic 16 A3 (0065, 0067)"
+    owner: "Perolipotic (founder)"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-17-retro-2026-11-22.md"
+  - id: "epic-17-retro-item-86-a2-at-the-first-staging-then-production"
+    epic: 17
+    action: "A2 At the first staging, then production, deploy after 17.3: deploy the
+      notify that renders SHIFT_REMINDER with 0072; arm remind per DEPLOY.md 3b and
+      prove 200 REMIND_RAN; send one real reminder by push and by email to a test
+      member; look at the 17.1 Podsjetnici card states on a real phone; decide an
+      alert on a failing remind call (deferred-work :2025, :2040, :2049)"
+    owner: "operator or 20.5 (dev/operator); production go is the founder"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-17-retro-2026-11-22.md"
+  - id: "epic-17-retro-item-87-a3-at-the-d-s5-security-review-before-pr"
+    epic: 17
+    action: "A3 At the D-S5 security review, before production is armed: settle the
+      Vault-arming log risk (psql client-side interpolation; confirm logging settings
+      or use a bind parameter, deferred-work :2058); confirm or reverse 17.2 Design
+      Note 9 (a banned or deleted account whose member is active still gets its reminders)"
+    owner: "Perolipotic (founder); dev applies"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-17-retro-2026-11-22.md"
+  - id: "epic-17-retro-item-88-a4-story-fold-or-refuse-control-characte"
+    epic: 17
+    action: "A4 Story: fold or refuse control characters (CR/LF) in names for every
+      notice email subject, at the database or in notify for every code (deferred-work
+      :2055)"
+    owner: "PO to schedule; dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-17-retro-2026-11-22.md"
+  - id: "epic-17-retro-item-89-a5-docs-hygiene-epics-md-epic-17-header"
+    epic: 17
+    action: "A5 Docs hygiene: epics.md epic 17 header to D-S6 ratified 2026-11-21
+      and drop the waits-for-D-S6 lines; replace absolute /tmp scratchpad paths in
+      spec-17-3 and spec-19-1 (public repo)"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-17-retro-2026-11-22.md"
+  - id: "epic-17-retro-item-90-a6-process-bmad-build-toml-never-signal"
+    epic: 17
+    action: "A6 Process (bmad-build.toml): never signal processes by pattern (pkill
+      -f, killall), only own PIDs (17.2 incident stopped the manual-test edge runtime);
+      a migration adding any public/private function lists it in provisioning grantee
+      and invoker inventories, checked by the Unrun DB Test Auditor (17.3 CI failure);
+      worktree subagents cannot run gitleaks, so the orchestrator scans each branch
+      before every push and records it"
+    owner: "Perolipotic (process); dev for toml edits"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-17-retro-2026-11-22.md"

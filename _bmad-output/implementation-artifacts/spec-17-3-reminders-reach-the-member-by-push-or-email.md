@@ -2,14 +2,14 @@
 title: "17.3 Reminders reach the member by push or email"
 type: 'feature'
 created: '2026-11-21'
-status: 'in-review'
+status: 'done'
 baseline_commit: 'b5e0c94df104a638e7332e1abe4191ef643548bb'
 review_loop_iteration: 2
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-17-context.md'
 ---
 
-Status: review (built, reviews 1 and 2's patches applied, CI pending). DONE MEANS MERGED WITH GREEN CI: the frontmatter stays `in-review` and the sprint status `review` until the PR merges green. Approved unattended under the founder's standing instruction (decide and record, no questions). ~2.6k tokens, kept whole: one user goal (a due reminder reaches the member, in words, linking to the day) across `notify`, one migration, the e2e and the deploy runbook; the arming and its proof are what make delivery real, so splitting them off would ship a renderer nothing calls. Baseline: `main` at #349 (19.3, squash `b5e0c94`), after #348 (17.2, `abe226e`). Touches `hr.json` (hot: no other hot-file story runs from this baseline). Migration `0072` (19.5 runs in parallel with `0073`). Residual risks: `test/shift-reminders.test.ts`'s new cases, 0072 on a real Postgres and `e2e/tests/notifications/reminder-delivery.spec.ts` (the armed path, the fake-clock delivery, the live card layout) have never run (CI is their first run); no real Resend or push send was made.
+Status: done. Merged as #350 (squash `bac8d1b`, 2026-11-22) with `CI passed` green in run 44966269960 (head `bcb7990`). CI (PR #350): run 44965308725 on `33a1cf4` failed `Test (Vitest, local Supabase)` on one case, `test/provisioning.test.ts` "holds an expected grantee entry for every function in public and private" (`expected [ 'private.reminder_late/2' ] to deeply equal []`); its E2E shards 3 and 4 were cancelled by the next push. Review 2's `bcb7990` adds `private.reminder_late/2` to both inventories (Review Findings, review 2, first patch); whether review 2 found it independently or from that run is not recorded. No other commit was pushed for CI. Run 44966269960 passed every job: `test/shift-reminders.test.ts` (19), `test/notify-reminder.test.ts` (49), `test/provisioning.test.ts` (319), 0072 on CI's fresh stack, and the four E2E shards (599 passed, none flaky), which include `e2e/tests/notifications/reminder-delivery.spec.ts`. Approved unattended under the founder's standing instruction (decide and record, no questions). ~2.6k tokens, kept whole: one user goal (a due reminder reaches the member, in words, linking to the day) across `notify`, one migration, the e2e and the deploy runbook; the arming and its proof are what make delivery real, so splitting them off would ship a renderer nothing calls. Baseline: `main` at #349 (19.3, squash `b5e0c94`), after #348 (17.2, `abe226e`). Touches `hr.json` (hot: no other hot-file story runs from this baseline). Migration `0072` (19.5 runs in parallel with `0073`). Residual risks CI did not settle: no real Resend or push send was made (CI holds no key), the armed path has run only on CI's local stack, not on staging or production (`deferred-work.md`, the 17.3 entry), and the 17.1 card's other states have had no human look on a phone (OWNER 20.5). Rewritten as merged by the epic 17 retrospective (`epic-17-retro-2026-11-22.md`).
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 
@@ -127,14 +127,14 @@ Decisions (founder: decide and record):
 
 **Manual checks:**
 - 0072 in a throwaway in-process PGlite over stub tables: a reminder written 21 minutes ago settles `REMINDER_LATE`, one written 19 minutes ago is claimed.
-- Unrun by rule: `test/notify-boundary.test.ts`, `test/shift-reminders.test.ts`, the e2e spec; CI is their first run.
+- Unrun by rule: `test/notify-boundary.test.ts`, `test/shift-reminders.test.ts`, the e2e spec; CI is their first run. CI: they passed in run 44966269960 (PR #350).
 
 **Results (implementation, 2026-11-21).** Implemented directly by the planning agent (its investigation was already in context; no fresh subagent re-read the tree).
 - `pnpm typecheck` (all four projects), `pnpm lint`, `pnpm build`: clean. `pnpm --filter @shift/domain test`: 22 files, 975 passed. `pnpm --filter @shift/ics test`: 31 passed. `pnpm --filter ./apps/web test`: 184 files, 6859 passed (`key-sweep.test.ts` now leaves `reminders.notice.*` to `notify`, as it does `obavijesti.*`).
 - The fourteen DB-free root files above: 3292 passed (`test/notify-reminder.test.ts` 37 of them).
 - **0072 in PGlite** (scratchpad harness `s173/check-0072.mjs`, stub tables and helpers, no shared database): a reminder written 20 minutes before was settled `REMINDER_LATE` and not claimed; one written 19 min 59 s before was claimed; a `LOAN_MADE` row written two hours before was claimed, untouched.
 - **The e2e's imports under Playwright's loader**, checked with a throwaway one-test config in the worktree (no browser, no stack, no web server; deleted after): `remind/handler.ts` resolves `@shift/domain` through the root `tsconfig.json`'s paths onto the source, whose `.js` specifiers resolve to `.ts`, and `notify/messages.ts` loads. The spec itself was not run.
-- **Unrun, by rule:** `test/shift-reminders.test.ts`'s two new cases (`REMINDER_LATE`, the four channel cases), `test/notify-boundary.test.ts` (unchanged, DB-connecting), 0072 on a real Postgres, and `e2e/tests/notifications/reminder-delivery.spec.ts`. CI is their first run.
+- **Unrun, by rule:** `test/shift-reminders.test.ts`'s two new cases (`REMINDER_LATE`, the four channel cases), `test/notify-boundary.test.ts` (unchanged, DB-connecting), 0072 on a real Postgres, and `e2e/tests/notifications/reminder-delivery.spec.ts`. CI is their first run. CI: the first run (44965308725) failed `provisioning`'s inventory on `private.reminder_late/2`; after review 2's fix all passed in run 44966269960.
 
 ## Review Findings (review 1, 2026-11-21)
 
@@ -174,7 +174,7 @@ Five layers ran unattended: the Blind Hunter, the Edge Case Hunter, the Verifica
   - **Testing FR-62 after a sent reminder.** This is listed in the Epic AC Deviations.
 
 
-**Results (review 1, 2026-11-21).** `pnpm typecheck`, `pnpm lint`, `pnpm build`: clean. `pnpm --filter @shift/domain test`: 975 passed. `pnpm --filter @shift/ics test`: 31 passed. `pnpm --filter ./apps/web test`: 184 files, 6859 passed. The fourteen DB-free root files: 3302 passed (`test/notify-reminder.test.ts` 46). The PGlite harness (`s173/check-0072.mjs`) on the patched 0072: seven rows as expected (written 20 min ago, late; 19 min 59 s, claimed; H1 16 min past due, late; 10 min past due, claimed; mismatched `leadHours`, claimed; a recent evening-before row, claimed; an old `LOAN_MADE`, claimed). Still unrun, so first run in CI: the DB cases, 0072 on a real Postgres and the e2e spec.
+**Results (review 1, 2026-11-21).** `pnpm typecheck`, `pnpm lint`, `pnpm build`: clean. `pnpm --filter @shift/domain test`: 975 passed. `pnpm --filter @shift/ics test`: 31 passed. `pnpm --filter ./apps/web test`: 184 files, 6859 passed. The fourteen DB-free root files: 3302 passed (`test/notify-reminder.test.ts` 46). The PGlite harness (`s173/check-0072.mjs`) on the patched 0072: seven rows as expected (written 20 min ago, late; 19 min 59 s, claimed; H1 16 min past due, late; 10 min past due, claimed; mismatched `leadHours`, claimed; a recent evening-before row, claimed; an old `LOAN_MADE`, claimed). Still unrun, so first run in CI: the DB cases, 0072 on a real Postgres and the e2e spec. CI: passed in run 44966269960 (PR #350).
 
 ## Review Findings (review 2, 2026-11-22)
 
@@ -233,7 +233,7 @@ Six layers ran unattended on `origin/main...HEAD` (`33a1cf4`): the Blind Hunter,
 **Results (review 2, 2026-11-22).**
 - `pnpm typecheck`, `pnpm lint` and `pnpm build`: clean.
 - `pnpm exec vitest run` on `test/resource-hygiene.test.ts`, `test/supabase-scaffold.test.ts`, `test/key-hygiene.test.ts`, `test/functions-router.test.ts`, `test/remind.test.ts`, `test/notify-reminder.test.ts`, `test/localization-guard.test.ts`, `test/localization-applied.test.ts` and `test/coolify-deploy.test.ts`: 9 files, all passed. `notify-reminder` has 49 tests.
-- Unrun by rule, so CI is their first run: `test/provisioning.test.ts`'s new entries, `test/shift-reminders.test.ts`'s cases, 0072 on a real Postgres, and the e2e spec.
+- Unrun by rule, so CI is their first run: `test/provisioning.test.ts`'s new entries, `test/shift-reminders.test.ts`'s cases, 0072 on a real Postgres, and the e2e spec. CI: all passed in run 44966269960 (PR #350).
 
 ## Suggested Review Order
 
