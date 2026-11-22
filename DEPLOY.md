@@ -2947,3 +2947,128 @@ them and no stranger's pending signup.
 **A dump carries the switch.** A staging dump holds
 `signup_settings.open = true`. Production restores only from production's own
 dumps (story 20.7), never from staging's.
+
+### 9.10 Housekeeping, suspension and the abuse report (story 19.5)
+
+The operator's side of AD-25. Everything here is SQL run as `postgres` with the
+database password, **over the tailnet only** (the stack's Postgres as
+`tailscale serve` publishes it on the server's tailnet host, §8.2's `DB_HOST`),
+never through the API: no session role may call any of it. Run `psql` with
+`-v ON_ERROR_STOP=1`, so a refusal (`ORGANIZATION_UNKNOWN`) exits non-zero.
+Locally, run the same files with `supabase db query --local -f <file>`, the
+slug passed the same way (`PGOPTIONS="-c shift.organization_slug=<slug>"`).
+
+**The `housekeeping` job** (migration `0073`) is pg_cron's, daily at 03:15
+UTC, clear of the nightly backup. It calls
+`private.delete_abandoned_accounts()`, which deletes an `auth.users` row only
+when all of these hold, read again under the row's lock:
+
+- its address is an email identity's: a username account (`…@….shift.invalid`)
+  is **never** deleted, whatever its age, and neither is one with no readable
+  address;
+- it is not banned now (a banned abuser's account and its evidence stay);
+- no `members` row names it, in any organization;
+- no organization was founded by it (`founded_by`);
+- it is unconfirmed, and both created and last sent a confirmation link more
+  than 7 days ago (a repeat signup re-sends the link), or it was confirmed
+  more than 30 days ago (D-S7).
+
+An account inside `create_organization`, or one a member insert is naming at
+that moment, is skipped and tried again the next night; so is one whose delete
+fails for any other reason, logged as `HOUSEKEEPING_SKIPPED <id> <sqlstate>`
+and counted as `failed`, without undoing the rest. GoTrue's identities,
+sessions and tokens go with the account. The job also deletes
+`private.organization_attempts` rows older than 30 days. It deletes no
+organization and no domain row: revoked calendar links stay as the removals
+they are. Each run writes its counts to the database log as
+`HOUSEKEEPING {"unconfirmed_accounts": …, "confirmed_accounts": …,
+"organization_attempts": …, "failed": …}`, which is the Postgres container's
+output: Coolify's log view of the stack's `db` service, or
+`docker logs <the db container> 2>&1 | grep HOUSEKEEPING` on the host.
+pg_cron's `cron.job_run_details` records only that the statement ran. To
+check it:
+
+```sql
+select jobname, schedule, command, active from cron.job where jobname = 'housekeeping';
+select status, return_message, start_time from cron.job_run_details
+ where jobid = (select jobid from cron.job where jobname = 'housekeeping')
+ order by start_time desc limit 7;
+```
+
+Running it by hand (`select private.delete_abandoned_accounts();`) answers the
+same counts. The e2e signup accounts a reused local stack accumulates go the
+same way after 7 days.
+
+**Suspending an organization** (FR-101). Only the operator does this; no
+screen offers it.
+
+```bash
+PGOPTIONS="-c shift.organization_slug=<slug>" \
+  psql -v ON_ERROR_STOP=1 "<the stack's database URL over the tailnet>" -f supabase/operator/suspend-organization.sql
+```
+
+From the commit on, the organization's members read and write nothing, a
+sign-in or a token refresh is refused (they see *Prijava*'s one refusal
+message, the same as a deactivated account's), every member's calendar link
+answers the feed's one 404, and no reminder or notification is written or
+sent; queued notifications settle `ORGANIZATION_SUSPENDED` (a push `notify`
+had already claimed settles `RECIPIENT_INACTIVE`, and an email it had already
+claimed may still go out). A token already
+issued keeps its claim until it expires, but reads nothing. A device's offline
+copy stays readable on that device until it lapses or signs out, and cannot
+sync or write. Nothing is deleted. `unsuspend-organization.sql`, run the same
+way, restores it as it was; notifications settled meanwhile are not sent
+again. Both refuse an unknown slug (`ORGANIZATION_UNKNOWN`) or none
+(`ORGANIZATION_SLUG_MISSING`), and say so when there was nothing to change.
+Each leaves one entry in the organization's change history with no field
+shown.
+
+**The abuse report.** `signup-report.sql` reads and writes nothing:
+
+```bash
+psql -v ON_ERROR_STOP=1 "<the stack's database URL over the tailnet>" -At -f supabase/operator/signup-report.sql
+```
+
+It prints one JSON document: the switch and its ceilings; the last 24 hours'
+accounts with no member (counted exactly as the hook counts its ceiling) against `accounts_per_day` and
+signup-founded organizations against `organizations_per_day` (checklist A10's
+alert: either near its ceiling is the signal); the 50 newest email-identity
+accounts of the last 7 days; accounts per day by confirmation state and
+organizations founded per day for 30 days, beside the ceilings (the job has
+already removed what it deletes, so a day older than a week shows what
+remains, not what arrived); every
+organization founded by signup (slug, name, created, suspended, members); and
+the 20 accounts with the most `create_organization` attempts. Its output holds
+addresses: keep it on the operator's machine, never in an issue, a pull
+request or this repository.
+
+**The runbook, when abuse appears.**
+
+1. Run the report. One actor filling the ceilings shuts signup for everyone
+   (A10): close the door first, `update private.signup_settings set open =
+   false where id;` (§9.9), which stops new accounts and organizations at once.
+2. Suspend each organization the report shows to be abusive, by slug.
+3. Leave the abandoned accounts to the job, or run it by hand. An account
+   that founded an organization is never deleted by it; the organization is
+   suspended instead.
+4. Reopen the door once the cause is understood, and record what happened in
+   the security review (A10).
+
+**Opening production (D-S5)** follows section H of
+`_bmad-output/planning-artifacts/architecture/architecture-shift-2026-09-02/SECURITY-REVIEW-EPIC-19.md`,
+in its order, and nothing else does:
+
+1. The security review of 19.1–19.5 is done against sections A to G, each row
+   with its evidence, and nothing is open at high severity.
+2. The limits are verified on the production stack's own configuration: its
+   Kong limits, its GoTrue limits and its `signup_settings`.
+3. The Resend plan's volume is checked against the D-S3 ceiling plus
+   `notify`'s (D-S4).
+4. Backups (20.7) and monitoring (20.8) run on production, and this job
+   appears in `cron.job` there.
+5. The second-factor decision for email identities, F1 and A10 are recorded.
+6. Production restores only from production's own dumps.
+7. **The founder says go.** Then a reviewed PR lets production build with
+   `VITE_SIGNUP_ENABLED`, the operator sets production's GoTrue environment
+   and restarts auth, and last opens `signup_settings` by SQL. Closing is the
+   reverse order.

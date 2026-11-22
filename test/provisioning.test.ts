@@ -2823,6 +2823,9 @@ describe('the access-control layer runs as the owner and hands that power to nob
     // predicate in `private`, which GoTrue's role may not reach.
     { name: 'create_organization', argumentCount: 8 },
     { name: 'forget_password_on_confirmation', argumentCount: 0, schema: 'private' },
+    // STORY 19.5 (0073). AD-25's housekeeping deletes `auth.users` rows, which
+    // no session role may touch; pg_cron runs it as the migration role.
+    { name: 'delete_abandoned_accounts', argumentCount: 0, schema: 'private' },
   ];
 
   it.skipIf(noDatabase).each(ACCESS_CONTROL_FUNCTIONS)(
@@ -3086,6 +3089,10 @@ describe('the access-control layer runs as the owner and hands that power to nob
     { name: 'forget_password_on_confirmation', argumentCount: 0, expected: [], schema: 'private' },
     // STORY 17.3 (0072). The late bound is the claim's alone: nobody's.
     { name: 'reminder_late', argumentCount: 2, expected: [], schema: 'private' },
+    // STORY 19.5 (0073). AD-10's one reader of `suspended` and AD-25's job are
+    // nobody's: their callers are definers and pg_cron.
+    { name: 'organization_live', argumentCount: 1, expected: [], schema: 'private' },
+    { name: 'delete_abandoned_accounts', argumentCount: 0, expected: [], schema: 'private' },
   ];
 
   it.skipIf(noDatabase).each([
@@ -3153,6 +3160,9 @@ describe('the access-control layer runs as the owner and hands that power to nob
     // STORY 17.3 (0072). The late bound runs as its caller, always the
     // definer claim owned by the migration role.
     { name: 'reminder_late', argumentCount: 2, schema: 'private' },
+    // STORY 19.5 (0073). The suspension predicate runs as its caller, always a
+    // definer owned by the migration role.
+    { name: 'organization_live', argumentCount: 1, schema: 'private' },
   ] as { name: string; argumentCount: number; schema?: string }[])('runs $name as the caller, with an empty search_path', async ({ name, argumentCount, schema }) => {
     // INVOKER, the opposite of the helper and the hook. They are reached from
     // the helper, the hook and the zero-admins function as the owner, and from

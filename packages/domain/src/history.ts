@@ -343,6 +343,9 @@ export const HISTORY_HIDDEN_COLUMNS: ReadonlySet<string> = new Set([
   // Story 19.3 (0071, AD-11): the founding account, an attribution like
   // `created_by`, recorded and never shown.
   'founded_by',
+  // Story 19.5 (0073, AD-10, AD-11): the operator's suspension, recorded and
+  // never shown. Suspension is not a user-facing surface (FR-101).
+  'suspended',
 ]);
 
 type FieldType =
