@@ -23,10 +23,11 @@
 --          0061's triggers and hidden from the history (AD-11,
 --          `HISTORY_HIDDEN_COLUMNS`): suspension is not a user-facing surface
 --          (FR-101).
---   (ii)   `private.organization_live(p_organization)`: the ONE function that
---          names the column (AD-10; a scaffold pin fails any other body that
---          does). An unknown or null organization is not live: it fails
---          closed. Executable by nobody: its callers are definers.
+--   (ii)   `private.organization_live(p_organization)`: the ONE function
+--          body in any migration that names the column (AD-10; a scaffold pin
+--          fails any other body that does; the operator scripts read and
+--          write it directly). An unknown or null organization is not live:
+--          it fails closed. Executable by nobody: its callers are definers.
 --   (iii)  Its callers, each re-created from its latest definition with the
 --          check added and nothing else changed (the scaffold diffs each one
 --          against its source, word for word):
@@ -72,7 +73,14 @@
 --          insert naming the account waits, then fails its foreign key. GoTrue's
 --          own foreign keys cascade the identities, sessions and tokens. It
 --          also deletes `private.organization_attempts` rows older than 30
---          days. It answers the counts and writes them to the server log.
+--          days. It answers the counts and raises them as a LOG line.
+--          A CIRCUIT BREAKER comes first: more candidates than seven times
+--          `accounts_per_day` (the hook's daily ceiling on memberless
+--          accounts) and it deletes nothing and fails `HOUSEKEEPING_HALTED`,
+--          so a `members` table emptied or half restored never empties
+--          `auth.users`; the operator may raise the ceiling for one session
+--          (`shift.housekeeping_ceiling`). Every other lock it meets is
+--          waited for 5 seconds at most (`lock_timeout`).
 --          Executable by nobody: pg_cron runs it as the migration role.
 --
 -- NOT CHANGED, decided here (19.5's required inputs):
@@ -916,8 +924,48 @@ declare
   confirmed_deleted integer := 0;
   attempts_deleted integer := 0;
   failed integer := 0;
+  candidates integer;
+  halt_ceiling integer;
   answer jsonb;
 begin
+  -- A lock this job meets beyond the row it takes `skip locked` (a cascade
+  -- into GoTrue's sessions or tokens) is waited for 5 seconds at most: the
+  -- account's subtransaction then fails, is counted and is tried next night.
+  perform pg_catalog.set_config('lock_timeout', '5s', true);
+
+  -- THE CIRCUIT BREAKER. The hook admits at most `accounts_per_day` memberless
+  -- accounts a day, so a night's candidates are at most two days' arrivals
+  -- (one unconfirmed, one confirmed cohort), a few nights' after missed runs.
+  -- More than a week's arrivals means the rule is reading something wrong (a
+  -- `members` table emptied or half restored, a clock jump): the job deletes
+  -- NOTHING and fails, which pg_cron records in `job_run_details`. The
+  -- operator, having checked, may run it by hand with a higher ceiling
+  -- (`set shift.housekeeping_ceiling = <n>`, DEPLOY.md section 9.10).
+  select 7 * s.accounts_per_day into halt_ceiling from private.signup_settings as s where s.id;
+  halt_ceiling := coalesce(
+    nullif(pg_catalog.btrim(coalesce(pg_catalog.current_setting('shift.housekeeping_ceiling', true), '')), '')::integer,
+    halt_ceiling,
+    700
+  );
+  select pg_catalog.count(*)::integer
+    into candidates
+    from auth.users as u
+   where private.address_kind(u.email) = 'email'
+     and (u.banned_until is null or u.banned_until <= pg_catalog.now())
+     and not exists (select 1 from public.members as m where m.auth_user_id = u.id)
+     and not exists (select 1 from public.organizations as o where o.founded_by = u.id)
+     and (
+       (u.email_confirmed_at is null
+        and greatest(u.created_at, coalesce(u.confirmation_sent_at, u.created_at)) < pg_catalog.now() - interval '7 days')
+       or (u.email_confirmed_at is not null and u.email_confirmed_at < pg_catalog.now() - interval '30 days')
+     );
+  if candidates > halt_ceiling then
+    raise exception using
+      errcode = 'check_violation',
+      message = 'HOUSEKEEPING_HALTED',
+      detail = candidates::text || ' candidates, ceiling ' || halt_ceiling::text;
+  end if;
+
   -- The candidates, read once. Each is taken again below, under its lock.
   for candidate in
     select u.id
@@ -984,9 +1032,16 @@ begin
     end;
   end loop;
 
-  delete from private.organization_attempts as a
-   where a.attempted_at < pg_catalog.now() - interval '30 days';
-  get diagnostics attempts_deleted = row_count;
+  -- Its own subtransaction too: a failure here never undoes the accounts.
+  begin
+    delete from private.organization_attempts as a
+     where a.attempted_at < pg_catalog.now() - interval '30 days';
+    get diagnostics attempts_deleted = row_count;
+  exception
+    when others then
+      failed := failed + 1;
+      raise warning 'HOUSEKEEPING_ATTEMPTS_SKIPPED %', sqlstate;
+  end;
 
   answer := pg_catalog.jsonb_build_object(
     'unconfirmed_accounts', unconfirmed_deleted,
@@ -996,7 +1051,8 @@ begin
   );
 
   -- pg_cron's `job_run_details` keeps the statement's status, not its value:
-  -- the counts go to the server log, which the operator reads.
+  -- the counts go to the server log where its level admits LOG (the
+  -- self-hosted stack's does not: `log_min_messages=fatal`, DEPLOY.md 9.10).
   raise log 'HOUSEKEEPING %', answer::text;
 
   return answer;

@@ -7170,13 +7170,22 @@ $$;`,
       "greatest(u.created_at, coalesce(u.confirmation_sent_at, u.created_at)) < pg_catalog.now() - interval '7 days')",
       "or (u.email_confirmed_at is not null and u.email_confirmed_at < pg_catalog.now() - interval '30 days')",
     ];
-    for (const clause of rule) expect(job.split(clause).length - 1, clause).toBeGreaterThanOrEqual(2);
+    for (const clause of rule) expect(job.split(clause).length - 1, clause).toBeGreaterThanOrEqual(3);
+    // The circuit breaker: the candidates counted by the same rule, and
+    // nothing deleted above seven days' worth of the hook's ceiling.
+    expect(job).toContain('select 7 * s.accounts_per_day into halt_ceiling from private.signup_settings as s where s.id;');
+    expect(job).toContain("pg_catalog.current_setting('shift.housekeeping_ceiling', true)");
+    expect(job).toMatch(/if candidates > halt_ceiling then\s+raise exception using\s+errcode = 'check_violation',\s+message = 'HOUSEKEEPING_HALTED'/);
+    expect(job).toContain("perform pg_catalog.set_config('lock_timeout', '5s', true);");
     const at = (needle: string): number => {
       const index = job.indexOf(needle);
       expect(index, `the job lacks ${needle}`).toBeGreaterThan(-1);
       return index;
     };
     const order = [
+      at("perform pg_catalog.set_config('lock_timeout', '5s', true);"),
+      at('into candidates'),
+      at("message = 'HOUSEKEEPING_HALTED'"),
       at('for candidate in'),
       at('for update of u skip locked;'),
       at('if exists (select 1 from public.members as m where m.auth_user_id = candidate)'),
@@ -7194,6 +7203,7 @@ $$;`,
     expect(job).not.toMatch(/\bexecute\b|\bformat\(/i);
     // One account per subtransaction: a failing row is logged and counted, never fatal.
     expect(job).toMatch(/exception\s+when others then\s+failed := failed \+ 1;\s+raise warning 'HOUSEKEEPING_SKIPPED % %', candidate, sqlstate;\s+end;\s+end loop;/);
+    expect(job).toMatch(/exception\s+when others then\s+failed := failed \+ 1;\s+raise warning 'HOUSEKEEPING_ATTEMPTS_SKIPPED %', sqlstate;\s+end;/);
     for (const role of ['public', 'anon', 'authenticated', 'service_role']) {
       expect(sql).toContain(`revoke execute on function private.delete_abandoned_accounts() from ${role};`);
     }

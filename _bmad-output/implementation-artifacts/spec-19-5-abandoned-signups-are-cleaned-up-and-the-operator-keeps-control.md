@@ -4,13 +4,13 @@ type: 'feature'
 created: '2026-11-21'
 status: 'in-review'
 baseline_commit: 'b5e0c94df104a638e7332e1abe4191ef643548bb'
-review_loop_iteration: 0
+review_loop_iteration: 1
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-19-context.md'
   - '{project-root}/_bmad-output/planning-artifacts/architecture/architecture-shift-2026-09-02/SECURITY-REVIEW-EPIC-19.md'
 ---
 
-Status: review, built and reviewed (five layers), CI pending; needs a rebase onto 17.3's merge first (Baseline). Unattended run: the checkpoint was taken as approved, the founder having said not to ask questions; the orchestrating session wrote the spec and implemented it directly rather than through a fresh implementation subagent.
+Status: review, built, reviewed (five layers) and security-reviewed (2026-11-22), rebased onto 17.3's merge (#350); CI pending. Unattended run: the checkpoint was taken as approved, the founder having said not to ask questions; the orchestrating session wrote the spec and implemented it directly rather than through a fresh implementation subagent.
 
 Baseline: `origin/main` at #349 (19.3 merged, 0071). Story 17.3 runs in parallel and takes migration 0072, so this story's migration is **0073**. On the orchestrator's word that 17.3 merges first, 0073's `claim_notifications` is re-created from **0072's** definition (`origin/feat/17-3-reminder-delivery` at `33a1cf4`, the `REMINDER_LATE` settle kept), so this branch must be rebased onto 17.3's merge before CI can pass: without 0072 the migration chain fails at 0073 (`private.reminder_late`) and three scaffold cases fail. No `hr.json` edit (17.3 holds the hot file); no UI change.
 
@@ -117,3 +117,45 @@ Review of 2026-11-22. Layers: Blind Hunter, Edge Case Hunter, Verification Gap, 
 12. Deferred (OWNER the D-S5 review): own-account writes by a suspended member's unexpired token, a device row a suspended member cannot delete, an already-claimed email. Deferred (OWNER the founder): the decisions above.
 
 Rejected, each with its reason: a batch limit on the job (abandoned accounts at staging scale are tens, each row lock is held for one short run, and a skipped row is retried the next night); dropping the two "no change" history entries (AD-11 audits every organizations column; hiding the column is the decision, D9); the sprint-status timestamp a day ahead (it is the local clock, as every earlier entry); rewording `catalog-sweep.ts`'s comments (moved unchanged on purpose, D10).
+
+### Security review (2026-11-22, after the rebase onto #350)
+
+Unattended, on `git diff origin/main...HEAD`, against `SECURITY-REVIEW-EPIC-19.md`'s 19.5 rows (E3, E4, F1–F4). Layers: Blind Hunter, Edge Case Hunter, Verification Gap, and the Acceptance and Epic AC auditors together. The artifact renderer was skipped because the change generates no file for a user. The reviewer also checked the focus items directly.
+
+**Rebase.** There were two conflicts. `test/provisioning.test.ts` kept both sides' entries: 17.3's `reminder_late` and 19.5's `organization_live` and `delete_abandoned_accounts`. In `test/supabase-scaffold.test.ts`, 17.3's "no later definition" pin now expects `['0073_housekeeping_and_suspension.sql']`. The merged 0072's `claim_notifications` equals the copy 0073 started from, apart from the two suspension edits (diffed), so 0073's claim stands unchanged. The word-for-word pin checks all nine re-created callers against their latest definitions found dynamically, and the grant replay passes against the merged chain.
+
+**Checked directly, no finding.**
+- `organization_live` coverage. All 69 `create policy` statements AND their claim with `current_member_access()`. Every `security definer` function granted to `anon` or `authenticated`, at its latest definition, reads `current_member_access()`, `organization_live` or `calendar_feed_member_live`. The one exception is `create_organization`, the claimless path. admin-auth authorizes through `current_member_access` with the caller's token. The feed reaches `calendar_feed_inputs`, which goes through `calendar_feed_member_live`. History and exports read through the policies. Every `service_role` function is either re-created or settles only rows the claim returned.
+- `suspended` has no column grant to `authenticated`, and no Edge Function writes `organizations`. admin-auth's only `organizations` access is a select.
+- The operator scripts: the slug is a session setting and is never interpolated. Each script is one `do` block, refuses a missing or unknown slug, and is run with `ON_ERROR_STOP=1`.
+- Deletion: members are never deleted, so their row is a lasting guard. `members.auth_user_id` cascades but is excluded and re-checked. The pilot's accounts all hold member rows, or are synthesized. A cron misfire or double run is harmless: the rule is age-based, and a second run answers zero (F1).
+
+**Findings and dispositions.**
+1. Patched (high, Edge Case Hunter + reviewer): the job had no circuit breaker. A `members` table emptied or half restored while `auth.users` stays intact would have deleted every confirmed memberless email account in one night. The job now counts its candidates first. Above seven times `accounts_per_day` (the hook's daily ceiling on memberless accounts, so at least three nights of normal arrivals), it deletes nothing and fails `HOUSEKEEPING_HALTED`, which `cron.job_run_details` records. The operator may raise the ceiling for one session (`shift.housekeeping_ceiling`). DEPLOY.md section 9.10 also says to pause the job during a restore. Covered by a scaffold pin and a DB case (unrun), and in PGlite: 3 candidates over a ceiling of 2 halted with nothing deleted.
+2. Patched (medium, Blind Hunter): the runbook promised `HOUSEKEEPING` counts in the container log, but the stack's Postgres runs with `log_min_messages=fatal`. DEPLOY.md, the migration header and the spine now say so. Running the job by hand answers the counts. A durable record and an alert are deferred to 20.8.
+3. Patched (low, Edge Case Hunter): a cascade into GoTrue's child rows could wait on a lock with no bound. `lock_timeout` is now 5 s for the run, so such an account fails, is counted and is retried the next night.
+4. Patched (low, Edge Case Hunter): an error in the attempts purge would have rolled back the night's account deletions. It now runs in its own subtransaction (`HOUSEKEEPING_ATTEMPTS_SKIPPED`, counted `failed`).
+5. Patched (Verification Gap): new DB cases. An account whose delete raises 23503 (a restricting foreign key) is counted `failed` while the rest still go; this case was confirmed in PGlite, which also caught that a temporary table cannot reference `auth.users`. A null `confirmation_sent_at` (8 days old: deleted; 6 days: kept). A suspended row whose member also turned email off settles `ORGANIZATION_SUSPENDED`, so D3's order is now exercised. The report's `organizations_founded` and `organizations_by_day` are checked against a scene.
+6. Patched (docs, Blind Hunter + Acceptance Auditor): the abuse runbook now closes the door before running the report, and says how to ban an account (`banned_until`; the job keeps banned accounts). Checklist step 5 now names founder decision F1 (B2's timing). The spine's "two more callers" is corrected to one. "The ONE function" is scoped to migration bodies. The four PGlite scripts are named. `deferred-work.md`'s four "RESOLVED by 19.5" entries now say their DB evidence is pending CI.
+7. Deferred (OWNER 20.8): a durable per-run record of the counts, and an alert on a failed run, `failed > 0`, or a job that stopped. Deferred (OWNER the D-S5 review, A10): the report cannot tell one actor from many (no domain grouping, ban state, resend count or source address).
+8. Recorded for the founder (in the existing D-S5 decisions entry): the circuit breaker, and the AC1 narrowings that the frozen Epic AC Deviations section does not list. These are the banned exclusion and the two clocks; the code matches D4.
+
+**Rejected, with reasons.**
+- Deleting a confirmed account despite recent sign-ins or a reset follows D-S7 and the epic's 30 days as ratified, and the person can sign up again. The founder's D-S5 entry already names "whatever its sign-ins".
+- `service_role` may write `suspended`: it is AD-17's trusted secret-key role, past row level security, as for `founded_by` (D11). A column revoke cannot override its table grant. No Edge Function writes `organizations`.
+- `anon`'s default table UPDATE is pre-existing for every column. There is no update policy, so row level security refuses it.
+- A `founded_by` foreign key: only `create_organization` sets it, after locking the account (AD-23 step 1), and the job re-reads it under the lock.
+- A null `created_at`: GoTrue always sets it.
+- Subtransaction-cache overflow: a nightly job, now bounded by the breaker.
+- Dropping the "no change" history entries: decided in D9 (AD-11).
+- `suspended_at` and a reason: the audit rows record when and by whom.
+- Suspended users get no explanation and there is no appeal path: FR-101 makes suspension an operator action with the deactivation's one message.
+- A distinct push status for in-flight rows: D2, documented.
+- The bundled 19.3 bookkeeping: it closes the prior story.
+- Report-count drift against the hook: the report states the hook's rule, and the scene asserts it.
+- Report flakiness: the assertions filter by tag, or run in one rolled-back transaction on a serial runner.
+- `PGOPTIONS` with `supabase db query`: the existing `db:demo` script already relies on it.
+- An explicit `swap_parties_active` case: the suspended sweep plus the static definer scan cover it.
+- The deletion job being armed before the founder accepts: the founder delegated it ("Ask First: none"). On every stack the door is closed or the accounts are members, so only true abandoned signups qualify, and the breaker now bounds an error.
+
+**Verification (2026-11-22, after the patches).** `pnpm typecheck`, `pnpm lint` and `pnpm build` pass. The ten root files pass: 10 files, 3180 tests. The changed function, run in a scratch PGlite (not committed) over stand-in tables, halted at a ceiling below its count with nothing deleted, then deleted the two healthy accounts and counted the restricted one `failed`. Unrun, with CI as their first run: `test/housekeeping.test.ts` (the three new cases), `test/suspended-organization.test.ts` (the extended settle and report cases), the moved sweep, and `test/provisioning.test.ts`.

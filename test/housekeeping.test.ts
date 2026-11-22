@@ -37,15 +37,15 @@ const NOTHING: Counts = { unconfirmed_accounts: 0, confirmed_accounts: 0, organi
  * An account as the OWNER, created `createdDaysAgo` days ago and confirmed
  * `confirmedDaysAgo` days ago (null: unconfirmed), with its email identity
  * row, as GoTrue would leave it. `sentDaysAgo` is its last confirmation link
- * (a repeat signup re-sends it and keeps `created_at`); `banned` bans it for
- * a year.
+ * (a repeat signup re-sends it and keeps `created_at`), and `neverSent`
+ * leaves `confirmation_sent_at` null; `banned` bans it for a year.
  */
 async function account(
   client: Client,
   email: string | null,
   createdDaysAgo: number,
   confirmedDaysAgo: number | null,
-  options: { sentDaysAgo?: number; banned?: boolean } = {},
+  options: { sentDaysAgo?: number; neverSent?: boolean; banned?: boolean } = {},
 ): Promise<string> {
   const id = randomUUID();
   await client.query(
@@ -56,11 +56,19 @@ async function account(
      ) values (
        '00000000-0000-0000-0000-000000000000', $1, 'authenticated', 'authenticated', $2,
        case when $4::int is null then null else now() - make_interval(days => $4::int) end,
-       now() - make_interval(days => coalesce($5::int, $3::int)),
+       case when $7::boolean then null else now() - make_interval(days => coalesce($5::int, $3::int)) end,
        case when $6::boolean then now() + interval '1 year' end,
        '{}'::jsonb, '{}'::jsonb, now() - make_interval(days => $3::int), now(), '', '', '', ''
      )`,
-    [id, email?.replace('<id>', id) ?? null, createdDaysAgo, confirmedDaysAgo, options.sentDaysAgo ?? null, options.banned ?? false],
+    [
+      id,
+      email?.replace('<id>', id) ?? null,
+      createdDaysAgo,
+      confirmedDaysAgo,
+      options.sentDaysAgo ?? null,
+      options.banned ?? false,
+      options.neverSent ?? false,
+    ],
   );
   await client.query(
     `insert into auth.identities (provider_id, user_id, identity_data, provider, created_at, updated_at)
@@ -137,9 +145,12 @@ describe('the housekeeping job (story 19.5, AD-25, D-S7)', () => {
         confirmed31: await account(client, `hk-c31-<id>@example.com`, 40, 31),
         // A link re-sent 9 days ago is as stale as the account.
         resentLongAgo: await account(client, `hk-rs9-<id>@example.com`, 40, null, { sentDaysAgo: 9 }),
+        // No link recorded: the 7 days run from the creation alone.
+        neverSent8: await account(client, `hk-ns8-<id>@example.com`, 8, null, { neverSent: true }),
       };
       const kept = {
         unconfirmed6: await account(client, `hk-u6-<id>@example.com`, 6, null),
+        neverSent6: await account(client, `hk-ns6-<id>@example.com`, 6, null, { neverSent: true }),
         // A repeat signup re-sent the link 2 days ago: its owner holds a live link.
         resentRecently: await account(client, `hk-rs2-<id>@example.com`, 40, null, { sentDaysAgo: 2 }),
         // An account the operator banned keeps its evidence.
@@ -204,6 +215,55 @@ describe('the housekeeping job (story 19.5, AD-25, D-S7)', () => {
       // A second run finds nothing left to delete.
       expect(await housekeeping(client)).toEqual(NOTHING);
       for (const [label, id] of Object.entries(kept)) expect(await exists(client, id), `${label} was deleted on the second run`).toBe(true);
+    });
+  });
+
+  it.skipIf(noDatabase)('counts an account whose delete fails as failed, and still deletes the rest (one subtransaction each)', async () => {
+    await inRolledBackTransaction(async (client) => {
+      const poisoned = await account(client, `hk-poison-<id>@example.com`, 8, null);
+      const doomed = await account(client, `hk-poison-ok-<id>@example.com`, 8, null);
+      // A row restricting the delete, as a future foreign key without a
+      // cascade would: the account's delete raises 23503. (A temporary table
+      // may not reference auth.users; this one goes with the rollback.)
+      await client.query('create table private.housekeeping_poison (user_id uuid references auth.users (id))');
+      await client.query('insert into private.housekeeping_poison (user_id) values ($1)', [poisoned]);
+      const expected = await expectedCounts(client);
+      const counts = await housekeeping(client);
+      expect(counts).toEqual({ ...expected, unconfirmed_accounts: expected.unconfirmed_accounts - 1, failed: 1 });
+      expect(await exists(client, poisoned), 'the failing account was deleted').toBe(true);
+      expect(await exists(client, doomed), 'one failing account undid the others').toBe(false);
+    });
+  });
+
+  it.skipIf(noDatabase)('deletes nothing and fails HOUSEKEEPING_HALTED above its ceiling, and runs once the operator raises it (circuit breaker)', async () => {
+    await inRolledBackTransaction(async (client) => {
+      const stale = await account(client, `hk-halt-<id>@example.com`, 8, null);
+      const attempt = await account(client, `hk-halt-a-<id>@example.com`, 2, null);
+      await client.query(
+        "insert into private.organization_attempts (auth_user_id, attempted_at) values ($1, now() - interval '31 days')",
+        [attempt],
+      );
+      const candidates = (await expectedCounts(client)).unconfirmed_accounts + (await expectedCounts(client)).confirmed_accounts;
+      expect(candidates).toBeGreaterThanOrEqual(1);
+      // One below the count: the job must refuse, deleting nothing at all.
+      await client.query("select set_config('shift.housekeeping_ceiling', $1, true)", [String(candidates - 1)]);
+      await client.query('savepoint halted');
+      const refused = await client.query('select private.delete_abandoned_accounts()').then(
+        () => null,
+        (cause: unknown) => cause as { code?: string; message?: string; detail?: string },
+      );
+      await client.query('rollback to savepoint halted');
+      expect(refused?.code).toBe('23514');
+      expect(refused?.message).toBe('HOUSEKEEPING_HALTED');
+      expect(refused?.detail).toBe(`${candidates} candidates, ceiling ${candidates - 1}`);
+      expect(await exists(client, stale), 'a halted run deleted an account').toBe(true);
+      expect(await countOf(client, `select count(*)::int as n from private.organization_attempts where auth_user_id = '${attempt}'`)).toBe(1);
+      // At the count exactly, it runs.
+      await client.query("select set_config('shift.housekeeping_ceiling', $1, true)", [String(candidates)]);
+      const counts = await housekeeping(client);
+      expect(counts.unconfirmed_accounts + counts.confirmed_accounts).toBe(candidates);
+      expect(await exists(client, stale)).toBe(false);
+      await client.query("select set_config('shift.housekeeping_ceiling', '', true)");
     });
   });
 

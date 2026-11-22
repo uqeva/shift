@@ -420,6 +420,13 @@ describe('a suspended organization reads nothing (story 19.5, AD-10, E3)', () =>
       );
       const pending = queued[0]?.id ?? '';
       const push = inFlight[0];
+      // The member has also turned email off, so 0044's settle matches the
+      // pending row too: the suspension's runs first and is the reason recorded (D3).
+      await client.query(
+        `insert into notification_settings (organization_id, member_id, email) values ($1, $2, false)
+         on conflict (organization_id, member_id) do update set email = false`,
+        [who.organizationId, who.id],
+      );
 
       await runOperatorScript(client, 'suspend-organization.sql', PILOT.slug);
       await actAsService(client);
@@ -443,6 +450,10 @@ describe('a suspended organization reads nothing (story 19.5, AD-10, E3)', () =>
       await actAsOwner(client);
       expect(again.map((row) => row.id), 'a settled row was sent after unsuspending').not.toContain(pending);
       // Delivery is restored: a row queued after unsuspending is claimed.
+      await client.query('update notification_settings set email = true where organization_id = $1 and member_id = $2', [
+        who.organizationId,
+        who.id,
+      ]);
       const { rows: fresh } = await client.query<{ id: string }>(
         `insert into notification_outbox (organization_id, code, subject_id, recipient_member_id, channel, operands)
          values ($1, 'LEAVE_REQUEST_DECIDED', $2, $3, 'email', '{}'::jsonb) returning id::text`,
@@ -553,6 +564,7 @@ describe('only the operator suspends, and unsuspending changes no record (story 
       type Report = {
         last_24_hours: { accounts_without_member: number; organizations_founded: number };
         recent_accounts: { email: string; with_member: boolean; confirmed_at: string | null }[];
+        organizations_by_day: { founded: number }[];
         accounts_by_day: { created: number; confirmed: number; with_member: number }[];
         organizations_founded_by_signup: { slug: string; suspended: boolean; members: number }[];
         most_attempts: { account: string; attempts_24_hours: number; attempts_30_days: number }[];
@@ -582,7 +594,8 @@ describe('only the operator suspends, and unsuspending changes no record (story 
       const founder = await make(`report-c-${tag}@example.com`, true);
       await make(`report-s-${tag}@${PILOT.slug}.shift.invalid`, true);
       const other = await organizationId(client, OTHER.slug);
-      await client.query('update organizations set founded_by = $1 where id = $2', [founder, other]);
+      // Created now too, so the 24-hour and per-day organization figures see it.
+      await client.query('update organizations set founded_by = $1, created_at = now() where id = $2', [founder, other]);
       await runOperatorScript(client, 'suspend-organization.sql', OTHER.slug);
       await client.query(
         `insert into private.organization_attempts (auth_user_id, attempted_at)
@@ -593,7 +606,11 @@ describe('only the operator suspends, and unsuspending changes no record (story 
 
       // The hook's ceiling counts every memberless account, the synthesized one too.
       expect(after.last_24_hours.accounts_without_member - before.last_24_hours.accounts_without_member).toBe(3);
-      // `founded_by` alone makes an organization signup-founded here (the fixture's own created_at may be older than 24 hours).
+      // The organization ceiling's figures count it, once (`founded_by` set, created now).
+      expect(after.last_24_hours.organizations_founded - before.last_24_hours.organizations_founded).toBe(1);
+      const foundedOf = (rows: Report['organizations_by_day']): number => rows.reduce((total, row) => total + row.founded, 0);
+      expect(foundedOf(after.organizations_by_day) - foundedOf(before.organizations_by_day)).toBe(1);
+      // `founded_by` alone makes an organization signup-founded here.
       const listed = after.organizations_founded_by_signup.find((entry) => entry.slug === OTHER.slug);
       expect(listed?.suspended).toBe(true);
       expect(listed?.members).toBeGreaterThan(0);

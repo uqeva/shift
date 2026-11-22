@@ -2980,13 +2980,39 @@ and counted as `failed`, without undoing the rest. GoTrue's identities,
 sessions and tokens go with the account. The job also deletes
 `private.organization_attempts` rows older than 30 days. It deletes no
 organization and no domain row: revoked calendar links stay as the removals
-they are. Each run writes its counts to the database log as
-`HOUSEKEEPING {"unconfirmed_accounts": …, "confirmed_accounts": …,
-"organization_attempts": …, "failed": …}`, which is the Postgres container's
-output: Coolify's log view of the stack's `db` service, or
-`docker logs <the db container> 2>&1 | grep HOUSEKEEPING` on the host.
-pg_cron's `cron.job_run_details` records only that the statement ran. To
-check it:
+they are.
+
+**The circuit breaker.** Before deleting anything the job counts its
+candidates. The before-user-created hook admits at most `accounts_per_day`
+memberless accounts a day, so a normal night has at most two days' arrivals.
+If the count is above **seven times `accounts_per_day`** (700 by default), the
+job deletes nothing and fails with `HOUSEKEEPING_HALTED` (`<n> candidates,
+ceiling <m>` in its detail). `cron.job_run_details` then shows `failed` with
+that message. A count that high means the rule is reading something wrong, for
+example a `members` table emptied or half restored, so find the cause first.
+To clear a real backlog once it is understood, run the job by hand with a
+higher ceiling for that session only:
+
+```sql
+set shift.housekeeping_ceiling = 2000;
+select private.delete_abandoned_accounts();
+```
+
+During a restore from backup (20.7), pause the job first
+(`select cron.alter_job((select jobid from cron.job where jobname = 'housekeeping'), active => false);`)
+and re-enable it (`active => true`) once the restored data has been checked.
+
+**What a run leaves.** The function answers its counts,
+`{"unconfirmed_accounts": …, "confirmed_accounts": …,
+"organization_attempts": …, "failed": …}`, and raises them as a `LOG` line
+(`HOUSEKEEPING {…}`), with a `WARNING` (`HOUSEKEEPING_SKIPPED <id> <sqlstate>`)
+for each account it skipped. The self-hosted stack's Postgres runs with
+`log_min_messages=fatal` (`deploy/coolify/supabase/docker-compose.yml`), so
+those lines **do not reach the container's log there**. pg_cron's
+`cron.job_run_details` records only whether the statement succeeded, so a
+nightly run's counts are not kept anywhere. A durable record and an alert on
+`failed` or a halt belong to monitoring (20.8, `deferred-work.md`). To see the
+counts, run the job by hand: it answers them. To check that it runs:
 
 ```sql
 select jobname, schedule, command, active from cron.job where jobname = 'housekeeping';
@@ -3044,14 +3070,19 @@ request or this repository.
 
 **The runbook, when abuse appears.**
 
-1. Run the report. One actor filling the ceilings shuts signup for everyone
-   (A10): close the door first, `update private.signup_settings set open =
-   false where id;` (§9.9), which stops new accounts and organizations at once.
-2. Suspend each organization the report shows to be abusive, by slug.
-3. Leave the abandoned accounts to the job, or run it by hand. An account
+1. Close the door: `update private.signup_settings set open = false where
+   id;` (§9.9). This stops new accounts and organizations at once. One actor
+   filling the ceilings shuts signup for everyone anyway (A10).
+2. Run the report.
+3. Suspend each organization the report shows to be abusive, by slug.
+4. Leave the abandoned accounts to the job, or run it by hand. An account
    that founded an organization is never deleted by it; the organization is
-   suspended instead.
-4. Reopen the door once the cause is understood, and record what happened in
+   suspended instead. To keep an abusive account and its attempts as evidence,
+   ban it, over the same tailnet connection:
+   `update auth.users set banned_until = now() + interval '10 years' where id = '<id>';`.
+   GoTrue refuses a banned account's sign-in and refresh, and the job never
+   deletes a banned account.
+5. Reopen the door once the cause is understood, and record what happened in
    the security review (A10).
 
 **Opening production (D-S5)** follows section H of
@@ -3066,7 +3097,8 @@ in its order, and nothing else does:
    `notify`'s (D-S4).
 4. Backups (20.7) and monitoring (20.8) run on production, and this job
    appears in `cron.job` there.
-5. The second-factor decision for email identities, F1 and A10 are recorded.
+5. The second-factor decision for email identities, founder decision F1 (B2's
+   timing, if Kong cannot relay) and A10 are recorded.
 6. Production restores only from production's own dumps.
 7. **The founder says go.** Then a reviewed PR lets production build with
    `VITE_SIGNUP_ENABLED`, the operator sets production's GoTrue environment
