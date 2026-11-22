@@ -44,12 +44,16 @@ describe('the keys rendered and the keys declared are the same set', () => {
    * Nor `signup.email.*` (story 19.1): the Auth email GoTrue sends, built into
    * `dist/auth-email/*.html` by `lib/auth-email.ts` at build. No screen renders
    * them either; `test/auth-email.test.ts` holds every one to a template.
+   *
+   * Nor `reminders.notice.*` (story 17.3): the shift reminder `notify`
+   * renders from its pinned copy (`PODSJETNICI`, `test/notify-reminder.test.ts`).
    */
   const declared = (): string[] =>
     resourceKeys()
       .filter((key) => !key.startsWith('count.') || key === 'count.days')
       .filter((key) => !key.startsWith('obavijesti.'))
       .filter((key) => !key.startsWith('signup.email.'))
+      .filter((key) => !key.startsWith('reminders.notice.'))
       .sort();
 
   it('renders every screen key the resource file declares', () => {

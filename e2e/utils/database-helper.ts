@@ -1,4 +1,6 @@
 import { randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import pg from 'pg';
 
@@ -2605,6 +2607,212 @@ export async function reminderSettingsOf(
       [slug, username],
     );
     return rows[0] ?? null;
+  } finally {
+    await client.end();
+  }
+}
+
+/**
+ * Story 17.3: one value of `supabase/functions/.env`, which
+ * `scripts/ci/write-local-env.mjs` writes and `supabase functions serve`
+ * reads, or a thrown error naming the variable (never a value) and the fix.
+ */
+export function functionsEnvValue(name: string): string {
+  const path = fileURLToPath(new URL('../../supabase/functions/.env', import.meta.url));
+  let text: string;
+  try {
+    text = readFileSync(path, 'utf8');
+  } catch {
+    throw new Error('E2E: supabase/functions/.env is missing. Run `node scripts/ci/write-local-env.mjs`.');
+  }
+  for (const line of text.split('\n')) {
+    const at = line.indexOf('=');
+    if (at > 0 && line.slice(0, at).trim() === name) {
+      const value = line.slice(at + 1).trim();
+      if (value !== '') return value;
+    }
+  }
+  throw new Error(
+    `E2E: supabase/functions/.env has no ${name}. Run \`node scripts/ci/write-local-env.mjs --force\` and serve the functions again.`,
+  );
+}
+
+/** The two Vault names the `remind` job reads (0070's `private.invoke_remind`). */
+const REMIND_VAULT_NAMES = ['remind_url', 'remind_invoke_secret'] as const;
+
+/** What {@link armRemindInVault} replaced, for {@link disarmRemindInVault}. */
+export interface ArmedRemind {
+  readonly replaced: readonly { readonly name: string; readonly value: string }[];
+}
+
+/**
+ * Story 17.3: arms the local `remind` job as DEPLOY.md §3b arms a deployed
+ * one: Vault's `remind_url` (the gateway as the database container reaches
+ * it) and `remind_invoke_secret` (the function's own, from
+ * `supabase/functions/.env`). Whatever the local Vault held under either
+ * name is kept, for {@link disarmRemindInVault} to put back.
+ */
+export async function armRemindInVault(url: string, secret: string): Promise<ArmedRemind> {
+  const client = await connect();
+  try {
+    await client.query('begin');
+    const { rows } = await client.query<{ name: string; value: string }>(
+      'select name, decrypted_secret as value from vault.decrypted_secrets where name = any($1::text[])',
+      [REMIND_VAULT_NAMES],
+    );
+    await client.query('delete from vault.secrets where name = any($1::text[])', [REMIND_VAULT_NAMES]);
+    await client.query("select vault.create_secret($1, 'remind_url')", [url]);
+    await client.query("select vault.create_secret($1, 'remind_invoke_secret')", [secret]);
+    await client.query('commit');
+    return { replaced: rows };
+  } catch (cause) {
+    await client.query('rollback').catch(() => undefined);
+    throw cause;
+  } finally {
+    await client.end();
+  }
+}
+
+/** Removes what {@link armRemindInVault} stored, and puts back what it replaced. */
+export async function disarmRemindInVault(armed: ArmedRemind): Promise<void> {
+  const client = await connect();
+  try {
+    await client.query('begin');
+    await client.query('delete from vault.secrets where name = any($1::text[])', [REMIND_VAULT_NAMES]);
+    for (const { name, value } of armed.replaced) {
+      await client.query('select vault.create_secret($1, $2)', [value, name]);
+    }
+    await client.query('commit');
+  } catch (cause) {
+    await client.query('rollback').catch(() => undefined);
+    throw cause;
+  } finally {
+    await client.end();
+  }
+}
+
+/**
+ * Story 17.3: what the cron job does every five minutes, once: `select
+ * private.invoke_remind()`, then pg_net's answer to that request, polled
+ * until it lands (`timeoutMs`). `null` when no request was queued (Vault
+ * not armed) or no answer came in time.
+ */
+export async function invokeRemindAsTheCronDoes(
+  // pg_net's own timeout for the call is 55 s (0070); a cold first start of
+  // `functions serve` may take most of it.
+  timeoutMs = 60_000,
+): Promise<{ readonly status: number | null; readonly body: string | null } | null> {
+  const client = await connect();
+  try {
+    const { rows } = await client.query<{ id: string | null }>('select private.invoke_remind()::text as id');
+    const id = rows[0]?.id ?? null;
+    if (id === null) return null;
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const answered = await client.query<{ status: number | null; body: string | null; error: string | null }>(
+        'select status_code as status, content as body, error_msg as error from net._http_response where id = $1::bigint',
+        [id],
+      );
+      const answer = answered.rows[0];
+      if (answer !== undefined) return { status: answer.status, body: answer.body ?? answer.error };
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    return null;
+  } finally {
+    await client.end();
+  }
+}
+
+/** A device row the table's checks accept (0045), as the DB suites' own. */
+const REMINDER_DEVICE_P256DH = `B${'k'.repeat(86)}`;
+const REMINDER_DEVICE_AUTH = 'a'.repeat(22);
+
+/**
+ * Story 17.3: registers one push device to the run organization's member
+ * `username`, in SQL, as the SPA's subscribe would. Its endpoint must name a
+ * real push host (0045's check), but no push service is posted to: the E2E's
+ * stack arms no `notify` job (no `notify_url` in Vault, no VAPID private key),
+ * and the case removes its reminder rows before it ends. Answers the
+ * endpoint, for {@link removePushEndpointInSql}.
+ */
+export async function addPushDeviceInSql(slug: string, username: string): Promise<string> {
+  const endpoint = `https://fcm.googleapis.com/fcm/send/e2e-reminder-${randomBytes(8).toString('hex')}`;
+  const client = await connect();
+  try {
+    const { rowCount } = await client.query(
+      `insert into push_subscriptions (organization_id, member_id, endpoint, p256dh, auth)
+       select m.organization_id, m.id, $3, $4, $5
+         from members m join organizations o on o.id = m.organization_id
+        where o.slug = $1 and m.username = $2`,
+      [slug, username, endpoint, REMINDER_DEVICE_P256DH, REMINDER_DEVICE_AUTH],
+    );
+    if (rowCount !== 1) throw new Error(`E2E: no member ${username} in ${slug} to register a device to`);
+    return endpoint;
+  } finally {
+    await client.end();
+  }
+}
+
+/** One queued shift reminder, as 0070 wrote it, with the claim's target. */
+export interface StoredShiftReminder {
+  readonly channel: string;
+  readonly operands: Record<string, unknown>;
+  readonly sent: boolean;
+  readonly failure: string | null;
+  readonly locale: string | null;
+  readonly slug: string;
+  readonly organizationName: string;
+}
+
+/** Story 17.3: the member `username`'s `SHIFT_REMINDER` rows, by lead, date and channel. */
+export async function shiftRemindersOfInSql(slug: string, username: string): Promise<StoredShiftReminder[]> {
+  const client = await connect();
+  try {
+    const { rows } = await client.query<StoredShiftReminder>(
+      `select n.channel, n.operands, n.sent_at is not null as sent, n.failure_code as failure,
+              o.locale, o.slug, o.name as "organizationName"
+         from notification_outbox n
+         join members m on m.organization_id = n.organization_id and m.id = n.recipient_member_id
+         join organizations o on o.id = m.organization_id
+        where o.slug = $1 and m.username = $2 and n.code = 'SHIFT_REMINDER'
+        order by n.operands ->> 'lead', n.operands ->> 'date', n.channel`,
+      [slug, username],
+    );
+    return rows;
+  } finally {
+    await client.end();
+  }
+}
+
+/** Story 17.3: removes the member `username`'s `SHIFT_REMINDER` rows, so a case starts with none. */
+export async function removeShiftRemindersInSql(slug: string, username: string): Promise<void> {
+  const client = await connect();
+  try {
+    await client.query(
+      `delete from notification_outbox n
+        using members m, organizations o
+        where m.organization_id = n.organization_id and m.id = n.recipient_member_id
+          and o.id = m.organization_id and o.slug = $1 and m.username = $2
+          and n.code = 'SHIFT_REMINDER'`,
+      [slug, username],
+    );
+  } finally {
+    await client.end();
+  }
+}
+
+/** Story 17.3: the run organization's member `username`'s id. */
+export async function memberIdOf(slug: string, username: string): Promise<string> {
+  const client = await connect();
+  try {
+    const { rows } = await client.query<{ id: string }>(
+      `select m.id::text as id from members m join organizations o on o.id = m.organization_id
+        where o.slug = $1 and m.username = $2`,
+      [slug, username],
+    );
+    const found = rows[0];
+    if (found === undefined) throw new Error(`E2E: no member ${username} in ${slug}`);
+    return found.id;
   } finally {
     await client.end();
   }

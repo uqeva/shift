@@ -151,6 +151,14 @@ export const PUSH_DELETE_FAILED = 'PUSH_DELETE_FAILED';
 /** How long a push service keeps a payload for a device that is offline: a day. */
 export const PUSH_TTL_SECONDS = 86_400;
 
+/**
+ * Story 17.3 (AD-18): the longest a push service keeps a shift reminder for an
+ * offline device: 15 minutes, and never past the shift's start. A reminder
+ * that cannot arrive close to its time is dropped rather than arriving to say
+ * "in 12 hours" hours late.
+ */
+export const REMINDER_PUSH_TTL_MAX_SECONDS = 900;
+
 /** How many rows one run claims. With the pace and the timeout below, the worst case stays inside pg_net's 55 s. */
 export const BATCH_SIZE = 8;
 

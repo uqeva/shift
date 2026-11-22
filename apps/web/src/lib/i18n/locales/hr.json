@@ -2634,6 +2634,17 @@
     "loading": "Učitavanje podsjetnika",
     "unavailable": "Podsjetnike trenutačno nije moguće prikazati.",
     "retry": "Pokušaj ponovno",
-    "saveFailed": "Spremanje trenutačno nije moguće. Pokušaj ponovno."
+    "saveFailed": "Spremanje trenutačno nije moguće. Pokušaj ponovno.",
+    "notice": {
+      "hours": {
+        "subject": "Za {leadHours} h radiš: {shiftTypeName} {start}–{end}, {teamName}",
+        "body": "{organizationName}: za {leadHours} h, {date}, radiš: {shiftTypeName} {start}–{end}, {teamName}. Pogledaj dan u kalendaru: {link}"
+      },
+      "eveningBefore": {
+        "subject": "Sutra radiš: {shiftTypeName} {start}–{end}, {teamName}",
+        "body": "{organizationName}: sutra, {date}, radiš: {shiftTypeName} {start}–{end}, {teamName}. Pogledaj dan u kalendaru: {link}"
+      },
+      "footer": "Podsjetnike e-poštom možeš isključiti u aplikaciji, pod Obavijesti → Podsjetnici: {link}"
+    }
   }
 }

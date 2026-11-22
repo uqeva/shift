@@ -379,6 +379,108 @@ container reaches it on the stack's Docker network
 `supabase functions serve notify` running. `supabase db reset` removes them
 again.
 
+### 3b. Reminders: the `remind` function, its secret and its cron job (story 17.3)
+
+A shift reminder (CAP-26, AD-14 and AD-18 as amended) is written by the
+`remind` Edge Function and sent by `notify`, as every other notice is.
+
+- **The function.** `supabase/functions/remind` (`verify_jwt = false`), in the
+  `shift-functions` image beside the other three (§9.6). Its environment is
+  `SUPABASE_URL`, `SHIFT_SECRET_KEY` (for its two `service_role` RPCs,
+  `reminder_inputs` and `enqueue_shift_reminders`) and its own
+  `REMIND_INVOKE_SECRET`, never `notify`'s. It holds no Resend or VAPID key.
+- **The secret.** On a self-hosted stack the compose generates it
+  (`REMIND_INVOKE_SECRET=${SERVICE_PASSWORD_64_REMINDINVOKE}`); read the value
+  in Coolify's environment view of the Supabase resource. Elsewhere generate it
+  as §3a step 3 does (`openssl rand -hex 32`), once per environment.
+- **The cron job.** `remind`, every five minutes (`*/5 * * * *`), runs
+  `select private.invoke_remind()` (0070). It POSTs to Vault's `remind_url`
+  with Vault's `remind_invoke_secret` as its bearer, and does nothing while
+  either is absent. A migration never writes either.
+
+**Arming it, in this order, once per environment:**
+
+1. Deploy (and smoke) the release whose `notify` renders `SHIFT_REMINDER`
+   (story 17.3, migration `0072`). Arming before it would queue reminders an
+   older `notify` retries as `MESSAGE_UNKNOWN` until they fail.
+2. Vault, through `psql` on stdin, never on a command line (the internal
+   gateway, never the public origin; the secret as a psql variable). `$DC`
+   is `docker compose` for the environment's Supabase stack on its host, as
+   §9.5 defines it for the rehearsal. Put the value into the shell without
+   echoing it or leaving it in history (`read -rs SERVICE_PASSWORD_64_REMINDINVOKE`,
+   then paste it from Coolify's environment view). The two deletes make the
+   step safe to run again (a second `vault.create_secret` of the same name
+   fails):
+
+   ```bash
+   {
+     printf '\\set secret %s\n' "$SERVICE_PASSWORD_64_REMINDINVOKE"
+     echo "delete from vault.secrets where name in ('remind_url', 'remind_invoke_secret');"
+     echo "select vault.create_secret('http://supabase-kong:8000/functions/v1/remind', 'remind_url');"
+     echo "select vault.create_secret(:'secret', 'remind_invoke_secret');"
+   } | $DC exec -T supabase-db psql -U postgres -v ON_ERROR_STOP=1 -q -f -
+   unset SERVICE_PASSWORD_64_REMINDINVOKE
+   ```
+
+3. **Prove the armed path once** (the cron's own statement, answered by the
+   function):
+
+   ```bash
+   ID=$($DC exec -T supabase-db psql -U postgres -At -c "select private.invoke_remind();")
+   echo "request $ID"   # empty: Vault does not hold both secrets
+   sleep 10             # by ITS id: the notify job answers every minute too
+   $DC exec -T supabase-db psql -U postgres -At -c "
+     select status_code, content, error_msg from net._http_response where id = $ID;"
+   # -> 200|{"code":"REMIND_RAN","members":…,"due":…,"accepted":…,"skipped":…}|   ✅
+   # -> 401 INVOKE_SECRET_REFUSED: Vault's remind_invoke_secret is not the container's REMIND_INVOKE_SECRET ❌
+   # -> 503 REMINDER_INPUTS_UNAVAILABLE: the read did not reach the database (SUPABASE_URL, the secret key) ❌
+   # -> 503 REMINDER_ENQUEUE_FAILED: the write failed (0070 or 0072 not applied?) ❌
+   # -> 404 FUNCTION_NOT_FOUND: the image has no remind (the router's table) ❌
+   # -> an empty status with error_msg: remind_url is wrong or the gateway is down ❌
+   # -> no row yet: wait and read again; pg_net gives up after 55 s ❌
+   ```
+
+   A reminder whose due instant is more than 15 minutes behind every
+   successful run is never written, so a drifted secret loses reminders
+   silently: repeat this check after any rotation, and look at the last few
+   `net._http_response` rows when a member says a reminder did not come.
+
+**Rotating** the invoke secret: Vault first (`vault.update_secret`, as §3a's),
+then the container's variable and a redeploy, right after a `*/5` tick so the
+gap falls between runs. In between the job is answered 401 and writes
+nothing; a reminder that fell due then is written by the next good run if it
+is less than 15 minutes behind, and lost otherwise. Prove the path again
+(step 3) afterwards.
+
+**Disarming** (to stop every reminder): delete the two Vault secrets
+(`delete from vault.secrets where name in ('remind_url', 'remind_invoke_secret');`).
+The settings members chose stay. Reminders already queued are still sent by
+`notify` until their bound (below) settles them, at most about 20 minutes; to
+stop those too, settle them by hand
+(`update notification_outbox set failed_at = now(), failure_code = 'REMINDER_LATE' where code = 'SHIFT_REMINDER' and sent_at is null and failed_at is null;`).
+
+**What the member receives.** `notify` renders the row from `hr.json`'s
+`reminders.notice` (`Za 2 h radiš: Dnevna 07:00–19:00, Smjena A`, or `Sutra
+radiš: …`), linking through the organization's sign-in to that day in
+*Kalendar*; an email ends with the line pointing to *Obavijesti →
+Podsjetnici*. The claim settles a reminder `REMINDER_LATE` (0072) once it is
+15 minutes past its due instant (an `H<n>` lead) or 20 minutes after it was
+written (any lead), and a push lives no longer than the same 15 minutes past
+due, at most 15 minutes, and never past the shift's start. So an `H<n>`
+reminder never arrives more than 15 minutes after it fell due, and a
+backlog never sends "in 12 hours" hours late; the evening-before one, whose
+due instant needs the zone, may arrive up to about 35 minutes after it was
+written.
+
+**Locally** `node scripts/ci/write-local-env.mjs` writes a fresh
+`REMIND_INVOKE_SECRET` into `supabase/functions/.env` (an older file needs
+`--force` once). The E2E (`e2e/tests/notifications/reminder-delivery.spec.ts`)
+arms the local Vault with `http://supabase_kong_shift:8000/functions/v1/remind`
+and that value, proves the cron's call is answered `REMIND_RAN`, and disarms it
+again (`SHIFT_E2E_REMIND_URL` overrides that URL for a stack whose gateway
+has another name). To arm the local job by hand, run step 2 against the local
+database with that URL and the value from the file.
+
 ---
 
 ## 4. Cloudflare Pages
@@ -1915,6 +2017,7 @@ and none has a default in the compose:
 | `SERVICE_PASSWORD_64_PUBLISHABLEKEY` | the publishable key is `sb_publishable_` + this | Kong, `edge-runtime` (`SHIFT_PUBLISHABLE_KEY`), the SPA's build |
 | `SERVICE_PASSWORD_64_SECRETKEY` | the secret key is `sb_secret_` + this | Kong, `edge-runtime` (`SHIFT_SECRET_KEY`) only |
 | `SERVICE_PASSWORD_64_NOTIFYINVOKE` | `NOTIFY_INVOKE_SECRET` (64 characters, matches `notify`'s shape) | `edge-runtime`, and the stack's Vault (§3a) |
+| `SERVICE_PASSWORD_64_REMINDINVOKE` | `REMIND_INVOKE_SECRET` (story 17.2; 64 characters, `remind`'s own, never `notify`'s) | `edge-runtime`, and the stack's Vault once armed (§3b) |
 | `SERVICE_PASSWORD_POSTGRES` | Postgres's password: `postgres` and `supabase_admin` (superusers) and every service role (`roles.sql`), and `db push`'s | GoTrue, PostgREST, Storage, pg-meta and Studio. Each of those containers therefore holds a superuser password; none is reachable from outside the stack's network but Studio's loopback port |
 | `SERVICE_PASSWORD_PGMETACRYPTO` | pg-meta's encryption key | pg-meta, Studio |
 
@@ -2092,6 +2195,7 @@ JWT=$(openssl rand -hex 32)
   echo "SERVICE_PASSWORD_64_PUBLISHABLEKEY=$(openssl rand -hex 32)"
   echo "SERVICE_PASSWORD_64_SECRETKEY=$(openssl rand -hex 32)"
   echo "SERVICE_PASSWORD_64_NOTIFYINVOKE=$(openssl rand -hex 32)"
+  echo "SERVICE_PASSWORD_64_REMINDINVOKE=$(openssl rand -hex 32)"
   JWT=$JWT node -e '
     const c = require("node:crypto"), s = process.env.JWT, now = Math.floor(Date.now() / 1000);
     const b = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
@@ -2244,6 +2348,18 @@ $DC exec -T supabase-db psql -U postgres -At -c "
 # -> 200 / 0     ✅ the job reached notify on the stack's network; the outbox is drained
 $DC logs supabase-kong | grep -c 'functions/v1/notify'
 # -> at least 1  ✅ the job's calls are in Kong's log
+# Story 17.3: the reminder job, armed as §3b arms it, and its call proved once.
+{
+  printf '\\set secret %s\n' "$SERVICE_PASSWORD_64_REMINDINVOKE"
+  echo "delete from vault.secrets where name in ('remind_url', 'remind_invoke_secret');"
+  echo "select vault.create_secret('http://supabase-kong:8000/functions/v1/remind', 'remind_url');"
+  echo "select vault.create_secret(:'secret', 'remind_invoke_secret');"
+} | $DC exec -T supabase-db psql -U postgres -v ON_ERROR_STOP=1 -q -f -
+ID=$($DC exec -T supabase-db psql -U postgres -At -c "select private.invoke_remind();")
+sleep 10
+$DC exec -T supabase-db psql -U postgres -At -c "
+  select status_code, content from net._http_response where id = $ID;"
+# -> 200|{"code":"REMIND_RAN",…}   ✅ remind answered the cron's own call (401: the secrets drifted)
 MARK="probe$(openssl rand -hex 8)"
 curl -s -o /dev/null "$API/functions/v1/notify/$MARK?token=$MARK"
 curl -s -o /dev/null "$API/storage/v1/object/sign/organization-logos/x.png?token=$MARK"
@@ -2359,7 +2475,9 @@ on the host by story 20.5 (`deferred-work.md`):
 
 **Cron.** Vault's `notify_url` on a self-hosted stack is
 `http://supabase-kong:8000/functions/v1/notify`, the internal gateway: the
-scheduled call never leaves the host (§9.4, §9.5 step 7b).
+scheduled call never leaves the host (§9.4, §9.5 step 7b). So is
+`remind_url`, `http://supabase-kong:8000/functions/v1/remind`, armed only
+after the `notify` that renders reminders is live (§3b, story 17.3).
 
 ### 9.7 The SPA: the `shift-web` image (story 20.3)
 

@@ -25,6 +25,7 @@ import {
   PUSH_SUBSCRIPTION_INVALID,
   PUSH_TTL_SECONDS,
   RECIPIENT_INACTIVE,
+  REMINDER_PUSH_TTL_MAX_SECONDS,
   SEND_TIMEOUT_MS,
   type ClaimedNotification,
   type Configuration,
@@ -36,7 +37,40 @@ import {
   type RpcAnswer,
   type Settlement,
 } from './handler.ts';
-import { renderPush } from './messages.ts';
+import { REMINDER_CODE, REMINDER_LEAD_HOURS, STARTS_AT_SHAPE, renderPush } from './messages.ts';
+
+/** How long past its due instant an hours reminder may still arrive (0072's bound). */
+const REMINDER_GRACE_SECONDS = 900;
+
+/**
+ * How long a push service may keep this row's payload for an offline device,
+ * in seconds (story 17.3, AD-18 as amended). A day for every notice, as
+ * before. For a shift reminder: never past the shift's start, never more than
+ * {@link REMINDER_PUSH_TTL_MAX_SECONDS}, and for an `H<n>` lead never past 15
+ * minutes after its due instant (`startsAt − n hours`, 0072's bound), so an
+ * offline device never shows "Za 2 h radiš" long after it was true.
+ * Comparisons of instants the row and the clock carry, not a domain answer.
+ * An unreadable `startsAt` is 0 (the render refuses such a row first).
+ */
+export function pushTtlSecondsOf(code: string, operands: unknown, now: number): number {
+  if (code !== REMINDER_CODE) return PUSH_TTL_SECONDS;
+  const row = operands !== null && typeof operands === 'object' ? (operands as Record<string, unknown>) : {};
+  const startsAt = row['startsAt'];
+  if (typeof startsAt !== 'string' || !STARTS_AT_SHAPE.test(startsAt)) return 0;
+  const start = Date.parse(startsAt);
+  if (!Number.isFinite(start) || !Number.isFinite(now)) return 0;
+  let ttl = Math.min(Math.floor((start - now) / 1000), REMINDER_PUSH_TTL_MAX_SECONDS);
+  const lead = row['lead'];
+  const hours = typeof lead === 'string' && Object.hasOwn(REMINDER_LEAD_HOURS, lead) ? REMINDER_LEAD_HOURS[lead as keyof typeof REMINDER_LEAD_HOURS] : null;
+  if (hours !== null) {
+    const graceEnds = start - hours * 3_600_000 + REMINDER_GRACE_SECONDS * 1000;
+    ttl = Math.min(ttl, Math.floor((graceEnds - now) / 1000));
+  }
+  return Math.max(0, ttl);
+}
+
+/** Story 17.3: a reminder whose push could live no time at all is not sent: it is too late. */
+export const REMINDER_LATE = 'REMINDER_LATE';
 
 /**
  * `web-push`'s request builder, without its sender, as a {@link PushEncryptor}:
@@ -132,6 +166,7 @@ export async function deliverPush(
   encryptPush: PushEncryptor | undefined,
   readDevices: (row: ClaimedNotification) => Promise<DeviceRead>,
   deleteSubscription: (device: PushSubscriptionRow) => Promise<void>,
+  now: () => number = Date.now,
 ): Promise<Settlement | { readonly result: 'skip' }> {
   // TRANSIENT, as the email's: a code this deployment cannot render yet.
   const rendered = renderPush(row.code, row.locale, row.operands, {
@@ -159,6 +194,12 @@ export async function deliverPush(
   // rather than stacks.
   const tag = `${row.code}:${typeof row.subject_id === 'string' ? row.subject_id : row.id}`;
   const payload = JSON.stringify({ title: rendered.title, body: rendered.body, url: rendered.url, tag });
+  // Read after the device read, right before the sends: a reminder's TTL
+  // counts down to its shift's start (17.3).
+  const ttl = pushTtlSecondsOf(row.code, row.operands, now());
+  // A reminder with nothing left of its window is final, never posted: a push
+  // service may still deliver a TTL of 0 to an online device, hours late.
+  if (row.code === REMINDER_CODE && ttl === 0) return { result: 'permanent', failureCode: REMINDER_LATE };
 
   // The devices IN PARALLEL: one row takes one send's timeout at most, so the
   // run's time budget holds however many devices a member has.
@@ -171,7 +212,7 @@ export async function deliverPush(
           payload,
           {
             vapid,
-            ttl: PUSH_TTL_SECONDS,
+            ttl,
           },
         );
       } catch {

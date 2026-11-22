@@ -2530,6 +2530,15 @@ const SANCTIONED_SCREEN_KEYS = [
   'reminders.unavailable',
   'reminders.retry',
   'reminders.saveFailed',
+  // STORY 17.3 (AD-18, UX-DR57): the reminder itself, rendered by `notify`
+  // from its pinned copy (`PODSJETNICI`): `Za {n} h radiš: …` and `Sutra
+  // radiš: …`, each linking to the day, and the email's footer pointing to
+  // *Obavijesti → Podsjetnici*. The team is its own name, never "tim".
+  'reminders.notice.hours.subject',
+  'reminders.notice.hours.body',
+  'reminders.notice.eveningBefore.subject',
+  'reminders.notice.eveningBefore.body',
+  'reminders.notice.footer',
   // STORY 12.2. A member proposes a swap: *Predloži zamjenu* in the day
   // detail's footer and the surface's heading, back link and lede; the given
   // shift, the colleague and return fields with their options, hint and the

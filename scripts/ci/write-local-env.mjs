@@ -3,7 +3,9 @@
 //
 //   apps/web/.env.local       VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY,
 //                             VITE_VAPID_PUBLIC_KEY (a fixed local one)
-//   supabase/functions/.env   the function's keys and its allowed origin
+//   supabase/functions/.env   the function's keys and its allowed origin, and
+//                             (story 17.3) `remind`'s invoke secret, made
+//                             fresh and random for this stack
 //
 // Both files are gitignored. Nothing is echoed: the keys go from the CLI's
 // stdout straight into files created with mode 0600, and the log names the
@@ -16,6 +18,7 @@
 // of running the CLI, and `--root <dir>` writes under another directory.
 
 import { execFileSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -33,12 +36,25 @@ export const LOCAL_VAPID_PUBLIC_KEY =
   'BO8VM-jYeQGhMl_-cXpeQll7R16J-dxBA0BgLyaSQbtkHe5omXOEkIGtO8uODlxq2pm20O_bYx4fExhSE-wXTfw';
 
 /**
+ * Story 17.3: a fresh invoke secret for the local `remind` (64 hex
+ * characters, the shape `INVOKE_SECRET_SHAPE` admits). Never a literal: every
+ * stack gets its own, and the E2E arms the local Vault with the value it
+ * finds in `supabase/functions/.env` (`e2e/utils/database-helper.ts`).
+ *
+ * @returns {string}
+ */
+export function freshInvokeSecret() {
+  return randomBytes(32).toString('hex');
+}
+
+/**
  * The two files' contents, from the parsed status JSON.
  *
  * @param {Record<string, unknown>} status
+ * @param {string} [remindInvokeSecret] `remind`'s invoke secret; fresh unless given (tests only)
  * @returns {{ web: string, functions: string }}
  */
-export function renderEnvFiles(status) {
+export function renderEnvFiles(status, remindInvokeSecret = freshInvokeSecret()) {
   const apiUrl = required(status, 'API_URL');
   const publishable = required(status, 'PUBLISHABLE_KEY');
   const secret = required(status, 'SECRET_KEY');
@@ -49,6 +65,9 @@ export function renderEnvFiles(status) {
   }
   if (!secret.startsWith('sb_secret_')) {
     throw new Error('supabase status: SECRET_KEY is not an sb_secret_ key');
+  }
+  if (!/^[A-Za-z0-9_-]{32,}$/.test(remindInvokeSecret)) {
+    throw new Error('the remind invoke secret is not at least 32 URL-safe characters');
   }
 
   return {
@@ -67,6 +86,9 @@ export function renderEnvFiles(status) {
       `SHIFT_SECRET_KEY=${secret}`,
       `SHIFT_PUBLISHABLE_KEY=${publishable}`,
       `SHIFT_ALLOWED_ORIGINS=${LOCAL_APP_ORIGIN}`,
+      // Story 17.3: `remind`'s own (AD-17), which the E2E also stores in the
+      // local Vault as `remind_invoke_secret`, so the cron's call is proved.
+      `REMIND_INVOKE_SECRET=${remindInvokeSecret}`,
       '',
     ].join('\n'),
   };

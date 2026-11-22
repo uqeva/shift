@@ -256,6 +256,7 @@ export function createHandler(
             dependencies.encryptPush,
             readDevices,
             deleteSubscription,
+            now,
           )
         : await deliverEmail(row, configuration.configuration, dependencies.fetch);
 
