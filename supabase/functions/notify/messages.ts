@@ -8,9 +8,15 @@
  *
  * Rendering is plain `{name}` interpolation and nothing else: no ICU, no
  * plural, no select. An operand that is an ISO calendar date is formatted the
- * way the SPA's `formatIsoDate` formats it (`23.09.2026`, UX-DR34). Nothing
- * here computes a domain answer (AD-16's spirit, AD-18): the operands arrive
- * already decided, in the outbox row.
+ * way the SPA's `formatIsoDate` formats it (`23.09.2026`, UX-DR34), and one
+ * that is a minute of the shift (story 17.3) the way `formatMinuteOfDay`
+ * does (`07:00`). Nothing here computes a domain answer (AD-16's spirit,
+ * AD-18): the operands arrive already decided, in the outbox row.
+ *
+ * Story 17.3: a shift reminder (`SHIFT_REMINDER`, AD-18's one exception) is
+ * rendered from {@link PODSJETNICI}, a second pinned copy, of `hr.json`'s
+ * `reminders.notice`, on its own branch: every other code renders exactly as
+ * before.
  *
  * Imports nothing, so Vitest asserts it in the node environment (AD-15).
  */
@@ -192,6 +198,70 @@ export const OBAVIJESTI = {
 } as const;
 
 /**
+ * Story 17.3: the shift reminder's text. A COPY of `hr.json`'s
+ * `reminders.notice`, pinned deep-equal by `test/notify-reminder.test.ts`, as
+ * {@link OBAVIJESTI} is to `obavijesti`. Edit `hr.json` first, then this.
+ * `hours` names the lead in hours (`Za 2 h radiš: …`); `eveningBefore` is the
+ * 20:00 reminder (`Sutra radiš: …`); `footer` ends every reminder email,
+ * pointing to *Obavijesti → Podsjetnici*.
+ */
+export const PODSJETNICI = {
+  hours: {
+    subject: 'Za {leadHours} h radiš: {shiftTypeName} {start}–{end}, {teamName}',
+    body: '{organizationName}: za {leadHours} h, {date}, radiš: {shiftTypeName} {start}–{end}, {teamName}. Pogledaj dan u kalendaru: {link}',
+  },
+  eveningBefore: {
+    subject: 'Sutra radiš: {shiftTypeName} {start}–{end}, {teamName}',
+    body: '{organizationName}: sutra, {date}, radiš: {shiftTypeName} {start}–{end}, {teamName}. Pogledaj dan u kalendaru: {link}',
+  },
+  footer: 'Podsjetnike e-poštom možeš isključiti u aplikaciji, pod Obavijesti → Podsjetnici: {link}',
+} as const;
+
+/** The code `remind` writes (0070), rendered from {@link PODSJETNICI}. */
+export const REMINDER_CODE = 'SHIFT_REMINDER';
+
+/**
+ * The lead codes, as `@shift/domain`'s `REMINDER_LEADS` spells them (AD-18:
+ * one closed set). A copy, because this module imports nothing; held equal to
+ * the domain's by `test/notify-reminder.test.ts`.
+ */
+export const REMINDER_LEADS = ['H1', 'H2', 'H3', 'H6', 'H12', 'EVENING_BEFORE'] as const;
+
+export type ReminderLeadCode = (typeof REMINDER_LEADS)[number];
+
+export type ReminderNoticeKey = Exclude<keyof typeof PODSJETNICI, 'footer'>;
+
+/**
+ * The hours each `H<n>` lead names, as `@shift/domain`'s `REMINDER_LEAD_HOURS`
+ * (held equal by `test/notify-reminder.test.ts`). A row whose `leadHours`
+ * disagrees with its lead is refused rather than telling the wrong time.
+ */
+export const REMINDER_LEAD_HOURS: Readonly<Record<Exclude<ReminderLeadCode, 'EVENING_BEFORE'>, number>> = {
+  H1: 1,
+  H2: 2,
+  H3: 3,
+  H6: 6,
+  H12: 12,
+};
+
+/** `startsAt` as 0070 writes it: a whole-second UTC instant. */
+export const STARTS_AT_SHAPE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+
+/**
+ * The text each lead renders with (AD-18: "the variant from the lead"). An
+ * `H<n>` lead names its hours through the row's `leadHours`; the evening
+ * before names none.
+ */
+export const REMINDER_VARIANT_OF: Readonly<Record<ReminderLeadCode, ReminderNoticeKey>> = {
+  H1: 'hours',
+  H2: 'hours',
+  H3: 'hours',
+  H6: 'hours',
+  H12: 'hours',
+  EVENING_BEFORE: 'eveningBefore',
+};
+
+/**
  * A message an outbox code renders with. `footer` is not one: it is the line
  * every email ends with (story 10.3), linking to the settings.
  */
@@ -205,6 +275,9 @@ export const SETTINGS_PATH = '/obavijesti';
  * resource of its own renders in Croatian, as the SPA does.
  */
 const MESSAGES_BY_LANGUAGE: Readonly<Record<string, typeof OBAVIJESTI>> = { hr: OBAVIJESTI };
+
+/** The reminder's text by language, on the same terms (story 17.3). */
+const REMINDERS_BY_LANGUAGE: Readonly<Record<string, typeof PODSJETNICI>> = { hr: PODSJETNICI };
 
 const FALLBACK_LANGUAGE = 'hr';
 
@@ -340,6 +413,19 @@ export function linkPathOf(key: MessageKey, operands: Readonly<Record<string, un
   }
 }
 
+/**
+ * Story 17.3: the day a reminder is about, opened in *Kalendar* on that team
+ * (`?mjesec=…&dan=…&danSmjena=…`, as the calendar's own day links), or `null`
+ * when the operands do not name a real date and a team id.
+ */
+export function reminderPathOf(operands: Readonly<Record<string, unknown>>): string | null {
+  const date = operands['date'];
+  const teamId = operands['teamId'];
+  if (typeof date !== 'string' || formatIsoDate(date) === null) return null;
+  if (typeof teamId !== 'string' || !UUID.test(teamId)) return null;
+  return `/kalendar?mjesec=${date.slice(0, 7)}&dan=${date}&danSmjena=${teamId.toLowerCase()}`;
+}
+
 /** The organization a row belongs to, as the claim returns it. */
 export interface RenderTarget {
   /** The app's origin; a trailing slash is ignored. */
@@ -382,6 +468,31 @@ const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
  * much it looks like a date.
  */
 const DATE_OPERANDS: ReadonlySet<string> = new Set(['startDate', 'endDate', 'date', 'effectiveFrom', 'returnDate']);
+
+/**
+ * Story 17.3: the operands that are minutes of a shift (AD-6: integer minutes
+ * since the shift date's midnight), by name, and the only ones formatted as a
+ * clock time, for a reminder only: its `start` and `end` (0070). Any other
+ * code renders exactly as before, whatever its operands are named.
+ */
+const TIME_OPERANDS: ReadonlySet<string> = new Set(['start', 'end']);
+
+/** The last minute a shift's interval may name: the end of the next day (0070's `<= 2879`). */
+export const LAST_SHIFT_MINUTE = 2879;
+
+const MINUTES_PER_DAY = 1440;
+
+/**
+ * A minute of a shift as a clock time: `420` → `07:00`, `1500` → `01:00` (a
+ * night's second half, past midnight), as `apps/web`'s `formatMinuteOfDay`
+ * shows `minute mod 1440`. `null` for anything that is not a whole minute in
+ * `0 … 2879`.
+ */
+export function formatMinute(minute: unknown): string | null {
+  if (typeof minute !== 'number' || !Number.isInteger(minute) || minute < 0 || minute > LAST_SHIFT_MINUTE) return null;
+  const ofDay = minute % MINUTES_PER_DAY;
+  return `${String(Math.floor(ofDay / 60)).padStart(2, '0')}:${String(ofDay % 60).padStart(2, '0')}`;
+}
 
 /**
  * `2026-09-23` → `23.09.2026`, as `apps/web`'s `formatIsoDate`. `null` for a
@@ -452,8 +563,9 @@ type Composed =
 
 /** The parts one row renders to, shared by the email and the push. */
 function compose(code: string, locale: string | null, operands: unknown, target: RenderTarget): Composed {
-  const codeKey = Object.hasOwn(MESSAGE_OF_CODE, code) ? MESSAGE_OF_CODE[code] : undefined;
-  if (codeKey === undefined) return { ok: false, code: MESSAGE_UNKNOWN };
+  const isReminder = code === REMINDER_CODE;
+  const codeKey = !isReminder && Object.hasOwn(MESSAGE_OF_CODE, code) ? MESSAGE_OF_CODE[code] : undefined;
+  if (!isReminder && codeKey === undefined) return { ok: false, code: MESSAGE_UNKNOWN };
 
   const language = languageOf(locale);
   const messages = MESSAGES_BY_LANGUAGE[language] ?? MESSAGES_BY_LANGUAGE[FALLBACK_LANGUAGE];
@@ -469,7 +581,12 @@ function compose(code: string, locale: string | null, operands: unknown, target:
 
   const values: Record<string, string> = {};
   for (const [name, value] of Object.entries(operands as Record<string, unknown>)) {
-    if (typeof value === 'number' && Number.isFinite(value)) {
+    if (isReminder && TIME_OPERANDS.has(name)) {
+      // 17.3: a minute of the shift, or the row is refused, never `NaN:NaN`.
+      const formatted = formatMinute(value);
+      if (formatted === null) return { ok: false, code: OPERANDS_INVALID };
+      values[name] = formatted;
+    } else if (typeof value === 'number' && Number.isFinite(value)) {
       values[name] = String(value);
     } else if (typeof value === 'string' && DATE_OPERANDS.has(name)) {
       const formatted = formatIsoDate(value);
@@ -479,6 +596,11 @@ function compose(code: string, locale: string | null, operands: unknown, target:
       values[name] = value;
     }
   }
+
+  if (isReminder) {
+    return composeReminder(language, operands as Record<string, unknown>, values, target.appUrl, slug, organizationName);
+  }
+  if (codeKey === undefined) return { ok: false, code: MESSAGE_UNKNOWN };
 
   const variant = RETURN_VARIANT_OF[codeKey];
   let key = variant !== undefined && typeof (operands as Record<string, unknown>)['returnDate'] === 'string' ? variant : codeKey;
@@ -503,6 +625,59 @@ function compose(code: string, locale: string | null, operands: unknown, target:
   const subject = interpolate(message.subject, values);
   const body = interpolate(message.body, values);
   const footer = interpolate(messages.footer, { link: linkOf(target.appUrl, slug, SETTINGS_PATH) });
+  if (subject === null || body === null || footer === null) return { ok: false, code: OPERANDS_INVALID };
+
+  return { ok: true, subject, body, link, linkPath: signInPathOf(slug, path), footer };
+}
+
+/**
+ * Story 17.3: a shift reminder's parts. The variant is the lead's
+ * ({@link REMINDER_VARIANT_OF}); the names, the date and the minutes are the
+ * row's, as `enqueue_shift_reminders` wrote them; the link opens the day, and
+ * the footer is the reminder's own. A lead outside the set, a blank name, a
+ * missing minute, a `leadHours` that is not its lead's, or an unreadable
+ * `startsAt` refuses the row.
+ */
+function composeReminder(
+  language: string,
+  operands: Readonly<Record<string, unknown>>,
+  values: Record<string, string>,
+  appUrl: string,
+  slug: string,
+  organizationName: string,
+): Composed {
+  const reminders = REMINDERS_BY_LANGUAGE[language] ?? REMINDERS_BY_LANGUAGE[FALLBACK_LANGUAGE];
+  if (reminders === undefined) return { ok: false, code: MESSAGE_UNKNOWN };
+
+  const lead = operands['lead'];
+  const key = typeof lead === 'string' && Object.hasOwn(REMINDER_VARIANT_OF, lead) ? REMINDER_VARIANT_OF[lead as ReminderLeadCode] : undefined;
+  if (key === undefined) return { ok: false, code: OPERANDS_INVALID };
+  for (const name of ['shiftTypeName', 'teamName']) {
+    const text = operands[name];
+    if (typeof text !== 'string' || text.trim() === '') return { ok: false, code: OPERANDS_INVALID };
+  }
+  // Both ends are needed, and only as minutes: a missing one is never `00:00`.
+  if (values['start'] === undefined || values['end'] === undefined) return { ok: false, code: OPERANDS_INVALID };
+  if (key === 'hours') {
+    // The hours the text names are the lead's own: a disagreeing row is refused.
+    const hours = operands['leadHours'];
+    if (hours !== REMINDER_LEAD_HOURS[lead as Exclude<ReminderLeadCode, 'EVENING_BEFORE'>]) return { ok: false, code: OPERANDS_INVALID };
+  }
+  const startsAt = operands['startsAt'];
+  if (typeof startsAt !== 'string' || !STARTS_AT_SHAPE.test(startsAt) || !Number.isFinite(Date.parse(startsAt))) {
+    return { ok: false, code: OPERANDS_INVALID };
+  }
+
+  const path = reminderPathOf(operands);
+  if (path === null) return { ok: false, code: OPERANDS_INVALID };
+  const link = linkOf(appUrl, slug, path);
+  values['organizationName'] = organizationName;
+  values['link'] = link;
+
+  const message = reminders[key];
+  const subject = interpolate(message.subject, values);
+  const body = interpolate(message.body, values);
+  const footer = interpolate(reminders.footer, { link: linkOf(appUrl, slug, SETTINGS_PATH) });
   if (subject === null || body === null || footer === null) return { ok: false, code: OPERANDS_INVALID };
 
   return { ok: true, subject, body, link, linkPath: signInPathOf(slug, path), footer };

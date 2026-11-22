@@ -6469,11 +6469,18 @@ describe('the reminder job (0070, story 17.2)', () => {
       );
     expect(definers('private.filter_notification_outbox')).toEqual(['0044_notification_settings.sql', '0070_shift_reminders.sql']);
     const claims = definers('public.claim_notifications');
-    expect(claims.filter((file) => file > '0046_notification_recipient_rules.sql')).toEqual(['0070_shift_reminders.sql']);
+    // Story 17.3: 0072 re-creates 0070's claim with the late settle (its own block below).
+    expect(claims.filter((file) => file > '0046_notification_recipient_rules.sql')).toEqual([
+      '0070_shift_reminders.sql',
+      '0072_reminder_delivery.sql',
+    ]);
     expect(claims).toContain('0046_notification_recipient_rules.sql');
     expect(migrationNames().filter((file) => file > '0070_shift_reminders.sql').filter((file) =>
-      /function (?:private\.filter_notification_outbox|public\.claim_notifications|private\.notify_members)\(/.test(read(file)),
+      /function (?:private\.filter_notification_outbox|private\.notify_members)\(/.test(read(file)),
     )).toEqual([]);
+    expect(migrationNames().filter((file) => file > '0072_reminder_delivery.sql').filter((file) =>
+      /function public\.claim_notifications\(/.test(read(file)),
+    ), 'a later migration redefines the claim without this pin moving').toEqual([]);
   });
 
   it("keeps 0044's filter and drops a reminder email while 0069's predicate is false", () => {
@@ -6538,6 +6545,90 @@ describe('the reminder job (0070, story 17.2)', () => {
     expect(sql).toContain("select cron.schedule('remind', '*/5 * * * *', 'select private.invoke_remind()');");
     expect(sql.match(/cron\.schedule\(/g)).toHaveLength(1);
     expect(sql, 'a migration writes a Vault secret').not.toMatch(/vault\.(create|update)_secret|insert into vault\./);
+  });
+});
+
+describe('a late reminder is never sent (0072, story 17.3)', () => {
+  const read = (name: string): string => stripLineComments(readFileSync(join(supabaseRoot, 'migrations', name), 'utf8'));
+  const migration = (): string => read('0072_reminder_delivery.sql');
+  const bodyOf = (sql: string, name: string): string =>
+    new RegExp(`create (?:or replace )?function ${name.replace('.', '\\.')}\\([\\s\\S]*?\\$\\$;`).exec(sql)?.[0] ?? '';
+
+  /** The settle 0072 adds, word for word. */
+  const LATE_SETTLE = `  update public.notification_outbox o
+     set failed_at = now(),
+         failure_code = 'REMINDER_LATE',
+         next_attempt_at = null
+   where o.id in (
+     select c.id
+       from public.notification_outbox c
+      where c.sent_at is null
+        and c.failed_at is null
+        and c.code = 'SHIFT_REMINDER'
+        and c.channel in ('email', 'push')
+        and (c.claimed_at is null or c.claimed_at < now() - interval '10 minutes')
+        and private.reminder_late(c.operands, c.created_at)
+      for update skip locked
+   );
+
+`;
+  const LATE_GUARD = '              and not private.reminder_late(c.operands, c.created_at)\n';
+
+  it("is 0070's claim with exactly the late settle and its guard, the grants restated", () => {
+    const ours = bodyOf(migration(), 'public.claim_notifications');
+    const theirs = bodyOf(read('0070_shift_reminders.sql'), 'public.claim_notifications');
+    expect(theirs, "0070's claim is not found").not.toBe('');
+    expect(ours).toContain(LATE_SETTLE);
+    expect(ours).toContain(LATE_GUARD);
+    // Nothing else changed: 0070's settles, select, return type and tail, byte for byte.
+    // (Whitespace-blind: stripped comments leave their indentation behind.)
+    const words = (body: string): string => body.replace(/\s+/g, ' ');
+    expect(words(ours.replace(LATE_SETTLE, '').replace(LATE_GUARD, ''))).toBe(words(theirs));
+    // The late settle runs after the expiry and before the lead and email ones.
+    expect(ours.match(/failure_code = '([A-Z_]+)'/g)).toEqual([
+      "failure_code = 'ATTEMPTS_EXHAUSTED'",
+      "failure_code = 'RECIPIENT_INACTIVE'",
+      "failure_code = 'REMINDER_EXPIRED'",
+      "failure_code = 'REMINDER_LATE'",
+      "failure_code = 'REMINDER_TURNED_OFF'",
+      "failure_code = 'EMAIL_TURNED_OFF'",
+      "failure_code = 'EMAIL_TURNED_OFF'",
+      "failure_code = 'PUSH_NO_SUBSCRIPTION'",
+    ]);
+    // The guard sits inside the reminder-only clause of the select.
+    expect(ours).toMatch(
+      /c\.code <> 'SHIFT_REMINDER'\s+or \(\s+coalesce\(now\(\) < private\.reminder_starts_at\(c\.operands\), false\)\s+and not private\.reminder_late\(c\.operands, c\.created_at\)\s+and private\.reminder_lead_on/,
+    );
+    const sql = migration();
+    expect(sql).toContain('revoke execute on function public.claim_notifications(integer) from public;');
+    expect(sql).toContain('revoke execute on function public.claim_notifications(integer) from anon;');
+    expect(sql).toContain('revoke execute on function public.claim_notifications(integer) from authenticated;');
+    expect(sql).toContain('grant execute on function public.claim_notifications(integer) to service_role;');
+  });
+
+  it('is late 15 minutes past an hours lead\'s due instant, or 20 minutes after it was written, and callable by no session role', () => {
+    const sql = migration();
+    const late = bodyOf(sql, 'private.reminder_late');
+    expect(late).toMatch(/returns boolean\s+language plpgsql\s+stable\s+security invoker\s+set search_path = ''/);
+    expect(late).toContain("if p_created_at is not null and p_created_at <= now() - interval '20 minutes' then");
+    // The due instant of an `H<n>` lead: real hours before the start (AD-6), its lead and hours agreeing.
+    expect(late).toContain("and (p_operands ->> 'lead') ~ '^H(1|2|3|6|12)$'");
+    expect(late).toContain("and hours = pg_catalog.substr(p_operands ->> 'lead', 2) then");
+    expect(late).toContain("return now() >= starts_at - pg_catalog.make_interval(hours => hours::integer) + interval '15 minutes';");
+    expect(Object.keys(REMINDER_LEAD_HOURS).sort()).toEqual(['H1', 'H12', 'H2', 'H3', 'H6']);
+    expect(sql).toContain('revoke execute on function private.reminder_late(jsonb, timestamptz) from public, anon, authenticated, service_role;');
+    expect(sql).not.toMatch(/grant execute on function private\.reminder_late/);
+  });
+
+  it('defines nothing else, writes no Vault value, and adds no table, column or send_after', () => {
+    const sql = migration();
+    expect([...sql.matchAll(/create (?:or replace )?function ([\w.]+)\(/g)].map((match) => match[1])).toEqual([
+      'private.reminder_late',
+      'public.claim_notifications',
+    ]);
+    expect(sql, 'a migration writes a Vault secret').not.toMatch(/vault\.(create|update)_secret|insert into vault\./);
+    expect(sql).not.toMatch(/\bcreate table\b|\balter table\b|\bsend_after\b|\bcron\.schedule\(/);
+    expect(sql).not.toMatch(/grant execute on function [^;]* to (anon|authenticated);/);
   });
 });
 

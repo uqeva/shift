@@ -19,7 +19,7 @@ import {
   vapidPairProblem,
 } from '../scripts/ci/require-config.mjs';
 import { rewriteAuthUrls, stripComment, withoutLocalRateLimits } from '../scripts/ci/set-auth-urls.mjs';
-import { LOCAL_APP_ORIGIN, LOCAL_VAPID_PUBLIC_KEY, renderEnvFiles } from '../scripts/ci/write-local-env.mjs';
+import { LOCAL_APP_ORIGIN, LOCAL_VAPID_PUBLIC_KEY, freshInvokeSecret, renderEnvFiles } from '../scripts/ci/write-local-env.mjs';
 
 /**
  * The pipeline's helpers (`scripts/ci/`). Each one guards a step whose failure
@@ -251,13 +251,30 @@ describe('write-local-env: the E2E env files from supabase status', () => {
     );
     // Story 10.4: a public key's shape (65 bytes, unpadded base64url), never a private one's.
     expect(LOCAL_VAPID_PUBLIC_KEY).toMatch(/^[A-Za-z0-9_-]{87}$/);
-    expect(files.functions.split('\n')).toEqual([
+    const lines = files.functions.split('\n');
+    expect(lines.slice(0, 3)).toEqual([
       'SHIFT_SECRET_KEY=sb_secret_local',
       'SHIFT_PUBLISHABLE_KEY=sb_publishable_local',
       `SHIFT_ALLOWED_ORIGINS=${LOCAL_APP_ORIGIN}`,
-      '',
     ]);
+    // Story 17.3: remind's own invoke secret, then the final newline.
+    expect(lines[3]).toMatch(/^REMIND_INVOKE_SECRET=[0-9a-f]{64}$/);
+    expect(lines.slice(4)).toEqual(['']);
     expect(LOCAL_APP_ORIGIN).toBe('http://127.0.0.1:5173');
+  });
+
+  it("makes remind's invoke secret fresh for every stack, never a literal, and refuses a short one (story 17.3)", () => {
+    const secretOf = (functions: string): string | undefined =>
+      /^REMIND_INVOKE_SECRET=(.*)$/m.exec(functions)?.[1];
+    const first = secretOf(renderEnvFiles(status).functions);
+    const second = secretOf(renderEnvFiles(status).functions);
+    expect(first).toMatch(/^[0-9a-f]{64}$/);
+    expect(second).not.toBe(first);
+    expect(freshInvokeSecret()).toMatch(/^[0-9a-f]{64}$/);
+    expect(secretOf(renderEnvFiles(status, 'r'.repeat(40)).functions)).toBe('r'.repeat(40));
+    expect(() => renderEnvFiles(status, 'short')).toThrow(/remind invoke secret/);
+    // Never in the web file: it is a function's credential (AD-17).
+    expect(renderEnvFiles(status).web).not.toContain('REMIND_INVOKE_SECRET');
   });
 
   it('never puts the secret key into the web file (AD-17)', () => {

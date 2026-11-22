@@ -2,14 +2,14 @@
 title: "17.2 The remind job writes reminders that fall due"
 type: 'feature'
 created: '2026-11-21'
-status: 'in-review'
+status: 'done'
 baseline_commit: 'e82bb39cd6c9681ca6a8ee78a48dbd3c765c7c11'
 review_loop_iteration: 2
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-17-context.md'
 ---
 
-Status: review (built, reviews 1 and 2's patches applied, CI pending). DONE MEANS MERGED WITH GREEN CI: the frontmatter stays `in-review` and the sprint status `review` until the PR merges green. Approved unattended under the founder's standing instruction (decide and record, no questions). ~2.4k tokens, kept whole: one user goal (a due reminder is written once, from the schedule as it stands) across the domain, SQL and one function; splitting the RPCs from the function would ship either half unusable. Baseline: `main` at #347 (17.1). Touches the structural pin tests (no hot UI file). Migration `0070` (19.3 runs in parallel and takes `0071`). Residual risks: the DB suite `test/shift-reminders.test.ts`, the provisioning inventories, the claimless sweep's `remind` call, 0070 on the real stack, the image probe and the runtime-parity job have never run (CI is their first run).
+Status: done — merged as #348 (squash `abe226e`, 2026-11-21) with `CI passed` green. CI (PR #348): run 44956923180 on `6e41e27` was cancelled, superseded by the push of review 2's `9ee30f3` (no failure); run 44957845376 on `9ee30f3` passed every job, `Test (Vitest, local Supabase)` (with `test/shift-reminders.test.ts`, the provisioning inventories and the claimless sweep), `Functions image (build, offline probe)`, `Runtime parity (Node and edge-runtime)`, the four E2E shards and `CI passed`. No fix was pushed for CI alone. Approved unattended under the founder's standing instruction (decide and record, no questions). ~2.4k tokens, kept whole: one user goal (a due reminder is written once, from the schedule as it stands) across the domain, SQL and one function; splitting the RPCs from the function would ship either half unusable. Baseline: `main` at #347 (17.1). Touches the structural pin tests (no hot UI file). Migration `0070` (19.3 runs in parallel and takes `0071`). Residual risks settled by CI: the DB suite `test/shift-reminders.test.ts`, the provisioning inventories, the claimless sweep's `remind` call, 0070 on CI's fresh stack, the image probe and the runtime-parity job all passed in run 44957845376. Still open: 0070 on a real deployed stack, and the armed path (story 17.3 arms and proves it).
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 
@@ -114,9 +114,9 @@ Decisions (founder: decide and record):
 
 **Manual checks:**
 - Bundle `remind` with the saved pinned `edge-runtime` under chroot (no network) as 16.4 did, and serve it: a POST without the secret is 401.
-- Unrun by rule: `test/shift-reminders.test.ts`, the provisioning inventories, the claimless sweep, the image probe and runtime-parity job; CI is their first run.
+- Unrun by rule: `test/shift-reminders.test.ts`, the provisioning inventories, the claimless sweep, the image probe and runtime-parity job; CI is their first run. CI: all passed in run 44957845376 (PR #348).
 
-**Results (review 2, 2026-11-21).** `pnpm typecheck`, `pnpm lint`, `pnpm build`: clean. `pnpm --filter @shift/domain test`: 22 files, 975 passed. `pnpm --filter @shift/ics test`: 31 passed. The nine DB-free root files above: 2503 passed. Still unrun by rule, and so first run in CI: `test/shift-reminders.test.ts` with its two new cases, the provisioning inventories, the claimless sweep and the image probe.
+**Results (review 2, 2026-11-21).** `pnpm typecheck`, `pnpm lint`, `pnpm build`: clean. `pnpm --filter @shift/domain test`: 22 files, 975 passed. `pnpm --filter @shift/ics test`: 31 passed. The nine DB-free root files above: 2503 passed. Still unrun by rule, and so first run in CI: `test/shift-reminders.test.ts` with its two new cases, the provisioning inventories, the claimless sweep and the image probe. CI: they passed in run 44957845376 (PR #348).
 
 **Results (review 1, 2026-11-21).** `pnpm typecheck`, `pnpm lint`, `pnpm build`: clean. `pnpm --filter @shift/domain test`: 22 files, 974 passed. `pnpm --filter @shift/ics test`: 31 passed. `pnpm --filter ./apps/web test`: 183 files, 6830 passed. The nine DB-free root files above: 2502 passed (17.1's 3002 was a different set of eight, with `localization-applied`, not these). 0070 re-run in the throwaway PGlite after the today patch: unchanged behaviour.
 
@@ -124,7 +124,7 @@ Decisions (founder: decide and record):
 - `pnpm typecheck`, `pnpm lint`, `pnpm build`: clean. `pnpm --filter @shift/domain test`: 22 files, 971 passed. `pnpm --filter @shift/ics test`: 31 passed. `pnpm --filter ./apps/web test`: 183 files, 6830 passed. The nine DB-free root files above (with `test/remind.test.ts`): 2499 passed (key-hygiene's two built-bundle scans skipped as before).
 - **0070 compiled and exercised in a throwaway in-process Postgres** (PGlite, scratchpad, over stub tables and the real `notify_members`, `reminder_email_on` and 0044 filter; no shared database touched): two runs of the same two items accepted 2 and 2 and left four rows (one per lead per channel), the subject equal to `md5('SHIFT_REMINDER:'||member||':'||date||':'||team||':'||lead)`, `leadHours` 1 on H1 and absent on the evening lead; all six skips answered 0; all fifteen shape breaches raised 22023 `REMINDER_ITEMS_INVALID`; with the reminder email switch off only the push row was written; the claim returned only the live row and settled expired and unreadable `startsAt` as `REMINDER_EXPIRED`, the lead gone as `REMINDER_TURNED_OFF`, the email as `EMAIL_TURNED_OFF`; `invoke_remind()` sent nothing with no secret or the URL alone, and one bearer POST with both.
 - **The bundle, offline.** The image layout built as the Dockerfile's COPY lines in the saved pinned `edge-runtime` v1.74.3 rootfs, every function bundled under `chroot` with no network (`remind` 248 065 bytes). `remind` served alone (`unshare -n`): no bearer and a wrong one 401 `INVOKE_SECRET_REFUSED`; the right one with the gateway unreachable 503 `REMINDER_INPUTS_UNAVAILABLE`, and the runtime's log held `remind: REMINDER_INPUTS_UNAVAILABLE` alone. `scripts/ci/probe-functions-image.sh` itself was not completed locally (see the incident below); CI's `functions-image` job is its first run.
-- **Unrun, by the STRICT DATABASE RULE:** `test/shift-reminders.test.ts` (new), the provisioning inventories, the claimless sweep's `remind` call, the scaffold-pinned SQL on a real Postgres, the image probe and the runtime-parity job. CI is their first run.
+- **Unrun, by the STRICT DATABASE RULE:** `test/shift-reminders.test.ts` (new), the provisioning inventories, the claimless sweep's `remind` call, the scaffold-pinned SQL on a real Postgres, the image probe and the runtime-parity job. CI is their first run. CI: all passed in run 44957845376 (PR #348).
 - **Incident.** A first attempt to run the image probe locally ended with `pkill -f "edge-runtime start"`, which, in the host's PID namespace, very likely stopped the manual-test stack's `supabase_edge_runtime_shift` container (seen `Exited (15)` afterwards). It was not restarted by this story (containers are off limits); reported to the orchestrator.
 
 

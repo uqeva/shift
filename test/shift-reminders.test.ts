@@ -443,6 +443,112 @@ describe('the claim settles a reminder that can no longer be sent (0070)', () =>
   });
 });
 
+describe('the claim never sends a reminder that waited too long (0072, story 17.3)', () => {
+  it.skipIf(noDatabase)('settles REMINDER_LATE one written 20 minutes ago or 15 minutes past its due instant, claims one written 19 minutes ago, and leaves the expiry and other codes alone', async () => {
+    await inRolledBackTransaction(async (client) => {
+      const [pilot] = FIXTURES;
+      const who = await member(client, pilot.slug, pilot.member);
+      await remindable(client, who, ['H1'], true);
+      const { teamId } = await teamAndType(client, who.organizationId);
+      const ahead = await isoFromNow(client, '3 hours');
+      // Owner scene: two queued push reminders, written `age` before the transaction's now.
+      const queue = async (subject: string, age: string): Promise<string> => {
+        const { rows } = await client.query<{ id: string }>(
+          `insert into notification_outbox (organization_id, code, subject_id, recipient_member_id, channel, operands, created_at)
+           values ($1, 'SHIFT_REMINDER', md5($2)::uuid, $3, 'push', $4::jsonb, now() - $5::interval) returning id::text`,
+          [who.organizationId, subject, who.id, JSON.stringify({ date: '2026-01-01', teamId, start: 420, end: 1140, startsAt: ahead, lead: 'H1' }), age],
+        );
+        return rows[0]?.id ?? '';
+      };
+      const late = await queue('late', '20 minutes');
+      const fresh = await queue('fresh', '19 minutes');
+      // An hours lead 16 minutes past its due instant (H1, starting in 44 minutes), written just now: late.
+      const pastDue = await isoFromNow(client, '44 minutes');
+      const { rows: duePast } = await client.query<{ id: string }>(
+        `insert into notification_outbox (organization_id, code, subject_id, recipient_member_id, channel, operands)
+         values ($1, 'SHIFT_REMINDER', md5('past-due')::uuid, $2, 'push', $3::jsonb) returning id::text`,
+        [who.organizationId, who.id, JSON.stringify({ date: '2026-01-01', teamId, start: 420, end: 1140, startsAt: pastDue, lead: 'H1', leadHours: 1 })],
+      );
+      const overdue = duePast[0]?.id ?? '';
+      // Late AND already started: the expiry settle runs first and names it.
+      const { rows: startedRows } = await client.query<{ id: string }>(
+        `insert into notification_outbox (organization_id, code, subject_id, recipient_member_id, channel, operands, created_at)
+         values ($1, 'SHIFT_REMINDER', md5('late-started')::uuid, $2, 'push', $3::jsonb, now() - interval '1 hour') returning id::text`,
+        [who.organizationId, who.id, JSON.stringify({ date: '2026-01-01', teamId, start: 420, end: 1140, startsAt: await isoFromNow(client, '-1 minute'), lead: 'H1' })],
+      );
+      const started = startedRows[0]?.id ?? '';
+      // Another code, written long ago: untouched by the reminder bound.
+      const { rows: otherRows } = await client.query<{ id: string }>(
+        `insert into notification_outbox (organization_id, code, subject_id, recipient_member_id, channel, operands, created_at)
+         values ($1, 'LOAN_MADE', md5('old-loan')::uuid, $2, 'push', $3::jsonb, now() - interval '2 hours') returning id::text`,
+        [who.organizationId, who.id, JSON.stringify({ startDate: '2026-01-01', endDate: '2026-01-02', teamName: 'T' })],
+      );
+      const other = otherRows[0]?.id ?? '';
+      await client.query(
+        `update notification_outbox set failed_at = now(), failure_code = 'HIDDEN_BY_TEST'
+          where sent_at is null and failed_at is null and id <> all($1::uuid[])`,
+        [[late, fresh, overdue, started, other]],
+      );
+
+      await actAsService(client);
+      const { rows: claimed } = await client.query<{ id: string }>('select id::text from public.claim_notifications(100)');
+      await actAsOwner(client);
+
+      const ids = claimed.map((row) => row.id);
+      expect(ids).toContain(fresh);
+      expect(ids).not.toContain(late);
+      const { rows: settled } = await client.query<{ id: string; failure: string | null }>(
+        'select id::text, failure_code as failure from notification_outbox where id = any($1::uuid[])',
+        [[late, fresh]],
+      );
+      expect(settled.find((row) => row.id === late)?.failure).toBe('REMINDER_LATE');
+      expect(settled.find((row) => row.id === fresh)?.failure).toBeNull();
+      expect(ids).not.toContain(overdue);
+      expect(ids).toContain(other);
+      const { rows: more } = await client.query<{ id: string; failure: string | null }>(
+        'select id::text, failure_code as failure from notification_outbox where id = any($1::uuid[])',
+        [[overdue, started, other]],
+      );
+      expect(more.find((row) => row.id === overdue)?.failure).toBe('REMINDER_LATE');
+      expect(more.find((row) => row.id === started)?.failure).toBe('REMINDER_EXPIRED');
+      expect(more.find((row) => row.id === other)?.failure).toBeNull();
+    });
+  });
+});
+
+describe('a reminder reaches exactly the channels the member has (D-S6, story 17.3)', () => {
+  it.skipIf(noDatabase)('writes push and email, push only, email only, or nothing', async () => {
+    await inRolledBackTransaction(async (client) => {
+      const [pilot] = FIXTURES;
+      const who = await member(client, pilot.slug, pilot.member);
+      const { teamId, shiftTypeId } = await teamAndType(client, who.organizationId);
+      const startsAt = await isoFromNow(client, '1 hour');
+      const cases: readonly { readonly device: boolean; readonly email: boolean; readonly expected: readonly string[] }[] = [
+        { device: true, email: true, expected: ['email', 'push'] },
+        { device: true, email: false, expected: ['push'] },
+        { device: false, email: true, expected: ['email'] },
+        { device: false, email: false, expected: [] },
+      ];
+      for (const [index, { device, email, expected }] of cases.entries()) {
+        // Owner scene: the channels for this case, then one item on a date of its own.
+        await actAsOwner(client);
+        await remindable(client, who, ['H1'], email);
+        if (!device) await client.query('delete from push_subscriptions where organization_id = $1 and member_id = $2', [who.organizationId, who.id]);
+        const date = await todayOf(client, who.organizationId, 10 + index);
+        await actAsService(client);
+        // Accepted every time: "no channel" is a channel-level drop, never a skipped item.
+        expect(
+          await enqueue(client, [{ memberId: who.id, date, teamId, shiftTypeId, lead: 'H1', start: 420, end: 1140, startsAt }]),
+          JSON.stringify({ device, email }),
+        ).toBe(1);
+        await actAsOwner(client);
+        const rows = (await remindersOf(client, who)).filter((row) => row.operands['date'] === date);
+        expect(rows.map((row) => row.channel).sort(), JSON.stringify({ device, email })).toEqual([...expected]);
+      }
+    });
+  });
+});
+
 describe('the remind cron job (0070)', () => {
   it.skipIf(noDatabase)('runs every five minutes, and sends nothing while Vault holds no remind_url', async () => {
     await inRolledBackTransaction(async (client) => {
