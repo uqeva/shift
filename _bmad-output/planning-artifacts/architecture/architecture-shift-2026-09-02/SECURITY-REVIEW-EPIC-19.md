@@ -49,7 +49,7 @@ Each row needs evidence: a test that runs in CI, a probe run on the local stack 
 | C5 | No session can change its sign-in address (B4b), so neither kind can become the other | probe |
 | C6 | Email links use `token_hash` and are verified by POST, on a click. No session token appears in a URL. Opening a link with a GET, or loading `/potvrda`, consumes nothing | probe |
 | C7 | The allow list and the site URL are the app origin only. A link cannot redirect anywhere else | config |
-| C8 | A confirmed signup holds only a password the confirming person chose. A stranger who signed the same address up first, unconfirmed, cannot leave their password on the account the owner confirms (GoTrue v2.196.0 keeps the first signup's password on a repeat signup). Added by the security review of 19.2. **Decided and built by 19.3** (founder decision 2026-11-21: confirmation forgets the password; see the 19.3 rows below), CI pending | DB or e2e test |
+| C8 | A confirmed signup holds only a password the confirming person chose. A stranger who signed the same address up first, unconfirmed, cannot leave their password on the account the owner confirms (GoTrue v2.196.0 keeps the first signup's password on a repeat signup). Added by the security review of 19.2. **Decided and built by 19.3** (founder decision 2026-11-21: confirmation forgets the password; see the 19.3 rows below), CI green (PR #349) | DB or e2e test |
 | C9 | After a link is used, the page names the address now signed in before anything is created, so a forwarded link (login CSRF) or a device already signed in as another account is visible. Added by the security review of 19.2 | e2e |
 
 ## D. Creating an organization (AD-23)
@@ -64,7 +64,7 @@ Each row needs evidence: a test that runs in CI, a probe run on the local stack 
 | D6 | A self-provisioned fixture organization passes all of `test/rls-isolation.test.ts`, in both directions against the pilot fixture | DB suite |
 | D7 | `search_path = ''` and every name is qualified. No dynamic SQL | source pin |
 
-### Story 19.3's evidence (as built 2026-11-21; every DB and e2e case written unrun, CI is its first run)
+### Story 19.3's evidence (as built 2026-11-21; every DB and e2e case was written unrun and passed on CI's first run, PR #349, run 44960497114)
 
 | # | Evidence |
 |---|---|
@@ -98,6 +98,19 @@ Each row needs evidence: a test that runs in CI, a probe run on the local stack 
 | F2 | An account that is inside `create_organization` is skipped and never deleted (`skip locked`, then the re-check) | DB test |
 | F3 | No session role can execute the job's function | catalog |
 | F4 | The operator scripts work only over the tailnet and change only `suspended` | runbook |
+
+### Story 19.5's evidence (as built 2026-11-21; every DB case written unrun, CI is its first run)
+
+Migration `0073_housekeeping_and_suspension.sql`. Beside the unrun DB files, the whole migration chain 0001–0073 and the four operator scripts (19.5's three and `provision-organization.sql`) were applied to an in-process PGlite over a stand-in for Supabase's platform schemas, and the housekeeping and suspension behaviour below was exercised there (single connection: the lock races are CI's alone).
+
+| # | Evidence |
+|---|---|
+| E3 | `test/suspended-organization.test.ts`: the catalog sweep of 19.1, moved to `test/catalog-sweep.ts`, run as an admin of the pilot suspended by `suspend-organization.sql` (zero rows from every table and view, every write refused, the same answer from every executable function with real and absent ids, no Storage read or write); the hook answers `SIGN_IN_REFUSED` for its members only; the feed lookup answers null; `reminder_inputs` omits, `enqueue_shift_reminders` skips, `notify_members` queues nothing; `push_devices_for_send` answers `inactive`; the claim settles a queued row `ORGANIZATION_SUSPENDED` and never sends it, after unsuspending too. Source pin (`test/supabase-scaffold.test.ts`, 0073 block): only `private.organization_live` names `suspended` in any function body, and each of the nine re-created callers equals its latest definition word for word but for the check |
+| E4 | `suspended` is outside every column grant (scaffold pin; `has_column_privilege` case); an admin's update is refused 42501 and `anon`'s matches no row (no update policy). `service_role` is the secret key's trusted role (AD-17), as for `founded_by`; the test asserts it holds the privilege, so a change is a decision |
+| F1 | `test/housekeeping.test.ts`: stale unconfirmed (8 days, or a link last re-sent 9 days ago) and confirmed (31 days) email identities go, and the returned counts equal, by kind, a count taken just before by the stated rule (a second run answers zero); 6 and 29 days, a link re-sent 2 days ago, a banned account (confirmed or not), a late confirmation, accounts with a member row (confirmed or not), synthesized accounts (member or not, a subdomain, upper case, a trailing dot), no address, a malformed address and an organization's `founded_by` stay; a Founding Admin made by `create_organization` 45 days after confirmation stays; identities cascade; attempts older than 30 days go. One failing account (a restricting foreign key) is counted `failed` and the rest still go (DB case, PGlite). Above seven times `accounts_per_day` candidates the job deletes nothing and fails `HOUSEKEEPING_HALTED`, so an emptied `members` table cannot empty `auth.users` (DB case, PGlite, scaffold pin; security review 2026-11-22) |
+| F2 | `test/housekeeping.test.ts`: an account held `for update` (AD-23 step 1) or by an uncommitted member insert (its foreign key's key share lock) is skipped, then deleted once released. Source pin: the lock, then a new statement's re-check, then the delete, which itself re-checks |
+| F3 | `test/housekeeping.test.ts` and `test/provisioning.test.ts`: no session role executes `private.delete_abandoned_accounts()`; a definer with `search_path = ''`; the `housekeeping` job is `15 3 * * *`, run as the function's owner, who holds DELETE on `auth.users` |
+| F4 | Scaffold pin: each script is one `do` block reading the slug from a setting, and writes `organizations.suspended` alone; `signup-report.sql` is one `select` that writes nothing. `test/suspended-organization.test.ts` runs all three (an unknown and a missing slug refused; only the column and two audit rows change). DEPLOY.md §9.10 is the runbook (over the tailnet only) |
 
 ## G. Secrets and logs (AD-17, NFR-27)
 

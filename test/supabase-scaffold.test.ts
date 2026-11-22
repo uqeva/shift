@@ -6054,8 +6054,16 @@ describe('the signup door migration (story 19.1, 0066)', () => {
   it('opens the switch on the local stack only, in the seed', () => {
     const seed = stripLineComments(readFileSync(join(supabaseRoot, 'seed.sql'), 'utf8'));
     expect(seed.match(/update private\.signup_settings set open = true where id;/g)).toHaveLength(1);
+    // No operator script writes the switch. Story 19.5's `signup-report.sql`
+    // READS it (the ceilings it reports against) and writes nothing, which its
+    // own pin holds; every other script does not name it at all.
     for (const script of readdirSync(operatorRoot).filter((name) => name.endsWith('.sql'))) {
-      expect(readFileSync(join(operatorRoot, script), 'utf8'), `${script} names the switch`).not.toMatch(/signup_settings/);
+      const text = readFileSync(join(operatorRoot, script), 'utf8');
+      if (script === 'signup-report.sql') {
+        expect(stripLineComments(text), `${script} writes the switch`).not.toMatch(/\b(update|insert into|delete from|truncate)\s+private\.signup_settings/i);
+        continue;
+      }
+      expect(text, `${script} names the switch`).not.toMatch(/signup_settings/);
     }
   });
 
@@ -6469,18 +6477,20 @@ describe('the reminder job (0070, story 17.2)', () => {
       );
     expect(definers('private.filter_notification_outbox')).toEqual(['0044_notification_settings.sql', '0070_shift_reminders.sql']);
     const claims = definers('public.claim_notifications');
-    // Story 17.3: 0072 re-creates 0070's claim with the late settle (its own block below).
+    // Story 19.5's 0073 re-creates the claim and `notify_members` with the
+    // suspension check alone, which its own pin diffs word for word.
     expect(claims.filter((file) => file > '0046_notification_recipient_rules.sql')).toEqual([
       '0070_shift_reminders.sql',
       '0072_reminder_delivery.sql',
+      '0073_housekeeping_and_suspension.sql',
     ]);
     expect(claims).toContain('0046_notification_recipient_rules.sql');
     expect(migrationNames().filter((file) => file > '0070_shift_reminders.sql').filter((file) =>
       /function (?:private\.filter_notification_outbox|private\.notify_members)\(/.test(read(file)),
-    )).toEqual([]);
+    )).toEqual(['0073_housekeeping_and_suspension.sql']);
     expect(migrationNames().filter((file) => file > '0072_reminder_delivery.sql').filter((file) =>
       /function public\.claim_notifications\(/.test(read(file)),
-    ), 'a later migration redefines the claim without this pin moving').toEqual([]);
+    ), 'a later migration redefines the claim without this pin moving').toEqual(['0073_housekeeping_and_suspension.sql']);
   });
 
   it("keeps 0044's filter and drops a reminder email while 0069's predicate is false", () => {
@@ -6842,6 +6852,383 @@ describe('a verified account creates its organization (0071, story 19.3)', () =>
     );
     for (const role of ['public', 'anon', 'authenticated', 'service_role']) {
       expect(sql).toContain(`revoke execute on function private.forget_password_on_confirmation() from ${role};`);
+    }
+  });
+});
+
+describe('housekeeping and suspension (0073, story 19.5)', () => {
+  const MIGRATION = '0073_housekeeping_and_suspension.sql';
+  const raw = (name: string): string => readFileSync(join(supabaseRoot, 'migrations', name), 'utf8');
+  const migration = (): string => stripLineComments(raw(MIGRATION));
+  const operatorScript = (name: string): string => stripLineComments(readFileSync(join(operatorRoot, name), 'utf8'));
+  /** One `create [or replace] function <name>(` line through the first line that is exactly `$$;`, as written. */
+  const definitionOf = (sql: string, name: string): string => {
+    const lines = sql.split('\n');
+    const start = lines.findIndex((line) => new RegExp(`^create (or replace )?function ${name.replace('.', '\\.')}\\(`).test(line));
+    if (start < 0) return '';
+    const end = lines.findIndex((line, index) => index > start && line === '$$;');
+    return lines.slice(start, end + 1).join('\n');
+  };
+
+  /**
+   * Every function 0073 re-creates, the migration holding its LATEST
+   * definition before 0073, and the edits 0073 makes to it, each an exact
+   * (before, after) pair. The pin applies the edits to the source and expects
+   * 0073's text, word for word: nothing else in any of them changed.
+   */
+  const RECREATED: readonly (readonly [string, string, readonly (readonly [string, string])[]])[] = [
+    [
+      'public.current_member_access',
+      '0008_member_status.sql',
+      [
+        [
+          `   where m.auth_user_id = (select auth.uid())
+$$;`,
+          `   where m.auth_user_id = (select auth.uid())
+     -- 0073 (AD-10, story 19.5): a suspended organization's member has no access.
+     and private.organization_live(m.organization_id)
+$$;`,
+        ],
+      ],
+    ],
+    [
+      'public.custom_access_token_hook',
+      '0008_member_status.sql',
+      [
+        [
+          `    return jsonb_set(event, '{claims}', signer_claims - 'organization_id');
+  end if;
+`,
+          `    return jsonb_set(event, '{claims}', signer_claims - 'organization_id');
+  end if;
+
+  -- 0073 (AD-10, story 19.5): a member of a suspended organization gets no
+  -- token either, with the same refusal and the same 403.
+  if not private.organization_live(signer_organization) then
+    return jsonb_build_object(
+      'error',
+      jsonb_build_object('http_code', 403, 'message', 'SIGN_IN_REFUSED')
+    );
+  end if;
+`,
+        ],
+      ],
+    ],
+    [
+      'private.calendar_feed_member_live',
+      '0067_calendar_feed_tokens.sql',
+      [
+        [
+          `       and public.member_active_on(m.id, public.organization_today(m.organization_id))
+  )
+$$;`,
+          `       and public.member_active_on(m.id, public.organization_today(m.organization_id))
+       -- 0073 (AD-10, story 19.5): and its organization is not suspended.
+       and private.organization_live(m.organization_id)
+  )
+$$;`,
+        ],
+      ],
+    ],
+    [
+      'public.reminder_inputs',
+      '0070_shift_reminders.sql',
+      [
+        [
+          `   where due.today is not null
+     and public.member_active_on(due.member_id, due.today);`,
+          `   where due.today is not null
+     and public.member_active_on(due.member_id, due.today)
+     -- 0073 (AD-10, story 19.5): no suspended organization's member.
+     and private.organization_live(due.organization_id);`,
+        ],
+      ],
+    ],
+    [
+      'public.enqueue_shift_reminders',
+      '0070_shift_reminders.sql',
+      [
+        [
+          `    if v_organization is null
+       or v_today is null
+`,
+          `    if v_organization is null
+       -- 0073 (AD-10, story 19.5): a suspended organization's item is skipped.
+       or not private.organization_live(v_organization)
+       or v_today is null
+`,
+        ],
+      ],
+    ],
+    [
+      'private.notify_members',
+      '0045_push_subscriptions.sql',
+      [
+        [
+          `  if today is null or p_recipients is null or pg_catalog.cardinality(p_recipients) = 0 then
+    return;
+  end if;
+`,
+          `  if today is null or p_recipients is null or pg_catalog.cardinality(p_recipients) = 0 then
+    return;
+  end if;
+
+  -- 0073 (AD-10, story 19.5): a suspended organization queues nothing.
+  if not private.organization_live(p_organization) then
+    return;
+  end if;
+`,
+        ],
+      ],
+    ],
+    [
+      'public.push_devices_for_send',
+      '0046_notification_recipient_rules.sql',
+      [
+        [
+          `    return pg_catalog.jsonb_build_object('status', 'lease_lost', 'devices', '[]'::jsonb);
+  end if;
+`,
+          `    return pg_catalog.jsonb_build_object('status', 'lease_lost', 'devices', '[]'::jsonb);
+  end if;
+
+  -- 0073 (AD-10, story 19.5): a suspended organization's row is posted to no
+  -- device. It reads as \`inactive\`, so \`notify\` settles it failed, unchanged.
+  if not private.organization_live(row_organization) then
+    return pg_catalog.jsonb_build_object('status', 'inactive', 'devices', '[]'::jsonb);
+  end if;
+`,
+        ],
+      ],
+    ],
+    [
+      'public.claim_notifications',
+      '0072_reminder_delivery.sql',
+      [
+        [
+          `  -- 0046 (A3): a pending row, either channel, whose recipient is not active
+`,
+          `  -- 0073 (AD-10, story 19.5): a pending row, either channel, of a suspended
+  -- organization is never sent, before the settles below, so it is the reason
+  -- recorded. Not in flight, as below.
+  update public.notification_outbox o
+     set failed_at = now(),
+         failure_code = 'ORGANIZATION_SUSPENDED',
+         next_attempt_at = null
+   where o.id in (
+     select c.id
+       from public.notification_outbox c
+      where c.sent_at is null
+        and c.failed_at is null
+        and c.channel in ('email', 'push')
+        and (c.claimed_at is null or c.claimed_at < now() - interval '10 minutes')
+        and not private.organization_live(c.organization_id)
+      for update skip locked
+   );
+
+  -- 0046 (A3): a pending row, either channel, whose recipient is not active
+`,
+        ],
+        [
+          `          and public.member_active_on(c.recipient_member_id, public.organization_today(c.organization_id))
+`,
+          `          -- 0073 (AD-10, story 19.5): nor while its organization is suspended.
+          and private.organization_live(c.organization_id)
+          and public.member_active_on(c.recipient_member_id, public.organization_today(c.organization_id))
+`,
+        ],
+      ],
+    ],
+    [
+      'public.swap_parties_active',
+      '0049_swap_requests.sql',
+      [
+        [
+          `  if claimed is null or p_organization is distinct from claimed then
+    return false;
+  end if;
+`,
+          `  if claimed is null or p_organization is distinct from claimed then
+    return false;
+  end if;
+
+  -- 0073 (AD-10, story 19.5): nothing is active in a suspended organization.
+  if not private.organization_live(claimed) then
+    return false;
+  end if;
+`,
+        ],
+      ],
+    ],
+  ];
+
+  it('re-creates each caller from its latest definition, word for word but for the suspension check (AD-10)', () => {
+    const numbered = migrationNames()
+      .filter((name) => MIGRATION_NAME.test(name))
+      .sort();
+    for (const [name, source, edits] of RECREATED) {
+      const definedIn = numbered.filter((file) => definitionOf(raw(file), name) !== '');
+      expect(definedIn.slice(-2), `${name}: ${source} is not its latest definition before 0073`).toEqual([source, MIGRATION]);
+      let expected = definitionOf(raw(source), name).replace(/^create (or replace )?function /, 'create or replace function ');
+      for (const [before, after] of edits) {
+        expect(expected.split(before).length - 1, `${name}: the edit's anchor is not unique`).toBe(1);
+        expected = expected.replace(before, () => after);
+      }
+      expect(definitionOf(raw(MIGRATION), name), name).toBe(expected);
+      expect(stripLineComments(expected), `${name} does not call the predicate`).toContain('private.organization_live(');
+    }
+    expect(RECREATED.map(([name]) => name).sort()).toEqual(
+      [...raw(MIGRATION).matchAll(/^create or replace function ([a-z_]+\.[a-z_]+)\(/gm)].map((match) => match[1]).sort(),
+    );
+  });
+
+  it('leaves every re-created caller executable by exactly the roles it was before (AD-10)', () => {
+    // Replays every migration's privilege statements per function, as
+    // Postgres would: a plain `create function` starts from Supabase's default
+    // grants, `create or replace` keeps them, `revoke`/`grant` edit them.
+    const DEFAULT = ['anon', 'authenticated', 'public', 'service_role'];
+    const privileges = (files: readonly string[], name: string): string[] => {
+      let roles = new Set<string>();
+      const escapedName = name.replace('.', '\\.');
+      for (const file of files) {
+        for (const statement of sqlStatements(stripLineComments(raw(file)))) {
+          if (new RegExp(`^create function ${escapedName}\\(`).test(statement)) roles = new Set(DEFAULT);
+          const privilege = new RegExp(`^(grant|revoke) execute on function ${escapedName}\\([^)]*\\) (?:to|from) ([\\w, ]+)$`).exec(statement);
+          if (privilege === null) continue;
+          for (const role of (privilege[2] ?? '').split(',').map((entry) => entry.trim())) {
+            if (privilege[1] === 'grant') roles.add(role);
+            else roles.delete(role);
+          }
+        }
+      }
+      return [...roles].sort();
+    };
+    const numbered = migrationNames()
+      .filter((name) => MIGRATION_NAME.test(name))
+      .sort();
+    const before = numbered.filter((file) => file < MIGRATION);
+    for (const [name] of RECREATED) {
+      expect(privileges(numbered, name), name).toEqual(privileges(before, name));
+    }
+    expect(privileges(numbered, 'public.claim_notifications')).toEqual(['service_role']);
+    expect(privileges(numbered, 'public.current_member_access')).toEqual(['authenticated']);
+    expect(privileges(numbered, 'private.calendar_feed_member_live')).toEqual([]);
+  });
+
+  it('names organizations.suspended in one function body alone, which nobody may execute (AD-10, E3)', () => {
+    const sql = migration();
+    expect(sql).toContain('alter table public.organizations add column suspended boolean not null default false;');
+    const live = /create function private\.organization_live\(p_organization uuid\)[\s\S]*?\$\$;/.exec(sql)?.[0] ?? '';
+    expect(live).toMatch(/returns boolean\s+language sql\s+stable\s+security invoker\s+set search_path = ''/);
+    expect(live).toMatch(/where o\.id = p_organization\s+and not o\.suspended/);
+    for (const role of ['public', 'anon', 'authenticated', 'service_role']) {
+      expect(sql).toContain(`revoke execute on function private.organization_live(uuid) from ${role};`);
+    }
+    const naming = migrationNames()
+      .sort()
+      .flatMap((file) =>
+        [...stripLineComments(raw(file)).matchAll(/create (?:or replace )?function ([a-z_.]+)\([\s\S]*?\$\$([\s\S]*?)\$\$;/g)]
+          .filter((match) => /\bsuspended\b/.test(match[2] ?? ''))
+          .map((match) => `${file}: ${match[1] ?? ''}`),
+      );
+    expect(naming).toEqual([`${MIGRATION}: private.organization_live`]);
+    // Not only function bodies: no view, policy, trigger or `do` block of any
+    // migration names it, under any dollar tag, but the column itself.
+    const statements = migrationNames()
+      .sort()
+      .flatMap((file) => sqlStatements(stripLineComments(raw(file))).map((statement) => [file, statement] as const))
+      .filter(([, statement]) => /\bsuspended\b/.test(statement))
+      .map(([file, statement]) => `${file}: ${/^\S+(?: \S+){0,3}/.exec(statement)?.[0] ?? ''}`);
+    expect(statements).toEqual([
+      `${MIGRATION}: alter table public.organizations add`,
+      `${MIGRATION}: create function private.organization_live(p_organization uuid)`,
+    ]);
+    // E4: no grant names the column, so only the operator writes it.
+    expect(migrationStatements()).not.toMatch(/grant [^;]*\bsuspended\b[^;]* on table public\.organizations/i);
+    // AD-11: recorded and never shown, as `founded_by`.
+    expect(HISTORY_HIDDEN_COLUMNS.has('suspended')).toBe(true);
+  });
+
+  it('settles a suspended organization’s queued rows before every other settle but the exhausted one', () => {
+    const claim = definitionOf(raw(MIGRATION), 'public.claim_notifications');
+    const at = (needle: string): number => claim.indexOf(needle);
+    expect(at("failure_code = 'ATTEMPTS_EXHAUSTED'")).toBeLessThan(at("failure_code = 'ORGANIZATION_SUSPENDED'"));
+    expect(at("failure_code = 'ORGANIZATION_SUSPENDED'")).toBeLessThan(at("failure_code = 'RECIPIENT_INACTIVE'"));
+    expect(claim).toMatch(/and not private\.organization_live\(c\.organization_id\)\s+for update skip locked/);
+  });
+
+  it('deletes only a stale email identity with no member row and no organization founded, under its lock, re-checked (AD-25, F1, F2, F3)', () => {
+    const sql = migration();
+    const job = /create function private\.delete_abandoned_accounts\(\)[\s\S]*?\$\$;/.exec(sql)?.[0] ?? '';
+    expect(job).toMatch(/returns jsonb\s+language plpgsql\s+volatile\s+security definer\s+set search_path = ''/);
+    // The candidates' rule, once to list them and once under the lock.
+    const rule = [
+      "private.address_kind(u.email) = 'email'",
+      'not exists (select 1 from public.members as m where m.auth_user_id = u.id)',
+      'not exists (select 1 from public.organizations as o where o.founded_by = u.id)',
+      '(u.banned_until is null or u.banned_until <= pg_catalog.now())',
+      "greatest(u.created_at, coalesce(u.confirmation_sent_at, u.created_at)) < pg_catalog.now() - interval '7 days')",
+      "or (u.email_confirmed_at is not null and u.email_confirmed_at < pg_catalog.now() - interval '30 days')",
+    ];
+    for (const clause of rule) expect(job.split(clause).length - 1, clause).toBeGreaterThanOrEqual(3);
+    // The circuit breaker: the candidates counted by the same rule, and
+    // nothing deleted above seven days' worth of the hook's ceiling.
+    expect(job).toContain('select 7 * s.accounts_per_day into halt_ceiling from private.signup_settings as s where s.id;');
+    expect(job).toContain("pg_catalog.current_setting('shift.housekeeping_ceiling', true)");
+    expect(job).toMatch(/if candidates > halt_ceiling then\s+raise exception using\s+errcode = 'check_violation',\s+message = 'HOUSEKEEPING_HALTED'/);
+    expect(job).toContain("perform pg_catalog.set_config('lock_timeout', '5s', true);");
+    const at = (needle: string): number => {
+      const index = job.indexOf(needle);
+      expect(index, `the job lacks ${needle}`).toBeGreaterThan(-1);
+      return index;
+    };
+    const order = [
+      at("perform pg_catalog.set_config('lock_timeout', '5s', true);"),
+      at('into candidates'),
+      at("message = 'HOUSEKEEPING_HALTED'"),
+      at('for candidate in'),
+      at('for update of u skip locked;'),
+      at('if exists (select 1 from public.members as m where m.auth_user_id = candidate)'),
+      at('delete from auth.users as u'),
+      at('delete from private.organization_attempts as a'),
+    ];
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(job).toMatch(/delete from auth\.users as u\s+where u\.id = candidate\s+and not exists \(select 1 from public\.members as m where m\.auth_user_id = u\.id\);/);
+    expect(job).toContain("where a.attempted_at < pg_catalog.now() - interval '30 days';");
+    // It deletes from those two tables and nowhere else, and writes nothing more.
+    expect([...job.matchAll(/(?<!for )\b(delete from|insert into|update|truncate)\s+([a-z_.]+)/gi)].map((match) => `${match[1]?.toLowerCase() ?? ''} ${match[2] ?? ''}`)).toEqual([
+      'delete from auth.users',
+      'delete from private.organization_attempts',
+    ]);
+    expect(job).not.toMatch(/\bexecute\b|\bformat\(/i);
+    // One account per subtransaction: a failing row is logged and counted, never fatal.
+    expect(job).toMatch(/exception\s+when others then\s+failed := failed \+ 1;\s+raise warning 'HOUSEKEEPING_SKIPPED % %', candidate, sqlstate;\s+end;\s+end loop;/);
+    expect(job).toMatch(/exception\s+when others then\s+failed := failed \+ 1;\s+raise warning 'HOUSEKEEPING_ATTEMPTS_SKIPPED %', sqlstate;\s+end;/);
+    for (const role of ['public', 'anon', 'authenticated', 'service_role']) {
+      expect(sql).toContain(`revoke execute on function private.delete_abandoned_accounts() from ${role};`);
+    }
+    expect(migrationStatements()).not.toMatch(/grant execute on function private\.delete_abandoned_accounts/i);
+    expect(sql).toContain("select cron.schedule('housekeeping', '15 3 * * *', 'select private.delete_abandoned_accounts()');");
+  });
+
+  it('gives the operator scripts that change suspended alone, by slug, and a report that writes nothing (AD-25, F4)', () => {
+    for (const [script, value] of [
+      ['suspend-organization.sql', 'true'],
+      ['unsuspend-organization.sql', 'false'],
+    ] as const) {
+      const sql = operatorScript(script);
+      expect(sql.trim(), `${script} is not one do block`).toMatch(/^do \$\$[\s\S]*\$\$;$/);
+      expect(sql).toContain("current_setting('shift.organization_slug', true)");
+      expect([...sql.matchAll(/(?<!for )\b(delete from|insert into|update|truncate)\s+([a-z_.]+)/gi)].map((match) => match[2])).toEqual(['public.organizations']);
+      expect(sql).toMatch(new RegExp(`update public\\.organizations as o\\s+set suspended = ${value}\\s+where o\\.id = target_id;`));
+      expect(sql).toContain("message = 'ORGANIZATION_UNKNOWN'");
+    }
+    const report = operatorScript('signup-report.sql');
+    expect(sqlStatements(report)).toHaveLength(1);
+    expect(report.trim()).toMatch(/^select pg_catalog\.jsonb_pretty\(/);
+    expect(report).not.toMatch(/\b(delete|insert|update|truncate|alter|create|drop|grant|revoke)\b/i);
+    for (const key of ['door', 'last_24_hours', 'recent_accounts', 'accounts_by_day', 'organizations_by_day', 'organizations_founded_by_signup', 'most_attempts']) {
+      expect(report).toContain(`'${key}'`);
     }
   });
 });

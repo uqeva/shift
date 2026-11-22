@@ -2,7 +2,7 @@
 title: '19.3 A verified account creates its organization'
 type: 'feature'
 created: '2026-11-21'
-status: 'in-review'
+status: 'done'
 baseline_commit: 'e82bb39'
 review_loop_iteration: 0
 context:
@@ -11,7 +11,7 @@ context:
   - '{project-root}/_bmad-output/planning-artifacts/ux-designs/ux-shift-2026-11-21-signup/README.md'
 ---
 
-Status: review, built, CI pending (unattended run; the checkpoint was taken as approved, the founder having said not to ask).
+Status: done. Merged as PR #349, squash `b5e0c94df104a638e7332e1abe4191ef643548bb` (2026-11-21), with `CI passed` green on its first and only pipeline run (run 44960497114, on `838f97b`). Unattended run; the checkpoint was taken as approved, the founder having said not to ask.
 
 Baseline: `origin/main` at #347 (17.1 merged; 19.1 #341 and 19.2 #344 merged). Touches the hot file `hr.json` and the structural pins; story 17.2 runs in parallel with migration 0070, so this story's migration is **0071** and the scaffold's no-gap case fails locally until 0070 merges (expected). The screens follow the epic 19 UX review (UX-DR63, UX-DR66), which the founder has **not yet accepted**: built to it. Run unattended: the founder said not to ask questions, and decided C8 (2026-11-21).
 
@@ -67,7 +67,7 @@ Baseline: `origin/main` at #347 (17.1 merged; 19.1 #341 and 19.2 #344 merged). T
 - `apps/web/src/features/auth/hooks/use-mail-link.ts`, `components/mail-link-panels.tsx`, `services/signup.ts`, `pages/potvrda.tsx` -- the signup link takes the password form.
 - `packages/domain/src/history.ts` + test -- `founded_by` hidden (AD-11).
 - `hr.json`, `test/resource-hygiene.test.ts`, fixtures and sweeps that register screens and keys.
-- Tests: `test/create-organization.test.ts` (new, DB, unrun), `test/signup-account.test.ts` (C8, unrun), `test/provisioning.test.ts` (catalog, unrun), `test/supabase-scaffold.test.ts` (pins, run), `test/fixtures/known-timezones.json` (new), `e2e/tests/auth/signup.spec.ts` (mailed link, recovery, unconfirmed, step 1; unrun).
+- Tests: `test/create-organization.test.ts` (new, DB), `test/signup-account.test.ts` (C8), `test/provisioning.test.ts` (catalog), `test/supabase-scaffold.test.ts` (pins, run), `test/fixtures/known-timezones.json` (new), `e2e/tests/auth/signup.spec.ts` (mailed link, recovery, unconfirmed, step 1). Written unrun; all passed in CI (run 44960497114).
 - Implementation notes found in planning (not frozen):
   - The claimless sweep (`test/claimless-account.test.ts:69`) already exempts `create_organization`; every other new function revokes execute from `public`, `anon`, `authenticated` and `service_role`, each by name (0066's pattern).
   - `test/signup-account.test.ts`'s `emailIdentityMember` inserts an email identity's member row as the owner; under D5 it sets `shift.founding_account` first (as the definer does), and a new case shows an admin's insert refused. Its live case now expects the signup password refused after the verify (C8), then sets a password with `PUT /auth/v1/user` and signs in with it; a second case signs one address up twice (the first password a stranger's).
@@ -115,10 +115,10 @@ Decisions (the founder said decide and record):
 - `pnpm typecheck`, `pnpm lint`, `pnpm build`: pass.
 - `pnpm --filter ./apps/web test`: 184 files, 6852 tests pass. `pnpm --filter @shift/domain test`: 21 files, 958 tests pass.
 - The allowed root files (after the build): 3127 of 3128 pass; the one failure is the scaffold's no-gap case (0070 is 17.2's, not yet merged), as expected.
-- Written unrun, CI is their first run: `test/create-organization.test.ts` (new), `test/signup-account.test.ts` (C8 live and database cases, D5), `test/provisioning.test.ts` (catalog entries, the self/operator twin), `test/claimless-account.test.ts` (its admin-created email identity now sets its password after `createUser`, which C8 makes necessary), `e2e/tests/auth/signup.spec.ts` (the mailed link, step 1 to *Danas*, a taken slug, an unconfirmed sign-in, a recovery link).
+- Written unrun, and all passed on CI's first run (run 44960497114: `Test (Vitest, local Supabase)` and the four e2e shards green, no fix pushed for CI): `test/create-organization.test.ts` (new), `test/signup-account.test.ts` (C8 live and database cases, D5), `test/provisioning.test.ts` (catalog entries, the self/operator twin), `test/claimless-account.test.ts` (its admin-created email identity now sets its password after `createUser`, which C8 makes necessary), `e2e/tests/auth/signup.spec.ts` (the mailed link, step 1 to *Danas*, a taken slug, an unconfirmed sign-in, a recovery link).
 - Deviations from the mockup, recorded in UX-DR66 and deferred-work: no `Korak 1 od 7` in step 1's lede until 19.4 builds the rail. The `Intl.` read of the device zone is the one named exception in `format.test.ts`; the zone list and the zone check moved into `lib/i18n/format.ts` (`supportedTimeZones`, `isRenderableTimeZone`).
 
-**Residual risks:** every DB and E2E case above is unrun; the race (D3) commits on the shared CI stack and cleans up after itself; the edge-runtime half of the timezone parity vector is deferred (OWNER 20.5); a two-account concurrent ceiling case (D4 under concurrency) is reasoned from the advisory lock, not tested.
+**Residual risks:** every DB and E2E case above passed in CI (run 44960497114), so none is unrun any more; the race (D3) commits on the shared CI stack and cleaned up after itself there; the edge-runtime half of the timezone parity vector is deferred (OWNER 20.5); a two-account concurrent ceiling case (D4 under concurrency) is reasoned from the advisory lock, not tested.
 
 ## Review Findings
 
@@ -171,7 +171,7 @@ Run unattended (the founder said not to ask). Layers: Blind Hunter, Edge Case Hu
 
 Rejected, each with its reason: a null address passing step 2 (`address_kind(null)` is `malformed`, refused); the dead signup link offering recovery (D2, intended); `attempts` never purged and throttled retries extending the window (AD-25's housekeeping owns retention, review 1; counting every attempt is AD-23 step 5); slug enumeration through proposals (review 1: slugs are not secret, D-S8, each probe costs an attempt); the client not refusing reserved slugs (review 1); the global advisory lock (held for one short definer call, under per-account and per-IP limits); the over-length name message (the field's own maxLength stops it on the page); no hook-level test for the second press (no React test harness in `apps/web`; the decision is `afterCreateOf`, node-tested, and the guard is three lines); `NOT_CREATABLE` with a still-claimless session showing "try again" (banned, deleted or held accounts only; suspension is 19.5's); the routing loop via `povratak=/postavljanje` (each hop drops one level of nesting and ends at `/`); `founded_by` outliving its account (an attribution like `created_by`, by design).
 
-Open for CI (not runnable here): every DB and e2e case, and that the migration role may create a trigger on `auth.users` and lock its rows (0071 is the first migration to do either; Supabase supports triggers on `auth.users` from user migrations).
+Settled by CI (run 44960497114, green on `838f97b`): every DB and e2e case passed, and the migration role created the trigger on `auth.users` and locked its rows (0071 applied on CI's fresh stack).
 
 ## Suggested Review Order
 
@@ -228,7 +228,7 @@ Open for CI (not runnable here): every DB and e2e case, and that the migration r
 - The slug proposed from the typed name.
   [`create-organization.ts:45`](../../apps/web/src/features/auth/services/create-organization.ts#L45)
 
-**Tests (DB and E2E written unrun)**
+**Tests (DB and E2E written unrun, passed in CI run 44960497114)**
 
 - C8 live: a stranger's earlier password signs nothing in once the owner confirms.
   [`signup-account.test.ts:241`](../../test/signup-account.test.ts#L241)
