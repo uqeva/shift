@@ -26,9 +26,7 @@ import {
   seedTeamRotation,
   setEmailNotificationsInSql,
   shiftRemindersOfInSql,
-  type ArmedRemind,
   type RotationHold,
-  type SeededRotation,
 } from '../../utils/database-helper.ts';
 import { addDays } from '../../utils/dates.ts';
 import { hr } from '../../utils/i18n.ts';
@@ -83,6 +81,14 @@ test.describe.configure({ mode: 'serial' });
 
 let settingsHold: RotationHold | null = null;
 
+/**
+ * What a test changed on the shared stack, undone in `afterEach` (newest
+ * first), which Playwright runs even after a test timed out: the Vault arm,
+ * the rotation lock and seed, the member's held facts, the reminder rows.
+ * Each undo runs whatever the one before it did, so one failure skips none.
+ */
+const undo: (() => Promise<unknown>)[] = [];
+
 test.beforeEach(async () => {
   // Waiting for the other holders may take a while.
   test.slow();
@@ -91,8 +97,13 @@ test.beforeEach(async () => {
 });
 
 test.afterEach(async () => {
+  const failures: unknown[] = [];
+  for (const step of undo.splice(0).reverse()) {
+    await step().catch((cause: unknown) => failures.push(cause));
+  }
   await settingsHold?.release();
   settingsHold = null;
+  if (failures.length > 0) throw failures[0];
 });
 
 /** Neither the page nor the card scrolls sideways (17.1's deferred layout check, on the live screen). */
@@ -144,18 +155,14 @@ test('the cron job’s own call reaches remind through the armed Vault and is an
   const fixture = readFixture();
   // Nobody of the run has a lead on, so the real clock writes nothing.
   const reminders = await holdReminderSettingsInSql(fixture.slug, fixture.member.username);
-  let armed: ArmedRemind | null = null;
-  try {
-    armed = await armRemindInVault(LOCAL_REMIND_URL, functionsEnvValue('REMIND_INVOKE_SECRET'));
-    const answer = await invokeRemindAsTheCronDoes();
-    expect(answer, 'pg_net recorded no answer to the cron call').not.toBeNull();
-    // 401: Vault's remind_invoke_secret is not the served function's. 503: the read failed.
-    expect(answer?.status, answer?.body ?? '').toBe(200);
-    expect(JSON.parse(answer?.body ?? '{}')).toMatchObject({ code: REMIND_RAN });
-  } finally {
-    if (armed !== null) await disarmRemindInVault(armed);
-    await restoreReminderSettingsInSql(reminders);
-  }
+  undo.push(() => restoreReminderSettingsInSql(reminders));
+  const armed = await armRemindInVault(LOCAL_REMIND_URL, functionsEnvValue('REMIND_INVOKE_SECRET'));
+  undo.push(() => disarmRemindInVault(armed));
+  const answer = await invokeRemindAsTheCronDoes();
+  expect(answer, 'pg_net recorded no answer to the cron call').not.toBeNull();
+  // 401: Vault's remind_invoke_secret is not the served function's. 503: the read failed.
+  expect(answer?.status, answer?.body ?? '').toBe(200);
+  expect(JSON.parse(answer?.body ?? '{}')).toMatchObject({ code: REMIND_RAN });
 });
 
 test('one lead on: exactly one reminder per channel on a fake clock, each opening its day; with it off, none', async ({
@@ -164,93 +171,91 @@ test('one lead on: exactly one reminder per channel on a fake clock, each openin
   calendarPage,
 }) => {
   const fixture = readFixture();
+  // Each change is registered for `afterEach` the moment it is made, so a
+  // failure or a timeout anywhere still undoes all of them.
   const rotationHold = holdRotation(fixture.slug);
+  undo.push(() => rotationHold.release());
   await rotationHold.ready;
   const devices = await holdPushDevicesInSql(fixture.slug, fixture.member.username);
+  undo.push(() => restorePushDevicesInSql(devices));
   const reminders = await holdReminderSettingsInSql(fixture.slug, fixture.member.username);
+  undo.push(() => restoreReminderSettingsInSql(reminders));
   const email = await holdMemberEmailInSql(fixture.slug, fixture.member.username, `${fixture.member.username}@example.org`);
+  undo.push(() => restoreMemberEmailInSql(email));
   const organizationWas = await setEmailNotificationsInSql(fixture.slug, true);
-  let endpoint: string | null = null;
-  let seed: SeededRotation | null = null;
-  try {
-    await removeShiftRemindersInSql(fixture.slug, fixture.member.username);
-    endpoint = await addPushDeviceInSql(fixture.slug, fixture.member.username);
-    // From today `[Dan, Noć, Slobodno, Slobodno]`: tomorrow is a Noć, 19:00–07:00.
-    seed = await seedTeamRotation(fixture.slug, fixture.team.id, `P${randomBytes(3).toString('hex')}`);
-    const tomorrow = addDays(seed.today, 1);
-    const night = seed.steps[1];
-    const dueAt = (await organizationInstant(fixture.slug, tomorrow, '18:00')).getTime();
-    const memberId = await memberIdOf(fixture.slug, fixture.member.username);
+  undo.push(() => setEmailNotificationsInSql(fixture.slug, organizationWas));
+  await removeShiftRemindersInSql(fixture.slug, fixture.member.username);
+  const endpoint = await addPushDeviceInSql(fixture.slug, fixture.member.username);
+  undo.push(() => removePushEndpointInSql(endpoint));
+  // From today `[Dan, Noć, Slobodno, Slobodno]`: tomorrow is a Noć, 19:00–07:00.
+  const seed = await seedTeamRotation(fixture.slug, fixture.team.id, `P${randomBytes(3).toString('hex')}`);
+  undo.push(() => removeSeededRotation(seed));
+  // Last registered, so undone first: the rows this case's runs wrote.
+  undo.push(() => removeShiftRemindersInSql(fixture.slug, fixture.member.username));
+  const tomorrow = addDays(seed.today, 1);
+  const night = seed.steps[1];
+  const dueAt = (await organizationInstant(fixture.slug, tomorrow, '18:00')).getTime();
+  const memberId = await memberIdOf(fixture.slug, fixture.member.username);
 
-    // The member asks, on the live screen: 1 h before, by email too.
-    await notificationsPage.goto();
-    await notificationsPage.reminderLead(lead.h1).click();
-    await expect(notificationsPage.savedLine(copy.saved)).toBeVisible();
-    await notificationsPage.reminderEmail.click();
-    await expect(notificationsPage.reminderEmail).toBeChecked();
-    await expect(notificationsPage.reminderLine(copy.channelBoth)).toBeVisible();
-    await expectNoSidewaysScroll(page, notificationsPage.remindersSection);
-    await page.setViewportSize({ width: 390, height: 844 });
-    await expectNoSidewaysScroll(page, notificationsPage.remindersSection);
-    await page.setViewportSize({ width: 1280, height: 900 });
+  // The member asks, on the live screen: 1 h before, by email too.
+  await notificationsPage.goto();
+  await notificationsPage.reminderLead(lead.h1).click();
+  await expect(notificationsPage.savedLine(copy.saved)).toBeVisible();
+  await notificationsPage.reminderEmail.click();
+  await expect(notificationsPage.reminderEmail).toBeChecked();
+  await expect(notificationsPage.reminderLine(copy.channelBoth)).toBeVisible();
+  await expectNoSidewaysScroll(page, notificationsPage.remindersSection);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectNoSidewaysScroll(page, notificationsPage.remindersSection);
+  await page.setViewportSize({ width: 1280, height: 900 });
 
-    // Two runs at the due instant: the second writes nothing new (Q25).
-    const run = remindOnAFakeClock(dueAt, memberId);
-    for (const attempt of [1, 2]) {
-      const answer = await run();
-      expect(answer.status, `run ${String(attempt)}`).toBe(200);
-      expect(answer.body, `run ${String(attempt)}`).toMatchObject({ code: REMIND_RAN, members: 1, due: 1, accepted: 1 });
-    }
-    const rows = await shiftRemindersOfInSql(fixture.slug, fixture.member.username);
-    expect(rows.map((row) => `${String(row.operands['lead'])} ${String(row.operands['date'])} ${row.channel}`)).toEqual([
-      `H1 ${tomorrow} email`,
-      `H1 ${tomorrow} push`,
-    ]);
-
-    // Each renders as notify sends it: the shift, both times, the team, and the day.
-    const subject = `Za 1 h radiš: ${night} 19:00–07:00, ${fixture.team.name}`;
-    const day = `/kalendar?mjesec=${tomorrow.slice(0, 7)}&dan=${tomorrow}&danSmjena=${fixture.team.id}`;
-    const [emailRow, pushRow] = rows;
-    if (emailRow === undefined || pushRow === undefined) throw new Error('E2E: the two reminder rows are missing');
-    const target = { appUrl: APP_ORIGIN, slug: emailRow.slug, organizationName: emailRow.organizationName };
-    const mail = render(REMINDER_CODE, emailRow.locale, emailRow.operands, target);
-    expect(mail).toMatchObject({ ok: true, subject });
-    expect(mail.ok && mail.text).toContain(`povratak=${encodeURIComponent(day)}`);
-    expect(mail.ok && mail.text).toContain(copy.notice.footer.replace(': {link}', ''));
-    const push = renderPush(REMINDER_CODE, pushRow.locale, pushRow.operands, target);
-    if (!push.ok) throw new Error(`E2E: the push did not render (${push.code})`);
-    expect(push.title).toBe(subject);
-
-    // One tap shows the shift: the push's path, signed in, lands on that day.
-    await page.goto(push.url);
-    await expect
-      .poll(() => {
-        const url = new URL(page.url());
-        return [url.pathname, url.searchParams.get('mjesec'), url.searchParams.get('dan'), url.searchParams.get('danSmjena')];
-      })
-      .toEqual(['/kalendar', tomorrow.slice(0, 7), tomorrow, fixture.team.id]);
-    const detail = calendarPage.detailOf(fixture.team.name, tomorrow);
-    await expect(detail).toBeVisible();
-    await expect(detail).toContainText(night);
-
-    // With the lead off, the same clock writes nothing.
-    await removeShiftRemindersInSql(fixture.slug, fixture.member.username);
-    await notificationsPage.goto();
-    await notificationsPage.reminderLead(lead.h1).click();
-    await expect(notificationsPage.reminderLine(copy.off)).toBeVisible();
-    await expectNoSidewaysScroll(page, notificationsPage.remindersSection);
-    const off = await run();
-    expect(off.status).toBe(200);
-    expect(off.body).toMatchObject({ code: REMIND_RAN, members: 0, due: 0 });
-    expect(await shiftRemindersOfInSql(fixture.slug, fixture.member.username)).toEqual([]);
-  } finally {
-    await removeShiftRemindersInSql(fixture.slug, fixture.member.username);
-    if (seed !== null) await removeSeededRotation(seed);
-    if (endpoint !== null) await removePushEndpointInSql(endpoint);
-    await setEmailNotificationsInSql(fixture.slug, organizationWas);
-    await restoreMemberEmailInSql(email);
-    await restoreReminderSettingsInSql(reminders);
-    await restorePushDevicesInSql(devices);
-    await rotationHold.release();
+  // Two runs at the due instant: the second writes nothing new (Q25).
+  const run = remindOnAFakeClock(dueAt, memberId);
+  for (const attempt of [1, 2]) {
+    const answer = await run();
+    expect(answer.status, `run ${String(attempt)}`).toBe(200);
+    expect(answer.body, `run ${String(attempt)}`).toMatchObject({ code: REMIND_RAN, members: 1, due: 1, accepted: 1 });
   }
+  const rows = await shiftRemindersOfInSql(fixture.slug, fixture.member.username);
+  expect(rows.map((row) => `${String(row.operands['lead'])} ${String(row.operands['date'])} ${row.channel}`)).toEqual([
+    `H1 ${tomorrow} email`,
+    `H1 ${tomorrow} push`,
+  ]);
+
+  // Each renders as notify sends it: the shift, both times, the team, and the day.
+  const subject = `Za 1 h radiš: ${night} 19:00–07:00, ${fixture.team.name}`;
+  const day = `/kalendar?mjesec=${tomorrow.slice(0, 7)}&dan=${tomorrow}&danSmjena=${fixture.team.id}`;
+  const [emailRow, pushRow] = rows;
+  if (emailRow === undefined || pushRow === undefined) throw new Error('E2E: the two reminder rows are missing');
+  const target = { appUrl: APP_ORIGIN, slug: emailRow.slug, organizationName: emailRow.organizationName };
+  const mail = render(REMINDER_CODE, emailRow.locale, emailRow.operands, target);
+  expect(mail).toMatchObject({ ok: true, subject });
+  expect(mail.ok && mail.text).toContain(`povratak=${encodeURIComponent(day)}`);
+  expect(mail.ok && mail.text).toContain(copy.notice.footer.replace(': {link}', ''));
+  const push = renderPush(REMINDER_CODE, pushRow.locale, pushRow.operands, target);
+  if (!push.ok) throw new Error(`E2E: the push did not render (${push.code})`);
+  expect(push.title).toBe(subject);
+
+  // One tap shows the shift: the push's path, signed in, lands on that day.
+  await page.goto(push.url);
+  await expect
+    .poll(() => {
+      const url = new URL(page.url());
+      return [url.pathname, url.searchParams.get('mjesec'), url.searchParams.get('dan'), url.searchParams.get('danSmjena')];
+    })
+    .toEqual(['/kalendar', tomorrow.slice(0, 7), tomorrow, fixture.team.id]);
+  const detail = calendarPage.detailOf(fixture.team.name, tomorrow);
+  await expect(detail).toBeVisible();
+  await expect(detail).toContainText(night);
+
+  // With the lead off, the same clock writes nothing.
+  await removeShiftRemindersInSql(fixture.slug, fixture.member.username);
+  await notificationsPage.goto();
+  await notificationsPage.reminderLead(lead.h1).click();
+  await expect(notificationsPage.reminderLine(copy.off)).toBeVisible();
+  await expectNoSidewaysScroll(page, notificationsPage.remindersSection);
+  const off = await run();
+  expect(off.status).toBe(200);
+  expect(off.body).toMatchObject({ code: REMIND_RAN, members: 0, due: 0 });
+  expect(await shiftRemindersOfInSql(fixture.slug, fixture.member.username)).toEqual([]);
 });

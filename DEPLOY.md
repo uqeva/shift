@@ -410,7 +410,8 @@ A shift reminder (CAP-26, AD-14 and AD-18 as amended) is written by the
    echoing it or leaving it in history (`read -rs SERVICE_PASSWORD_64_REMINDINVOKE`,
    then paste it from Coolify's environment view). The two deletes make the
    step safe to run again (a second `vault.create_secret` of the same name
-   fails):
+   fails), and `-1` runs the three statements as one transaction, so a failure
+   leaves Vault as it was rather than half armed:
 
    ```bash
    {
@@ -418,7 +419,7 @@ A shift reminder (CAP-26, AD-14 and AD-18 as amended) is written by the
      echo "delete from vault.secrets where name in ('remind_url', 'remind_invoke_secret');"
      echo "select vault.create_secret('http://supabase-kong:8000/functions/v1/remind', 'remind_url');"
      echo "select vault.create_secret(:'secret', 'remind_invoke_secret');"
-   } | $DC exec -T supabase-db psql -U postgres -v ON_ERROR_STOP=1 -q -f -
+   } | $DC exec -T supabase-db psql -U postgres -v ON_ERROR_STOP=1 -q -1 -f -
    unset SERVICE_PASSWORD_64_REMINDINVOKE
    ```
 
@@ -427,10 +428,13 @@ A shift reminder (CAP-26, AD-14 and AD-18 as amended) is written by the
 
    ```bash
    ID=$($DC exec -T supabase-db psql -U postgres -At -c "select private.invoke_remind();")
-   echo "request $ID"   # empty: Vault does not hold both secrets
-   sleep 10             # by ITS id: the notify job answers every minute too
-   $DC exec -T supabase-db psql -U postgres -At -c "
-     select status_code, content, error_msg from net._http_response where id = $ID;"
+   if [ -z "$ID" ]; then
+     echo "no request: Vault does not hold both secrets (step 2)"   # ❌
+   else
+     sleep 10           # by ITS id: the notify job answers every minute too
+     $DC exec -T supabase-db psql -U postgres -At -c "
+       select status_code, content, error_msg from net._http_response where id = $ID;"
+   fi
    # -> 200|{"code":"REMIND_RAN","members":…,"due":…,"accepted":…,"skipped":…}|   ✅
    # -> 401 INVOKE_SECRET_REFUSED: Vault's remind_invoke_secret is not the container's REMIND_INVOKE_SECRET ❌
    # -> 503 REMINDER_INPUTS_UNAVAILABLE: the read did not reach the database (SUPABASE_URL, the secret key) ❌
@@ -445,7 +449,17 @@ A shift reminder (CAP-26, AD-14 and AD-18 as amended) is written by the
    silently: repeat this check after any rotation, and look at the last few
    `net._http_response` rows when a member says a reminder did not come.
 
-**Rotating** the invoke secret: Vault first (`vault.update_secret`, as §3a's),
+**Rotating** the invoke secret: Vault first, on stdin as in step 2 (the new
+value read with `read -rs`, never on a command line):
+
+```bash
+{
+  printf '\\set secret %s\n' "$SERVICE_PASSWORD_64_REMINDINVOKE"
+  echo "select vault.update_secret((select id from vault.secrets where name = 'remind_invoke_secret'), :'secret');"
+} | $DC exec -T supabase-db psql -U postgres -v ON_ERROR_STOP=1 -q -1 -f -
+unset SERVICE_PASSWORD_64_REMINDINVOKE
+```
+
 then the container's variable and a redeploy, right after a `*/5` tick so the
 gap falls between runs. In between the job is answered 401 and writes
 nothing; a reminder that fell due then is written by the next good run if it
@@ -457,7 +471,9 @@ is less than 15 minutes behind, and lost otherwise. Prove the path again
 The settings members chose stay. Reminders already queued are still sent by
 `notify` until their bound (below) settles them, at most about 20 minutes; to
 stop those too, settle them by hand
-(`update notification_outbox set failed_at = now(), failure_code = 'REMINDER_LATE' where code = 'SHIFT_REMINDER' and sent_at is null and failed_at is null;`).
+(`update public.notification_outbox set failed_at = now(), failure_code = 'REMINDER_DISARMED', next_attempt_at = null where code = 'SHIFT_REMINDER' and sent_at is null and failed_at is null and (claimed_at is null or claimed_at < now() - interval '10 minutes');`:
+its own code, so a later "why did my reminder not come" reads as the disarm,
+and never a row `notify` holds in flight).
 
 **What the member receives.** `notify` renders the row from `hr.json`'s
 `reminders.notice` (`Za 2 h radiš: Dnevna 07:00–19:00, Smjena A`, or `Sutra
@@ -465,8 +481,9 @@ radiš: …`), linking through the organization's sign-in to that day in
 *Kalendar*; an email ends with the line pointing to *Obavijesti →
 Podsjetnici*. The claim settles a reminder `REMINDER_LATE` (0072) once it is
 15 minutes past its due instant (an `H<n>` lead) or 20 minutes after it was
-written (any lead), and a push lives no longer than the same 15 minutes past
-due, at most 15 minutes, and never past the shift's start. So an `H<n>`
+written (any lead). A push's TTL is the least of three bounds: 15 minutes,
+the time left to the shift's start, and (an `H<n>` lead only) the time left to
+15 minutes past its due instant; a reminder with none left is not posted. So an `H<n>`
 reminder never arrives more than 15 minutes after it fell due, and a
 backlog never sends "in 12 hours" hours late; the evening-before one, whose
 due instant needs the zone, may arrive up to about 35 minutes after it was
@@ -2354,11 +2371,12 @@ $DC logs supabase-kong | grep -c 'functions/v1/notify'
   echo "delete from vault.secrets where name in ('remind_url', 'remind_invoke_secret');"
   echo "select vault.create_secret('http://supabase-kong:8000/functions/v1/remind', 'remind_url');"
   echo "select vault.create_secret(:'secret', 'remind_invoke_secret');"
-} | $DC exec -T supabase-db psql -U postgres -v ON_ERROR_STOP=1 -q -f -
+} | $DC exec -T supabase-db psql -U postgres -v ON_ERROR_STOP=1 -q -1 -f -
 ID=$($DC exec -T supabase-db psql -U postgres -At -c "select private.invoke_remind();")
+[ -n "$ID" ] || { echo "no request: Vault does not hold both remind secrets"; exit 1; }
 sleep 10
 $DC exec -T supabase-db psql -U postgres -At -c "
-  select status_code, content from net._http_response where id = $ID;"
+  select status_code, content, error_msg from net._http_response where id = $ID;"
 # -> 200|{"code":"REMIND_RAN",…}   ✅ remind answered the cron's own call (401: the secrets drifted)
 MARK="probe$(openssl rand -hex 8)"
 curl -s -o /dev/null "$API/functions/v1/notify/$MARK?token=$MARK"

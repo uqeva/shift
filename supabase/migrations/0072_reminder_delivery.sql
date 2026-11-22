@@ -23,8 +23,9 @@
 --         hours, AD-6: a subtraction, no zone), or, for any lead (the evening
 --         before's due instant needs the zone, so it has only this), once it
 --         was written (`created_at`) 20 minutes ago. `remind` writes a row at
---         most 5 minutes before it is due, so a row retried once (10 minutes)
---         still goes. An unreadable `startsAt` is not "late": 0070's expiry
+--         most 5 minutes before it is due, so a row written by its due instant
+--         and retried once (10 minutes) still goes; one written later than 5
+--         minutes past due may be settled late before its retry. An unreadable `startsAt` is not "late": 0070's expiry
 --         settles it first.
 --   (ii)  0070's claim with ONE settle more and its guard: a pending
 --         `SHIFT_REMINDER` row that is late is settled `REMINDER_LATE` and

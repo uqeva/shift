@@ -39,8 +39,12 @@ import {
 } from './handler.ts';
 import { REMINDER_CODE, REMINDER_LEAD_HOURS, STARTS_AT_SHAPE, renderPush } from './messages.ts';
 
-/** How long past its due instant an hours reminder may still arrive (0072's bound). */
-const REMINDER_GRACE_SECONDS = 900;
+/**
+ * How long past its due instant an hours reminder may still arrive: 0072's
+ * `interval '15 minutes'` in `private.reminder_late`, held equal by
+ * `test/notify-reminder.test.ts`.
+ */
+export const REMINDER_GRACE_SECONDS = 900;
 
 /**
  * How long a push service may keep this row's payload for an offline device,
@@ -71,6 +75,12 @@ export function pushTtlSecondsOf(code: string, operands: unknown, now: number): 
 
 /** Story 17.3: a reminder whose push could live no time at all is not sent: it is too late. */
 export const REMINDER_LATE = 'REMINDER_LATE';
+
+/**
+ * Story 17.3: a reminder whose shift has started by the time its push would
+ * go: the claim's own code for that case (0070), so the two read alike.
+ */
+export const REMINDER_EXPIRED = 'REMINDER_EXPIRED';
 
 /**
  * `web-push`'s request builder, without its sender, as a {@link PushEncryptor}:
@@ -196,10 +206,16 @@ export async function deliverPush(
   const payload = JSON.stringify({ title: rendered.title, body: rendered.body, url: rendered.url, tag });
   // Read after the device read, right before the sends: a reminder's TTL
   // counts down to its shift's start (17.3).
-  const ttl = pushTtlSecondsOf(row.code, row.operands, now());
+  const at = now();
+  const ttl = pushTtlSecondsOf(row.code, row.operands, at);
   // A reminder with nothing left of its window is final, never posted: a push
   // service may still deliver a TTL of 0 to an online device, hours late.
-  if (row.code === REMINDER_CODE && ttl === 0) return { result: 'permanent', failureCode: REMINDER_LATE };
+  // Its shift already started: EXPIRED, as the claim names it; else LATE.
+  if (row.code === REMINDER_CODE && ttl === 0) {
+    const startsAt = (row.operands as Record<string, unknown> | null)?.['startsAt'];
+    const started = typeof startsAt !== 'string' || !(at < Date.parse(startsAt));
+    return { result: 'permanent', failureCode: started ? REMINDER_EXPIRED : REMINDER_LATE };
+  }
 
   // The devices IN PARALLEL: one row takes one send's timeout at most, so the
   // run's time budget holds however many devices a member has.

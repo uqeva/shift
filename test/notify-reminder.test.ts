@@ -20,7 +20,7 @@ import {
   type PushEncryptor,
   type RpcAnswer,
 } from '../supabase/functions/notify/handler.ts';
-import { REMINDER_LATE, pushTtlSecondsOf } from '../supabase/functions/notify/push.ts';
+import { REMINDER_EXPIRED, REMINDER_GRACE_SECONDS, REMINDER_LATE, pushTtlSecondsOf } from '../supabase/functions/notify/push.ts';
 import { createHandler } from '../supabase/functions/notify/run.ts';
 import {
   LAST_SHIFT_MINUTE,
@@ -83,6 +83,16 @@ describe('notify renders reminders from a pinned copy of reminders.notice (story
     ) as { reminders?: { notice?: unknown } };
     expect(resource.reminders?.notice, 'hr.json has no reminders.notice').toBeDefined();
     expect(PODSJETNICI).toEqual(resource.reminders?.notice);
+  });
+
+  it('never calls a team "tim" nor the shift a "smjena": a team is its own name', () => {
+    const words: string[] = [PODSJETNICI.hours, PODSJETNICI.eveningBefore].flatMap((message) => [message.subject, message.body]);
+    words.push(PODSJETNICI.footer);
+    const texts = words.map((text) => text.replace(/\{\w+\}/g, ''));
+    for (const text of texts) {
+      expect(text).not.toMatch(/\btim(?:a|u|om|ovi)?\b/iu);
+      expect(text).not.toMatch(/smjen/iu);
+    }
   });
 
   it("spells the lead set exactly as the domain does, and picks a variant for each lead", () => {
@@ -341,6 +351,19 @@ describe('notify sends a claimed reminder by email and by push (story 17.3)', ()
     const { settles, encrypted } = await run([claimed('push', operands())], Date.parse('2026-11-23T04:20:00Z'));
     expect(encrypted).toEqual([]);
     expect(settles).toEqual([expect.objectContaining({ p_result: 'permanent', p_failure_code: REMINDER_LATE })]);
+  });
+
+  it('fails a reminder push whose shift has started REMINDER_EXPIRED, as the claim names it, and posts nothing', async () => {
+    // The H2 row's shift starts at 06:00Z.
+    const { settles, encrypted } = await run([claimed('push', operands())], Date.parse('2026-11-23T06:00:00Z'));
+    expect(encrypted).toEqual([]);
+    expect(settles).toEqual([expect.objectContaining({ p_result: 'permanent', p_failure_code: REMINDER_EXPIRED })]);
+  });
+
+  it('holds the push grace equal to 0072\'s late bound', () => {
+    const sql = readFileSync(join(repoRoot, 'supabase', 'migrations', '0072_reminder_delivery.sql'), 'utf8');
+    const late = /create function private\.reminder_late[\s\S]*?\$\$;/.exec(sql)?.[0] ?? '';
+    expect(late).toContain(`+ interval '${String(REMINDER_GRACE_SECONDS / 60)} minutes'`);
   });
 
   it('retries a reminder it cannot render, as any unrenderable row, and sends nothing', async () => {

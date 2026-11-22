@@ -2049,6 +2049,15 @@
   summary: OWNER the first staging and production deploys after 17.3 (story 20.5's host check, or the operator). Arm `remind` on each real environment as DEPLOY.md §3b says (after its `notify` renders `SHIFT_REMINDER`), prove the cron's call is answered 200 `REMIND_RAN`, and send one real reminder to a test member by push and by email (Resend and a real push service were never reached from CI: no key there).
   evidence: 17.3 Epic AC Deviations ("arrives" is the outbox row and its rendering in CI); DEPLOY.md §3b.
 
+## Deferred from: code review 2 of spec-17-3-reminders-reach-the-member-by-push-or-email (2026-11-22)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-17-3-reminders-reach-the-member-by-push-or-email.md`
+  summary: OWNER `notify` hardening (every notice, not only reminders). An email's subject is an organization's own names interpolated as they were saved (team, shift type, member). The 0009/0013/0036 checks bound their length and blankness but not control characters, so a name with a CR/LF reaches Resend's `subject` as is. It travels inside JSON, so no header can be injected, but Resend may refuse the request (a 4xx is a permanent failure) or show a broken subject. Either refuse control characters in names at the database, or fold whitespace in `notify`'s subject for every code. Byte-identical rendering of every existing code is 17.3's frozen rule, so this is not 17.3's to change.
+  evidence: review 2 of 17.3 (Edge Case Hunter); `notify/messages.ts` `interpolate`, `notify/email.ts`.
+- source_spec: `_bmad-output/implementation-artifacts/spec-17-3-reminders-reach-the-member-by-push-or-email.md`
+  summary: OWNER the D-S5 security review, with DEPLOY.md. The Vault arming in DEPLOY.md §3a (`notify`) and §3b (`remind`) keeps the secret off every command line (stdin, a psql variable), but psql interpolates `:'secret'` on the client, so the statement the server receives contains the value. Under `log_min_error_statement = error` (Postgres's default), a FAILED `vault.create_secret`/`update_secret` writes that statement, with the secret, to the database log, and `log_statement = all` (if anyone sets it) logs it on success too. Confirm the self-hosted image's logging settings, or pass the value as a bind parameter (e.g. a `\bind` in psql 16+, or a short script) so it never appears in statement text.
+  evidence: review 2 of 17.3 (main reviewer); DEPLOY.md §3a, §3b, §9.5.
+
 ## Deferred from: story 19.3, a verified account creates its organization (2026-11-21)
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-19-3-a-verified-account-creates-its-organization.md`

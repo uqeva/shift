@@ -4,12 +4,12 @@ type: 'feature'
 created: '2026-11-21'
 status: 'in-review'
 baseline_commit: 'b5e0c94df104a638e7332e1abe4191ef643548bb'
-review_loop_iteration: 1
+review_loop_iteration: 2
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-17-context.md'
 ---
 
-Status: review (built, review 1's patches applied, CI pending). DONE MEANS MERGED WITH GREEN CI: the frontmatter stays `in-review` and the sprint status `review` until the PR merges green. Approved unattended under the founder's standing instruction (decide and record, no questions). ~2.6k tokens, kept whole: one user goal (a due reminder reaches the member, in words, linking to the day) across `notify`, one migration, the e2e and the deploy runbook; the arming and its proof are what make delivery real, so splitting them off would ship a renderer nothing calls. Baseline: `main` at #349 (19.3, squash `b5e0c94`), after #348 (17.2, `abe226e`). Touches `hr.json` (hot: no other hot-file story runs from this baseline). Migration `0072` (19.5 runs in parallel with `0073`). Residual risks: `test/shift-reminders.test.ts`'s new cases, 0072 on a real Postgres and `e2e/tests/notifications/reminder-delivery.spec.ts` (the armed path, the fake-clock delivery, the live card layout) have never run (CI is their first run); no real Resend or push send was made.
+Status: review (built, reviews 1 and 2's patches applied, CI pending). DONE MEANS MERGED WITH GREEN CI: the frontmatter stays `in-review` and the sprint status `review` until the PR merges green. Approved unattended under the founder's standing instruction (decide and record, no questions). ~2.6k tokens, kept whole: one user goal (a due reminder reaches the member, in words, linking to the day) across `notify`, one migration, the e2e and the deploy runbook; the arming and its proof are what make delivery real, so splitting them off would ship a renderer nothing calls. Baseline: `main` at #349 (19.3, squash `b5e0c94`), after #348 (17.2, `abe226e`). Touches `hr.json` (hot: no other hot-file story runs from this baseline). Migration `0072` (19.5 runs in parallel with `0073`). Residual risks: `test/shift-reminders.test.ts`'s new cases, 0072 on a real Postgres and `e2e/tests/notifications/reminder-delivery.spec.ts` (the armed path, the fake-clock delivery, the live card layout) have never run (CI is their first run); no real Resend or push send was made.
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 
@@ -110,7 +110,7 @@ Decisions (founder: decide and record):
 1. **The copy's home** is `reminders.notice` (17.1's namespace), mirrored in `notify` as `PODSJETNICI` beside `OBAVIJESTI`, each pinned to its namespace; `notify-boundary`'s pins of `obavijesti` stand untouched.
 2. **Words.** The subject is the epic's line; the body adds the organization and the date (`22.11.2026`), as every notice does. The team is its own name, never "tim".
 3. **The footer** links `/obavijesti` (the card is its third section; a hash would not survive the card's async load), and names *Obavijesti → Podsjetnici*.
-4. **Late reminders (17.2's entry), as patched in review 1.** A row is written at most 5 minutes before due and at most 15 after. `0072`'s `private.reminder_late` makes it late 15 minutes past its due instant when the lead is `H<n>` (`startsAt − n hours`, a subtraction, `leadHours` agreeing with the lead), or 20 minutes after it was written (`created_at`, every lead: the evening before's due instant needs the zone, so it has only this). The claim settles a late row `REMINDER_LATE`. So an `H<n>` reminder never reaches a device more than 15 minutes after it fell due; the evening-before one ("Sutra radiš") at most about 35 minutes after it was written, when "tomorrow" is still true. An email retried once (10 min backoff) still goes.
+4. **Late reminders (17.2's entry), as patched in review 1.** A row is written at most 5 minutes before due and at most 15 after. `0072`'s `private.reminder_late` makes it late 15 minutes past its due instant when the lead is `H<n>` (`startsAt − n hours`, a subtraction, `leadHours` agreeing with the lead), or 20 minutes after it was written (`created_at`, every lead: the evening before's due instant needs the zone, so it has only this). The claim settles a late row `REMINDER_LATE`. So an `H<n>` reminder never reaches a device more than 15 minutes after it fell due; the evening-before one ("Sutra radiš") at most about 35 minutes after it was written, when "tomorrow" is still true. An email written by its due instant and retried once (10 min backoff) still goes; one written more than 5 minutes past due may be settled late before its retry (review 2).
 5. **TTL**, as patched in review 1: `max(0, min(startsAt − now, 900 s, due + 15 min − now))`, `now` the handler's clock, the last term for an `H<n>` lead only; an unreadable `startsAt` is 0, and the render refuses such a row first. A reminder whose TTL is 0 is never posted (a push service may still deliver a TTL of 0 to an online device): it fails `REMINDER_LATE`. AD-18 amended.
 6. **Arming (17.2's entry).** DEPLOY.md §3b: deploy the `notify` that renders `SHIFT_REMINDER`, then the two Vault writes on stdin, then the smoke (prove the armed path, 17.2's entry): `select private.invoke_remind()` and, after a few seconds, `net._http_response` 200 with `REMIND_RAN`; 401 is a secret drift, 503 an unreachable read. Rotation as `notify`'s.
 7. **Locally** `write-local-env` generates `REMIND_INVOKE_SECRET` (never a literal); the e2e reads it from `supabase/functions/.env`, arms Vault with `http://supabase_kong_shift:8000/functions/v1/remind`, and deletes both secrets after. An existing `.env` from before needs `--force` once.
@@ -175,6 +175,65 @@ Five layers ran unattended: the Blind Hunter, the Edge Case Hunter, the Verifica
 
 
 **Results (review 1, 2026-11-21).** `pnpm typecheck`, `pnpm lint`, `pnpm build`: clean. `pnpm --filter @shift/domain test`: 975 passed. `pnpm --filter @shift/ics test`: 31 passed. `pnpm --filter ./apps/web test`: 184 files, 6859 passed. The fourteen DB-free root files: 3302 passed (`test/notify-reminder.test.ts` 46). The PGlite harness (`s173/check-0072.mjs`) on the patched 0072: seven rows as expected (written 20 min ago, late; 19 min 59 s, claimed; H1 16 min past due, late; 10 min past due, claimed; mismatched `leadHours`, claimed; a recent evening-before row, claimed; an old `LOAN_MADE`, claimed). Still unrun, so first run in CI: the DB cases, 0072 on a real Postgres and the e2e spec.
+
+## Review Findings (review 2, 2026-11-22)
+
+Six layers ran unattended on `origin/main...HEAD` (`33a1cf4`): the Blind Hunter, the Edge Case Hunter, the Verification Gap reviewer, the Acceptance Auditor, the Epic AC Auditor and the Artifact Renderer.
+
+- **Acceptance and Epic AC Auditors.** No AC is violated, and no deviation is unlisted. Each deferred AC has its entry.
+- **0072 against 0070.** Both `claim_notifications` bodies were extracted and run through `diff`. They differ only in the `REMINDER_LATE` settle, between the expiry settle and the lead settle, the select's `and not private.reminder_late(...)` guard, and one comment. The following are byte-identical, so no other kind of notification changes:
+  - the signature and the return table;
+  - `security definer` and `search_path ''`;
+  - every other settle and its in-flight guard;
+  - the claim's order, `limit` and `skip locked`;
+  - the four grants.
+- **Privacy.** The copy's placeholders are exactly the organization's name, the date, the member's own shift type, the start and end, the member's own team, the link and `leadHours`. A test pins this set. The link carries only the slug, the date and the team id.
+- **Injection.** No email is HTML: `email.ts` posts `subject` and `text` to Resend as JSON. So a name with `<script>` in it is shown as text, and nothing can be injected into a header. A CR/LF in a name is a pre-existing gap that every notice shares (deferred, below).
+- **The tap path.** `povratak` is not an open redirect. `reminderPathOf` builds a fixed `/kalendar?…` from a checked ISO date and an anchored UUID, `signInPathOf` URI-encodes both slug and path, and the SPA's `returnTargetOf` admits same-origin paths only.
+- **`write-local-env`.** The secret is `randomBytes(32)` hex, written to a 0600 file and never echoed.
+- **Croatian copy.** Grammar and diacritics are correct (`radiš`, `Podsjetnike`, `e-poštom`, `Pogledaj dan u kalendaru`).
+- **Artifact Renderer.** A real H2 email and an evening-before email were rendered with `notify`'s own `render` and `renderPush`, through esbuild, with no stubs.
+  - The fixture used a 90-character organization name, a 120-character team name with a 51-character unbroken word, and a shift type holding `<script>`, `&` and quotes.
+  - The output was shown as a text/plain mail in the standalone Chromium harness at 390 px and 1280 px.
+  - Nothing overflowed. Every diacritic and the `→` rendered, and the markup showed as literal text. Night times read `01:00–07:00`, the date `23.11.2026`, and both links are fully encoded.
+  - Files: `/tmp/claude-0/-root-ai-agency-projects-shift/15d9a6a8-661d-4657-8658-921e573ab7c3/scratchpad/s173r2/`.
+
+- [x] [Review][Patch] **CI's first DB run would have failed.** `test/provisioning.test.ts` sweeps every function in `public` and `private` against its grantee list, and its invoker list held no `private.reminder_late/2`. Both lists now hold it: grantees none, `SECURITY INVOKER`, empty `search_path`. (high) [test/provisioning.test.ts]
+- [x] [Review][Patch] **The e2e's cleanup now survives a timeout.** Both cases register each change for `afterEach` the moment it is made, in one `undo` stack that runs newest first. One failed undo no longer skips the rest. The changes are the Vault arm, the rotation lock and its seed, the member's devices, reminder settings and email, the organization's email switch, and the reminder rows.
+  - Before, all of this ran in the body's `finally`, and holds were taken before the `try`. A timeout or a throwing hold could leak the rotation lock or the settings. On a retry, a leaked arm would have been saved as "what was there" and restored, leaving the shard's stack armed for every later spec. (medium) [reminder-delivery.spec.ts]
+- [x] [Review][Patch] **The DEPLOY.md runbook is safer to run.**
+  - Arming runs as one transaction (`psql -1`), so a failure cannot leave Vault half armed.
+  - The proof checks for an empty request id before it builds `where id = $ID`. §9.5 also selects `error_msg`.
+  - Rotation has its own stdin-only `vault.update_secret` snippet.
+  - The hand settle on disarming is fully qualified. It skips rows `notify` holds in flight, clears `next_attempt_at`, and records `REMINDER_DISARMED` rather than passing as `REMINDER_LATE`.
+  - The TTL sentence now lists its three bounds. (medium) [DEPLOY.md §3b, §9.5]
+- [x] [Review][Patch] **The push names its failure by cause.** A reminder push with no TTL left whose shift has already started now fails `REMINDER_EXPIRED`, as the claim names that case; otherwise it fails `REMINDER_LATE`. The push's 15-minute grace is exported, and a test holds it equal to 0072's `interval '15 minutes'`. (low) [push.ts, test/notify-reminder.test.ts]
+- [x] [Review][Patch] **The "no `tim`, no `smjena`" rule is now a test** over every reminder subject, body and footer. (low) [test/notify-reminder.test.ts]
+- [x] [Review][Patch] **The retry claim is narrowed.** "An email retried once still goes" holds for a row written by its due instant. One written more than 5 minutes past due may be settled late before its retry. Design Note 4 and the 0072 header now say so. (low) [0072, Design Notes]
+- [x] [Review][Defer] **A CR/LF in a name reaches every notice's email subject.** This is pre-existing and shared by every code, and the frozen rule keeps the existing codes byte-identical. [notify/messages.ts] — deferred to `deferred-work.md`.
+- [x] [Review][Defer] **psql interpolates `:'secret'` on the client.** A failed `vault.create_secret` would therefore log the value in the server's error log. This applies to §3a's existing `notify` arming as much as §3b. [DEPLOY.md] — deferred to `deferred-work.md` (D-S5).
+- Rejected, with reasons:
+  - **The §9.5 rehearsal never loads `SERVICE_PASSWORD_64_REMINDINVOKE`.** It does: the rehearsal sources `$R/.env` with `set -a` before step 7b. It also never needs to disarm, because its trap removes the whole stack, volumes included.
+  - **Edge and database clocks may differ.**
+    - Self-hosted, both run on one host under NTP, so the skew is seconds against a 15-minute bound.
+    - Taking `now` from the claim would change `notify`'s claim contract for every code.
+  - **A `leadHours` stored as the string `"2"`.** Only 0070 writes the row, and it writes a number. The SQL treats the string as valid while `notify` refuses it, so such a row would be retried until 0072 settles it late, within 20 minutes. It is never sent wrong.
+  - **The evening-before push has no `created_at` term.** This is as specified. The claim's 20-minute bound plus at most 15 minutes of TTL is the stated "about 35 minutes" (Design Note 4, DEPLOY.md).
+  - **Trim surrounding spaces in names.** Every notice interpolates names exactly as they were saved, and the database refuses blank ones.
+  - **The e2e hardcodes `19:00–07:00` and the 18:00 due instant.** These are the seeded `Noć`'s fixed times (`seedTeamRotation`). A changed seed fails loudly at the subject assertion, which names both.
+  - **The "never retracted" test is weak.** It is a static guard over later migrations, beside the structural fact that no path deletes or edits a sent row. Its regexes catch the claim's own settles and any plain `delete from` the outbox.
+  - **The channel DB cases depend on their order.** They form one scene on purpose: case 3 removes the device that case 4 must lack. The DB auditor of review 1 and this review's Verification Gap reviewer traced all four cases as correct.
+  - **`REMINDER_LATE` lives in `push.ts`, not `handler.ts`.** This is cosmetic. The code is used only by the push branch.
+  - **0073 (19.5) may need to redefine the claim.** The scaffold pin "no later migration redefines the claim" now names 0072, so a 19.5 claim copied from 0070 fails CI and must start from 0072's.
+  - **A night's second half names the shift's date.** This is Design Note 9's decision, the same as the calendar's.
+  - **Spec wording (37 vs 46 tests; 21 vs 20 minutes).** These counts come from different runs: the implementation's and review 1's. Both statements are true.
+  - **`deferred-work.md` is hard to read, and the new entry has no story owner.** This is out of scope. The entry names its owners: the first staging and production deploys, and 20.5.
+  - **An e2e killed by a signal leaves the local Vault armed.** `afterEach` now covers every failure and timeout. Only a process kill bypasses it. CI's stacks are per shard and thrown away, and locally the window is seconds.
+
+**Results (review 2, 2026-11-22).**
+- `pnpm typecheck`, `pnpm lint` and `pnpm build`: clean.
+- `pnpm exec vitest run` on `test/resource-hygiene.test.ts`, `test/supabase-scaffold.test.ts`, `test/key-hygiene.test.ts`, `test/functions-router.test.ts`, `test/remind.test.ts`, `test/notify-reminder.test.ts`, `test/localization-guard.test.ts`, `test/localization-applied.test.ts` and `test/coolify-deploy.test.ts`: 9 files, all passed. `notify-reminder` has 49 tests.
+- Unrun by rule, so CI is their first run: `test/provisioning.test.ts`'s new entries, `test/shift-reminders.test.ts`'s cases, 0072 on a real Postgres, and the e2e spec.
 
 ## Suggested Review Order
 
