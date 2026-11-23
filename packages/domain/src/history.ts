@@ -177,6 +177,8 @@ export const HISTORY_FIELDS = [
   'carryOverExpiryMonth',
   'carryOverExpiryDay',
   'carryOverFirstLeaveYear',
+  // Story 19.4 (0074): the onboarding card's dismissal, a field like every setting.
+  'onboardingDismissed',
   'username',
   'email',
   'role',
@@ -386,6 +388,7 @@ const FIELD_OF_COLUMN: Readonly<Record<string, readonly [HistoryField, FieldType
   carry_over_expiry_month: ['carryOverExpiryMonth', 'number'],
   carry_over_expiry_day: ['carryOverExpiryDay', 'number'],
   carry_over_first_leave_year: ['carryOverFirstLeaveYear', 'number'],
+  onboarding_dismissed: ['onboardingDismissed', 'boolean'],
   username: ['username', 'text'],
   email: ['email', 'text'],
   role: ['role', 'enum'],

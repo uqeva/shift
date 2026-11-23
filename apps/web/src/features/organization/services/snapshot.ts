@@ -121,9 +121,14 @@ export const ORGANIZATION_READ_STALE_MS = 300000;
  * The four `carry_over_*` columns joined for story 13.4 (`0057`): the
  * carry-over setting, all four or none, edited on this screen; every leave
  * balance derives carried days from it (13.4b). `0057` ships before the SPA, as `0048` did.
+ *
+ * `founded_by` (0071) and `onboarding_dismissed` (0074) joined for story 19.4
+ * (AD-24): whether the *Danas* card may be drawn at all. `founded_by` is mapped
+ * to a boolean at parse and its uuid is never kept (D4); every member can
+ * already select it, so no grant changed. `0074` ships before the SPA.
  */
 export const ORGANIZATION_COLUMNS =
-  'id,slug,name,organization_type,timezone,locale,leave_year_start_month,leave_year_start_day,logo_path,brand_accent,uses_fire_ranks,email_notifications,minimum_members,carry_over_max_days,carry_over_expiry_month,carry_over_expiry_day,carry_over_first_leave_year';
+  'id,slug,name,organization_type,timezone,locale,leave_year_start_month,leave_year_start_day,logo_path,brand_accent,uses_fire_ranks,email_notifications,minimum_members,carry_over_max_days,carry_over_expiry_month,carry_over_expiry_day,carry_over_first_leave_year,founded_by,onboarding_dismissed';
 
 /**
  * The carry-over setting (story 13.4, `0057`): the most days that carry into a
@@ -198,6 +203,17 @@ export interface OrganizationSnapshot {
    * value as `null` ({@link carryOverOf}).
    */
   readonly carryOver: CarryOverSetting | null;
+  /**
+   * Whether the organization was founded by signup (`founded_by` set, 0071,
+   * story 19.4 D4). A boolean, never the account's uuid. A row without the
+   * column (a fixture) reads `false`: no onboarding card.
+   */
+  readonly foundedBySignup: boolean;
+  /**
+   * Whether an admin hid the onboarding card (`0074`, AD-24), for every admin.
+   * A row without the column reads `false`.
+   */
+  readonly onboardingDismissed: boolean;
 }
 
 /** The last day an expiry may fall on in each month, February at 28 (`0057`). */
@@ -286,6 +302,8 @@ export interface OrganizationNameEdit {
   readonly emailNotifications?: never;
   readonly minimumMembers?: never;
   readonly carryOver?: never;
+  readonly onboardingDismissed?: never;
+  readonly foundedBySignup?: never;
 }
 
 /**
@@ -305,6 +323,8 @@ export interface OrganizationLeaveYearEdit {
   readonly emailNotifications?: never;
   readonly minimumMembers?: never;
   readonly carryOver?: never;
+  readonly onboardingDismissed?: never;
+  readonly foundedBySignup?: never;
 }
 
 /**
@@ -331,6 +351,8 @@ export interface OrganizationLogoEdit {
   readonly emailNotifications?: never;
   readonly minimumMembers?: never;
   readonly carryOver?: never;
+  readonly onboardingDismissed?: never;
+  readonly foundedBySignup?: never;
 }
 
 /**
@@ -378,6 +400,8 @@ export interface OrganizationAccentEdit {
   readonly emailNotifications?: never;
   readonly minimumMembers?: never;
   readonly carryOver?: never;
+  readonly onboardingDismissed?: never;
+  readonly foundedBySignup?: never;
 }
 
 /**
@@ -407,6 +431,8 @@ export interface OrganizationFireRanksEdit {
   readonly emailNotifications?: never;
   readonly minimumMembers?: never;
   readonly carryOver?: never;
+  readonly onboardingDismissed?: never;
+  readonly foundedBySignup?: never;
 }
 
 /**
@@ -429,6 +455,8 @@ export interface OrganizationEmailNotificationsEdit {
   readonly usesFireRanks?: never;
   readonly minimumMembers?: never;
   readonly carryOver?: never;
+  readonly onboardingDismissed?: never;
+  readonly foundedBySignup?: never;
 }
 
 /**
@@ -452,6 +480,8 @@ export interface OrganizationMinimumMembersEdit {
   readonly usesFireRanks?: never;
   readonly emailNotifications?: never;
   readonly carryOver?: never;
+  readonly onboardingDismissed?: never;
+  readonly foundedBySignup?: never;
 }
 
 /**
@@ -477,10 +507,37 @@ export interface OrganizationCarryOverEdit {
   readonly usesFireRanks?: never;
   readonly emailNotifications?: never;
   readonly minimumMembers?: never;
+  readonly onboardingDismissed?: never;
+  readonly foundedBySignup?: never;
 }
 
 /**
- * One of the eight writes, and NEVER two of them.
+ * The onboarding card's dismissal (story 19.4, `0074`, AD-24), written on its
+ * own — a NINTH disjoint shape, for the fire-rank setting's reason. The only
+ * stored onboarding fact; every step's state is derived from rows.
+ */
+export interface OrganizationOnboardingDismissedEdit {
+  readonly onboardingDismissed: boolean;
+  /** None of these, ever. See {@link OrganizationWrite}. */
+  readonly id?: never;
+  readonly slug?: never;
+  readonly locale?: never;
+  readonly name?: never;
+  readonly organizationType?: never;
+  readonly timezone?: never;
+  readonly leaveYearStartMonth?: never;
+  readonly leaveYearStartDay?: never;
+  readonly logoPath?: never;
+  readonly brandAccent?: never;
+  readonly usesFireRanks?: never;
+  readonly emailNotifications?: never;
+  readonly minimumMembers?: never;
+  readonly carryOver?: never;
+  readonly foundedBySignup?: never;
+}
+
+/**
+ * One of the nine writes, and NEVER two of them.
  *
  * The `?: never` members on every side are what make "disjoint" a fact the
  * compiler checks rather than a claim a comment makes. Without them a value
@@ -498,7 +555,8 @@ export type OrganizationWrite =
   | OrganizationFireRanksEdit
   | OrganizationEmailNotificationsEdit
   | OrganizationMinimumMembersEdit
-  | OrganizationCarryOverEdit;
+  | OrganizationCarryOverEdit
+  | OrganizationOnboardingDismissedEdit;
 
 /**
  * Which of the two a write is: the one that actually carries a logo path.
@@ -553,6 +611,11 @@ function isMinimumMembersEdit(write: OrganizationWrite): write is OrganizationMi
  */
 function isCarryOverEdit(write: OrganizationWrite): write is OrganizationCarryOverEdit {
   return 'carryOver' in write && write.carryOver !== undefined;
+}
+
+/** The one that carries the onboarding card's dismissal (story 19.4). */
+function isOnboardingDismissedEdit(write: OrganizationWrite): write is OrganizationOnboardingDismissedEdit {
+  return 'onboardingDismissed' in write && typeof write.onboardingDismissed === 'boolean';
 }
 
 /**
@@ -849,6 +912,11 @@ export function organizationSnapshotOf(row: unknown): OrganizationSnapshot | nul
       fields['carry_over_expiry_day'],
       fields['carry_over_first_leave_year'],
     ),
+    // STORY 19.4 (D4): a boolean, never the uuid; lenient as the two above, so
+    // a row without the columns (a fixture) reads "operator-provisioned, not
+    // dismissed", which draws no onboarding card.
+    foundedBySignup: typeof fields['founded_by'] === 'string' && fields['founded_by'] !== '',
+    onboardingDismissed: fields['onboarding_dismissed'] === true,
   };
 }
 
@@ -910,6 +978,9 @@ export function organizationEditColumns(
       carry_over_first_leave_year: setting?.firstLeaveYear ?? null,
     };
   }
+
+  // ONE COLUMN on the onboarding card's dismissal (story 19.4, 0074).
+  if (isOnboardingDismissedEdit(write)) return { onboarding_dismissed: write.onboardingDismissed };
 
   // ONE COLUMN on the name (story 7.18). It used to travel with the type, the
   // zone and the leave year's start, filled in from the cached snapshot, so a

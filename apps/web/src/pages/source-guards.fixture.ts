@@ -15,6 +15,7 @@ import {
 import { HOURS_SCREEN_PARTS } from '@/features/hours/hours-screen.fixture';
 import { LEAVE_REQUEST_PARTS, LEAVE_SCREEN_PARTS } from '@/features/leave/leave-screen.fixture';
 import { NOTIFICATIONS_SCREEN_PARTS } from '@/features/notifications/notifications-screen.fixture';
+import { ONBOARDING_SCREEN_PARTS } from '@/features/onboarding/onboarding-screens.fixture';
 import { CALENDAR_FEED_SCREEN_PARTS, MEMBER_FEED_CARD_PARTS } from '@/features/calendar-feed/calendar-feed-screen.fixture';
 import { SWAP_PROPOSAL_PARTS } from '@/features/swaps/swaps-screen.fixture';
 import { TODAY_SCREEN_PARTS } from '@/features/today/today-screen.fixture';
@@ -340,6 +341,26 @@ export const NOTIFICATIONS_PAGE = join(srcRoot, 'pages', 'obavijesti.tsx');
 
 /** Story 10.3: the screen's rules, its saved lines off one `\w*MessageKey` union. */
 export const NOTIFICATIONS_KEYS = join(NOTIFICATIONS_FEATURE, 'services', 'settings.ts');
+
+/** Story 19.4: the onboarding feature, which holds the setup frame and the *Danas* card. */
+export const ONBOARDING_FEATURE = join(srcRoot, 'features', 'onboarding');
+
+/** Story 19.4: `/postavljanje/$step`'s files, page first, with the *Danas* card. */
+export const ONBOARDING: readonly string[] = Object.values(ONBOARDING_SCREEN_PARTS).map((parts) =>
+  join(srcRoot, ...parts),
+);
+
+/** Story 19.4: the page itself, which the set is read from first. */
+export const ONBOARDING_PAGE = join(srcRoot, 'pages', 'postavljanje.$step.tsx');
+
+/** Story 19.4: the step names, off `stepNameMessageKey`. */
+export const ONBOARDING_STEP_KEYS = join(ONBOARDING_FEATURE, 'services', 'steps.ts');
+
+/** Story 19.4: the states, prerequisites and step 7's counts, off `\w*MessageKey` unions. */
+export const ONBOARDING_PROGRESS_KEYS = join(ONBOARDING_FEATURE, 'services', 'progress.ts');
+
+/** Story 19.4: step 6's copy lines, off `linkCopyMessageKey`. */
+export const ONBOARDING_LINK_KEYS = join(ONBOARDING_FEATURE, 'services', 'sign-in-link.ts');
 
 /** Story 16.5: the calendar-feed feature, which holds `/kalendar-na-mobitelu` and the member page's card. */
 export const CALENDAR_FEED_FEATURE = join(srcRoot, 'features', 'calendar-feed');
@@ -1238,6 +1259,16 @@ export const SCREENS = [
   // 17.1: the reminders card's retry; its seven switches are `Switch`es,
   // never a `<Button>` or a field.
   { name: 'the notification settings screen', file: NOTIFICATIONS, expectedFields: 0, expectedButtons: 3 },
+  // STORY 19.4. The setup frame and the *Danas* card: no field of its own
+  // (every form is the shipped surface's, counted there). TWENTY buttons:
+  // the page's two retries and its three add buttons (bands, teams, people);
+  // *Izađi iz postavljanja*; *Svi koraci*; the footer's *Natrag*, *Dalje* and
+  // *Preskoči za sada*; step 6's *Kopiraj*; step 7's *Postavi*, *Otvori
+  // kalendar*, *Na Danas* and *Nastavi*; the card's *Nastavi* and *Sakrij*,
+  // its dialog's *Odustani* and *Sakrij postavljanje*; *Kalendar*'s
+  // *Nastavi postavljanje*. TWENTY-THREE SINCE REVIEW 1: the frame's
+  // organization retry, step 5's prerequisites retry and step 6's list retry.
+  { name: 'the setup frame', file: ONBOARDING, expectedFields: 0, expectedButtons: 23 },
   // STORY 16.5. On *Kalendar na mobitelu*, no field (the URL is shown, never
   // an input) and TWELVE buttons, each written once: the link card's write
   // (*Izradi poveznicu*, *Izradi novu poveznicu*, *Isključi*, one element),

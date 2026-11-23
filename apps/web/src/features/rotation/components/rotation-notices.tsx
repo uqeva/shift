@@ -8,6 +8,7 @@ import { ArrowUUpLeft, FloppyDisk } from '@/components/ui/icon';
 import { Notice } from '@/components/ui/notice';
 import { ErasureDialog } from '@/features/conflicts/components/erasure-dialog';
 import type { RotationBuilder } from '@/features/rotation/hooks/use-rotation-builder';
+import { ROTATION_SAVE_ERROR_ID } from '@/features/rotation/utils/element-ids';
 import type { ScheduledChange } from '@/features/rotation/services/history';
 import { ROTATION_KEY, rotationMessageKey, rotationRetryMessageKey } from '@/features/rotation/services/list';
 import {
@@ -321,7 +322,7 @@ export function RotationNotices({
   return (
     <>
       {outcome === null || outcome.ok ? null : (
-        <Notice role="alert">
+        <Notice id={ROTATION_SAVE_ERROR_ID} role="alert">
           {t(rotationWriteMessageKey(outcome.code))}
           {partial === null ? null : <> {t(partial)}</>}
           {cancelOffered ? (

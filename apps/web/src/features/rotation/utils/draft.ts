@@ -64,6 +64,13 @@ export interface RotationDraft {
    * phase applies. Never before the organization's today.
    */
   readonly effectiveFrom: string;
+  /**
+   * Whether the person chose `Vrijedi od` (story 19.4, O3, FR-97). Until they
+   * do, the field is shown empty and a save is refused
+   * (`ROTATION_EFFECTIVE_UNCHOSEN`); {@link effectiveFrom} stays today only as
+   * the preview's first date, never as a value the person sees as chosen.
+   */
+  readonly effectiveChosen: boolean;
   /** Each active team's step, by team id, as an index into {@link steps}. */
   readonly offsets: Readonly<Record<string, number>>;
   /**
@@ -120,6 +127,7 @@ export function emptyDraftOf(teams: readonly TeamRow[], today: string): Rotation
     steps: [],
     anchorDate: today,
     effectiveFrom: today,
+    effectiveChosen: false,
     offsets: Object.fromEntries(teams.map((team) => [team.id, 0])),
     keys: [],
     nextKey: 0,
@@ -202,6 +210,7 @@ export function prefillOf(snapshot: RotationSnapshot, today: string): RotationDr
     steps: steps.map((step) => step.shiftTypeId),
     anchorDate: today,
     effectiveFrom: today,
+    effectiveChosen: false,
     offsets,
     keys: freshKeys(steps.length),
     nextKey: steps.length,
@@ -373,7 +382,7 @@ export function withAnchor(draft: RotationDraft, value: string): RotationDraft {
 export function withEffectiveFrom(draft: RotationDraft, value: string): RotationDraft {
   const date = value.trim();
 
-  return isIsoDate(date) ? { ...draft, effectiveFrom: date } : draft;
+  return isIsoDate(date) ? { ...draft, effectiveFrom: date, effectiveChosen: true } : draft;
 }
 
 /** A `<select>`'s value as a step index of `draft`, or `null`. */
@@ -733,6 +742,8 @@ export const ROTATION_EMPTY = 'ROTATION_EMPTY';
 export const ROTATION_NO_TEAMS = 'ROTATION_NO_TEAMS';
 /** A team's rotation already has a version scheduled after today (2.6 cancels it). */
 export const ROTATION_SCHEDULED = 'ROTATION_SCHEDULED';
+/** `Vrijedi od` was never chosen (story 19.4, O3): nothing pre-selects it. */
+export const ROTATION_EFFECTIVE_UNCHOSEN = 'ROTATION_EFFECTIVE_UNCHOSEN';
 /** The effective date is before the organization's today: past schedules are never rewritten (2.6). */
 export const ROTATION_EFFECTIVE_PAST = 'ROTATION_EFFECTIVE_PAST';
 /**
@@ -752,6 +763,7 @@ export type DraftRefusal =
   | typeof ROTATION_EMPTY
   | typeof ROTATION_NO_TEAMS
   | typeof ROTATION_SCHEDULED
+  | typeof ROTATION_EFFECTIVE_UNCHOSEN
   | typeof ROTATION_EFFECTIVE_PAST
   | typeof ROTATION_EFFECTIVE_TOO_FAR
   | typeof ROTATION_TYPE_ARCHIVED
@@ -843,6 +855,27 @@ export function draftRefusalOf(
   if (draft.steps.some((shiftTypeId) => !inUse.has(shiftTypeId))) return ROTATION_TYPE_ARCHIVED;
   if (draftUnchangedOf(snapshot, draft, draft.effectiveFrom)) return ROTATION_UNCHANGED;
   if (rotationChangedTodayOf(snapshot, draft.effectiveFrom)) return ROTATION_CHANGED_TODAY;
+  // STORY 19.4 (O3): a date the person never chose is never saved. LAST, so
+  // a PREVIEW can ignore it (`previewRefusalOf`), and
+  // every refusal about the draft itself is said first, judged on the preview's
+  // date (today), and this one only stands between a sound draft and its save.
+  if (!draft.effectiveChosen) return ROTATION_EFFECTIVE_UNCHOSEN;
 
   return null;
+}
+
+/**
+ * What stops a PREVIEW of `draft` (the 11.2 short-staffed block): every
+ * refusal the save has but one. `Vrijedi od` not chosen yet (story 19.4, O3)
+ * refuses only the SAVE — the preview reads the draft from its preview date,
+ * today, so an unchosen draft is previewed and still never saved.
+ */
+export function previewRefusalOf(
+  snapshot: RotationSnapshot,
+  draft: RotationDraft,
+  today: string,
+): DraftRefusal | null {
+  const refusal = draftRefusalOf(snapshot, draft, today);
+
+  return refusal === ROTATION_EFFECTIVE_UNCHOSEN ? null : refusal;
 }

@@ -275,6 +275,15 @@ const SANCTIONED_PLURAL_KEYS = [
   // STORY 18.4: the loan dialog's warning of dates the member is inactive on —
   // `1 dan`, `3 dana`, `5 dana`.
   'loans.inactive',
+  // STORY 19.4: the setup frame, step 7 and the Danas card.
+  'onboarding.rotation.typesCount',
+  'onboarding.done.left',
+  'onboarding.done.leftNoCard',
+  'onboarding.done.hourBandsCount',
+  'onboarding.done.teamsCount',
+  'onboarding.done.shiftTypesCount',
+  'onboarding.done.membersCount',
+  'onboarding.card.title',
 ];
 
 /** The flat screen strings the application is permitted to ship, by the story
@@ -1207,6 +1216,8 @@ const SANCTIONED_SCREEN_KEYS = [
   'kalendar.columnDate',
   'kalendar.noRotation',
   'kalendar.noTeams',
+  // STORY 19.4 (UX-DR70): where a schedule comes from.
+  'kalendar.noTeamsWhy',
   'kalendar.error.unavailable',
   // STORY 3.2a: the mode switch — its label, *Moj raspored* and *Sve smjene*
   // — the notice for a viewer on no team all month, and a day on no team.
@@ -2789,6 +2800,7 @@ const SANCTIONED_SCREEN_KEYS = [
   'history.field.carryOverExpiryMonth',
   'history.field.carryOverExpiryDay',
   'history.field.carryOverFirstLeaveYear',
+  'history.field.onboardingDismissed',
   'history.field.username',
   'history.field.email',
   'history.field.role',
@@ -3073,6 +3085,8 @@ const SANCTIONED_SCREEN_KEYS = [
   'signup.sent.note',
   'signup.sent.resend',
   'signup.sent.resendIn',
+  // STORY 19.4 (D10): the resend's wait, said once as its description.
+  'signup.sent.resendWait',
   'signup.sent.resent',
   'signup.signIn.organizationHint',
   'signup.signIn.error',
@@ -3160,6 +3174,100 @@ const SANCTIONED_SCREEN_KEYS = [
   'signup.setup.error.timezoneUnknown',
   'signup.setup.error.unavailable',
   'signup.setup.error.routing',
+  // STORY 19.4: the onboarding namespace, the O3 refusals and the fresh organization's empty states.
+  'danas.admin.coverage.noTeam',
+  'danas.admin.coverage.noTeamNext',
+  'ljudi.alone',
+  'ljudi.form.levelChoose',
+  'ljudi.form.error.levelUnpicked',
+  'ljudi.form.error.allowanceEmpty',
+  'organization.hourBands.empty',
+  'organization.hourBands.emptyNext',
+  'rotation.shiftTypes.empty',
+  'rotation.shiftTypes.emptyNext',
+  'rotation.shiftTypes.kindChoose',
+  'rotation.shiftTypes.error.kindMissing',
+  'rotation.builder.error.effectiveUnchosen',
+  'smjene.empty',
+  'smjene.emptyNext',
+  'onboarding.frame.label',
+  'onboarding.frame.exit',
+  'onboarding.frame.railHeading',
+  'onboarding.frame.railLabel',
+  'onboarding.frame.progress',
+  'onboarding.frame.allSteps',
+  'onboarding.frame.sheetHeading',
+  'onboarding.frame.sheetLine',
+  'onboarding.frame.close',
+  'onboarding.frame.back',
+  'onboarding.frame.skip',
+  'onboarding.frame.next',
+  'onboarding.frame.unavailable',
+  'onboarding.frame.retry',
+  'onboarding.step.organization',
+  'onboarding.step.hourBands',
+  'onboarding.step.teams',
+  'onboarding.step.shiftTypes',
+  'onboarding.step.rotation',
+  'onboarding.step.members',
+  'onboarding.step.done',
+  'onboarding.state.created',
+  'onboarding.state.set',
+  'onboarding.state.unset',
+  'onboarding.hourBands.explainerTitle',
+  'onboarding.hourBands.explainerBody',
+  'onboarding.hourBands.example',
+  'onboarding.teams.lede',
+  'onboarding.teams.explainerTitle',
+  'onboarding.teams.explainerBody',
+  'onboarding.teams.example',
+  'onboarding.shiftTypes.lede',
+  'onboarding.shiftTypes.explainerTitle',
+  'onboarding.shiftTypes.explainerBody',
+  'onboarding.shiftTypes.example',
+  'onboarding.rotation.lede',
+  'onboarding.rotation.explainerTitle',
+  'onboarding.rotation.explainerBody',
+  'onboarding.rotation.example',
+  'onboarding.rotation.missing',
+  'onboarding.rotation.missingTeam',
+  'onboarding.rotation.missingWorkingType',
+  'onboarding.rotation.missingLink',
+  'onboarding.rotation.missingNote',
+  'onboarding.rotation.unavailable',
+  'onboarding.rotation.typesHeading',
+  'onboarding.rotation.typesNote',
+  'onboarding.members.lede',
+  'onboarding.members.explainerTitle',
+  'onboarding.members.explainerBody',
+  'onboarding.members.example',
+  'onboarding.members.signInLink',
+  'onboarding.members.copy',
+  'onboarding.members.copied',
+  'onboarding.members.copyFailed',
+  'onboarding.members.signInHint',
+  'onboarding.done.lede',
+  'onboarding.done.finished',
+  'onboarding.done.summaryLabel',
+  'onboarding.done.organizationLine',
+  'onboarding.done.rotationFrom',
+  'onboarding.done.set',
+  'onboarding.done.setLabel',
+  'onboarding.done.toToday',
+  'onboarding.done.resume',
+  'onboarding.done.openCalendar',
+  'onboarding.card.set',
+  'onboarding.card.rotationLeft',
+  'onboarding.card.listLabel',
+  'onboarding.card.resume',
+  'onboarding.card.hide',
+  'onboarding.card.dialogTitle',
+  'onboarding.card.dialogBody',
+  'onboarding.card.dialogWhere',
+  'onboarding.card.cancel',
+  'onboarding.card.confirm',
+  'onboarding.card.refused',
+  'onboarding.card.calendarResume',
 ];
 
 /** Everything the resource file is permitted to hold, together. */
@@ -3496,6 +3604,14 @@ const ROTATION_OVERRIDE_NAMESPACE = 'rotation.builder.overrides.';
  */
 const HISTORY_NAMESPACE = 'history.';
 /**
+ * STORY 19.4 (AD-24): the setup frame walks through the Team (*Smjene*) and the
+ * Shift Type (*Tipovi smjena*) on one screen, as `history` names both: the
+ * term `tip… smjen…`, and `smjen` otherwise only as the Team's noun. The
+ * calendar's empty state says where a schedule comes from, both included.
+ */
+const ONBOARDING_NAMESPACE = 'onboarding.';
+const CALENDAR_SOURCES_KEY = 'kalendar.noTeamsWhy';
+/**
  * 0036: the day detail's refusal of an override whose team OR type was
  * archived meanwhile names both, as `rotation.builder.overrides.refused.archived`
  * does, so it reads under the builder's rule rather than the day detail's.
@@ -3522,6 +3638,8 @@ function teamTermOutOfTurn(key: string, message: string): boolean {
   if (
     key.startsWith(ROTATION_OVERRIDE_NAMESPACE) ||
     key.startsWith(HISTORY_NAMESPACE) ||
+    key.startsWith(ONBOARDING_NAMESPACE) ||
+    key === CALENDAR_SOURCES_KEY ||
     key === CALENDAR_OVERRIDE_ARCHIVED_KEY
   ) {
     // The term taken out, `smjen` may remain only as the Team's noun.
@@ -3861,6 +3979,75 @@ describe('the messages obey the voice rules that bind every string', () => {
     // STORY 4.3's one, in the same voice: `Izvezi`, not the noun `Izvoz`,
     // which is the label the control wears while the file is built.
     expect(messageAt('sati.organization.export.action')).toBe('Izvezi u Excel');
+  });
+});
+
+/**
+ * STORY 19.4 (FR-97, SM-C3, DI-8, UX-DR70): a fresh organization's words are
+ * the organization's own. The `onboarding` namespace and the empty states a
+ * Founding Admin meets before setup is done say no fire-department term, no
+ * pilot shift name (`Dan`, `Noć`, `Slobodno` as words), no count of four teams
+ * and no 12 hours. `Dan od 24 sata` (the hour bands' day) and `Dan {day}` are
+ * not shift names, so they are not hits.
+ */
+const FRESH_ORGANIZATION_KEYS: readonly string[] = [
+  'danas.admin.coverage.noTeam',
+  'danas.admin.coverage.noTeamNext',
+  'kalendar.noTeams',
+  'kalendar.noTeamsWhy',
+  'ljudi.alone',
+  'organization.hourBands.empty',
+  'organization.hourBands.emptyNext',
+  'rotation.builder.error.noTeams',
+  'rotation.builder.error.effectiveUnchosen',
+  'rotation.shiftTypes.empty',
+  'rotation.shiftTypes.emptyNext',
+  'rotation.shiftTypes.error.kindMissing',
+  'smjene.empty',
+  'smjene.emptyNext',
+  'ljudi.form.error.levelUnpicked',
+  'ljudi.form.error.allowanceEmpty',
+];
+
+/** The pilot- or fire-specific literal a message carries, or `null`. */
+function pilotLiteralIn(message: string): string | null {
+  const patterns: readonly RegExp[] = [
+    /vatrog|požar|pozar|intervencij|dežurstv|dezurstv|\bdvd\b|zapovjedni/iu,
+    /(?<![\p{L}\p{N}])(?:Dan(?! od 24 sata)(?! \{)|Noć|Slobodno)(?![\p{L}\p{N}])/u,
+    /(?<![\p{L}\p{N}])(?:četiri|4)\s+smjen/iu,
+    /(?<![\p{L}\p{N}])12\s*(?:h|sati|sata)(?![\p{L}\p{N}])/iu,
+  ];
+  for (const pattern of patterns) {
+    const found = pattern.exec(message);
+    if (found !== null) return found[0];
+  }
+  return null;
+}
+
+describe('a fresh organization is told nothing pilot- or fire-specific (story 19.4, DI-8)', () => {
+  it('sweeps the onboarding namespace and the fresh organization’s empty states', () => {
+    const keys = [...leafKeys(resource()).filter((key) => key.startsWith('onboarding.')), ...FRESH_ORGANIZATION_KEYS];
+    expect(keys.filter((key) => key.startsWith('onboarding.')).length, 'no onboarding keys to sweep').toBeGreaterThan(50);
+    const found = keys
+      .map((key) => ({ key, hit: pilotLiteralIn(String(messageAt(key))) }))
+      .filter((entry) => entry.hit !== null);
+    for (const key of FRESH_ORGANIZATION_KEYS) expect(messageAt(key), `${key} is not in hr.json`).toBeTypeOf('string');
+    expect(found).toEqual([]);
+  });
+
+  it('would notice each kind of literal, and not the day that is no shift name', () => {
+    expect(pilotLiteralIn('Primjer: DVD Kaštel')).not.toBeNull();
+    expect(pilotLiteralIn('Vatrogasna smjena')).not.toBeNull();
+    expect(pilotLiteralIn('radni „Dan” i „Noć”')).not.toBeNull();
+    expect(pilotLiteralIn('neradni Slobodno')).not.toBeNull();
+    expect(pilotLiteralIn('četiri smjene')).not.toBeNull();
+    expect(pilotLiteralIn('4 smjene')).not.toBeNull();
+    expect(pilotLiteralIn('smjena od 12 sati')).not.toBeNull();
+    expect(pilotLiteralIn('12 h')).not.toBeNull();
+    expect(pilotLiteralIn('Dan od 24 sata')).toBeNull();
+    expect(pilotLiteralIn('Dan {day}')).toBeNull();
+    expect(pilotLiteralIn('dijele dan na dva razdoblja')).toBeNull();
+    expect(pilotLiteralIn('od 06:00 i drugi od 20:00')).toBeNull();
   });
 });
 

@@ -22,6 +22,7 @@ import { povijestPromjenaRoute } from '@/pages/povijest-promjena';
 import { postavkeRotacijeRoute } from '@/pages/postavke-rotacije';
 import { postavkeRotacijeTipSmjeneRoute } from '@/pages/postavke-rotacije.tipovi-smjena.$id';
 import { postavljanjeRoute } from '@/pages/postavljanje';
+import { setupStepRoute } from '@/pages/postavljanje.$step';
 import { potvrdaRoute } from '@/pages/potvrda';
 import { prijavaBareRoute, prijavaRoute } from '@/pages/prijava';
 import { registracijaRoute } from '@/pages/registracija';
@@ -164,6 +165,9 @@ const routeTree = rootRoute.addChildren([
   potvrdaRoute,
   zaboravljenaLozinkaRoute,
   postavljanjeRoute,
+  // STORY 19.4 (AD-24, D1): setup's steps 2–7, outside the layout too (no
+  // shell), with the layout's session checks and the admin guard of its own.
+  setupStepRoute,
   appDestinations,
 ]);
 

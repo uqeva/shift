@@ -28,7 +28,7 @@ import {
   type OrganizationForm,
   type OrganizationRefusal,
 } from '@/features/auth/services/create-organization';
-import { knownPathOf, returnTargetOf } from '@/features/auth/services/return-target';
+import { SIGNED_IN_HOME, knownPathOf, returnTargetOf } from '@/features/auth/services/return-target';
 import { localSessionEnd } from '@/features/auth/services/sign-out';
 import { writesOnline } from '@/lib/offline/use-write-gate';
 import { supabaseClient } from '@/lib/supabase/client';
@@ -124,7 +124,12 @@ export function useCreateOrganization(povratak: string | undefined) {
       const next = afterCreateOf(code, await refreshedDestination(supabaseClient().auth));
 
       if (next.kind === AFTER_NAVIGATE) {
-        await navigate({ href: returnTargetOf(povratak, knownPathOf(router)), replace: true });
+        // STORY 19.4 (D2): with no return target, to `/postavljanje`, whose
+        // guard sends a claimed admin to step 2; a carried target still wins.
+        // A return target the validator refuses counts as none (review 1).
+        const target = returnTargetOf(povratak, knownPathOf(router));
+        if (target === SIGNED_IN_HOME) await navigate({ to: '/postavljanje', replace: true });
+        else await navigate({ href: target, replace: true });
 
         return;
       }

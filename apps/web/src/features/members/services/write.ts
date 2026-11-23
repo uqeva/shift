@@ -42,6 +42,8 @@ import {
   MEMBER_TEAM_STALE,
   MEMBER_TEAM_UNCHANGED,
   MEMBER_TEAM_UNPICKED,
+  MEMBER_ALLOWANCE_EMPTY,
+  MEMBER_LEVEL_UNPICKED,
   MEMBER_UNKNOWN,
   MEMBER_WRITE_FUNCTION,
   MEMBER_WRITE_INVALID,
@@ -289,6 +291,15 @@ export const DEFAULT_MEMBER_ROLE: MemberRole = 'member_role';
  */
 export function chosenRole(value: string): MemberRole {
   return MEMBER_ROLES.find((known) => known === value) ?? DEFAULT_MEMBER_ROLE;
+}
+
+/**
+ * The level a NEW member's `<select>` holds, or `null` when none was chosen
+ * (story 19.4, O3, FR-97): the add dialog pre-selects no level, so an empty or
+ * unknown value is refused (`MEMBER_LEVEL_UNPICKED`) rather than defaulted.
+ */
+export function enteredRole(value: string): MemberRole | null {
+  return MEMBER_ROLES.find((known) => known === value) ?? null;
 }
 
 /**
@@ -2277,6 +2288,8 @@ export {
   MEMBER_WRITE_REFUSED,
   MEMBER_WRITE_UNAVAILABLE,
   MEMBER_NAME_TOO_LONG,
+  MEMBER_LEVEL_UNPICKED,
+  MEMBER_ALLOWANCE_EMPTY,
   ORGANIZATION_WOULD_HAVE_NO_ADMIN,
   PARTIAL_SAVE_KEY,
   PASSWORD_RESET,
@@ -2311,3 +2324,40 @@ export {
   type PostgrestFailure,
   type StatusChange,
 } from '@/features/members/services/wire';
+
+/** The level and leave days a new member is added with, once both are entered (story 19.4, O3). */
+export type NewMemberChoice =
+  | { readonly ok: true; readonly role: MemberRole; readonly leaveAllowanceDays: number }
+  | {
+      readonly ok: false;
+      readonly code: typeof MEMBER_LEVEL_UNPICKED | typeof MEMBER_ALLOWANCE_EMPTY | typeof MEMBER_WRITE_INVALID;
+      /** Which control the refusal is about, so focus goes there. */
+      readonly field: typeof NEW_MEMBER_ROLE_FIELD | typeof NEW_MEMBER_LEAVE_FIELD;
+    };
+
+export const NEW_MEMBER_ROLE_FIELD = 'role';
+export const NEW_MEMBER_LEAVE_FIELD = 'leave';
+
+/**
+ * The add dialog's level and leave days, in field order (story 19.4, O3):
+ * nothing is pre-selected or proposed, so no level is `MEMBER_LEVEL_UNPICKED`,
+ * an empty field `MEMBER_ALLOWANCE_EMPTY`, and any other unusable number the
+ * shipped `MEMBER_WRITE_INVALID`. Refused before anything is sent.
+ */
+export function newMemberChoiceOf(role: string, leave: string): NewMemberChoice {
+  const chosen = enteredRole(role);
+
+  if (chosen === null) return { ok: false, code: MEMBER_LEVEL_UNPICKED, field: NEW_MEMBER_ROLE_FIELD };
+
+  const days = enteredAllowance(leave);
+
+  if (days === null) {
+    return {
+      ok: false,
+      code: leave.trim() === '' ? MEMBER_ALLOWANCE_EMPTY : MEMBER_WRITE_INVALID,
+      field: NEW_MEMBER_LEAVE_FIELD,
+    };
+  }
+
+  return { ok: true, role: chosen, leaveAllowanceDays: days };
+}

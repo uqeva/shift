@@ -11,6 +11,7 @@ import {
   rotationHistoryOf,
   inForceFromOf,
   rotationHistoryStatusMessageKey,
+  draftSaveBarHintOf,
   saveBarHintOf,
   scheduledChangeOf,
   type RotationHistoryStatus,
@@ -177,6 +178,16 @@ describe('the history', () => {
 });
 
 describe('the save bar hint (story 5.5c)', () => {
+  it('names no date while Vrijedi od is not chosen, and the chosen one once it is (story 19.4, O3)', async () => {
+    const snapshot = await snapshotOf(PILOT);
+
+    expect(draftSaveBarHintOf(true, snapshot, TODAY, { effectiveFrom: TODAY, effectiveChosen: false })).toBeNull();
+    expect(draftSaveBarHintOf(true, snapshot, TODAY, { effectiveFrom: '2026-11-01', effectiveChosen: true })).toEqual(
+      saveBarHintOf(true, snapshot, TODAY, '2026-11-01'),
+    );
+    expect(draftSaveBarHintOf(false, snapshot, TODAY, { effectiveFrom: '2026-11-01', effectiveChosen: true })).toBeNull();
+  });
+
   it('says nothing with no unsaved changes', async () => {
     expect(saveBarHintOf(false, await snapshotOf(PILOT), TODAY, NEXT_WEEK)).toBeNull();
   });

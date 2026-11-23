@@ -193,6 +193,9 @@ test.describe('at 390 px, on a touch phone', () => {
     await rotationPage.stepButton(2).tap();
     await expect(steps).toHaveCount(2);
     for (const [index, name] of [work, renamed].entries()) await expect(steps.nth(index)).toContainText(name);
+    // STORY 19.4 (O3): `Vrijedi od` opens empty, so it is chosen on step 3.
+    await rotationPage.stepButton(3).tap();
+    await rotationPage.chooseEffectiveFrom();
     await rotationPage.stepButton(4).tap();
     await expect(rotationPage.stepProgress(4)).toBeFocused();
 

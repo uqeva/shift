@@ -517,6 +517,110 @@ describe('create_organization: the organization it founds (D5 of the checklist, 
   });
 });
 
+describe('the onboarding card’s one stored fact (0074, story 19.4, AD-24)', () => {
+  it.skipIf(noDatabase)('founds an organization not dismissed, and lets its Founding Admin dismiss it and nothing else', async () => {
+    await inRolledBackTransaction(async (client) => {
+      await door(client);
+      const founder = await account(client);
+      await actAs(client, founder.id);
+      const created = await create(client, input());
+      const organization = 'answer' in created ? String(created.answer['organizationId']) : '';
+      await actAsOwner(client);
+      expect(organization).not.toBe('');
+
+      const dismissed = async (): Promise<unknown> =>
+        (
+          await client.query<{ onboarding_dismissed: boolean }>(
+            'select onboarding_dismissed from public.organizations where id = $1',
+            [organization],
+          )
+        ).rows[0]?.onboarding_dismissed;
+      // AD-24: the default; every step's progress is derived, nothing else is stored.
+      expect(await dismissed()).toBe(false);
+
+      // The Founding Admin, as the refreshed session: the dismissal lands.
+      await actAs(client, founder.id, { organization_id: organization });
+      const { rowCount } = await client.query('update public.organizations set onboarding_dismissed = true where id = $1', [
+        organization,
+      ]);
+      expect(rowCount).toBe(1);
+      // `founded_by` has no column grant (E4): refused outright.
+      await client.query('savepoint founded');
+      const refused = await client
+        .query('update public.organizations set founded_by = $1 where id = $2', [randomUUID(), organization])
+        .then(
+          () => null,
+          (cause: { code?: string }) => cause.code ?? '',
+        );
+      await client.query('rollback to savepoint founded');
+      expect(refused).toBe('42501');
+      await actAsOwner(client);
+      expect(await dismissed()).toBe(true);
+
+      // 0061 records it as a field of the organization, with the admin as actor.
+      const { rows: events } = await client.query<{ actor: string; changed: boolean }>(
+        `select actor::text, (new_row ->> 'onboarding_dismissed') = 'true' as changed from public.audit_events
+          where organization_id = $1 and table_name = 'organizations' and operation = 'UPDATE'`,
+        [organization],
+      );
+      expect(events).toEqual([{ actor: founder.id, changed: true }]);
+    });
+  });
+});
+
+describe('the onboarding dismissal is its own admin’s alone (0074, story 19.4 review 1)', () => {
+  it.skipIf(noDatabase)('refuses a member of the organization and another organization’s admin, writing nothing', async () => {
+    await inRolledBackTransaction(async (client) => {
+      // EVERY SCENE AS THE OWNER, before the first `actAs`.
+      await door(client);
+      const pilot = await organizationId(client, PILOT.slug);
+      const founder = await account(client);
+      await actAs(client, founder.id);
+      const created = await create(client, input());
+      const organization = 'answer' in created ? String(created.answer['organizationId']) : '';
+      await actAsOwner(client);
+      expect(organization).not.toBe('');
+
+      // A member-role colleague of the founded organization, inserted as the
+      // owner the way `create_organization` names an email identity's account.
+      const colleague = await account(client);
+      await client.query("select set_config('shift.founding_account', $1, true)", [colleague.id]);
+      await client.query(
+        `insert into public.members (organization_id, auth_user_id, name, username, email, role, leave_allowance_days)
+         values ($1, $2, 'Kolegica', private.email_identity_username($3), $3, 'member_role', 20)`,
+        [organization, colleague.id, colleague.email],
+      );
+      await client.query("select set_config('shift.founding_account', '', true)");
+      const { rows: admins } = await client.query<{ auth_user_id: string }>(
+        'select auth_user_id::text from public.members where organization_id = $1 and username = $2',
+        [pilot, PILOT.admin],
+      );
+      const pilotAdmin = admins[0]?.auth_user_id ?? '';
+      expect(pilotAdmin).not.toBe('');
+
+      for (const [subject, claim] of [
+        [colleague.id, organization],
+        [pilotAdmin, pilot],
+      ] as const) {
+        await actAs(client, subject, { organization_id: claim });
+        // The policy matches no row: zero rows, no error (0004).
+        const { rowCount } = await client.query(
+          'update public.organizations set onboarding_dismissed = true where id = $1',
+          [organization],
+        );
+        expect(rowCount, subject).toBe(0);
+        await actAsOwner(client);
+      }
+
+      const { rows } = await client.query<{ onboarding_dismissed: boolean }>(
+        'select onboarding_dismissed from public.organizations where id = $1',
+        [organization],
+      );
+      expect(rows[0]?.onboarding_dismissed).toBe(false);
+    });
+  });
+});
+
 describe('create_organization: one account founds one organization (D3)', () => {
   it.skipIf(noDatabase)('lets two concurrent calls from one account found exactly one organization', async () => {
     const owner = await connect();

@@ -54,6 +54,10 @@ import {
   NOT_FOUND,
   NOTIFICATIONS,
   NOTIFICATIONS_KEYS,
+  ONBOARDING,
+  ONBOARDING_LINK_KEYS,
+  ONBOARDING_PROGRESS_KEYS,
+  ONBOARDING_STEP_KEYS,
   CALENDAR_FEED,
   CALENDAR_FEED_COPY_KEYS,
   CALENDAR_FEED_DOWNLOAD_KEYS,
@@ -148,7 +152,8 @@ export const KEY_SOURCES = [
   { name: 'the set-password rules', file: SET_PASSWORD_KEYS, keys: messageKeyUnions, strings: 8 },
   // STORY 19.2: the signup screens, and their rules' message unions.
   // EIGHTY-EIGHT SINCE STORY 19.3: step 1's form and frame, and the signup link's password form.
-  { name: 'the signup screens', file: SIGNUP_SCREEN, keys: translationKeys, strings: 88 },
+  // NINETY SINCE STORY 19.4 (D10): the resend's name written once more, and its wait.
+  { name: 'the signup screens', file: SIGNUP_SCREEN, keys: translationKeys, strings: 90 },
   { name: 'the signup rules', file: SIGNUP_KEYS, keys: messageKeyUnions, strings: 10 },
   // STORY 19.3: step 1's rules, seven local refusals, three failures, and the two notices after an answer (review of 19.3).
   { name: 'the create-organization rules', file: CREATE_ORGANIZATION_KEYS, keys: messageKeyUnions, strings: 12 },
@@ -320,7 +325,8 @@ export const KEY_SOURCES = [
     name: 'the member list',
     file: MEMBER_LIST,
     keys: translationKeys,
-    strings: 42,
+    // STORY 19.4: the one-person line (ljudi.alone).
+    strings: 43,
   },
   {
     // STORY 1.7a. EIGHT on the team list: its heading, the link back
@@ -338,7 +344,8 @@ export const KEY_SOURCES = [
     name: 'the team list',
     file: TEAM_LIST,
     keys: translationKeys,
-    strings: 16,
+    // STORY 19.4: the empty state's fact and consequence.
+    strings: 18,
   },
   {
     // EIGHT on one team: the name label, Save, the archive offer, prompt,
@@ -491,7 +498,8 @@ export const KEY_SOURCES = [
     name: 'the Danas destination',
     file: DANAS,
     keys: translationKeys,
-    strings: 99,
+    // STORY 19.4: coverage with no team, its fact and its consequence.
+    strings: 101,
   },
   {
     // STORY 6.1a: today's three cases, the next shift's two headings, and
@@ -560,7 +568,8 @@ export const KEY_SOURCES = [
     name: 'the hour band list',
     file: HOUR_BAND_LIST,
     keys: translationKeys,
-    strings: 36,
+    // STORY 19.4: the empty state's fact and what the first band does.
+    strings: 38,
   },
   {
     // TWELVE on one band: its heading, the two field labels, Save, the window
@@ -618,7 +627,8 @@ export const KEY_SOURCES = [
     name: 'the shift type list',
     file: SHIFT_TYPE_LIST,
     keys: translationKeys,
-    strings: 29,
+    // STORY 19.4: the kind's Odaberi and the empty state's two lines.
+    strings: 32,
   },
   {
     // On one type: the facts a row says (as on the list), the name and Save,
@@ -650,7 +660,8 @@ export const KEY_SOURCES = [
     name: 'the shift type write rules',
     file: SHIFT_TYPE_WRITE_KEYS,
     keys: memberListKeys,
-    strings: 22,
+    // STORY 19.4: no kind chosen (O3).
+    strings: 23,
   },
   {
     // STORY 2.3b. THIRTY-SIX on the builder since the renegotiation — the
@@ -912,7 +923,8 @@ export const KEY_SOURCES = [
     // ONE HUNDRED AND EIGHTY-EIGHT SINCE STORY 16.1: the printed month —
     // *Ispiši*, the header's title and time printed, and *Moj raspored*'s
     // filter in words with and without a team.
-    strings: 188,
+    // STORY 19.4: where a schedule comes from, with no team.
+    strings: 189,
   },
   {
     // STORY 12.2. On the swap proposal: its heading (twice, once while the
@@ -1192,7 +1204,8 @@ export const KEY_SOURCES = [
     // 151 SINCE STORY 18.5: the loan record's word, `Posudba`.
     // 152 SINCE STORY 16.5: the calendar link's record, `Kalendar na mobitelu`.
     keys: (text: string) => [...translationKeys(text), ...messageKeyUnions(text)],
-    strings: 152,
+    // STORY 19.4: the onboarding dismissal's field label.
+    strings: 153,
   },
   {
     // STORY 14.3: the PDF's words — the title (the caption), the header's
@@ -1411,6 +1424,19 @@ export const KEY_SOURCES = [
     keys: messageKeyUnions,
     strings: 2,
   },
+  {
+    // STORY 19.4: the setup frame, its steps' explainers, step 6's link, step 7
+    // and the *Danas* card with its *Sakrij* dialog.
+    name: 'the setup frame',
+    file: ONBOARDING,
+    keys: translationKeys,
+    // 78 SINCE REVIEW 1: the frame's unavailable line and retry, step 5's unavailable line and its retry.
+    strings: 78,
+  },
+  { name: 'the setup steps', file: ONBOARDING_STEP_KEYS, keys: messageKeyUnions, strings: 7 },
+  // Three states, two prerequisites, step 7's four counts and its two left lines (review 1).
+  { name: 'the setup progress rules', file: ONBOARDING_PROGRESS_KEYS, keys: messageKeyUnions, strings: 11 },
+  { name: 'the setup link rules', file: ONBOARDING_LINK_KEYS, keys: messageKeyUnions, strings: 2 },
   {
     // STORY 10.3: the two saved lines, off `emailStatusMessageKey`, and the
     // two ledes, one per role, off `ledeMessageKey`.
@@ -1651,7 +1677,8 @@ export const KEY_SOURCES = [
     name: 'the rotation write rules',
     file: ROTATION_WRITE_KEYS,
     keys: memberWriteKeys,
-    strings: 16,
+    // STORY 19.4: Vrijedi od never chosen (O3).
+    strings: 17,
   },
   {
     // THIRTEEN on the create form: its own heading, five field labels, the save
@@ -1679,7 +1706,8 @@ export const KEY_SOURCES = [
     name: 'the member create form',
     file: MEMBER_CREATE,
     keys: translationKeys,
-    strings: 19,
+    // STORY 19.4: the level's Odaberi (O3).
+    strings: 20,
   },
   {
     // EIGHTEEN on the edit form: its own heading, five field labels, save,
@@ -1871,7 +1899,8 @@ export const KEY_SOURCES = [
     name: 'the member write rules',
     file: MEMBER_WRITE_KEYS,
     keys: memberWriteKeys,
-    strings: 66,
+    // STORY 19.4: no level chosen and no allowance (O3).
+    strings: 68,
   },
   {
     // ELEVEN on the member list's rules: four column headings, two permission

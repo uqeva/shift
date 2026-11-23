@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus } from '@/components/ui/icon';
 import { Notice } from '@/components/ui/notice';
 import { SectionNumber } from '@/components/ui/section-number';
@@ -75,6 +75,13 @@ export function ShiftTypeListSection({ screen }: { readonly screen: ShiftTypeLis
               {t('rotation.shiftTypes.open')}
             </Button>
           </CardHeader>
+          {/* STORY 19.4 (UX-DR67, 70): no type in use says the fact and its consequence. */}
+          {list.active.length === 0 ? (
+            <CardContent className="grid gap-1 border-t p-4 text-sm">
+              <p className="font-semibold">{t('rotation.shiftTypes.empty')}</p>
+              <p className="text-muted-foreground">{t('rotation.shiftTypes.emptyNext')}</p>
+            </CardContent>
+          ) : null}
           <ShiftTypeTable label={t('rotation.shiftTypes.heading')} rows={list.active} />
         </Card>
       )}

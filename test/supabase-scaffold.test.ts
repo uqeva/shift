@@ -980,6 +980,9 @@ describe('the access-control migration', () => {
       // shape: the staffing setting, nullable, current-state (0048).
       'minimum_members',
       'name',
+      // STORY 19.4. The onboarding card's dismissal, its one stored fact, on
+      // its own disjoint write shape (0074, AD-24).
+      'onboarding_dismissed',
       'organization_type',
       'timezone',
       // MEMBER RANK. The fire-rank setting, an EIGHTH column on its own
@@ -1314,6 +1317,18 @@ describe('the access-control migration', () => {
       /add column minimum_members smallint\s+constraint organizations_minimum_members_check check \(minimum_members >= 1\);/,
     );
     expect(statements).toMatch(/grant update \(minimum_members\) on table public\.organizations to authenticated/);
+  });
+
+  it('gives every organization an onboarding dismissal that defaults off, writable by its own grant (0074)', () => {
+    // STORY 19.4 (AD-24). Source text only; the refusals are `test/rls-isolation.test.ts`.
+    const statements = migrationStatements();
+
+    expect(statements).toMatch(/add column onboarding_dismissed boolean not null default false;/);
+    expect(statements).toMatch(/grant update \(onboarding_dismissed\) on table public\.organizations to authenticated/);
+    // The only stored onboarding fact: no other migration names a step, a skip or a progress column.
+    expect(statements).not.toMatch(/onboarding_(?!dismissed)\w+/);
+    // `founded_by` stays unwritable by a session (E4).
+    expect(statements).not.toMatch(/grant\s+update\s*\([^)]*founded_by[^)]*\)/);
   });
 
   it('gives every organization an email switch that defaults on, and filters the outbox in one trigger (0044)', () => {

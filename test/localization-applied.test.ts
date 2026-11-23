@@ -724,6 +724,21 @@ const SOURCES = [
   join(webRoot, 'src', 'features', 'notifications', 'hooks', 'use-push-settings.ts'),
   join(webRoot, 'src', 'features', 'notifications', 'components', 'push-settings-card.tsx'),
   join(webRoot, 'src', 'features', 'notifications', 'services', 'push.ts'),
+  // Story 19.4: setup's steps 2–7 and the *Danas* card — the page and every
+  // module of the onboarding feature that ships.
+  join(webRoot, 'src', 'pages', 'postavljanje.$step.tsx'),
+  join(webRoot, 'src', 'features', 'onboarding', 'hooks', 'use-onboarding-progress.ts'),
+  join(webRoot, 'src', 'features', 'onboarding', 'components', 'setup-frame.tsx'),
+  join(webRoot, 'src', 'features', 'onboarding', 'components', 'setup-rail.tsx'),
+  join(webRoot, 'src', 'features', 'onboarding', 'components', 'setup-footer.tsx'),
+  join(webRoot, 'src', 'features', 'onboarding', 'components', 'step-explainer.tsx'),
+  join(webRoot, 'src', 'features', 'onboarding', 'components', 'rotation-step-parts.tsx'),
+  join(webRoot, 'src', 'features', 'onboarding', 'components', 'sign-in-link-card.tsx'),
+  join(webRoot, 'src', 'features', 'onboarding', 'components', 'setup-summary.tsx'),
+  join(webRoot, 'src', 'features', 'onboarding', 'components', 'onboarding-card.tsx'),
+  join(webRoot, 'src', 'features', 'onboarding', 'services', 'steps.ts'),
+  join(webRoot, 'src', 'features', 'onboarding', 'services', 'progress.ts'),
+  join(webRoot, 'src', 'features', 'onboarding', 'services', 'sign-in-link.ts'),
   // Story 16.5: *Kalendar na mobitelu* — the page, its two hooks and cards,
   // the member page's card and hook, and the rules and copy modules.
   join(webRoot, 'src', 'pages', 'kalendar-na-mobitelu.tsx'),
@@ -1801,8 +1816,11 @@ function wordOccurrences(haystack: string, needle: string): number {
 // STORY 19.2: `/zaboravljena-lozinka`, whose `lozinka` is email recovery's
 // path (the route definition and the two `<Link to>` that open it: the
 // sign-in's forgot panel and the dead-link page), never copy.
+// STORY 19.4: `/postavljanje/tipovi-smjena`, setup's step 4, whose `smjena`
+// is the step's path (the step list's one table), never copy.
 const ROUTE_SEGMENTS = [
   '/postavke-rotacije/tipovi-smjena/',
+  '/postavljanje/tipovi-smjena',
   '/postavi-lozinku',
   '/povijest-promjena',
   '/zaboravljena-lozinka',

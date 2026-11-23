@@ -158,6 +158,8 @@
         "full": "✓ puna smjena",
         "nobody": "Nitko nije raspoređen",
         "none": "Danas nijedna smjena ne radi.",
+        "noTeam": "Još nema nijedne smjene.",
+        "noTeamNext": "Kad postaviš smjene i rotaciju, ovdje piše tko danas radi.",
         "off": "Slobodno: {teams}",
         "noRotation": "Bez rotacije: {teams}",
         "link": "Otvori kalendar smjena"
@@ -442,6 +444,7 @@
       "carryOverExpiryMonth": "Mjesec isteka prijenosa",
       "carryOverExpiryDay": "Dan isteka prijenosa",
       "carryOverFirstLeaveYear": "Prva godina prijenosa",
+      "onboardingDismissed": "Postavljanje sakriveno",
       "username": "Korisničko ime",
       "email": "E-pošta",
       "role": "Razina",
@@ -538,6 +541,7 @@
     "columnDate": "Datum",
     "noRotation": "Bez rotacije",
     "noTeams": "Nijedna smjena nije u upotrebi, pa kalendar nema što prikazati.",
+    "noTeamsWhy": "Raspored nastaje iz smjena, tipova smjena i rotacije.",
     "noTeam": "Nisi član nijedne smjene.",
     "ownNote": "Tvoj raspored · {team}. Filtri vrijede za „Sve smjene”.",
     "ownNoteNoTeam": "Tvoj raspored · bez smjene. Filtri vrijede za „Sve smjene”.",
@@ -1122,6 +1126,7 @@
     "name": "Ime",
     "email": "Adresa e-pošte",
     "role": "Razina ovlasti",
+    "alone": "Za sada si jedina osoba u organizaciji.",
     "leave": "Dani godišnjeg odmora",
     "leaveUnit": "{count, plural, one {dan god.} few {dana god.} other {dana god.}}",
     "admin": "Administrator",
@@ -1182,6 +1187,7 @@
       "newHeading": "Nova osoba",
       "newLede": "Nova osoba dobiva račun za prijavu i početnu lozinku.",
       "add": "Dodaj osobu",
+      "levelChoose": "Odaberi",
       "again": "Dodaj još jednu",
       "openPage": "Otvori stranicu osobe",
       "usernameHint": "Predloženo iz imena. Bez razmaka i znaka @.",
@@ -1214,6 +1220,8 @@
       "error": {
         "refused": "Promjena nije spremljena. Odjavi se i prijavi ponovno.",
         "invalid": "Unesena vrijednost nije dopuštena.",
+        "levelUnpicked": "Odaberi razinu ovlasti.",
+        "allowanceEmpty": "Upiši dane godišnjeg odmora (0 ili više).",
         "nameTooLong": "Ime može imati najviše 100 znakova.",
         "usernameTaken": "Ovo korisničko ime već postoji u organizaciji.",
         "usernameInvalid": "Korisničko ime ne smije sadržavati razmak ili znak @.",
@@ -1512,6 +1520,8 @@
       "lede": "Pojasi dijele dan na razdoblja. Svaki pojas počinje u svoje vrijeme i traje do početka sljedećeg.",
       "explainerTitle": "Kako rade satni pojasi?",
       "explainerBody": "Upisuješ samo naziv i početak pojasa. Kraj, trajanje i prelazak preko ponoći izračunavaju se iz početka sljedećeg pojasa.",
+      "empty": "Još nema nijednog satnog pojasa.",
+      "emptyNext": "Dodaj prvi pojas: on pokriva cijeli dan dok ne dodaš sljedeći.",
       "open": "Dodaj satni pojas",
       "addHeading": "Novi satni pojas",
       "close": "Zatvori",
@@ -1609,8 +1619,11 @@
       "archiveShort": "Arhiviraj",
       "count": "{count, plural, one {# tip smjene} few {# tipa smjene} other {# tipova smjena}}",
       "archivedHeading": "Arhivirani tipovi smjena",
+      "empty": "Još nema nijednog tipa smjene.",
+      "emptyNext": "Uzorak rotacije slaže se od tipova smjena, pa ih dodaj prije rotacije.",
       "name": "Naziv tipa smjene",
       "kind": "Vrsta tipa smjene",
+      "kindChoose": "Odaberi",
       "working": "Radni",
       "nonworking": "Neradni",
       "start": "Početak",
@@ -1650,6 +1663,7 @@
         "unavailable": "Tipove smjena trenutačno nije moguće učitati. Pokušaj ponovno.",
         "retry": "Pokušaj ponovno",
         "nameEmpty": "Naziv tipa smjene ne može biti prazan.",
+        "kindMissing": "Odaberi vrstu tipa smjene: radni ili neradni.",
         "nameTooLong": "Naziv tipa smjene može imati najviše 100 znakova.",
         "nameTaken": "Tip smjene s tim nazivom već postoji u organizaciji.",
         "timeInvalid": "Početak i završetak moraju biti vremena dana u punim minutama, na primjer 07:00.",
@@ -1889,6 +1903,7 @@
         "empty": "Uzorak mora imati barem jedan korak.",
         "noTeams": "Za rotaciju je potrebna barem jedna smjena u upotrebi.",
         "scheduled": "Promjena rotacije već je zakazana za kasniji datum, pa rotaciju sada nije moguće spremiti. Poništi zakazanu promjenu pa spremi ponovno.",
+        "effectiveUnchosen": "Odaberi datum od kojeg rotacija vrijedi.",
         "effectivePast": "Rotacija ne može vrijediti od datuma prije današnjeg. Odaberi današnji ili kasniji datum.",
         "effectiveTooFar": "Rotacija ne može vrijediti od datuma više od godinu dana unaprijed. Provjeri godinu u polju Vrijedi od.",
         "typeArchived": "Uzorak sadrži arhivirani tip. Ukloni taj korak ili ga zamijeni prije spremanja.",
@@ -1956,6 +1971,8 @@
   "smjene": {
     "heading": "Smjene",
     "lede": "Ekipe koje rade zajedno. Osoba je u jednoj smjeni, od datuma koji joj je zadan.",
+    "empty": "Još nema nijedne smjene.",
+    "emptyNext": "Raspored se crta po smjenama, pa bez njih kalendar nema što prikazati.",
     "open": "Nova smjena",
     "addHeading": "Nova smjena",
     "close": "Zatvori",
@@ -2495,7 +2512,8 @@
       "note": "Poveznica vrijedi sat vremena. Poruku potraži i u neželjenoj pošti.",
       "resend": "Pošalji ponovno",
       "resendIn": "Pošalji ponovno za {time}",
-      "resent": "Ako adresa može primiti poruku, poslali smo novu poveznicu."
+      "resent": "Ako adresa može primiti poruku, poslali smo novu poveznicu.",
+      "resendWait": "Nova poveznica može se zatražiti {seconds} sekundi nakon prethodne."
     },
     "signIn": {
       "organizationHint": "Za prijavu e-mailom organizacija nije potrebna.",
@@ -2560,7 +2578,7 @@
     },
     "setup": {
       "heading": "Nova organizacija",
-      "lede": "Ništa nije unaprijed upisano: svaki podatak je tvoj.",
+      "lede": "Korak 1 od {total}. Ništa nije unaprijed upisano: svaki podatak je tvoj.",
       "signedInAs": "Prijavljuješ se adresom {email}.",
       "signOut": "Odjava",
       "signOutError": "Odjava trenutačno nije moguća. Pokušaj ponovno.",
@@ -2645,6 +2663,114 @@
         "body": "{organizationName}: sutra, {date}, radiš: {shiftTypeName} {start}–{end}, {teamName}. Pogledaj dan u kalendaru: {link}"
       },
       "footer": "Podsjetnike e-poštom možeš isključiti u aplikaciji, pod Obavijesti → Podsjetnici: {link}"
+    }
+  },
+  "onboarding": {
+    "frame": {
+      "label": "Postavljanje",
+      "exit": "Izađi iz postavljanja",
+      "railHeading": "Korak {n} od {total}",
+      "railLabel": "Koraci postavljanja",
+      "progress": "Korak {n} od {total} · {step}",
+      "allSteps": "Svi koraci",
+      "sheetHeading": "Koraci postavljanja",
+      "sheetLine": "Postavljeno {set} od {facts} · korak {n} od {total}",
+      "close": "Zatvori",
+      "back": "Natrag",
+      "skip": "Preskoči za sada",
+      "next": "Dalje: {step}",
+      "unavailable": "Organizaciju trenutačno nije moguće učitati. Pokušaj ponovno.",
+      "retry": "Pokušaj ponovno"
+    },
+    "step": {
+      "organization": "Organizacija",
+      "hourBands": "Satni pojasi",
+      "teams": "Smjene",
+      "shiftTypes": "Tipovi smjena",
+      "rotation": "Rotacija",
+      "members": "Ljudi",
+      "done": "Gotovo"
+    },
+    "state": {
+      "created": "stvorena",
+      "set": "postavljeno",
+      "unset": "nije postavljeno"
+    },
+    "hourBands": {
+      "explainerTitle": "Čemu služe satni pojasi?",
+      "explainerBody": "Sati rada zbrajaju se po pojasevima, na primjer da se odvoje sati u različitim dijelovima dana. Upisuješ samo naziv i početak; kraj se izračuna.",
+      "example": "Primjer: dva pojasa, jedan od 06:00 i drugi od 20:00, dijele dan na dva razdoblja. Jedan pojas pokriva cijeli dan."
+    },
+    "teams": {
+      "lede": "Ekipe koje rade zajedno. Svaka osoba je u jednoj od njih, od datuma koji joj je zadan.",
+      "explainerTitle": "Što je smjena?",
+      "explainerBody": "Smjena je ekipa ljudi koja radi po istom rasporedu. Nazovi ih kako ih zovete vi; broj smjena je tvoj.",
+      "example": "Primjer: „Ekipa 1”, „Sjever”, „Tim B”."
+    },
+    "shiftTypes": {
+      "lede": "Tipovi smjena koje raspored koristi: radni imaju početak i završetak, neradni nemaju vremena.",
+      "explainerTitle": "Što je tip smjene?",
+      "explainerBody": "Tip smjene kaže kada se radi. Radni tip ima početak i završetak i može prijeći ponoć; neradni tip označava dane bez rada.",
+      "example": "Primjer: radni „Jutarnja” 06:00–14:00 i neradni „Odmor”."
+    },
+    "rotation": {
+      "lede": "Uzorak tipova smjena koji se ponavlja, i pomak svake smjene u njemu.",
+      "explainerTitle": "Kako radi rotacija?",
+      "explainerBody": "Uzorak je niz tipova smjena, dan po dan, koji se ponavlja. Svaka smjena prolazi isti uzorak, pomaknuta za nekoliko dana. Prije spremanja vidiš sljedeći ciklus i pokrivenost svakog dana.",
+      "example": "Primjer: uzorak od tri koraka i tri smjene s pomacima 1, 2 i 3 daje svaki dan točno jednu smjenu na svakom koraku.",
+      "missing": "Za rotaciju još nedostaje:",
+      "missingTeam": "barem jedna smjena u upotrebi",
+      "missingWorkingType": "barem jedan radni tip smjene",
+      "missingLink": "Korak {n}: {step}",
+      "missingNote": "Kad to postaviš, ovdje slažeš uzorak.",
+      "typesHeading": "Tipovi smjena",
+      "typesCount": "{count, plural, one {# tip smjene u upotrebi} few {# tipa smjene u upotrebi} other {# tipova smjena u upotrebi}}",
+      "typesNote": "Tipove smjena dodaješ i mijenjaš u koraku 4.",
+      "unavailable": "Smjene ili tipove smjena trenutačno nije moguće učitati, pa se ne vidi što rotaciji nedostaje."
+    },
+    "members": {
+      "lede": "Osobe koje se prijavljuju u organizaciju.",
+      "explainerTitle": "Kako se ljudi prijavljuju?",
+      "explainerBody": "Za svaku osobu upisuješ ime i korisničko ime; aplikacija daje početnu lozinku koju vidiš jednom. Osoba se prijavljuje s kraticom organizacije i pri prvoj prijavi postavlja svoju lozinku.",
+      "example": "Smjenu osobi daješ na njezinoj stranici, nakon dodavanja.",
+      "signInLink": "Poveznica za prijavu",
+      "copy": "Kopiraj",
+      "copied": "Poveznica je kopirana.",
+      "copyFailed": "Poveznicu nije moguće kopirati. Označi je i kopiraj ručno.",
+      "signInHint": "Pošalji je ljudima zajedno s korisničkim imenom i početnom lozinkom."
+    },
+    "done": {
+      "lede": "Pregled postavljanja.",
+      "left": "{count, plural, one {Ostao je još # korak. Možeš ga postaviti kad želiš: na Danas te čeka kartica Postavljanje.} few {Ostala su još # koraka. Možeš ih postaviti kad želiš: na Danas te čeka kartica Postavljanje.} other {Ostalo je još # koraka. Možeš ih postaviti kad želiš: na Danas te čeka kartica Postavljanje.}}",
+      "finished": "Postavljanje je gotovo. Raspored se računa iz rotacije, od datuma s kojim vrijedi.",
+      "summaryLabel": "Pregled koraka",
+      "organizationLine": "{name} · {slug}",
+      "hourBandsCount": "{count, plural, one {# pojas} few {# pojasa} other {# pojaseva}}",
+      "teamsCount": "{count, plural, one {# smjena} few {# smjene} other {# smjena}}",
+      "shiftTypesCount": "{count, plural, one {# tip smjene} few {# tipa smjene} other {# tipova smjena}}",
+      "membersCount": "{count, plural, one {# osoba} few {# osobe} other {# osoba}}",
+      "rotationFrom": "vrijedi od {date}",
+      "set": "Postavi",
+      "setLabel": "Postavi: {step}",
+      "toToday": "Na Danas",
+      "resume": "Nastavi: {step}",
+      "openCalendar": "Otvori kalendar",
+      "leftNoCard": "{count, plural, one {Ostao je još # korak. Možeš ga postaviti kad želiš, na njegovoj stranici.} few {Ostala su još # koraka. Možeš ih postaviti kad želiš, na njihovim stranicama.} other {Ostalo je još # koraka. Možeš ih postaviti kad želiš, na njihovim stranicama.}}"
+    },
+    "card": {
+      "title": "{count, plural, one {Postavljanje: još # korak} few {Postavljanje: još # koraka} other {Postavljanje: još # koraka}}",
+      "set": "Postavljeno {set} od {facts}.",
+      "rotationLeft": "Dok rotacija nije spremljena, raspored ne nastaje.",
+      "listLabel": "Koraci koji nisu postavljeni",
+      "resume": "Nastavi: {step}",
+      "hide": "Sakrij",
+      "dialogTitle": "Sakriti postavljanje?",
+      "dialogBody": "Kartica se više neće prikazivati nijednom administratoru.",
+      "dialogWhere": "Preostale korake i dalje postavljaš na njihovim stranicama: Organizacija, Postavke rotacije i Ljudi.",
+      "cancel": "Odustani",
+      "confirm": "Sakrij postavljanje",
+      "refused": "Postavljanje nije sakriveno. Pokušaj ponovno.",
+      "calendarResume": "Nastavi postavljanje"
     }
   }
 }

@@ -124,6 +124,7 @@ async function setUp(slug: string, day: number, scheduledStep: 0 | 1 | 2 | 3): P
 async function armCancel(rotationPage: RotationPage, scheduled: string, inApp = false): Promise<void> {
   if (!inApp) await rotationPage.goto();
   await expect(rotationPage.effectiveFromInput).toBeVisible();
+  await rotationPage.chooseEffectiveFrom();
   await rotationPage.saveButton.click();
   await expect(rotationPage.scheduledRefusal).toBeVisible();
   await rotationPage.cancelScheduledOffer(fullDate(scheduled)).click();

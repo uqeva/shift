@@ -332,6 +332,12 @@ export const MEMBER_TEAM_STALE = 'MEMBER_TEAM_STALE';
 /** No team was chosen: the picker still holds its placeholder (story 7.11).
  *  Never on the wire — the dialog refuses it before anything is sent. */
 export const MEMBER_TEAM_UNPICKED = 'MEMBER_TEAM_UNPICKED';
+/** No level was chosen (story 19.4, O3): the add dialog pre-selects none.
+ *  Never on the wire — the dialog refuses it before anything is sent. */
+export const MEMBER_LEVEL_UNPICKED = 'MEMBER_LEVEL_UNPICKED';
+/** The leave allowance is empty (story 19.4, O3): the add dialog proposes no
+ *  number. Never on the wire. */
+export const MEMBER_ALLOWANCE_EMPTY = 'MEMBER_ALLOWANCE_EMPTY';
 
 /** Move the member onto a team, or onto no team, from a date. */
 export const TEAM_MOVE = 'move';
@@ -429,6 +435,8 @@ export type MemberWriteFailure =
   | typeof MEMBER_TEAM_ARCHIVED
   | typeof MEMBER_TEAM_STALE
   | typeof MEMBER_TEAM_UNPICKED
+  | typeof MEMBER_LEVEL_UNPICKED
+  | typeof MEMBER_ALLOWANCE_EMPTY
   | typeof MEMBER_WRITE_UNAVAILABLE;
 
 /**
@@ -701,6 +709,8 @@ export function memberWriteMessageKey(
   | 'smjene.membership.error.archived'
   | 'smjene.membership.error.stale'
   | 'smjene.membership.error.unpicked'
+  | 'ljudi.form.error.levelUnpicked'
+  | 'ljudi.form.error.allowanceEmpty'
   | 'ljudi.form.error.signInIsEmail'
   | 'ljudi.form.error.unavailable' {
   if (failure === MEMBER_WRITE_REFUSED) return 'ljudi.form.error.refused';
@@ -743,6 +753,8 @@ export function memberWriteMessageKey(
   if (failure === MEMBER_TEAM_ARCHIVED) return 'smjene.membership.error.archived';
   if (failure === MEMBER_TEAM_STALE) return 'smjene.membership.error.stale';
   if (failure === MEMBER_TEAM_UNPICKED) return 'smjene.membership.error.unpicked';
+  if (failure === MEMBER_LEVEL_UNPICKED) return 'ljudi.form.error.levelUnpicked';
+  if (failure === MEMBER_ALLOWANCE_EMPTY) return 'ljudi.form.error.allowanceEmpty';
   if (failure === MEMBER_WRITE_UNAVAILABLE) return 'ljudi.form.error.unavailable';
 
   const unhandled: never = failure;

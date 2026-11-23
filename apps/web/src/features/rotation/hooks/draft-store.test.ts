@@ -45,7 +45,7 @@ describe('the draft store', () => {
     store.subscribe(() => heard.push('two'));
     expect(store.get()).toBeNull();
 
-    const draft = { steps: ['a'], anchorDate: TODAY, effectiveFrom: TODAY, offsets: {}, keys: ['step-0'], nextKey: 1 };
+    const draft = { steps: ['a'], anchorDate: TODAY, effectiveFrom: TODAY, effectiveChosen: true, offsets: {}, keys: ['step-0'], nextKey: 1 };
 
     store.set('org', draft);
     expect(store.get()).toEqual({ organizationId: 'org', draft });

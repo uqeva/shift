@@ -77,7 +77,13 @@ export function CalendarGrid({
   readonly screen: CalendarScreenState;
 }): ReactNode {
   if (shown.columns.length === 0) {
-    return <p className="px-4 pb-4 text-sm text-muted-foreground">{t('kalendar.noTeams')}</p>;
+    // STORY 19.4 (UX-DR70): the fact, and where a schedule comes from.
+    return (
+      <div className="grid gap-1 px-4 pb-4 text-sm">
+        <p className="text-muted-foreground">{t('kalendar.noTeams')}</p>
+        <p className="text-muted-foreground">{t('kalendar.noTeamsWhy')}</p>
+      </div>
+    );
   }
 
   const tabStop = gridTabStopOf(screen.gridFocus, shown.month, shown.rows, shown.columns.length);

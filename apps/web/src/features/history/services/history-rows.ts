@@ -379,6 +379,7 @@ const FIELD_KEYS: Readonly<Record<HistoryField, ReturnType<typeof historyFieldMe
   carryOverExpiryMonth: 'history.field.carryOverExpiryMonth',
   carryOverExpiryDay: 'history.field.carryOverExpiryDay',
   carryOverFirstLeaveYear: 'history.field.carryOverFirstLeaveYear',
+  onboardingDismissed: 'history.field.onboardingDismissed',
   username: 'history.field.username',
   email: 'history.field.email',
   role: 'history.field.role',
@@ -443,6 +444,7 @@ export function historyFieldMessageKey(
   | 'history.field.carryOverExpiryMonth'
   | 'history.field.carryOverExpiryDay'
   | 'history.field.carryOverFirstLeaveYear'
+  | 'history.field.onboardingDismissed'
   | 'history.field.username'
   | 'history.field.email'
   | 'history.field.role'

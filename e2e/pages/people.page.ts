@@ -305,10 +305,15 @@ export class PeoplePage extends BasePage {
     return this.addDialog.getByRole('status').filter({ hasText: fill(hr.ljudi.form.createdFor, { name, username }) });
   }
 
-  /** Fills the open add dialog's name and username. */
+  /**
+   * Fills the open add dialog's name and username, and (story 19.4, O3: the
+   * dialog pre-selects no level and proposes no count) its level and leave days.
+   */
   async fillNewMember(name: string, username: string): Promise<void> {
     await this.addNameInput.fill(name);
     await this.addUsernameInput.fill(username);
+    await this.addDialog.getByLabel(hr.ljudi.role, { exact: true }).selectOption({ label: hr.ljudi.member });
+    await this.addLeaveInput.fill('20');
   }
 
   /**

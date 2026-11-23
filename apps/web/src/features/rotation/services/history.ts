@@ -204,3 +204,17 @@ export function saveBarHintOf(
 
   return { effectiveLabel, inForceLabel: inForce === null ? null : (formatIsoDate(inForce) ?? inForce) };
 }
+
+/**
+ * The save bar's hint over the draft itself (story 19.4, O3): no date is
+ * named until `Vrijedi od` is chosen — the draft's preview date (today) is
+ * never shown as if the person had chosen it.
+ */
+export function draftSaveBarHintOf(
+  unsaved: boolean,
+  snapshot: RotationSnapshot,
+  today: string,
+  draft: { readonly effectiveFrom: string; readonly effectiveChosen: boolean },
+): SaveBarHint | null {
+  return draft.effectiveChosen ? saveBarHintOf(unsaved, snapshot, today, draft.effectiveFrom) : null;
+}

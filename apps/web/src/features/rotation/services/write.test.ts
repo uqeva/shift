@@ -8,6 +8,7 @@ import {
   ROTATION_CHANGED_TODAY,
   ROTATION_EFFECTIVE_PAST,
   ROTATION_EFFECTIVE_TOO_FAR,
+  ROTATION_EFFECTIVE_UNCHOSEN,
   ROTATION_EMPTY,
   ROTATION_NO_TEAMS,
   ROTATION_SCHEDULED,
@@ -48,6 +49,7 @@ import {
   ROTATION_WRITE_UNAVAILABLE,
   cancelScheduledRotation,
   discardUnassignedPattern,
+  effectiveFromRefusedOf,
   rotationCancelMessageKey,
   rotationPartialMessageKey,
   rotationWriteFailureOf,
@@ -204,10 +206,15 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** STORY 19.4 (O3): a draft whose `Vrijedi od` the person chose, as today. */
+function chosen(draft: RotationDraft): RotationDraft {
+  return withEffectiveFrom(draft, TODAY);
+}
+
 describe('the save', () => {
   it('writes a fresh pattern, then its steps, then one assignment per active team, all from today', async () => {
     const snapshot = await snapshotOf(PILOT);
-    const draft = withStepMoved(prefillOf(snapshot, TODAY), 1, STEP_UP);
+    const draft = withStepMoved(chosen(prefillOf(snapshot, TODAY)), 1, STEP_UP);
     const { log, sent, tables } = tablesOf();
 
     expect(await saveRotation(tables, ORGANIZATION, snapshot, draft, TODAY)).toEqual({ ok: true });
@@ -251,7 +258,7 @@ describe('the save', () => {
 
   it('sends only the facts 0016 grants: no id, attribution, cycle length or projected shift', async () => {
     const snapshot = await snapshotOf(UJ5);
-    const draft = withTeamStep(prefillOf(snapshot, TODAY), 'uj5-smjena-a', 4);
+    const draft = withTeamStep(chosen(prefillOf(snapshot, TODAY)), 'uj5-smjena-a', 4);
     const { sent, tables } = tablesOf();
 
     await saveRotation(tables, ORGANIZATION, snapshot, draft, TODAY);
@@ -267,7 +274,7 @@ describe('the save', () => {
 
   it('leaves every date before today as it was, and projects the draft from today', async () => {
     const snapshot = await snapshotOf(PILOT);
-    const draft = withTeamStep(prefillOf(snapshot, TODAY), 'pilot-smjena-a', 1);
+    const draft = withTeamStep(chosen(prefillOf(snapshot, TODAY)), 'pilot-smjena-a', 1);
     const { sent, tables } = tablesOf();
 
     await saveRotation(tables, ORGANIZATION, snapshot, draft, TODAY);
@@ -313,7 +320,7 @@ describe('the save', () => {
 
   it('builds a fresh pattern on every attempt, a retry included', async () => {
     const snapshot = await snapshotOf(PILOT);
-    const draft = withTeamStep(prefillOf(snapshot, TODAY), 'pilot-smjena-a', 1);
+    const draft = withTeamStep(chosen(prefillOf(snapshot, TODAY)), 'pilot-smjena-a', 1);
     const { sent, tables } = tablesOf([patternMade], [refusedWith('500'), stepsMade]);
 
     const first = await saveRotation(tables, ORGANIZATION, snapshot, draft, TODAY);
@@ -335,7 +342,7 @@ describe('from a date forward (story 2.6)', () => {
     for (const rows of [PILOT, UJ5]) {
       const snapshot = await snapshotOf(rows);
       const [first] = rotationTeamsOf(snapshot);
-      const draft = withEffectiveFrom(withTeamStep(prefillOf(snapshot, TODAY), first?.id ?? '', 1), NEXT_WEEK);
+      const draft = withEffectiveFrom(withTeamStep(chosen(prefillOf(snapshot, TODAY)), first?.id ?? '', 1), NEXT_WEEK);
       const { sent, tables } = tablesOf();
 
       expect(await saveRotation(tables, ORGANIZATION, snapshot, draft, TODAY)).toEqual({ ok: true });
@@ -355,7 +362,7 @@ describe('from a date forward (story 2.6)', () => {
 
   it('refuses a date before today with nothing sent, and keeps the draft', async () => {
     const snapshot = await snapshotOf(PILOT);
-    const draft = withEffectiveFrom(withTeamStep(prefillOf(snapshot, TODAY), 'pilot-smjena-a', 1), '2026-09-25');
+    const draft = withEffectiveFrom(withTeamStep(chosen(prefillOf(snapshot, TODAY)), 'pilot-smjena-a', 1), '2026-09-25');
     const copy = JSON.parse(JSON.stringify(draft)) as RotationDraft;
     const { log, tables } = tablesOf();
 
@@ -370,7 +377,7 @@ describe('from a date forward (story 2.6)', () => {
 
   it('leaves every date before the effective date as it was, and projects the draft from it', async () => {
     const snapshot = await snapshotOf(PILOT);
-    const draft = withEffectiveFrom(withTeamStep(prefillOf(snapshot, TODAY), 'pilot-smjena-a', 1), NEXT_WEEK);
+    const draft = withEffectiveFrom(withTeamStep(chosen(prefillOf(snapshot, TODAY)), 'pilot-smjena-a', 1), NEXT_WEEK);
     const { sent, tables } = tablesOf();
 
     await saveRotation(tables, ORGANIZATION, snapshot, draft, TODAY);
@@ -550,7 +557,7 @@ describe('an archived team does not refuse the save', () => {
     const snapshot = await snapshotOf(rows);
     const { sent, tables } = tablesOf();
 
-    expect(await saveRotation(tables, ORGANIZATION, snapshot, withTeamStep(prefillOf(snapshot, TODAY), 'pilot-smjena-a', 1), TODAY)).toEqual({ ok: true });
+    expect(await saveRotation(tables, ORGANIZATION, snapshot, withTeamStep(chosen(prefillOf(snapshot, TODAY)), 'pilot-smjena-a', 1), TODAY)).toEqual({ ok: true });
     expect((sent.assignments[0] as { team_id: string }[]).map((row) => row.team_id)).not.toContain('gone');
   });
 });
@@ -561,19 +568,19 @@ describe('refused before anything is sent, every value kept', () => {
       name: 'unchanged',
       code: ROTATION_UNCHANGED,
       rows: PILOT,
-      draft: (snapshot: RotationSnapshot) => prefillOf(snapshot, TODAY),
+      draft: (snapshot: RotationSnapshot) => chosen(prefillOf(snapshot, TODAY)),
     },
     {
       name: 'empty',
       code: ROTATION_EMPTY,
       rows: PILOT,
-      draft: (snapshot: RotationSnapshot) => emptyDraftOf(rotationTeamsOf(snapshot), TODAY),
+      draft: (snapshot: RotationSnapshot) => chosen(emptyDraftOf(rotationTeamsOf(snapshot), TODAY)),
     },
     {
       name: 'no team',
       code: ROTATION_NO_TEAMS,
       rows: { ...PILOT, teams: [], assignments: [] },
-      draft: (snapshot: RotationSnapshot) => withStepAdded(emptyDraftOf(rotationTeamsOf(snapshot), TODAY), 'pilot-dan'),
+      draft: (snapshot: RotationSnapshot) => withStepAdded(chosen(emptyDraftOf(rotationTeamsOf(snapshot), TODAY)), 'pilot-dan'),
     },
     {
       name: 'scheduled',
@@ -582,13 +589,13 @@ describe('refused before anything is sent, every value kept', () => {
         ...PILOT,
         assignments: [...PILOT.assignments, assignmentRow('pilot-smjena-b', 'pilot-rotation', 'pilot-step-0', SEEDED, '2026-10-02')],
       },
-      draft: (snapshot: RotationSnapshot) => withTeamStep(prefillOf(snapshot, TODAY), 'pilot-smjena-a', 1),
+      draft: (snapshot: RotationSnapshot) => withTeamStep(chosen(prefillOf(snapshot, TODAY)), 'pilot-smjena-a', 1),
     },
     {
       name: 'archived type',
       code: ROTATION_TYPE_ARCHIVED,
       rows: { ...PILOT, types: PILOT.types.map((row) => (row['id'] === 'pilot-noc' ? { ...row, archived: true } : row)) },
-      draft: (snapshot: RotationSnapshot) => withTeamStep(prefillOf(snapshot, TODAY), 'pilot-smjena-a', 1),
+      draft: (snapshot: RotationSnapshot) => withTeamStep(chosen(prefillOf(snapshot, TODAY)), 'pilot-smjena-a', 1),
     },
     {
       name: 'second save today',
@@ -597,7 +604,7 @@ describe('refused before anything is sent, every value kept', () => {
         ...PILOT,
         assignments: [...PILOT.assignments, assignmentRow('pilot-smjena-b', 'pilot-rotation', 'pilot-step-0', SEEDED, TODAY)],
       },
-      draft: (snapshot: RotationSnapshot) => withTeamStep(prefillOf(snapshot, TODAY), 'pilot-smjena-a', 1),
+      draft: (snapshot: RotationSnapshot) => withTeamStep(chosen(prefillOf(snapshot, TODAY)), 'pilot-smjena-a', 1),
     },
   ])('$name: $code, and nothing written', async ({ code, rows, draft }) => {
     const snapshot = await snapshotOf(rows);
@@ -617,7 +624,7 @@ describe('the failures, by code and by constraint', () => {
   async function changed() {
     const snapshot = await snapshotOf(PILOT);
 
-    return { snapshot, draft: withTeamStep(prefillOf(snapshot, TODAY), 'pilot-smjena-a', 1) };
+    return { snapshot, draft: withTeamStep(chosen(prefillOf(snapshot, TODAY)), 'pilot-smjena-a', 1) };
   }
 
   it('the pattern refused: 42501, nothing else sent, nothing left behind', async () => {
@@ -845,11 +852,21 @@ describe('the messages', () => {
   const messageAt = (key: string): unknown =>
     key.split('.').reduce<unknown>((node, part) => (node as Record<string, unknown> | undefined)?.[part], resource);
 
+  it('marks Vrijedi od for its three refusals only (story 19.4)', () => {
+    for (const code of [ROTATION_EFFECTIVE_UNCHOSEN, ROTATION_EFFECTIVE_PAST, ROTATION_EFFECTIVE_TOO_FAR]) {
+      expect(effectiveFromRefusedOf({ ok: false, code }), code).toBe(true);
+    }
+    expect(effectiveFromRefusedOf({ ok: false, code: ROTATION_EMPTY })).toBe(false);
+    expect(effectiveFromRefusedOf({ ok: true })).toBe(false);
+    expect(effectiveFromRefusedOf(null)).toBe(false);
+  });
+
   it('gives every code its own key, each in the resource file', () => {
     const codes: RotationWriteFailure[] = [
       ROTATION_EMPTY,
       ROTATION_NO_TEAMS,
       ROTATION_SCHEDULED,
+      ROTATION_EFFECTIVE_UNCHOSEN,
       ROTATION_EFFECTIVE_PAST,
       ROTATION_EFFECTIVE_TOO_FAR,
       ROTATION_TYPE_ARCHIVED,

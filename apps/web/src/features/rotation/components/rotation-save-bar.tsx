@@ -3,7 +3,7 @@ import { OfflineWriteNote } from '@/components/offline-write-note';
 import { Button } from '@/components/ui/button';
 import { FloppyDisk } from '@/components/ui/icon';
 import type { RotationBuilder } from '@/features/rotation/hooks/use-rotation-builder';
-import { saveBarHintOf } from '@/features/rotation/services/history';
+import { draftSaveBarHintOf } from '@/features/rotation/services/history';
 import type { RotationDraft } from '@/features/rotation/utils/draft';
 import { ROTATION_SAVE_BAR_ID } from '@/features/rotation/utils/element-ids';
 import { saveBarClassOf } from '@/features/rotation/utils/stepper';
@@ -41,7 +41,8 @@ export function RotationSaveBar({
 }) {
   const { snapshot, today, unsaved, pending, discard, saveButton, requestSave } = builder;
   const hint =
-    snapshot === null || today === null ? null : saveBarHintOf(unsaved, snapshot, today, current.effectiveFrom);
+    // STORY 19.4 (O3): no date is named until `Vrijedi od` is chosen.
+    snapshot === null || today === null ? null : draftSaveBarHintOf(unsaved, snapshot, today, current);
 
   return (
     <div

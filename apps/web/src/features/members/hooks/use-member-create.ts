@@ -7,11 +7,11 @@ import {
   MEMBER_ENTRY_NAME,
   MEMBER_ENTRY_USERNAME,
   MEMBER_WRITE_INVALID,
+  NEW_MEMBER_ROLE_FIELD,
+  newMemberChoiceOf,
   MEMBER_WRITE_UNAVAILABLE,
-  chosenRole,
   createFormStateOf,
   createMember,
-  enteredAllowance,
   memberEntryRefusalOf,
   storedEmail,
   suggestedUsername,
@@ -227,19 +227,26 @@ export function useMemberCreate(adding: boolean, navigate: MemberAddNavigate) {
       return;
     }
 
-    const leaveAllowanceDays = enteredAllowance(leave.value);
+    // STORY 19.4 (O3): no level is pre-selected, so none chosen is refused
+    // here, in field order, before anything is sent.
+    // STORY 19.4 (O3): the level and the days, in field order, by the one rule.
+    const choice = newMemberChoiceOf(role.value, leave.value);
 
-    if (leaveAllowanceDays === null) {
-      setFailure({ code: MEMBER_WRITE_INVALID, saved: false });
-      setInvalidField(leave.id);
+    if (!choice.ok) {
+      const field = choice.field === NEW_MEMBER_ROLE_FIELD ? role : leave;
+
+      setFailure({ code: choice.code, saved: false });
+      setInvalidField(field.id);
       // FOCUS MOVES TO THE OFFENDING CONTROL. The alert is announced on
       // insertion, and landing the caret in the field it is about is what turns
       // "a value is not allowed" into "this value is not allowed" for somebody
       // who cannot see the outline.
-      leave.focus();
+      field.focus();
 
       return;
     }
+
+    const { role: chosenLevel, leaveAllowanceDays } = choice;
 
     issuing.current = true;
     setFailure(null);
@@ -252,7 +259,7 @@ export function useMemberCreate(adding: boolean, navigate: MemberAddNavigate) {
         name: name.value,
         username: username.value,
         email: storedEmail(email.value),
-        role: chosenRole(role.value),
+        role: chosenLevel,
         leaveAllowanceDays,
         // In the one create payload, so the row is inserted with its rank.
         // Absent while the setting is off: the function stores no rank.

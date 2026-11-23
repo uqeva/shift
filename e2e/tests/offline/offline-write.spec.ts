@@ -280,6 +280,7 @@ test.describe('offline writes on the admin surfaces', () => {
 
     await rotationPage.goto();
     await expect(rotationPage.effectiveFromInput).toBeVisible();
+    await rotationPage.chooseEffectiveFrom();
     await rotationPage.saveButton.click();
     await expect(rotationPage.scheduledRefusal).toBeVisible();
     await rotationPage.cancelScheduledOffer(fullDate(scheduled)).click();

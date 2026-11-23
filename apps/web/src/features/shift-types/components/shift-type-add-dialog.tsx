@@ -12,10 +12,10 @@ import { Select } from '@/components/ui/select';
 import type { ShiftTypeListScreen } from '@/features/shift-types/hooks/use-shift-type-list';
 import {
   SHIFT_TYPE_END_FIELD,
+  SHIFT_TYPE_KIND_FIELD,
   SHIFT_TYPE_KINDS,
   SHIFT_TYPE_NAME_FIELD,
   SHIFT_TYPE_START_FIELD,
-  SHIFT_TYPE_WORKING,
   marksField,
   shiftTypeKindMessageKey,
   shiftTypeWriteMessageKey,
@@ -138,11 +138,18 @@ export function ShiftTypeAddDialog({ screen }: { readonly screen: ShiftTypeListS
               ref={kindField}
               id="shift-type-new-kind"
               name="kind"
-              defaultValue={SHIFT_TYPE_WORKING}
+              required
+              // STORY 19.4 (O3, FR-97): nothing is pre-selected; the times
+              // appear, empty, once Radni is chosen.
+              defaultValue={NO_TEXT}
               onChange={chooseKind}
+              aria-invalid={marksField(failure, SHIFT_TYPE_KIND_FIELD)}
               aria-describedby={failure === null ? undefined : 'shift-type-create-error'}
               className="h-11"
             >
+              <option value={NO_TEXT} disabled>
+                {t('rotation.shiftTypes.kindChoose')}
+              </option>
               {SHIFT_TYPE_KINDS.map((option) => (
                 <option key={option} value={option}>
                   {t(shiftTypeKindMessageKey(option))}

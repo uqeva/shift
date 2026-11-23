@@ -38,3 +38,7 @@ export const OVERRIDE_REVIEW_UNCHECKED_ID = 'rotation-overrides-unchecked';
  * focused control is never left under it.
  */
 export const ROTATION_SAVE_BAR_ID = 'rotation-save-bar';
+/** Story 19.4: the save's refusal under the header, which a refused date names. */
+export const ROTATION_SAVE_ERROR_ID = 'rotation-save-error';
+/** Story 19.4: `Vrijedi od`, where focus goes when the date is refused. */
+export const ROTATION_EFFECTIVE_FROM_ID = 'rotation-effective-from';

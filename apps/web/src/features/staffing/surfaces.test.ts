@@ -35,7 +35,13 @@ import {
   reviewRowsShortStaffedOf,
 } from '@/features/rotation/services/override-review-short-staffed';
 import { answerOf, assignmentRow, rotationTableOf, type FixtureRows } from '@/features/rotation/rotation.fixture';
-import { prefillOf, withEffectiveFrom, withTeamStep } from '@/features/rotation/utils/draft';
+import {
+  ROTATION_EFFECTIVE_UNCHOSEN,
+  draftRefusalOf,
+  prefillOf,
+  withEffectiveFrom,
+  withTeamStep,
+} from '@/features/rotation/utils/draft';
 import {
   SHORT_STAFFED_KNOWN,
   SHORT_STAFFED_SHOWN_ROWS,
@@ -310,6 +316,10 @@ describe.each(STAFFING_FIXTURES)('$name', (fixture) => {
       expect(draftShortStaffedOf(empty, rotation, draft, TODAY, UNTOUCHABLE)).toBeNull();
       // A draft the save would refuse before any check says nothing.
       expect(draftShortStaffedOf(four, rotation, withEffectiveFrom(draft, '2026-09-01'), TODAY, leave)).toBeNull();
+      // STORY 19.4 (O3): a `Vrijedi od` not chosen yet refuses only the save; the preview still speaks.
+      const unchosen = { ...draft, effectiveChosen: false };
+      expect(draftRefusalOf(rotation, unchosen, TODAY)).toBe(ROTATION_EFFECTIVE_UNCHOSEN);
+      expect(draftShortStaffedOf(four, rotation, unchosen, TODAY, leave)).toEqual(draftShortStaffedOf(four, rotation, draft, TODAY, leave));
     });
 
     describe('the builder’s line (Epic 11 retro A2, R1)', () => {

@@ -26,6 +26,8 @@ import {
 } from '@/features/calendar/utils/month';
 import { calendarMessageKey } from '@/features/calendar/services/snapshot';
 import { SwapProposedLine } from '@/features/swaps/components/swap-proposed-line';
+import { CalendarSetupResume } from '@/features/onboarding/components/onboarding-card';
+import { showsAdminToday } from '@/features/today/services/admin-today';
 import { useSwapProposed } from '@/features/swaps/hooks/use-swap-proposed';
 import { usePrintMonth } from '@/hooks/print';
 import { usePhone } from '@/hooks/viewport';
@@ -197,6 +199,8 @@ export function KalendarScreen() {
       </PageHeader>
       <OfflineNote offline={screen.offline} />
       <SwapProposedLine proposed={swapProposed} lineField={swapLine} />
+      {/* STORY 19.4 (UX-DR70): an admin's way back to setup while no team exists. */}
+      <CalendarSetupResume admin={showsAdminToday(snapshot?.viewer.role ?? null)} />
       {refusal === null ? null : (
         <div className="grid min-w-0 gap-2">
           <Notice role="alert">{t(calendarMessageKey(refusal))}</Notice>
