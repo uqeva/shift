@@ -152,7 +152,7 @@ Human decisions, 2026-10-10:
     - `chargedLeaveDays` in `e2e/utils/rotation.ts`, and the leave ⓘ locators.
     - The docs edits, minus leave hours.
   - **DROP:** `LeaveFigure.minutes`, `sati.leaveFigure`, the `leaveHours` export column, and the `+12 h` leave amounts.
-  - **Reference:** start from `/private/tmp/claude-501/-Users-perolipotic-Desktop-hobby-shift/15c6affe-cde0-478f-8a81-0174aa84e7a7/scratchpad/impl-v2.patch`, which is the reverted second implementation.
+  - **Reference:** start from `impl-v2.patch` in that session's local scratchpad (not committed), which is the reverted second implementation.
 
 ## Design Notes
 

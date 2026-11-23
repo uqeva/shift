@@ -196,7 +196,7 @@ Six layers ran unattended on `origin/main...HEAD` (`33a1cf4`): the Blind Hunter,
   - The fixture used a 90-character organization name, a 120-character team name with a 51-character unbroken word, and a shift type holding `<script>`, `&` and quotes.
   - The output was shown as a text/plain mail in the standalone Chromium harness at 390 px and 1280 px.
   - Nothing overflowed. Every diacritic and the `→` rendered, and the markup showed as literal text. Night times read `01:00–07:00`, the date `23.11.2026`, and both links are fully encoded.
-  - Files: `/tmp/claude-0/-root-ai-agency-projects-shift/15d9a6a8-661d-4657-8658-921e573ab7c3/scratchpad/s173r2/`.
+  - Files: the reviewer's local scratchpad (`s173r2/`), not committed.
 
 - [x] [Review][Patch] **CI's first DB run would have failed.** `test/provisioning.test.ts` sweeps every function in `public` and `private` against its grantee list, and its invoker list held no `private.reminder_late/2`. Both lists now hold it: grantees none, `SECURITY INVOKER`, empty `search_path`. (high) [test/provisioning.test.ts]
 - [x] [Review][Patch] **The e2e's cleanup now survives a timeout.** Both cases register each change for `afterEach` the moment it is made, in one `undo` stack that runs newest first. One failed undo no longer skips the rest. The changes are the Vault arm, the rotation lock and its seed, the member's devices, reminder settings and email, the organization's email switch, and the reminder rows.

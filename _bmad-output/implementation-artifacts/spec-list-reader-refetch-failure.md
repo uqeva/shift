@@ -93,7 +93,7 @@ context: []
     - The `QueryObserver`-driven tests with call-counting stub tables, and the `environmentManager.setIsServer` flip.
     - The `prijava.test.ts` retargeting.
     - The rewritten doc comments.
-    - The reverted attempt is saved at `/private/tmp/claude-501/-Users-perolipotic-Desktop-hobby-shift--claude-worktrees-list-reader-fix/2dac873a-59fb-4f55-898d-d16ee68196c4/scratchpad/attempt-1.patch`. Reuse it as a starting point, then apply the amendments above. Its retry counts (4 and 5 calls) become 2 and 3.
+    - The reverted attempt was saved as `attempt-1.patch` in that session's local scratchpad (not committed). Reuse it as a starting point if it is still at hand, then apply the amendments above. Its retry counts (4 and 5 calls) become 2 and 3.
 
 ## Design Notes
 
