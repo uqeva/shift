@@ -537,6 +537,26 @@ describe('the self-hosted stack (story 20.1): exposure', () => {
 });
 
 describe('the self-hosted stack (story 20.1): keys and secrets (AD-17)', () => {
+  it('names the JWT secret in a service before any service names a role JWT (story 20.5)', () => {
+    // Coolify v4.7.6 generates magic variables service by service, in file
+    // order, and signs SERVICE_SUPABASEANON_KEY / SERVICE_SUPABASESERVICE_KEY
+    // only if SERVICE_PASSWORD_JWT already exists; one created empty is never
+    // regenerated (staging's first start: Kong refused an empty anon key).
+    const names = Object.keys(compose.services);
+    const first = (variable: string): number =>
+      names.findIndex((name) => JSON.stringify(service(name).environment ?? []).includes(`\${${variable}}`));
+    const secret = first('SERVICE_PASSWORD_JWT');
+    expect(secret, 'some service names the JWT secret').toBeGreaterThanOrEqual(0);
+    for (const roleJwt of ['SERVICE_SUPABASEANON_KEY', 'SERVICE_SUPABASESERVICE_KEY']) {
+      expect(first(roleJwt), roleJwt).toBeGreaterThanOrEqual(secret);
+      // Within that service, too, the secret comes first.
+      const env = JSON.stringify(service(names[secret] ?? '').environment ?? []);
+      if (env.includes(`\${${roleJwt}}`)) {
+        expect(env.indexOf('${SERVICE_PASSWORD_JWT}'), roleJwt).toBeLessThan(env.indexOf(`\${${roleJwt}}`));
+      }
+    }
+  });
+
   it('maps each opaque key to its role JWT at the gateway, as the CLI does', () => {
     const env = environment('supabase-kong');
 
@@ -900,6 +920,30 @@ describe('the self-hosted stack (story 20.2): the functions route, its CORS and 
 describe('the self-hosted stack (story 20.1): limits and environment templates', () => {
   const staging = envTemplate('staging.env.example');
   const production = envTemplate('production.env.example');
+
+  it('runs Kong with one nginx worker, so its memory stays flat and each local limit is exact (story 20.5)', () => {
+    expect(environment('supabase-kong').get('KONG_NGINX_WORKER_PROCESSES')).toBe('1');
+  });
+
+  it('gives the slow starters a start period at staging’s CPU share (story 20.5’s rehearsal)', () => {
+    // Measured on the server at staging's limits: Storage ~95 s, pg-meta ~135 s,
+    // Kong ~70 s before their checks passed. Without a start period they are
+    // reported unhealthy first, `up --wait` fails and the functions (which wait
+    // on Kong being healthy) never start.
+    const seconds = (value: unknown): number => {
+      const match = /^(\d+)s$/.exec(String(value));
+      return match === null ? 0 : Number(match[1]);
+    };
+    const measured: Record<string, number> = { 'supabase-storage': 95, 'supabase-meta': 135, 'supabase-kong': 70 };
+    for (const [name, startedAfter] of Object.entries(measured)) {
+      const check = (service(name) as Service & { healthcheck?: { start_period?: unknown } }).healthcheck;
+      expect(seconds(check?.start_period), `${name}'s start_period`).toBeGreaterThanOrEqual(startedAfter * 1.5);
+    }
+    // pg-meta's check is the image's own, made explicit to carry the period.
+    const meta = service('supabase-meta') as Service & { healthcheck?: { test?: string[] } };
+    expect(meta.healthcheck?.test?.[0]).toBe('CMD-SHELL');
+    expect(meta.healthcheck?.test?.[1]).toContain("fetch('http://127.0.0.1:8080/health')");
+  });
 
   it('limits every service’s memory and CPU, staging (the defaults) below production', () => {
     let stagingMemory = 0;

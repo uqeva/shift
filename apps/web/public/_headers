@@ -2,7 +2,7 @@
 # 20.3, deploy/web/) serves this block, as built, on every response, errors
 # included: its nginx header lines are rendered from the BUILT dist/_headers at
 # image build, so only one `/*` block may exist, with no `!` detach. The build
-# appends the Content-Security-Policy-Report-Only line, derived from
+# appends the Content-Security-Policy line (enforced since story 20.5), derived from
 # VITE_SUPABASE_URL and the page's inline scripts
 # (apps/web/src/lib/content-security-policy.ts). HSTS: one year, subdomains,
 # no preload. Cloudflare Pages reads the same file while it is still used.

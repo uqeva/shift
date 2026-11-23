@@ -6,17 +6,17 @@
  * `headersWithPolicy`) appends it to `dist/_headers`' `/*` block, which the
  * `shift-web` image serves on every response (`deploy/web/`).
  *
- * REPORT-ONLY until story 20.5 has read the browser's reports on staging:
- * enforcing it is changing `CSP_HEADER`, nothing else. There is no
- * `report-uri`: no endpoint exists to receive reports, and 20.5 reads the
- * console's Report-Only messages instead.
+ * ENFORCING since story 20.5, which ran the SPA's surfaces against the
+ * self-hosted stack with the Report-Only policy and saw no violation (its
+ * spec, Verification). Going back to Report-Only is changing `CSP_HEADER`,
+ * nothing else. There is no `report-uri`: no endpoint receives reports.
  *
  * Pure: no `node:` import, no I/O. The build reads and writes the files and
  * hands in its SHA-256 function.
  */
 
-/** The response header the policy ships in. Enforcing it (20.5) changes this alone. */
-export const CSP_HEADER = 'Content-Security-Policy-Report-Only';
+/** The response header the policy ships in: enforcing since story 20.5. */
+export const CSP_HEADER = 'Content-Security-Policy';
 
 /**
  * A plain `http(s)` origin: scheme, host, optional port, nothing else. A

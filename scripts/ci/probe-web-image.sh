@@ -38,8 +38,8 @@ mapfile -t expected < <(awk '
     print name ": " value
   }
 ' "$dist/_headers")
-# The block must hold today's five headers and the build's policy (Report-Only
-# until 20.5 enforces it; either name is a policy), whatever else it holds.
+# The block must hold today's five headers and the build's policy (enforced
+# since 20.5; either name is a policy), whatever else it holds.
 for named in X-Content-Type-Options Referrer-Policy X-Frame-Options Permissions-Policy Strict-Transport-Security; do
   printf '%s\n' "${expected[@]}" | grep -q "^$named: " \
     || { echo "FAIL  $dist/_headers has no $named line"; exit 1; }

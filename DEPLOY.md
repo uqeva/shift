@@ -192,6 +192,12 @@ pnpm install && pnpm build && pnpm lint && pnpm typecheck && pnpm test
 
 ## 2. Supabase projects
 
+> **Staging is not a hosted project any more (story 20.5).** It is the
+> self-hosted stack on our server, run by Coolify: §9.11 records how it was
+> stood up and what is still manual. Production's move is story 20.9, which
+> rewrites §2–§6 as the self-hosting runbook; until then the hosted text below
+> describes production's current path only.
+
 Create **two** projects on the free plan — that is exactly the two active
 projects the free plan allows.
 
@@ -1964,8 +1970,8 @@ Shift is moving off hosted platforms onto our own server, run by Coolify
 (Epic 20, `sprint-change-proposal-2026-11-20-self-hosting.md`). Until story
 20.9 rewrites this runbook, the sections above still describe the hosted
 setup. This section describes the self-hosted Supabase stack that replaces a
-"Supabase project", one per environment. Nothing here has been started on the
-server yet: standing staging up is story 20.5.
+"Supabase project", one per environment. Story 20.5 rehearsed it on the server
+and created staging in Coolify (§9.11).
 
 The stack is `deploy/coolify/supabase/docker-compose.yml`. It is derived from
 Coolify's Supabase service template at Coolify v4.7.6 (commit
@@ -2011,6 +2017,19 @@ production's (`production.env.example`) about 2.9 GiB. Postgres's
 `shared_buffers` is 128 MB on staging, 256 MB on production. Every service
 logs through Docker's `json-file` driver, rotated at 10 MB with three files
 kept, so a noisy container cannot fill the disk.
+
+What story 20.5's rehearsal measured at staging's limits: a small CPU share
+makes the Node and Lua services slow to START, not slow to serve. Storage
+needed about 95 s, pg-meta about 135 s and Kong about 70 s before their health
+checks passed, so each has a `start_period` (180 s, 240 s, 180 s) and is not
+reported unhealthy, nor `up --wait` failed, while it is still starting. Kong
+sat at about 184 MiB at rest and reached 233 MiB on staging with one nginx
+worker per host CPU; it now runs one worker (`KONG_NGINX_WORKER_PROCESSES=1`,
+which also makes each `policy: local` limit exact) and sat at about 106 MiB
+after staging's checks, under a 240 MiB limit (production keeps 256 MiB); pg-meta sat at about 94 of its 112 MiB. The functions
+container peaked at about 125 MiB of its 448 MiB through the rehearsal's
+probes (two warm workers): the pair `FUNCTIONS_MEM_LIMIT=448m` and
+`MEMORY_LIMIT_MB = 150` per worker stays (`deferred-work.md`).
 
 **Inputs.** `staging.env.example` and `production.env.example` list every
 variable the operator sets in Coolify, with placeholders only (`<domain>`,
@@ -2152,9 +2171,17 @@ Vault setup (§3a), with `notify_url` set to the internal
 
 This proves the stack before it holds anything: every migration applies from
 nothing, the extensions work, the hook runs, signup is refused, and the opaque
-keys work through Kong. **It was not run by story 20.1** (no container could be
-started then); it runs as story 20.5's first act, on the server that will host
-staging, before the Coolify resource is created (`deferred-work.md`).
+keys work through Kong. **Story 20.5 ran it** on the server that hosts staging
+(2026-11-23): every step answered as written below (the results are in its
+spec's Verification). The run found five things, fixed here: Storage, Kong and
+pg-meta need a start period at staging's CPU share (§9.1), the CLI refuses a
+Postgres without TLS unless the URL says `sslmode=disable`, the locally built
+functions image must not be pulled, and `staging.env.example`'s open door and
+placeholder proxy network stop GoTrue and Kong from starting in a rehearsal.
+(The run trusted a private Docker range as the proxy network; the script below says
+`127.0.0.1/32` because this repository names no other address. Either passes
+Kong's check, and in a rehearsal nothing sits in front of Kong, so neither is
+ever the peer.)
 
 It runs under its own project name, `shift-rehearsal`, on its own loopback
 ports. **Never** use the project name or the ports of the local development
@@ -2200,6 +2227,8 @@ for (const service of Object.values(compose.services)) {
   }
 }
 compose.services["supabase-kong"].ports = ["127.0.0.1:${KONG_LOOPBACK_PORT:?}:8000"];
+// The image was built locally in step 1a: never pulled.
+compose.services["supabase-edge-functions"].pull_policy = "never";
 writeFileSync(join(out, "docker-compose.yml"), stringify(compose));
 ' "$R"
 
@@ -2228,6 +2257,9 @@ JWT=$(openssl rand -hex 32)
       -e 's#^SHIFT_FUNCTIONS_IMAGE=.*#SHIFT_FUNCTIONS_IMAGE=shift-functions:rehearsal#' \
       -e 's/<domain>/rehearsal.invalid/g' \
       -e 's/^RESEND_API_KEY=$/RESEND_API_KEY=re_rehearsal/' \
+      -e 's/^SHIFT_DISABLE_SIGNUP=.*/SHIFT_DISABLE_SIGNUP=true/' \
+      -e 's/^SHIFT_MAILER_AUTOCONFIRM=.*/SHIFT_MAILER_AUTOCONFIRM=true/' \
+      -e 's#^SHIFT_PROXY_CIDR=.*#SHIFT_PROXY_CIDR=127.0.0.1/32#' \
       deploy/coolify/supabase/staging.env.example
 } > "$R/.env"
 # A real VAPID pair, written over the template's two empty lines.
@@ -2245,8 +2277,9 @@ set -a; . "$R/.env"; set +a
 $DC up -d --wait supabase-db supabase-auth supabase-rest supabase-storage
 
 # 4. Every migration, from nothing.
-DB_URL="postgresql://postgres:$SERVICE_PASSWORD_POSTGRES@127.0.0.1:$PG_PORT/postgres"
-pnpm exec supabase db push --db-url "$DB_URL"
+# The stack's Postgres speaks no TLS; without `sslmode=disable` the CLI refuses it.
+DB_URL="postgresql://postgres:$SERVICE_PASSWORD_POSTGRES@127.0.0.1:$PG_PORT/postgres?sslmode=disable"
+pnpm exec supabase db push --db-url "$DB_URL" --yes
 pnpm exec supabase migration list --db-url "$DB_URL"
 $DC exec -T supabase-db psql -U postgres -At -c "
   select string_agg(extname, ',' order by extname) from pg_extension
@@ -2543,10 +2576,17 @@ manifest-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none';
 frame-src 'none'; frame-ancestors 'none'
 ```
 
-It ships as `Content-Security-Policy-Report-Only`: browsers report what it
-would block in the console, and block nothing. There is no `report-uri` (no
-endpoint receives reports). Story 20.5 reads those messages on staging, then
-makes it enforcing by changing `CSP_HEADER` alone. A `VITE_SUPABASE_URL` that
+It ships as **`Content-Security-Policy`, enforcing, since story 20.5.** 20.3
+shipped it Report-Only. 20.5 swept the SPA in Chromium (signed in, every main
+screen, the PDF and Excel exports, a logo upload and its signed-URL display,
+the service worker's registration): on its rehearsal stack, then on staging
+over HTTPS, Report-Only and then enforced, with no violation and no failed
+request (its spec, Verification). A push opt-in on a real device, the PWA
+install and an update through *Osvježi* are checked by hand on staging
+(`deferred-work.md`). Going back is setting `CSP_HEADER` to
+`Content-Security-Policy-Report-Only` (and its three pins in the tests), then
+rebuilding and redeploying every environment's image. There is no `report-uri`
+(no endpoint receives reports). A `VITE_SUPABASE_URL` that
 is not an `http(s)` URL with a plain host fails the build; an empty one (CI's
 `build` job) gives the policy with no Supabase origin. Styles keep
 `'unsafe-inline'`: `index.html` has inline `<style>` blocks and a `style=`
@@ -2603,11 +2643,9 @@ needs no other writable path.
 
 ### 9.8 The host: closed to everything but the web (story 20.4)
 
-**Not applied yet.** The scripts below are in the repository; applying them
-waits for the founder's go, the ratification of H-2, H-3, H-4, H-5, H-10 and
-H-15, console access to the VPS provider, and a `security-review` of the rules
-(`deploy/host/firewall/`) and of `deploy/host/shift-host.sh`. Nothing in this
-section has been run on any host.
+**Applied and confirmed by the founder (2026-11-23):** only 80 and 443 are
+public; the Coolify UI and API and SSH are reached over the tailnet only. The
+steps below are how it was, and is again, applied.
 
 After it, the only services the internet reaches are 80/tcp, 443/tcp and
 443/udp, over IPv4 and IPv6. The host also still answers ICMP, receives its
@@ -2876,10 +2914,14 @@ a plain 404, never the SPA's `index.html`.
 - `SHIFT_AUTH_EMAIL_PER_HOUR` (10 on staging) caps GoTrue's mail for the whole
   stack; Resend's daily allowance is shared with `notify` (checklist A9).
 
-**The client's address (AD-21).** `SHIFT_PROXY_CIDR` is the network of
-Coolify's Traefik on the host, as CIDRs: read it on the host with
-`docker network inspect coolify` (the subnet of its IPAM config) and set it in
-Coolify, never here. Kong believes `X-Forwarded-For` from those peers alone
+**The client's address (AD-21).** `SHIFT_PROXY_CIDR` is the network from which
+Coolify's Traefik reaches Kong, as CIDRs: the stack's OWN Docker network, which
+Coolify names after the service's uuid and attaches its Traefik to. Read it on
+the host after the first start with `docker network inspect <service uuid>`
+(the subnet of its IPAM config), set it in Coolify, never here, and restart the
+service. (Story 20.5 first set the `coolify` network's subnets, as this text
+then said, and Kong logged Traefik's address on the stack's network for every
+client.) Kong believes `X-Forwarded-For` from those peers alone
 (`KONG_TRUSTED_IPS`; it refuses an empty value, any `/0`, and a network wider
 than an IPv4 /8 or an IPv6 /32), sends GoTrue the
 resolved client as `X-Real-IP`, overwriting a client's own, and GoTrue's
@@ -3104,3 +3146,136 @@ in its order, and nothing else does:
    `VITE_SIGNUP_ENABLED`, the operator sets production's GoTrue environment
    and restarts auth, and last opens `signup_settings` by SQL. Closing is the
    reverse order.
+
+### 9.11 Staging on Coolify (story 20.5)
+
+Staging is the first stack on the server. It is stood up through the Coolify
+API from the host, not by the pipeline: 20.6's deploy stays inert until the
+founder enables it (a Tailscale OAuth client for CI, a deploy-scoped token, a
+registry credential). **The repository holds no address, hostname, port or
+secret of it**; the operator reads them in Coolify.
+
+**Status (2026-11-23): running.** The stack and the web application run on
+Let's Encrypt certificates; the migrations, Vault and the demo organization are
+in place, and §9.5's checks and story 20.5's pass on staging (its spec,
+Verification). Starting the service and deploying the application need the
+Coolify token's `deploy` ability (a read/write token is refused with 403).
+
+**What exists in Coolify.** A project `shift` with an environment `staging`
+(the founder's choice; the epic had named a project `shift-staging`), holding:
+
+- the **compose service** (`deploy/coolify/supabase/docker-compose.yml`, pasted
+  through the API as `docker_compose_raw`, never edited in Coolify), with Kong's
+  URL `https://api.staging.<domain>:8000` (`:8000` is the container port
+  Traefik forwards to; the public API origin, and so `VITE_SUPABASE_URL`, is
+  `https://api.staging.<domain>` with no port). Coolify generates every
+  `SERVICE_PASSWORD_*` (and the role JWTs, see below), but its API never
+  returns their values to a token without `read:sensitive`, so H-6's check
+  (none empty, none a demo value of Supabase's `.env.example`) reads them on
+  the host from the containers' environment; on staging every one passed;
+- the **`shift-web` application** (Docker image, port 8080, the domain
+  `https://staging.<domain>`, HTTPS forced, `--read-only --tmpfs /tmp`,
+  64 MiB, 0.1 CPU).
+
+Until there is a domain, `<domain>` is an `sslip.io` name of the server's public
+IPv4 (`staging.<ip-dashed>.sslip.io`, `api.staging.<ip-dashed>.sslip.io`), and
+Traefik's Let's Encrypt certificates are issued for those names.
+
+**The operator's inputs** are `staging.env.example`'s, with these differences,
+all decided for staging on 2026-11-23:
+
+| Input | Staging today | Why |
+| --- | --- | --- |
+| `SHIFT_DISABLE_SIGNUP`, `SHIFT_MAILER_AUTOCONFIRM` | `true`, `true` (the door SHUT) | there is no email provider; GoTrue's wrapper refuses an open door without SMTP (§9.9) |
+| `GOTRUE_SMTP_PASS`, `SHIFT_AUTH_EMAIL_FROM` | unset | no Resend account (it needs a domain) |
+| `RESEND_API_KEY` | an inert `re_…` placeholder | the compose requires it and `notify` refuses to start without the `re_` shape; Resend refuses every send with it, so email is never delivered and push is |
+| `NOTIFY_EMAIL_FROM` | an address under `shift.invalid` | nothing is sent |
+| `VAPID_*` | a pair generated for staging; the subject is the app's `https` origin | push works |
+| `SHIFT_FUNCTIONS_IMAGE` | `127.0.0.1:<registry-port>/shift-functions:staging` | see the registry below |
+| `SHIFT_PROXY_CIDR` | the stack's own network's subnet (`docker network inspect <service uuid>`; IPv4 only, as Coolify creates it) | §9.9: Traefik reaches Kong there. Kong logs each client's own IPv4 and IPv6 address, and a client's own `X-Forwarded-For` is not believed |
+
+**Images without GHCR: a loopback registry.** The compose's
+`pull_policy: always` makes every start pull `SHIFT_FUNCTIONS_IMAGE`, and
+Coolify pulls a Docker-image application's image too, so a tag that exists only
+in the host's Docker cannot be used. Until 20.6 pushes to GHCR, the images are
+built on the host from the branch's commit and pushed to a `registry:2.8.3`
+container (`shift-staging-registry`, restart `unless-stopped`, its images on
+the named volume `shift-staging-registry`) published on `127.0.0.1` only, which
+Docker trusts over plain HTTP. It has no authentication: anything on the host
+that can reach the loopback could push an image staging would pull, which on a
+single-tenant host is everyone who is already root. It is retired when 20.6's
+pipeline is enabled (`deferred-work.md`). `shift-web` is built for staging's API origin and
+publishable key (§9.7), checked with `scripts/ci/check-bundle.mjs`, and its maps
+deleted, as the pipeline does. The loopback registry is not a production path:
+20.9 uses GHCR through 20.6.
+
+**Postgres and the migrations.** Postgres and Studio publish on two loopback
+ports (`POSTGRES_LOOPBACK_PORT`, `STUDIO_LOOPBACK_PORT`). The migrations are
+pushed over that loopback from the host, in §9.4's order, with
+`?sslmode=disable` in the URL (the stack's Postgres speaks no TLS; over the
+tailnet the encryption is WireGuard's, and CI's URLs carry the same parameter,
+unverified over the tailnet until `tailscale serve` exists).
+**Publishing them on the tailnet with `tailscale serve --tcp` is the founder's
+step** (a change to what the tailnet exposes), and after it 20.4's
+`verify-exposure.sh` runs again with `--studio-url` and `--postgres-port`.
+
+**Vault** gets `notify_url` and `remind_url` on the internal gateway
+(`http://supabase-kong:8000/functions/v1/…`) and both invoke secrets, read from
+the functions container's environment and given to `psql` on stdin (§3a, §3b).
+
+**The demo organization** (§7.5, `demo_target=staging`) is seeded with `psql`
+inside the database container (validated on the rehearsal stack: 17 members,
+and the admin signs in with an `organization_id` claim), the password passed as
+a psql variable on stdin. The founder then signs in at `https://staging.<domain>/prijava/dvd-demo` as
+`admin`; the password is in a 0600 file on the host, never in the repository.
+
+**Coolify's API, as found on v4.7.6.** `POST /projects`, `POST
+/projects/<uuid>/environments`, `POST /services` (`docker_compose_raw` base64,
+`urls` for Kong's domain, `instant_deploy: false`), `PATCH
+/services/<uuid>/envs/bulk`, `PATCH /services/<uuid>` (a new compose) and
+`POST /applications/dockerimage` need the token's `write` ability.
+**Starting the service (`POST /services/<uuid>/start`, `/restart`) and
+deploying an application (`POST /deploy?uuid=<uuid>&force=false`; a GET is
+refused as "This endpoint has changed to a POST request") need `deploy`**, which a read/write token does
+not have. Coolify's parser records each `${NAME:?}` it finds in an
+`environment:` entry as a required variable, but not the ones in `image:` or
+`ports:` (`SHIFT_FUNCTIONS_IMAGE`, the two loopback ports), which must be set
+by hand all the same. A description may hold only letters, digits, spaces and
+`- _ . , ! ? ( ) ' " + = * / @ &`.
+
+**Magic variables are generated in file order, once.** Coolify v4.7.6 walks the
+compose service by service and creates each magic variable the first time it
+sees it, never regenerating one it created empty. It signs
+`SERVICE_SUPABASEANON_KEY` and `SERVICE_SUPABASESERVICE_KEY` with
+`SERVICE_PASSWORD_JWT` only if that already exists. Kong (which uses the role
+JWTs and must not hold the secret) used to come before GoTrue, so on staging's
+first start both role JWTs were created EMPTY and Kong refused to start
+(`kong-entrypoint: SUPABASE_ANON_KEY is empty`). The compose now lists Kong
+after GoTrue, PostgREST and Storage, and a test holds the order. On staging the
+two values were then minted on the host exactly as Coolify mints them (HS256
+with the stack's own secret, `iss supabase`, the role claim) and set through
+`PATCH /services/<uuid>/envs/bulk`, never printed. A new stack created from
+today's compose gets them from Coolify.
+
+**Backups.** Whether Coolify's scheduled backup can dump a database that lives
+inside a compose service is still unrecorded (20.7 decides on it): its API lists
+volume backups for a service's storages (`/services/<uuid>/storages/<uuid>/backups`)
+and no database backup for a service's Postgres, which points to the `pg_dump`
+sidecar; 20.7 confirms in the UI.
+
+**Roles that read every row (16.4's host check).** On the self-hosted image a
+role that is a superuser, bypasses RLS or holds `pg_read_all_data` can read
+`calendar_feed_tokens.token_hash`. The image creates: `postgres` and
+`supabase_admin` (they log in, with the stack's Postgres password),
+`supabase_etl_admin` and `supabase_read_only_user` (they may log in but have
+NO password, so nobody can), `service_role` (no login; reached only through
+Kong's secret-key mapping) and `pg_read_all_data` itself (no login). The only
+credential among them is the Postgres password, held by the stack's services
+and reached on the loopback (and on the tailnet once it is served) only. No
+statement reaches a log with its arguments: Postgres runs with
+`log_min_messages=fatal` (and `log_statement=ddl`, `pgaudit.log=none`), and
+PostgREST at its default `error` level.
+
+**Not set on staging, by decision.** The `calendar-feed` rate limit (the number
+is the founder's; `deferred-work.md`), the email provider and the open signup
+door (no domain yet), backups (20.7) and monitoring (20.8).

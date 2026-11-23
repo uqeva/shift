@@ -1080,7 +1080,7 @@ describe('the pipeline deploys through Coolify (story 20.6)', () => {
     }
     // The database URL carries no password: the CLI reads PGPASSWORD.
     for (const url of actionText.matchAll(/postgresql:\/\/[^"\s]*/g)) {
-      expect(url[0]).toBe('postgresql://postgres@$DB_HOST:$DB_PORT/postgres');
+      expect(url[0]).toBe('postgresql://postgres@$DB_HOST:$DB_PORT/postgres?sslmode=disable');
     }
     expect(actionText).toContain('docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin');
   });
@@ -1154,7 +1154,7 @@ describe('the pipeline deploys through Coolify (story 20.6)', () => {
     // The two deploys are deploy-images.sh, exercised above with stand-ins.
     expect(runOf('Deploy shift-web')).toBe('bash scripts/ci/deploy-images.sh deploy-web');
     expect(runOf('Deploy shift-functions')).toBe(
-      'DB_URL="postgresql://postgres@$DB_HOST:$DB_PORT/postgres" bash scripts/ci/deploy-images.sh deploy-functions',
+      'DB_URL="postgresql://postgres@$DB_HOST:$DB_PORT/postgres?sslmode=disable" bash scripts/ci/deploy-images.sh deploy-functions',
     );
     // psql and a connection are checked before the migration, never after it.
     expect(runOf('supabase migration list (before)')).toContain('command -v psql');

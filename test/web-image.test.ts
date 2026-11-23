@@ -82,13 +82,13 @@ describe('the shift-web image (story 20.3): dist/_headers as nginx lines', () =>
     expect(result.stdout).toBe(nginxLines(headers));
   });
 
-  it.skipIf(notBuilt)('renders the BUILT dist/_headers, the Report-Only CSP included', () => {
+  it.skipIf(notBuilt)('renders the BUILT dist/_headers, the enforced CSP included', () => {
     const file = readFileSync(join(dist, '_headers'), 'utf8');
     const result = render({ file: join(dist, '_headers') });
 
     expect(result.status).toBe(0);
     expect(result.stdout).toBe(nginxLines(allPathsHeaders(file)));
-    expect(result.stdout).toMatch(/^add_header Content-Security-Policy-Report-Only "default-src 'self'; [^"]+" always;$/m);
+    expect(result.stdout).toMatch(/^add_header Content-Security-Policy "default-src 'self'; [^"]+" always;$/m);
     expect(result.stdout.trim().split('\n')).toHaveLength(6);
   });
 
@@ -290,7 +290,7 @@ describe('the shift-web image (story 20.3): the Dockerfile', () => {
   });
 
   it('renders the headers from the built dist/_headers with the script', () => {
-    expect(instructions).toContain('COPY --chmod=0644 deploy/web/render-headers.sh apps/web/dist/_headers /tmp/render/');
+    expect(instructions).toContain('COPY --chmod=0755 deploy/web/render-headers.sh apps/web/dist/_headers /tmp/render/');
     expect(instructions).toContain(
       'RUN sh /tmp/render/render-headers.sh /tmp/render/_headers > /tmp/security-headers.conf',
     );
