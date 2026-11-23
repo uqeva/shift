@@ -81,7 +81,7 @@ Each row needs evidence: a test that runs in CI, a probe run on the local stack 
 | D7 | `test/supabase-scaffold.test.ts`: `search_path = ''`, no `execute` or `format(`, every write qualified |
 | E4 | `authenticated` holds no UPDATE on `founded_by` (0004's column grants never name it; scaffold pin, catalog case). `anon` keeps Supabase's default table grant and meets no update policy, so row level security refuses it; `service_role` is the secret key's trusted role (AD-17), past row level security for every column. No policy inserts an organization; `signup_settings` and `organization_attempts` grant nothing |
 
-### Story 19.4's evidence (as built 2026-11-22; the DB case written unrun, CI is its first run)
+### Story 19.4's evidence (as built 2026-11-22; the DB cases were written unrun and passed on CI, PR #354, run 45252333575)
 
 | # | Evidence |
 |---|---|
@@ -106,7 +106,7 @@ Each row needs evidence: a test that runs in CI, a probe run on the local stack 
 | F3 | No session role can execute the job's function | catalog |
 | F4 | The operator scripts work only over the tailnet and change only `suspended` | runbook |
 
-### Story 19.5's evidence (as built 2026-11-21; every DB case written unrun, CI is its first run)
+### Story 19.5's evidence (as built 2026-11-21; every DB case was written unrun and passed on CI's first run, PR #352, run 44978789771)
 
 Migration `0073_housekeeping_and_suspension.sql`. Beside the unrun DB files, the whole migration chain 0001–0073 and the four operator scripts (19.5's three and `provision-organization.sql`) were applied to an in-process PGlite over a stand-in for Supabase's platform schemas, and the housekeeping and suspension behaviour below was exercised there (single connection: the lock races are CI's alone).
 
