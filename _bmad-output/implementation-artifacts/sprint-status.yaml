@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 14:26
-last_updated: 11-22-2026 00:53
+last_updated: 11-23-2026 19:30
 project: shift
 project_key: NOKEY
 tracking_system: file-system
@@ -1228,7 +1228,7 @@ action_items:
     action: "A7: bump pdfmake 0.3.13 -> 0.3.14 once eligible (2026-11-22) and update
       the spine Stack row"
     owner: "dev"
-    status: open
+    status: done  # pdfmake 0.3.14 pinned (of 2026-11-08, eligible 2026-11-22), spine Stack row; history PDF re-rendered and rasterized, pixel-identical to 0.3.13 on all 29 pages; chore/retro-housekeeping-and-pdfmake (spec-retro-housekeeping-2026-11-23; built, CI pending)
     ref: "_bmad-output/implementation-artifacts/epic-14-retro-2026-11-16.md"
   - id: "epic-14-retro-item-68-a8-stop-the-leave-overview-and-rotation"
     epic: 14
@@ -1359,7 +1359,7 @@ action_items:
       :1838 and :1907 (CI halves settled in 44932179182); mark :2001 with the retro
       disposition; mark 16.2 spec :137 superseded"
     owner: "dev"
-    status: open
+    status: done  # 16.1 spec rewritten as merged (#335, runs, fixes); deferred-work 1838/1907 CI halves and 2001 disposition marked; 16.2 :137 superseded; chore/retro-housekeeping-and-pdfmake (spec-retro-housekeeping-2026-11-23; built, CI pending)
     ref: "_bmad-output/implementation-artifacts/epic-16-retro-2026-11-21.md"
   - id: "epic-16-retro-item-84-a6-process-theme-root-files-run-locally"
     epic: 16
@@ -1368,7 +1368,7 @@ action_items:
       an Edge Function is added; the last story of an epic gets its spec rewritten
       when set done"
     owner: "Perolipotic (process); dev for checklist edits"
-    status: open
+    status: done  # bmad-build.toml: theme root files rule, Edge Function CI/sweep rule (+ unrun-DB-test layer), epic last-story rewrite; chore/retro-housekeeping-and-pdfmake (spec-retro-housekeeping-2026-11-23; built, CI pending)
     ref: "_bmad-output/implementation-artifacts/epic-16-retro-2026-11-21.md"
   - id: "epic-17-retro-item-85-a1-approve-promoting-0069-0070-and-0072"
     epic: 17
@@ -1410,7 +1410,7 @@ action_items:
       and drop the waits-for-D-S6 lines; replace absolute /tmp scratchpad paths in
       spec-17-3 and spec-19-1 (public repo)"
     owner: "dev"
-    status: open
+    status: done  # epics.md epic 17 D-S6 ratified, waits dropped; scratchpad paths removed from spec-17-3, spec-19-1, spec-list-reader-refetch-failure, spec-hours-as-on-screen-leave-in-days (still in git history); chore/retro-housekeeping-and-pdfmake (spec-retro-housekeeping-2026-11-23; built, CI pending)
     ref: "_bmad-output/implementation-artifacts/epic-17-retro-2026-11-22.md"
   - id: "epic-17-retro-item-90-a6-process-bmad-build-toml-never-signal"
     epic: 17
@@ -1421,5 +1421,5 @@ action_items:
       worktree subagents cannot run gitleaks, so the orchestrator scans each branch
       before every push and records it"
     owner: "Perolipotic (process); dev for toml edits"
-    status: open
+    status: done  # bmad-build.toml: no pattern kills, provisioning inventories (+ unrun-DB-test layer), orchestrator gitleaks before every push; chore/retro-housekeeping-and-pdfmake (spec-retro-housekeeping-2026-11-23; built, CI pending)
     ref: "_bmad-output/implementation-artifacts/epic-17-retro-2026-11-22.md"

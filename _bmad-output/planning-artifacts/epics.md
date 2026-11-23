@@ -399,7 +399,7 @@ A member opts into reminders of their own upcoming shifts, delivered on the chan
 
 **Capabilities covered:** CAP-26
 **Standalone:** off by default; with no member opted in, nothing changes.
-**Implementation notes:** reuses 16.2's server-side projection, so it follows Architect pass 1. Story 17.2 amends AD-18 with its one exception (a reminder is the only notification no request asserts). Decision D-S6 pending ratification.
+**Implementation notes:** reuses 16.2's server-side projection, so it follows Architect pass 1. Story 17.2 amends AD-18 with its one exception (a reminder is the only notification no request asserts). Decision D-S6 ratified by the founder 2026-11-21.
 
 ### Epic 18: A member is lent to another team for a while (added 2026-11-20, sprint change)
 
@@ -2907,11 +2907,9 @@ Ana turns on a reminder for the evening before. At 20:00 her phone says she work
 
 Added 2026-11-20 by `sprint-change-proposal-2026-11-20-v2-scope.md` (§5.6). Reuses 16.2's server-side projection, so Architect pass 1 precedes every story here.
 
-**Capabilities:** CAP-26 · **Governed by:** AD-14, AD-17, AD-18 (amended by 17.2) · **Proves:** Q25, Q27 · **UX:** UX-DR49, 57 · **Decisions:** D-S6 (pending ratification)
+**Capabilities:** CAP-26 · **Governed by:** AD-14, AD-17, AD-18 (amended by 17.2) · **Proves:** Q25, Q27 · **UX:** UX-DR49, 57 · **Decisions:** D-S6 (ratified by the founder 2026-11-21)
 
-**Planning status (2026-11-20):** every story waits for Architect pass 1 (through 16.2) and for D-S6.
-
-**Planning status (2026-11-21, Architect pass 1 done):** every story still waits for D-S6, and 17.1 also for 16.2. The spine's `remind` and reminder clauses (AD-14, AD-18) mark their channel rules "ratified by the founder 2026-11-21 (D-S6)".
+**Planning status (2026-11-23):** Architect pass 1 is done and the founder ratified D-S6 on 2026-11-21 (`epic-17-context.md`, Decisions; the spine's AD-14 and AD-18 clauses; epic 17 retrospective R2), so no story waits for either; the spine's `remind` and reminder clauses (AD-14, AD-18) mark their channel rules "ratified by the founder 2026-11-21 (D-S6)". 17.1–17.3 are built and merged (epic 17 retrospective, 2026-11-22).
 
 ### Story 17.1: A member chooses their reminders
 
@@ -2919,7 +2917,7 @@ As a member,
 I want to choose when I am reminded of my shifts, or not at all,
 So that reminders help and never nag.
 
-**Depends on:** 16.2. Applies the AD-2 row for reminder settings. **Blocked on:** D-S6 (Architect pass 1 done).
+**Depends on:** 16.2. Applies the AD-2 row for reminder settings.
 
 **Acceptance Criteria:**
 
@@ -2947,7 +2945,7 @@ As a member who asked for reminders,
 I want each one written from my schedule as it stands just before it is due,
 So that a reminder is never about a shift I no longer work.
 
-**Depends on:** 17.1. Applies the AD-14, AD-17 and AD-18 amendment rows. **Blocked on:** D-S6 (Architect pass 1 done).
+**Depends on:** 17.1. Applies the AD-14, AD-17 and AD-18 amendment rows.
 
 **Acceptance Criteria:**
 
@@ -2978,7 +2976,7 @@ As a member,
 I want the reminder on the channel I chose, in my language, linking to the day,
 So that one tap shows me the shift.
 
-**Depends on:** 17.2. **Blocked on:** D-S6 (Architect pass 1 done).
+**Depends on:** 17.2.
 
 **Acceptance Criteria:**
 

@@ -9,6 +9,8 @@ context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-16-context.md'
 ---
 
+Status: done. Merged as #335, squash `b5469a7` (2026-11-21), after `CI passed` went green on `9f48916` (run 44886766058: 12 jobs passed, 5 skipped; E2E 144 + 144 + 144 + 144 passed). Before it: run 44883730290 on `7c6418b` failed two jobs. `Test (Vitest, local Supabase)` failed 15 cases in three DB-free root files, `theme-contrast` (9), `theme-tokens` (3) and `theme-fidelity` (3): the print block redeclared `--border`, `--input` and `--foreground` under `:root:has([data-print-month])`, which the token readers took as the light theme's. `E2E (Playwright, shard 2/4)` failed `e2e/tests/calendar/layout.spec.ts`'s sticky-head budget. Review 2's `17fa33d` ("the month's print touches no theme token and no other screen") fixed the theme cases; run 44884807614 on `895ff0e` then failed only the sticky head (165 px against `STICKY_HEAD_MAX` 160: *Ispiši* opened a third 44 px line at 390 px). `9f48916`, pushed only for CI, moved *Ispiši* to the page header's actions below 640 px (Spec Change Log, CI entry). The four theme root files (`theme-tokens`, `theme-contrast`, `theme-fidelity`, `theme-applied`) were not in this story's local list, so CI found the token defect first (epic 16 retro V1, A6). Baseline: `595b511`, the 18.5 merge (#332). Touched hot files (`index.css`, `hr.json`, the structural pins); no migration. Spec rewritten as merged by the 2026-11-23 retro housekeeping (epic 16 retro A5).
+
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 
 ## Intent
@@ -135,7 +137,7 @@ Baseline: `595b511`, the 18.5 merge (#332), the last merge touching the hot file
 
 ## Auto Run Result
 
-Status: done (built; sprint status `review  # built, CI pending`).
+Status: done (built; sprint status was `review  # built, CI pending` until #335 merged with CI green, then `done  # #335`; see the Status line at the top).
 
 **Rendered and opened (A GENERATED FILE IS OPENED).** A DB-free harness (scratchpad, not committed) built the real components, `readCalendar` over fixture rows, `calendarMarksOf`, `calendarMonthOf`, `calendarPrintHeaderOf` and the real `index.css` with Vite, beside a dummy sidebar and tab bar; Playwright's bundled headless Chromium printed each case with `page.pdf({ preferCSSPageSize: true })` at a 1280 px and a 390 px viewport; `pdftoppm` rasterized them and the pages were looked at. Fixture: October 2026 (31 days, today 14.10.), six teams, one named `Smjena C – Središnja vatrogasna postaja Novi Zagreb-istok`, a type `Pripravnostizvanrednodežurstvo` (one unbroken word) by override, Noć 19:00–07:00, minimum 2 people, Ana on leave 5.–9.10., Zoran (`Zoran Zorić-Kovačević Vukovarski`) lent A→C 10.–12.10., the viewer lent A→D 20.–22.10. and on leave 26.–27.10., organization `Javna vatrogasna postrojba Grada Velike Gorice i okolnih općina`.
 - `admin-sve` (dark theme): one A4 landscape page (841.92 × 594.96 pt); header of organization, `Raspored · Listopad 2026`, `Prikazano: sve smjene (6) · 12 osoba`, `Ispisano: 21.11.2026 u 14:05`; legend Čeka odluku, Izmijenjeno, Odsutnost, Premalo ljudi; 31 rows, six equal columns, black text on white with grey row rules and today's black bar; B on 07.–08.10. a solid outline with `⚠ ◷` and the short-staffed glyph; A short-staffed on 12.10. (Zoran on loan) and 20.–21.10. (viewer on loan); the long type wraps inside its dashed outline with `✎`; Noć always with `19:00–07:00` on its start date; no sidebar, tab bar, page title, mode switch, filter bar or *Ispiši*. Before the review's fix the same page lost its row rules (dark tokens) — the defect the patch closed.
@@ -147,7 +149,9 @@ Status: done (built; sprint status `review  # built, CI pending`).
 
 **Results (2026-11-21, after the review's patches):** typecheck and lint clean; domain 17 files, 905 passed; web 177 files, 6656 passed; DB-free root (8 files) 2531 passed; `pnpm build` passed. No migration, no e2e run locally (CI is the gate).
 
-**Results (2026-11-21, CI fix of the phone's sticky head):** typecheck and lint clean; web 177 files, 6658 passed; the eight DB-free root files 3106 passed (`localization-applied` after `pnpm build`); `pnpm build` passed. The harness, its head row now composed as the page's (`MonthNav` in it below 640 px, *Ispiši* in its slot), measured the sticky head at 113 px at 320, 360, 390 and 639 px (165 px before), with *Ispiši* 80 × 44 px under the `<h1>`. The two `layout.spec.ts` budget tests are left to CI.
+**Results (2026-11-21, CI fix of the phone's sticky head):** typecheck and lint clean; web 177 files, 6658 passed; the eight DB-free root files 3106 passed (`localization-applied` after `pnpm build`); `pnpm build` passed. The harness, its head row now composed as the page's (`MonthNav` in it below 640 px, *Ispiši* in its slot), measured the sticky head at 113 px at 320, 360, 390 and 639 px (165 px before), with *Ispiši* 80 × 44 px under the `<h1>`. The two `layout.spec.ts` budget tests were left to CI, and passed there: run 44886766058 on `9f48916` was green (see the Status line).
+
+**Residual risk, settled by CI (#335):** the e2e budgets (`layout.spec.ts`'s sticky head and one-line summary) and the four theme root files ran first in CI. Run 44883730290 failed 15 theme cases and the sticky head, run 44884807614 the sticky head alone; both were fixed before merge (`17fa33d`, `9f48916`), and run 44886766058 passed every job. The risks below are not CI's to settle and stay open.
 
 **Residual risks:**
 - Real browsers' print engines other than headless Chromium (Safari, Firefox, a phone's) were not exercised; a browser without named pages prints on its default page.

@@ -17,7 +17,7 @@ import { initLocalization } from '@/lib/i18n';
 
 /**
  * Epic 14 retro A9: the document is LAID OUT AND RENDERED by the real
- * pdfmake 0.3.13 (its node build, with the same `vfs_fonts` faces the browser
+ * pdfmake 0.3.14 (its node build, with the same `vfs_fonts` faces the browser
  * writer registers), not only defined. Every string pdfmake draws passes
  * through its `PDFDocument.text`, recorded here, and each text node of the
  * table must be among them. A node's `positions` would not do: a row taller
@@ -30,7 +30,8 @@ import { initLocalization } from '@/lib/i18n';
  */
 
 interface PdfMakeNode {
-  readonly virtualfs: { writeFileSync(name: string, data: Buffer): void };
+  /** 0.3.14 renamed 0.3.13's `virtualfs`: each document now reads through a child of this one. */
+  readonly sharedVirtualfs: { writeFileSync(name: string, data: Buffer): void };
   setFonts(fonts: object): void;
   setUrlAccessPolicy(policy: (url: string) => boolean): void;
   setLocalAccessPolicy(policy: (path: string) => boolean): void;
@@ -44,7 +45,7 @@ const coverage = historyPdfCoverageOf(vfs);
 
 /** What pdfmake drew, in order: each string it hands to the PDF. */
 let drawn: string[] = [];
-// pdfmake's internal class, by path: pinned to 0.3.13 (`apps/web/package.json`); restored after the suite.
+// pdfmake's internal class, by path: pinned to 0.3.14 (`apps/web/package.json`); restored after the suite.
 const PdfDocument = (require('pdfmake/js/PDFDocument') as { default: { prototype: { text: (...args: unknown[]) => unknown } } })
   .default;
 const drawText = PdfDocument.prototype.text;
@@ -217,7 +218,7 @@ async function render(model: HistoryExport, name: string) {
 beforeAll(async () => {
   await initLocalization();
   for (const file of Object.values(HISTORY_PDF_FACES)) {
-    pdfmake.virtualfs.writeFileSync(file, Buffer.from(vfs[file] ?? '', 'base64'));
+    pdfmake.sharedVirtualfs.writeFileSync(file, Buffer.from(vfs[file] ?? '', 'base64'));
   }
   pdfmake.setFonts({ [HISTORY_PDF_FONT]: HISTORY_PDF_FACES });
   pdfmake.setUrlAccessPolicy(() => false);
