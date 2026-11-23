@@ -82,13 +82,13 @@ describe('the shift-web image (story 20.3): dist/_headers as nginx lines', () =>
     expect(result.stdout).toBe(nginxLines(headers));
   });
 
-  it.skipIf(notBuilt)('renders the BUILT dist/_headers, the Report-Only CSP included', () => {
+  it.skipIf(notBuilt)('renders the BUILT dist/_headers, the enforced CSP included', () => {
     const file = readFileSync(join(dist, '_headers'), 'utf8');
     const result = render({ file: join(dist, '_headers') });
 
     expect(result.status).toBe(0);
     expect(result.stdout).toBe(nginxLines(allPathsHeaders(file)));
-    expect(result.stdout).toMatch(/^add_header Content-Security-Policy-Report-Only "default-src 'self'; [^"]+" always;$/m);
+    expect(result.stdout).toMatch(/^add_header Content-Security-Policy "default-src 'self'; [^"]+" always;$/m);
     expect(result.stdout.trim().split('\n')).toHaveLength(6);
   });
 

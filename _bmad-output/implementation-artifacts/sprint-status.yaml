@@ -727,7 +727,7 @@ development_status:
   20-2-edge-functions-run-behind-a-keyless-router: done  # #327; security-review of the router before production (20.9); live probe in 20.5's rehearsal (DEPLOY.md §9.5 step 7b)
   20-3-the-spa-ships-as-a-static-image-with-its-headers: done  # #329; CSP Report-Only, enforced only after 20.5 verifies it
   20-4-the-host-is-closed-to-everything-but-the-web: done  # applied and confirmed 2026-11-23 (founder); verify-exposure.sh re-run with Studio/Postgres waits for staging on the tailnet (20.5)
-  20-5-staging-stands-up-on-coolify: in-progress  # rehearsal passed on the server; staging CREATED in Coolify, not started: the token lacks `deploy` (founder); CI pending
+  20-5-staging-stands-up-on-coolify: review  # staging up, CI pending
   20-6-the-pipeline-deploys-through-coolify: review  # built (inert until configured), reviewed twice (2nd: CI/CD security), CI pending; enabling waits: Coolify API token (it must carry `deploy`, 20.5), Tailscale OAuth client, GHCR read token on the host, 20.5
   20-7-backups-leave-the-host-and-a-restore-is-rehearsed: backlog  # interim after 20.5; off-host waits: H-11 + target credential, H-12
   20-8-someone-hears-when-shift-is-down: backlog  # waits: 20.5, H-13, Coolify alert channel

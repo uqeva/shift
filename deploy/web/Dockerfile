@@ -14,7 +14,7 @@
 # Its header lines are rendered HERE from the built `dist/_headers`' `/*`
 # block (`render-headers.sh`, which refuses anything nginx would not keep), so
 # the image serves exactly the headers the build wrote, the
-# Content-Security-Policy-Report-Only line the build derived from
+# Content-Security-Policy line the build derived from
 # VITE_SUPABASE_URL included. The image holds the built files only: no source
 # map (`.dockerignore` keeps them out of the context, and the build fails if
 # one is left), no `_headers`/`_redirects` (Cloudflare's files), no key, no

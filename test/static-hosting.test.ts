@@ -63,8 +63,8 @@ const WORKBOX_RUNTIME = /^workbox-[\w-]+\.js$/;
  * The CONTENT-SECURITY-POLICY is not among them: its `connect-src` needs the
  * Supabase origin, which exists only as `VITE_SUPABASE_URL` at build time, so
  * the build derives it and appends it to `dist/_headers` (story 20.3,
- * `apps/web/src/lib/content-security-policy.ts`), Report-Only until story 20.5
- * verifies it on staging. It is asserted on the build output below.
+ * `apps/web/src/lib/content-security-policy.ts`), enforced since story 20.5
+ * verified it on the self-hosted stack. It is asserted on the build output below.
  */
 const SECURITY_HEADERS: Readonly<Record<string, RegExp>> = {
   'X-Content-Type-Options': /^nosniff$/,
@@ -224,12 +224,12 @@ describe('the build appends its Content-Security-Policy to _headers', () => {
     expect([...source.keys()].filter((name) => name.startsWith('content-security-policy'))).toEqual([]);
   });
 
-  it.skipIf(notBuilt)('ships a Report-Only policy whose script hashes are the built page’s inline scripts', () => {
+  it.skipIf(notBuilt)('ships an enforced policy whose script hashes are the built page’s inline scripts', () => {
     const headers = headersForAllPaths(readFileSync(join(dist, '_headers'), 'utf8'));
     const policy = headers.get(CSP_HEADER.toLowerCase());
 
     expect(policy, `${CSP_HEADER} is missing from the built /* block`).toBeDefined();
-    expect(headers.has('content-security-policy'), 'the policy is enforced before 20.5 verified it').toBe(false);
+    expect(headers.has('content-security-policy-report-only'), 'one policy header, the enforced one').toBe(false);
 
     const directives = directivesOf(policy ?? '');
     const page = readFileSync(join(dist, 'index.html'), 'utf8');

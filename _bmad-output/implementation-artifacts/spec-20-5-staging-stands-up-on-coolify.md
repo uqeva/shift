@@ -2,7 +2,7 @@
 title: 'Story 20.5: Staging stands up on Coolify'
 type: 'feature'
 created: '2026-11-23'
-status: 'in-progress'
+status: 'in-review'
 baseline_commit: 'b3f37ec51385befe78631e9d56c8082ed9a8d0fc'
 review_loop_iteration: 0
 context:
@@ -59,7 +59,8 @@ context:
 - `DEPLOY.md` §2, §3b, §9.1–§9.10 -- the runbook this story runs; a new §9.11 records the stand-up.
 - `test/self-hosted-stack.test.ts`, `test/supabase-scaffold.test.ts` -- pin the compose and DEPLOY; any compose change updates their pins.
 - `.github/actions/deploy/action.yml`, `test/coolify-deploy.test.ts` -- changed: every CI database URL ends `?sslmode=disable` (the run showed the CLI refuses a Postgres without TLS).
-- `deploy/web/Dockerfile`, `test/web-image.test.ts` -- changed: the render stage's `COPY --chmod=0755`. The CSP files are UNCHANGED (still Report-Only; see Spec Change Log).
+- `deploy/web/Dockerfile`, `test/web-image.test.ts`, `scripts/ci/probe-web-image.sh`, `apps/web/public/_headers`, `test/static-hosting.test.ts` -- changed: the render stage's `COPY --chmod=0755`; the enforced CSP's comments and pins.
+- `deploy/coolify/supabase/production.env.example` -- changed: `SHIFT_PROXY_CIDR` is the stack's own network.
 - `_bmad-output/implementation-artifacts/deferred-work.md` -- the 20.5-owned entries (CSP, rehearsal, key probe, `${VAR:?}`, pg-meta network, PGRST303, roles, logs, client IP, 404 timing, Outlook/real devices, GraphQL path, functions memory, Coolify API calls, `APP_ORIGINS`, template outage, remind arming).
 
 ## Tasks & Acceptance
@@ -67,14 +68,14 @@ context:
 **Execution:**
 - [x] Coolify API -- create the project `shift`/environment `staging`, the compose service with staging's inputs (sslip origins, loopback ports, the door shut, `SHIFT_PROXY_CIDR` from `docker network inspect coolify`, a fresh VAPID pair, an inert Resend placeholder), and the `shift-web` Docker-image application -- the stand-up itself.
 - [x] host -- build `shift-functions` and `shift-web` from this commit and serve them from a registry bound to the host's loopback, so `pull_policy: always` and Coolify's image pull both work without GHCR.
-- [ ] (BLOCKED: token lacks `deploy`; done on the rehearsal) staging DB -- §9.4's order: db, auth, rest, storage healthy; `db push --db-url` over loopback; `migration list` and `check-migrations.mjs`; restart auth; then the rest. Vault: `notify_url`/`remind_url` internal and both invoke secrets (§3a, §3b).
-- [ ] (BLOCKED, same; the password file exists, the seed is validated on the rehearsal) staging DB -- seed the demo organization (`demo_target=staging`), the admin password generated into a 0600 file and passed on stdin.
-- [ ] (DONE on the rehearsal, BLOCKED on staging) checks -- run §9.5's checks (7, 7b) against staging through its public API origin, then every 20.5-owned deferred check that can run here; record each under Verification.
-- [ ] (NOT DONE: the sweep ran on the rehearsal only; enforcement waits for staging over HTTPS) `apps/web/src/lib/content-security-policy.ts` (+ its test) -- switch to enforcing if the sweep shows no violation; redeploy and re-check.
+- [x] staging DB -- §9.4's order: db, auth, rest, storage healthy; `db push --db-url` over loopback; `migration list` and `check-migrations.mjs`; restart auth; then the rest. Vault: `notify_url`/`remind_url` internal and both invoke secrets (§3a, §3b).
+- [x] staging DB -- seed the demo organization (`demo_target=staging`), the admin password generated into a 0600 file and passed on stdin.
+- [x] checks -- run §9.5's checks (7, 7b) against staging through its public API origin, then every 20.5-owned deferred check that can run here; record each under Verification.
+- [x] `apps/web/src/lib/content-security-policy.ts` (+ its test) -- switch to enforcing if the sweep shows no violation; redeploy and re-check.
 - [x] repository fixes the live run reveals (compose, Dockerfiles, DEPLOY), each with its pinned test updated.
 - [x] `DEPLOY.md` -- §9.11 "Staging on Coolify (story 20.5)": how it was stood up, what is still manual, placeholders only; §2 points to it.
 - [x] `deferred-work.md` -- mark resolved entries `RESOLVED by 20.5 (2026-11-23)` / in part; add entries for this spec's deferrals.
-- [x] `sprint-status.yaml` -- 20.5 NOT `review  # staging up` (staging is not up: `in-progress`, with the blocker); 20.4 `done  # applied and confirmed 2026-11-23`.
+- [x] `sprint-status.yaml` -- 20.5 `review  # staging up, CI pending`; 20.4 `done  # applied and confirmed 2026-11-23`.
 
 **Acceptance Criteria:**
 - Given the Coolify service, when its environment is read, then every secret is Coolify-generated and none of the JWT secret, the anon key or the service key equals Supabase's `.env.example` demo value.
@@ -83,6 +84,25 @@ context:
 - Given a signup request, when sent through Kong, then no account is created.
 
 ## Spec Change Log
+
+- 2026-11-23, the stand-up resumed (the orchestrator gave the token
+  `deploy` and ran the kit's `finish.sh`). Findings and what was amended:
+  (1) Kong looped on `SUPABASE_ANON_KEY is empty`: Coolify v4.7.6 creates magic
+  variables once, in file order, and signs the role JWTs only if
+  `SERVICE_PASSWORD_JWT` already exists; Kong came first. Compose reordered
+  (Kong after GoTrue, PostgREST, Storage) with a test; on staging the two
+  values were minted as Coolify mints them and set through the API, never
+  printed. (2) Kong logged Traefik's address for every client:
+  `SHIFT_PROXY_CIDR` must be the stack's own network, not `coolify`'s; DEPLOY
+  §9.9 and both env templates corrected, staging's value set. (3) Kong reached
+  233 of 240 MiB with one worker per host CPU: `KONG_NGINX_WORKER_PROCESSES=1`
+  (also makes `policy: local` limits exact), with a test. (4) `GET /deploy` is
+  refused in v4.7.6: it is `POST` (20.6's code already posts). (5) The CSP,
+  swept on staging over HTTPS with no violation, is ENFORCED, and the enforced
+  build was redeployed and swept again. With every check passing on staging,
+  the story goes to `review  # staging up, CI pending`. The earlier review's
+  finding that the frozen Epic AC Deviations do not list the blocker is moot:
+  the blocker is gone and the ACs are met on staging.
 
 - 2026-11-23, review (blind, edge-case, verification-gap, epic-AC layers).
   Finding (high): the CSP had been switched to enforcing in the repository on
@@ -136,7 +156,7 @@ loopback only, holding `shift-functions:staging` built from the baseline; a
 helpers) that runs the rest of the stand-up and staging's checks in one go once
 the token has `deploy`. Their paths are in the report, not here.
 
-**Not done: the start (BLOCKED on the token's `deploy` ability).** Hence not
+**At first not done, superseded by "On staging" below: the start (BLOCKED on the token's `deploy` ability).** Hence not
 yet on staging: H-6's comparison of the generated values with Supabase's demo
 values (Coolify's API never returns them, and the containers that would carry
 them were never created), the migrations, Vault, the demo organization, the web
@@ -201,6 +221,31 @@ rehearsal (the run trusted a private Docker range; the committed text uses
 says so; in a rehearsal nothing sits in front of Kong, so neither is the peer).
 `test/self-hosted-stack.test.ts` pins the three start periods (at least 1.5×
 each measured start) and pg-meta's explicit check.
+
+**On staging (2026-11-23, after the token got `deploy`).** Through
+`https://api.staging.<ip-dashed>.sslip.io` and `https://staging.<ip-dashed>.sslip.io`.
+
+| Check | Result |
+| --- | --- |
+| H-6 | PASS: JWT secret and Postgres password 32 characters, not demo values; the role JWTs (minted, see Spec Change Log) carry `anon` / `service_role`, are not the demo tokens and not the demo `iat`. |
+| order rules | PASS: db, auth, storage healthy; all 74 migrations pushed over the loopback, `migration list` matches (`check-migrations.mjs`); auth restarted after the push. |
+| TLS | PASS: both names on Let's Encrypt certificates (`verify=0`); HTTP answers 302 to HTTPS; HSTS one year. Postgres and Studio publish on `127.0.0.1` only. |
+| Vault | PASS: `notify_url`, `remind_url` internal, both invoke secrets set from the functions' environment. |
+| demo organization | PASS: 17 members; the admin signs in. |
+| §9.5 step 7 | PASS: `authenticated` with `organization_id`; signup `{} 200` and 0 accounts; `/otp` 404; anon `[]`; service one row; unknown key 401; `/` 404. |
+| §9.5 step 7b | PASS: notify 401, admin-auth 401 (router), unknown 404, the preflight names the app's origin; the cron's last call 200 and the outbox drained; `remind` 200 `REMIND_RAN`. |
+| logs | PASS: no marker and no `calendar-feed/` in Kong's or the functions' log. |
+| PGRST303 | PASS: 20 fresh sign-ins read at once, 20 × 200. |
+| feed 404 through Traefik and Kong | PASS: a live token 200 `text/calendar`; unknown and revoked 404s alike, medians 265/267 ms (30 each). |
+| client address | FAIL then PASS: with the `coolify` subnets Kong logged Traefik (`10.0.x`); with the stack's own subnet it logs the client's own IPv4 and IPv6 address, and a client's `X-Forwarded-For` is not believed. |
+| CSP | PASS: the sweep over HTTPS (14 routes, PDF, xlsx, logo upload and display, service worker): 0 violations, 0 failed requests Report-Only, then 0 and 0 with the ENFORCED image deployed. |
+| memory | Kong 233/240 MiB with per-CPU workers, ~106 MiB with one; functions ~164/448 MiB; host 9 GiB available. |
+| backups (epic AC) | Recorded as far as the API shows: volume backups only for a service; 20.7 confirms in the UI (entry). |
+
+Still by hand (entries): push opt-in on a device, PWA install, *Osvježi*;
+Outlook/Google/iPhone; the enumeration probe and real email (no provider);
+`tailscale serve`; the pg-meta network split; the calendar-feed limit (the
+founder's number); `APP_ORIGINS`.
 
 **Commands.**
 - `pnpm exec vitest run test/self-hosted-stack.test.ts test/supabase-scaffold.test.ts test/resource-hygiene.test.ts test/key-hygiene.test.ts test/coolify-deploy.test.ts test/web-image.test.ts test/static-hosting.test.ts` -- all pass after the review patches (the local `dist` removed, so the built-`dist` cases skip; CI builds its own).

@@ -2023,8 +2023,10 @@ makes the Node and Lua services slow to START, not slow to serve. Storage
 needed about 95 s, pg-meta about 135 s and Kong about 70 s before their health
 checks passed, so each has a `start_period` (180 s, 240 s, 180 s) and is not
 reported unhealthy, nor `up --wait` failed, while it is still starting. Kong
-sat at about 184 MiB at rest, so staging's Kong limit is 240 MiB (production
-keeps 256 MiB); pg-meta sat at about 94 of its 112 MiB. The functions
+sat at about 184 MiB at rest and reached 233 MiB on staging with one nginx
+worker per host CPU; it now runs one worker (`KONG_NGINX_WORKER_PROCESSES=1`,
+which also makes each `policy: local` limit exact) and sat at about 106 MiB
+after staging's checks, under a 240 MiB limit (production keeps 256 MiB); pg-meta sat at about 94 of its 112 MiB. The functions
 container peaked at about 125 MiB of its 448 MiB through the rehearsal's
 probes (two warm workers): the pair `FUNCTIONS_MEM_LIMIT=448m` and
 `MEMORY_LIMIT_MB = 150` per worker stays (`deferred-work.md`).
@@ -2574,18 +2576,17 @@ manifest-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none';
 frame-src 'none'; frame-ancestors 'none'
 ```
 
-It ships as `Content-Security-Policy-Report-Only`: browsers report what it
-would block in the console, and block nothing. There is no `report-uri` (no
-endpoint receives reports). Story 20.5 ran the first sweep, on its rehearsal
-stack over plain HTTP on the loopback: signed in, every main screen, the PDF
-and Excel exports, a logo upload and its signed-URL display and the service
-worker's registration, in Chromium, with no violation and no failed request,
-Report-Only and then with a locally built enforced variant (its spec,
-Verification). It stays Report-Only until the same sweep has run on staging
-over HTTPS, with the push opt-in on a device, the PWA install and an update
-through *Osvježi* checked by hand; then enforcing it is changing `CSP_HEADER`
-(and its three pins in the tests), and every environment's image is rebuilt and
-redeployed, as is going back. A `VITE_SUPABASE_URL` that
+It ships as **`Content-Security-Policy`, enforcing, since story 20.5.** 20.3
+shipped it Report-Only. 20.5 swept the SPA in Chromium (signed in, every main
+screen, the PDF and Excel exports, a logo upload and its signed-URL display,
+the service worker's registration): on its rehearsal stack, then on staging
+over HTTPS, Report-Only and then enforced, with no violation and no failed
+request (its spec, Verification). A push opt-in on a real device, the PWA
+install and an update through *Osvježi* are checked by hand on staging
+(`deferred-work.md`). Going back is setting `CSP_HEADER` to
+`Content-Security-Policy-Report-Only` (and its three pins in the tests), then
+rebuilding and redeploying every environment's image. There is no `report-uri`
+(no endpoint receives reports). A `VITE_SUPABASE_URL` that
 is not an `http(s)` URL with a plain host fails the build; an empty one (CI's
 `build` job) gives the policy with no Supabase origin. Styles keep
 `'unsafe-inline'`: `index.html` has inline `<style>` blocks and a `style=`
@@ -2913,10 +2914,14 @@ a plain 404, never the SPA's `index.html`.
 - `SHIFT_AUTH_EMAIL_PER_HOUR` (10 on staging) caps GoTrue's mail for the whole
   stack; Resend's daily allowance is shared with `notify` (checklist A9).
 
-**The client's address (AD-21).** `SHIFT_PROXY_CIDR` is the network of
-Coolify's Traefik on the host, as CIDRs: read it on the host with
-`docker network inspect coolify` (the subnet of its IPAM config) and set it in
-Coolify, never here. Kong believes `X-Forwarded-For` from those peers alone
+**The client's address (AD-21).** `SHIFT_PROXY_CIDR` is the network from which
+Coolify's Traefik reaches Kong, as CIDRs: the stack's OWN Docker network, which
+Coolify names after the service's uuid and attaches its Traefik to. Read it on
+the host after the first start with `docker network inspect <service uuid>`
+(the subnet of its IPAM config), set it in Coolify, never here, and restart the
+service. (Story 20.5 first set the `coolify` network's subnets, as this text
+then said, and Kong logged Traefik's address on the stack's network for every
+client.) Kong believes `X-Forwarded-For` from those peers alone
 (`KONG_TRUSTED_IPS`; it refuses an empty value, any `/0`, and a network wider
 than an IPv4 /8 or an IPv6 /32), sends GoTrue the
 resolved client as `X-Real-IP`, overwriting a client's own, and GoTrue's
@@ -3150,12 +3155,11 @@ founder enables it (a Tailscale OAuth client for CI, a deploy-scoped token, a
 registry credential). **The repository holds no address, hostname, port or
 secret of it**; the operator reads them in Coolify.
 
-**Status (2026-11-23): created, not started.** The project, the service with
-its inputs and the web application exist, and §9.5's rehearsal passed on this
-server. Starting the service and deploying the web application need the
-Coolify token's `deploy` ability, which the token issued for this story does
-not have; the migrations, Vault, the demo organization and the checks on
-staging follow the start, in the order below (story 20.5's spec lists them).
+**Status (2026-11-23): running.** The stack and the web application run on
+Let's Encrypt certificates; the migrations, Vault and the demo organization are
+in place, and §9.5's checks and story 20.5's pass on staging (its spec,
+Verification). Starting the service and deploying the application need the
+Coolify token's `deploy` ability (a read/write token is refused with 403).
 
 **What exists in Coolify.** A project `shift` with an environment `staging`
 (the founder's choice; the epic had named a project `shift-staging`), holding:
@@ -3164,12 +3168,11 @@ staging follow the start, in the order below (story 20.5's spec lists them).
   through the API as `docker_compose_raw`, never edited in Coolify), with Kong's
   URL `https://api.staging.<domain>:8000` (`:8000` is the container port
   Traefik forwards to; the public API origin, and so `VITE_SUPABASE_URL`, is
-  `https://api.staging.<domain>` with no port). Coolify lists every
-  `SERVICE_PASSWORD_*` and both role JWTs as generated variables, but its API
-  never returns their values (a token without `read:sensitive`) and no
-  container has run yet, so whether each was generated, and is not a demo
-  value (H-6), is checked on the host from the containers' environment at the
-  first start;
+  `https://api.staging.<domain>` with no port). Coolify generates every
+  `SERVICE_PASSWORD_*` (and the role JWTs, see below), but its API never
+  returns their values to a token without `read:sensitive`, so H-6's check
+  (none empty, none a demo value of Supabase's `.env.example`) reads them on
+  the host from the containers' environment; on staging every one passed;
 - the **`shift-web` application** (Docker image, port 8080, the domain
   `https://staging.<domain>`, HTTPS forced, `--read-only --tmpfs /tmp`,
   64 MiB, 0.1 CPU).
@@ -3189,7 +3192,7 @@ all decided for staging on 2026-11-23:
 | `NOTIFY_EMAIL_FROM` | an address under `shift.invalid` | nothing is sent |
 | `VAPID_*` | a pair generated for staging; the subject is the app's `https` origin | push works |
 | `SHIFT_FUNCTIONS_IMAGE` | `127.0.0.1:<registry-port>/shift-functions:staging` | see the registry below |
-| `SHIFT_PROXY_CIDR` | the `coolify` network's IPv4 and IPv6 subnets (`docker network inspect coolify`) | §9.9 |
+| `SHIFT_PROXY_CIDR` | the stack's own network's subnet (`docker network inspect <service uuid>`; IPv4 only, as Coolify creates it) | §9.9: Traefik reaches Kong there. Kong logs each client's own IPv4 and IPv6 address, and a client's own `X-Forwarded-For` is not believed |
 
 **Images without GHCR: a loopback registry.** The compose's
 `pull_policy: always` makes every start pull `SHIFT_FUNCTIONS_IMAGE`, and
@@ -3231,13 +3234,28 @@ a psql variable on stdin. The founder then signs in at `https://staging.<domain>
 `urls` for Kong's domain, `instant_deploy: false`), `PATCH
 /services/<uuid>/envs/bulk`, `PATCH /services/<uuid>` (a new compose) and
 `POST /applications/dockerimage` need the token's `write` ability.
-**Starting the service (`POST /services/<uuid>/start`) and deploying an
-application (`GET /deploy?uuid=`) need `deploy`**, which a read/write token does
+**Starting the service (`POST /services/<uuid>/start`, `/restart`) and
+deploying an application (`POST /deploy?uuid=<uuid>&force=false`; a GET is
+refused as "This endpoint has changed to a POST request") need `deploy`**, which a read/write token does
 not have. Coolify's parser records each `${NAME:?}` it finds in an
 `environment:` entry as a required variable, but not the ones in `image:` or
 `ports:` (`SHIFT_FUNCTIONS_IMAGE`, the two loopback ports), which must be set
 by hand all the same. A description may hold only letters, digits, spaces and
 `- _ . , ! ? ( ) ' " + = * / @ &`.
+
+**Magic variables are generated in file order, once.** Coolify v4.7.6 walks the
+compose service by service and creates each magic variable the first time it
+sees it, never regenerating one it created empty. It signs
+`SERVICE_SUPABASEANON_KEY` and `SERVICE_SUPABASESERVICE_KEY` with
+`SERVICE_PASSWORD_JWT` only if that already exists. Kong (which uses the role
+JWTs and must not hold the secret) used to come before GoTrue, so on staging's
+first start both role JWTs were created EMPTY and Kong refused to start
+(`kong-entrypoint: SUPABASE_ANON_KEY is empty`). The compose now lists Kong
+after GoTrue, PostgREST and Storage, and a test holds the order. On staging the
+two values were then minted on the host exactly as Coolify mints them (HS256
+with the stack's own secret, `iss supabase`, the role claim) and set through
+`PATCH /services/<uuid>/envs/bulk`, never printed. A new stack created from
+today's compose gets them from Coolify.
 
 **Backups.** Whether Coolify's scheduled backup can dump a database that lives
 inside a compose service is still unrecorded (20.7 decides on it): its API lists

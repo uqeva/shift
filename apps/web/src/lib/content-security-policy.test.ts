@@ -30,8 +30,8 @@ function directivesOf(policy: string): Map<string, string[]> {
 }
 
 describe('the Content-Security-Policy header', () => {
-  it('ships Report-Only until 20.5 verifies it', () => {
-    expect(CSP_HEADER).toBe('Content-Security-Policy-Report-Only');
+  it('is enforced since 20.5 verified it', () => {
+    expect(CSP_HEADER).toBe('Content-Security-Policy');
   });
 });
 
