@@ -81,6 +81,13 @@ Each row needs evidence: a test that runs in CI, a probe run on the local stack 
 | D7 | `test/supabase-scaffold.test.ts`: `search_path = ''`, no `execute` or `format(`, every write qualified |
 | E4 | `authenticated` holds no UPDATE on `founded_by` (0004's column grants never name it; scaffold pin, catalog case). `anon` keeps Supabase's default table grant and meets no update policy, so row level security refuses it; `service_role` is the secret key's trusted role (AD-17), past row level security for every column. No policy inserts an organization; `signup_settings` and `organization_attempts` grant nothing |
 
+### Story 19.4's evidence (as built 2026-11-22; the DB case written unrun, CI is its first run)
+
+| # | Evidence |
+|---|---|
+| D5 | Unchanged by 19.4: no step writes anything on founding, and every step's write is the shipped surface's own (spec 19.4, D9). `test/create-organization.test.ts` (19.3's case) still counts the rows a fresh organization holds; the new case "the onboarding card's one stored fact" founds one with `onboarding_dismissed = false`. The SPA's `onboarding` copy and the fresh organization's empty states pass a literal sweep (`test/resource-hygiene.test.ts`, "a fresh organization is told nothing pilot- or fire-specific"), and the shared add dialogs pre-select no kind, time, *Vrijedi od*, level or allowance (O3; node tests in `shift-types`, `rotation`, `members`) |
+| E4 | `0074` adds one column grant, `update (onboarding_dismissed)`, which 0004's `organizations_update_by_own_active_admin` already confines to an active admin of the organization (scaffold pin; `test/rls-isolation.test.ts`'s granted-column list). `founded_by` still has no grant: the scaffold pins that no migration grants it, and the new create-organization case has the Founding Admin's `update … set founded_by` refused 42501. The SPA keeps `founded_by` as a boolean only (`foundedBySignup`), never the uuid |
+
 ## E. An account with no organization, and suspension (AD-10)
 
 | # | Check | Evidence |

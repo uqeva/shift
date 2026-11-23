@@ -1908,11 +1908,13 @@ describe('the two member forms write through the seam and keep nothing back', ()
     const handler = submitHandler(screen);
 
     expect(handler, 'no submit handler to read').not.toBe('');
+    // STORY 19.4 (review 1): the create form refuses its level and days
+    // through one rule (`newMemberChoiceOf`), `!choice.ok`, its field named.
     expect(handler, 'the locally-refused field is not marked').toMatch(
-      /leaveAllowanceDays === null[\s\S]{0,400}?setInvalidField\(/,
+      /(?:leaveAllowanceDays === null|!choice\.ok)[\s\S]{0,400}?setInvalidField\(/,
     );
     expect(handler, 'focus is not moved to the field the message is about').toMatch(
-      /leaveAllowanceDays === null[\s\S]{0,400}?\.focus\(\)/,
+      /(?:leaveAllowanceDays === null|!choice\.ok)[\s\S]{0,400}?\.focus\(\)/,
     );
     // B298: the form is `noValidate`, so a blank name or username and a
     // malformed address are refused here too, the field marked and focused.

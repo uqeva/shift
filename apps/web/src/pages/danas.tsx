@@ -1,5 +1,5 @@
 import { createRoute } from '@tanstack/react-router';
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 
 import { OfflineNote } from '@/components/offline-note';
 import { LoanNoticeLine } from '@/features/calendar/components/loan-notice-line';
@@ -11,6 +11,8 @@ import { TodayBody } from '@/features/today/components/today-body';
 import { useTodayRole } from '@/features/today/hooks/use-admin-today';
 import { OwnTeamLink } from '@/features/today/components/own-team-line';
 import { useToday } from '@/features/today/hooks/use-today';
+import { OnboardingCard } from '@/features/onboarding/components/onboarding-card';
+import { useOnboardingDismiss } from '@/features/organization/hooks/use-onboarding-dismiss';
 import {
   STATUS_DUTY,
   STATUS_UNSCHEDULED,
@@ -61,6 +63,10 @@ import {
 export function DanasScreen() {
   const { today, tiles, date, ownTeam, role: snapshotRole, loading: todayLoading, offline, retryable, retry } = useToday();
   const admin = showsAdminToday(useTodayRole(snapshotRole));
+  // STORY 19.4 (AD-24): the onboarding card's one write, the organization's own.
+  const onboardingDismiss = useOnboardingDismiss();
+  // Where focus lands once the card is dismissed and gone (review 1).
+  const heading = useRef<HTMLHeadingElement>(null);
   // Whether the admin body's own reads are pending: `main` is busy then too.
   const [adminBusy, setAdminBusy] = useState(false);
   // Whether the admin body shows its alert: then no as-of note stands above it.
@@ -129,13 +135,24 @@ export function DanasScreen() {
     >
       <PageHeader>
         <PageTitle asChild>
-          <h1>{t('nav.danas')}</h1>
+          <h1 ref={heading} tabIndex={-1}>
+            {t('nav.danas')}
+          </h1>
         </PageTitle>
         {renderDateLine()}
       </PageHeader>
       <OfflineNote offline={admin && adminUnavailable ? null : offline} />
       {admin ? (
         <div className="grid w-full min-w-0 max-w-3xl grid-cols-1 gap-4">
+          {/* STORY 19.4 (D8, UX-DR69): first, above *Treba tebe*, and outside
+              the admin body's skeleton: drawn once its reads are there. */}
+          <OnboardingCard
+            admin={admin}
+            dismiss={onboardingDismiss}
+            onDismissed={() => {
+              heading.current?.focus();
+            }}
+          />
           <AdminTodayBody onBusy={setAdminBusy} onUnavailable={setAdminUnavailable} />
         </div>
       ) : (

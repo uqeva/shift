@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { Badge } from '@/components/ui/badge';
-import { Card, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TeamTable } from '@/features/teams/components/team-table';
 import type { TeamListScreen } from '@/features/teams/hooks/use-team-list';
 import { t } from '@/lib/i18n';
@@ -40,6 +40,13 @@ export function TeamListSection({ screen }: { readonly screen: TeamListScreen })
                 is noise that buries them. */}
             <Badge variant="secondary">{t('smjene.count', { count: split.active.length })}</Badge>
           </CardHeader>
+          {/* STORY 19.4 (UX-DR67, 70): no team in use says the fact and its consequence. */}
+          {split.active.length === 0 ? (
+            <CardContent className="grid gap-1 border-t p-4 text-sm">
+              <p className="font-semibold">{t('smjene.empty')}</p>
+              <p className="text-muted-foreground">{t('smjene.emptyNext')}</p>
+            </CardContent>
+          ) : null}
           <TeamTable group={split.active} label={activeHeading} />
         </Card>
       )}

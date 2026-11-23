@@ -37,6 +37,9 @@ import { stepGroupClassOf, stepSectionClassOf } from '@/features/rotation/utils/
 import { usePhone } from '@/hooks/viewport';
 import { t } from '@/lib/i18n';
 import { useWriteGate } from '@/lib/offline/use-write-gate';
+import { effectiveFromRefusedOf } from '@/features/rotation/services/write';
+import { ROTATION_EFFECTIVE_FROM_ID, ROTATION_SAVE_ERROR_ID } from '@/features/rotation/utils/element-ids';
+import { NO_TEXT } from '@/utils/text';
 
 /**
  * The rotation builder (story 2.3b, UX-DR14, UX-DR15), rendered on
@@ -143,6 +146,7 @@ export function RotationSection({
   } = builder;
   // Below 640 px the offsets table stacks (story 7.6's pattern).
   const isPhone = usePhone();
+  const dateRefused = effectiveFromRefusedOf(builder.outcome);
 
   function renderChip(chip: ShiftTypeChip): ReactNode {
     return (
@@ -189,17 +193,22 @@ export function RotationSection({
               fixes the phase, `Vrijedi od` when it applies. */}
           <div className="flex flex-wrap items-end gap-3">
             <div className="grid w-full gap-2 sm:w-64">
-              <Label htmlFor="rotation-effective-from">{t('rotation.builder.effectiveFrom')}</Label>
+              <Label htmlFor={ROTATION_EFFECTIVE_FROM_ID}>{t('rotation.builder.effectiveFrom')}</Label>
               <Input
-                id="rotation-effective-from"
+                id={ROTATION_EFFECTIVE_FROM_ID}
                 name="effectiveFrom"
                 type="date"
                 required
                 min={today ?? undefined}
                 max={(today === null ? null : latestEffectiveFromOf(today)) ?? undefined}
-                value={current.effectiveFrom}
+                // STORY 19.4 (O3): shown empty until chosen; the save refuses
+                // until it is (`ROTATION_EFFECTIVE_UNCHOSEN`).
+                value={current.effectiveChosen ? current.effectiveFrom : NO_TEXT}
                 disabled={pending}
                 onChange={chooseEffectiveFrom(current)}
+                // STORY 19.4: a refused date is marked and names its refusal.
+                aria-invalid={dateRefused}
+                aria-describedby={dateRefused ? ROTATION_SAVE_ERROR_ID : undefined}
                 className="h-11 w-full"
               />
             </div>

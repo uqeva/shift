@@ -4,7 +4,7 @@ import type { Page } from '@playwright/test';
 
 import type { LoginPage } from '../../pages/login.page.ts';
 import { connect } from '../../utils/database-helper.ts';
-import { fill, hr } from '../../utils/i18n.ts';
+import { fill, hr, plural } from '../../utils/i18n.ts';
 import { expect, test } from '../../utils/custom-fixtures.ts';
 
 /**
@@ -187,7 +187,7 @@ async function signUpAndConfirm(page: Page, loginPage: LoginPage, address: strin
   await expect(loginPage.heading(hr.signup.setup.heading)).toBeVisible();
 }
 
-test('a mailed signup link sets the password, and step 1 founds the organization (story 19.3)', async ({ page, loginPage }) => {
+test('a mailed signup link sets the password, and step 1 founds the organization (story 19.3)', async ({ page, loginPage, hourBandsPage }) => {
   const address = `e2e-found-${randomUUID()}@example.com`;
   const { setup } = hr.signup;
   try {
@@ -214,9 +214,35 @@ test('a mailed signup link sets the password, and step 1 founds the organization
     await loginPage.fillSetup({ name: 'Tvrtka Primjer', slug: `e2e-${randomUUID().slice(0, 8)}` });
     await loginPage.setupSubmit.click();
 
-    // ORGANIZATION_CREATED: refreshed, claimed, in the app.
+    // ORGANIZATION_CREATED: refreshed, claimed, and on setup's step 2 (story
+    // 19.4, D2): the rail says where setup is, and nothing is set yet.
+    await expect(page).toHaveURL('/postavljanje/satni-pojasi');
+    await expect(loginPage.heading(hr.onboarding.step.hourBands)).toBeVisible();
+    await expect(loginPage.setupSkipLink).toBeVisible();
+
+    // Out of setup, to Danas, where the card resumes it: five steps left.
+    await loginPage.setupExitLink.click();
     await expect(page).toHaveURL('/danas');
     await expect(loginPage.heading(hr.nav.danas)).toBeVisible();
+    await expect(loginPage.onboardingCardTitle(plural(hr.onboarding.card.title, 5))).toBeVisible();
+
+    // Back to step 2 from the card; one band is the fact: the rail says
+    // *postavljeno*, the forward control *Dalje: Smjene*, the card one fewer.
+    await loginPage.onboardingCardLink(hr.onboarding.step.hourBands).click();
+    await expect(page).toHaveURL('/postavljanje/satni-pojasi');
+    await hourBandsPage.addBand('Jutro', '06:00');
+    await expect(loginPage.setupRailStep(hr.onboarding.step.hourBands, hr.onboarding.state.set)).toBeVisible();
+    await expect(loginPage.setupNextLink(hr.onboarding.step.teams)).toBeVisible();
+    await loginPage.setupExitLink.click();
+    await expect(loginPage.onboardingCardTitle(plural(hr.onboarding.card.title, 4))).toBeVisible();
+
+    // Sakrij, confirmed: the card is gone, and stays gone after a reload.
+    await loginPage.onboardingHideButton.click();
+    await loginPage.onboardingConfirmHide.click();
+    await expect(loginPage.onboardingCardTitle(plural(hr.onboarding.card.title, 4))).toHaveCount(0);
+    await page.reload();
+    await expect(loginPage.heading(hr.nav.danas)).toBeVisible();
+    await expect(loginPage.onboardingCardTitle(plural(hr.onboarding.card.title, 4))).toHaveCount(0);
   } finally {
     await removeSignup(address);
   }

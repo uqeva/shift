@@ -20,6 +20,8 @@ import {
   SHIFT_TYPE_END_FIELD,
   SHIFT_TYPE_KINDS,
   SHIFT_TYPE_IN_ROTATION,
+  SHIFT_TYPE_KIND_FIELD,
+  SHIFT_TYPE_KIND_MISSING,
   SHIFT_TYPE_NAME_EMPTY,
   SHIFT_TYPE_NAME_FIELD,
   SHIFT_TYPE_NAME_TAKEN,
@@ -196,10 +198,12 @@ describe('what is entered', () => {
     expect(enteredShiftTypeTime('')).toBeNull();
   });
 
-  it('offers the two kinds, working first, and reads anything else as working', () => {
+  it('offers the two kinds, working first, and reads anything else as no kind (story 19.4, O3)', () => {
     expect(SHIFT_TYPE_KINDS).toEqual([SHIFT_TYPE_WORKING, SHIFT_TYPE_NONWORKING]);
     expect(shiftTypeKindOf(SHIFT_TYPE_NONWORKING)).toBe(SHIFT_TYPE_NONWORKING);
-    expect(shiftTypeKindOf('x')).toBe(SHIFT_TYPE_WORKING);
+    expect(shiftTypeKindOf(SHIFT_TYPE_WORKING)).toBe(SHIFT_TYPE_WORKING);
+    expect(shiftTypeKindOf('x')).toBeNull();
+    expect(shiftTypeKindOf('')).toBeNull();
     expect(shiftTypeKindMessageKey(SHIFT_TYPE_WORKING)).toBe('rotation.shiftTypes.working');
     expect(shiftTypeKindMessageKey(SHIFT_TYPE_NONWORKING)).toBe('rotation.shiftTypes.nonworking');
   });
@@ -280,6 +284,18 @@ describe('the add', () => {
     start: '07:00',
     end: '07:00',
   } as const;
+
+  it('refuses an add with no kind chosen, sending nothing (story 19.4, O3)', async () => {
+    const both = tables(ONE_ROW, ONE_ROW);
+    const outcome = await createShiftType(both, ORGANIZATION, { ...WORKING_DEZURSTVO, kind: null }, TODAY);
+
+    expect(outcome).toEqual({ ok: false, code: SHIFT_TYPE_KIND_MISSING });
+    expect(both.types.calls).toEqual([]);
+    expect(both.versions.calls).toEqual([]);
+    expect(marksField(SHIFT_TYPE_KIND_MISSING, SHIFT_TYPE_KIND_FIELD)).toBe(true);
+    expect(refusedFieldOf(SHIFT_TYPE_KIND_MISSING, SHIFT_TYPE_NAME_FIELD)).toBe(SHIFT_TYPE_KIND_FIELD);
+    expect(shiftTypeWriteMessageKey(SHIFT_TYPE_KIND_MISSING)).toBe('rotation.shiftTypes.error.kindMissing');
+  });
 
   it('writes a working type to shift_types, then its first times from today to the versions', async () => {
     const both = tables(ONE_ROW, ONE_ROW);

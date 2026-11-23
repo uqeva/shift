@@ -11,6 +11,7 @@ import {
   ROTATION_NO_TEAMS,
   ROTATION_SCHEDULED,
   ROTATION_TYPE_ARCHIVED,
+  ROTATION_EFFECTIVE_UNCHOSEN,
   ROTATION_UNCHANGED,
   FOCUS_ADD,
   FOCUS_STEP,
@@ -233,7 +234,7 @@ describe('the prefill', () => {
 
     expect(prefillOf(noneAssigned, TODAY)).toEqual(emptyDraftOf(rotationTeamsOf(noneAssigned), TODAY));
     expect(prefillOf(noneAssigned, TODAY).offsets['pilot-smjena-a']).toBe(0);
-    expect(prefillOf(withNoTeam, TODAY)).toEqual({ steps: [], anchorDate: TODAY, effectiveFrom: TODAY, offsets: {}, keys: [], nextKey: 0 });
+    expect(prefillOf(withNoTeam, TODAY)).toEqual({ steps: [], anchorDate: TODAY, effectiveFrom: TODAY, effectiveChosen: false, offsets: {}, keys: [], nextKey: 0 });
   });
 
   it('takes the version in force today, not a later or earlier one', async () => {
@@ -347,7 +348,7 @@ describe('the step operations keep every team on its step', () => {
       teams: [...PILOT.teams, teamRow('new', 'Smjena E'), teamRow('gone', 'Smjena Z', { archived: true })],
     });
     const draft = normalizedDraftOf(
-      { steps: [DAN, NOC], anchorDate: TODAY, effectiveFrom: TODAY, offsets: { 'pilot-smjena-a': 1, 'pilot-smjena-b': 7, gone: 1 }, keys: [], nextKey: 0 },
+      { steps: [DAN, NOC], anchorDate: TODAY, effectiveFrom: TODAY, effectiveChosen: true, offsets: { 'pilot-smjena-a': 1, 'pilot-smjena-b': 7, gone: 1 }, keys: [], nextKey: 0 },
       rotationTeamsOf(snapshot),
     );
 
@@ -384,7 +385,7 @@ describe('each step keeps its client key, and focus lands where the rule says', 
   });
 
   it('repairs keys that do not match the steps', () => {
-    const draft = normalizedDraftOf({ steps: [DAN, NOC], anchorDate: TODAY, effectiveFrom: TODAY, offsets: {}, keys: ['x'], nextKey: 0 }, []);
+    const draft = normalizedDraftOf({ steps: [DAN, NOC], anchorDate: TODAY, effectiveFrom: TODAY, effectiveChosen: true, offsets: {}, keys: ['x'], nextKey: 0 }, []);
 
     expect(draft.keys).toEqual(['step-0', 'step-1']);
     expect(withStepAdded(draft, SLOB).keys).toEqual(['step-0', 'step-1', 'step-2']);
@@ -477,6 +478,7 @@ describe('Rasporedi ravnomjerno spreads the teams evenly over the cycle', () => 
     steps: Array.from({ length }, (_, index) => `type-${String(index)}`),
     anchorDate: TODAY,
     effectiveFrom: TODAY,
+    effectiveChosen: true,
     offsets: Object.fromEntries(teams.map((team) => [team.id, 0])),
     keys: Array.from({ length }, (_, index) => `step-${String(index)}`),
     nextKey: length,
@@ -811,7 +813,7 @@ describe('refused before anything is sent', () => {
     expect(draftUnchangedOf(snapshot, withTeamStep(draft, 'pilot-smjena-a', 1), TODAY)).toBe(false);
     expect(draftUnchangedOf(snapshot, withStepMoved(draft, 1, STEP_UP), TODAY)).toBe(false);
     expect(draftUnchangedOf(snapshot, withAnchor(draft, '2020-01-02'), TODAY)).toBe(false);
-    expect(draftRefusalOf(snapshot, withTeamStep(draft, 'pilot-smjena-a', 1), TODAY)).toBeNull();
+    expect(draftRefusalOf(snapshot, withEffectiveFrom(withTeamStep(draft, 'pilot-smjena-a', 1), TODAY), TODAY)).toBeNull();
   });
 
   it('judges by projection: an anchor moved by whole cycles projects the same and is unchanged, by a non-multiple is a change', async () => {
@@ -850,6 +852,23 @@ describe('refused before anything is sent', () => {
     expect(draftRefusalOf(noTeams, withStepAdded(empty, DAN), TODAY)).toBe(ROTATION_NO_TEAMS);
   });
 
+  it('refuses a sound draft whose Vrijedi od was never chosen, last, and shows none chosen (story 19.4, O3)', async () => {
+    const snapshot = await snapshotOf(PILOT);
+    const moved = withTeamStep(prefillOf(snapshot, TODAY), 'pilot-smjena-a', 1);
+
+    expect(prefillOf(snapshot, TODAY).effectiveChosen).toBe(false);
+    expect(emptyDraftOf(rotationTeamsOf(snapshot), TODAY).effectiveChosen).toBe(false);
+    expect(draftRefusalOf(snapshot, moved, TODAY)).toBe(ROTATION_EFFECTIVE_UNCHOSEN);
+    // The draft's own refusals still come first.
+    expect(draftRefusalOf(snapshot, prefillOf(snapshot, TODAY), TODAY)).toBe(ROTATION_UNCHANGED);
+    // A cleared input changes nothing: an unchosen draft stays unchosen, and a
+    // chosen one keeps its chosen date. A date chooses it.
+    expect(withEffectiveFrom(moved, '').effectiveChosen).toBe(false);
+    const chosenDraft = withEffectiveFrom(moved, TODAY);
+    expect(withEffectiveFrom(chosenDraft, '')).toEqual(chosenDraft);
+    expect(draftRefusalOf(snapshot, withEffectiveFrom(moved, TODAY), TODAY)).toBeNull();
+  });
+
   it('a step on an archived type', async () => {
     const snapshot = await snapshotOf({
       ...PILOT,
@@ -857,7 +876,7 @@ describe('refused before anything is sent', () => {
     });
 
     expect(draftRefusalOf(snapshot, prefillOf(snapshot, TODAY), TODAY)).toBe(ROTATION_TYPE_ARCHIVED);
-    expect(draftRefusalOf(snapshot, withStepRemoved(prefillOf(snapshot, TODAY), 1), TODAY)).toBeNull();
+    expect(draftRefusalOf(snapshot, withEffectiveFrom(withStepRemoved(prefillOf(snapshot, TODAY), 1), TODAY), TODAY)).toBeNull();
   });
 
   it('an assignment scheduled after today', async () => {

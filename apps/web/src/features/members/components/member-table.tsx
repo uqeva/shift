@@ -188,6 +188,11 @@ export function MemberTable({ list }: { readonly list: MemberList }): ReactNode 
           </TableBody>
         </Table>
       )}
+      {/* STORY 19.4 (UX-DR70): a fresh organization's only person is the
+          admin reading this; the line says why the list is short. */}
+      {list.alone && !loading ? (
+        <CardContent className="border-t p-4 text-sm text-muted-foreground">{t('ljudi.alone')}</CardContent>
+      ) : null}
     </Card>
   );
 }

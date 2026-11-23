@@ -16,7 +16,6 @@ import { CredentialLine } from '@/features/members/components/credential-line';
 import type { MemberCreate } from '@/features/members/hooks/use-member-create';
 import { memberLevelMessageKey } from '@/features/members/services/list';
 import {
-  DEFAULT_MEMBER_ROLE,
   LEAVE_ALLOWANCE_MAX,
   type IssuedCredential,
 } from '@/features/members/services/write';
@@ -45,10 +44,6 @@ import { NO_TEXT } from '@/utils/text';
  *  can act on, and AD-3 prefers a shape that cannot express the broken case. */
 const ALLOWANCE_MINIMUM = 0;
 const ALLOWANCE_STEP = 1;
-/** What a fresh form proposes. Not a policy — `members` carries no
- *  organization-wide constant (`0002:145`) — just the number an admin is most
- *  likely to keep, which they can change on every row. */
-const ALLOWANCE_DEFAULT = 20;
 
 /**
  * *Dodaj osobu* (story 7.13b): a dialog on Ljudi, in two steps. The first is
@@ -289,10 +284,16 @@ export function MemberAddDialog({ create }: { readonly create: MemberCreate }): 
                 ref={roleField}
                 id="member-role"
                 name="role"
-                defaultValue={DEFAULT_MEMBER_ROLE}
+                // STORY 19.4 (O3, FR-97): no level is pre-selected.
+                defaultValue={NO_TEXT}
+                required
+                aria-invalid={invalidField === 'member-role'}
                 aria-describedby={refusal === null ? undefined : MEMBER_ADD_ERROR_ID}
                 className="h-11"
               >
+                <option value={NO_TEXT} disabled>
+                  {t('ljudi.form.levelChoose')}
+                </option>
                 {MEMBER_ROLES.map((option) => (
                   <option key={option} value={option}>
                     {t(memberLevelMessageKey(option))}
@@ -319,7 +320,8 @@ export function MemberAddDialog({ create }: { readonly create: MemberCreate }): 
               step={ALLOWANCE_STEP}
               aria-invalid={invalidField === 'member-leave'}
               required
-              defaultValue={ALLOWANCE_DEFAULT}
+              // STORY 19.4 (O3, FR-97): no count is proposed.
+              defaultValue={NO_TEXT}
               aria-describedby={refusal === null ? undefined : MEMBER_ADD_ERROR_ID}
               className="h-11"
             />

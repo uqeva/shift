@@ -1173,3 +1173,13 @@ export function weekCellMessageKey(
 
   return cell.range === null ? 'danas.admin.week.cell' : 'danas.admin.week.cellTimed';
 }
+
+/**
+ * Whether *Pokrivenost danas* has no team to speak of at all (story 19.4,
+ * UX-DR70): every active team is in one of the three lists (working, off, no
+ * rotation), so all three empty is "no team exists", said as itself, never
+ * as "no team works today".
+ */
+export function coverageHasNoTeamOf(coverage: Coverage): boolean {
+  return coverage.rows.length === 0 && coverage.off.length === 0 && coverage.noRotation.length === 0;
+}

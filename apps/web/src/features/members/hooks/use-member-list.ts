@@ -248,6 +248,9 @@ export function useMemberList(search: MembersSearch, navigate: MembersNavigate) 
     retryable: clock.online && refusal !== null && membersRetryMessageKey(refusal) !== null,
     retry,
     loading,
+    // STORY 19.4 (UX-DR70): the organization holds one person, the viewer
+    // (an admin, the only reader of this list): `Za sada si jedina osoba…`.
+    alone: members !== null && members.length === 1,
     today,
     loanTeams,
     summary,

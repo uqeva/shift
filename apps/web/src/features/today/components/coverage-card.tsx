@@ -9,6 +9,7 @@ import {
   STAFFING_NOBODY,
   STAFFING_SHORT,
   coverageAbsentMessageKey,
+  coverageHasNoTeamOf,
   coveragePhaseMessageKey,
   coverageShiftMessageKey,
   coverageStaffingMessageKey,
@@ -67,6 +68,8 @@ function renderRow(row: CoverageRow): ReactNode {
  */
 export function CoverageCard({ coverage }: { readonly coverage: Coverage }): ReactNode {
   const headingId = useId();
+  // STORY 19.4 (UX-DR70): no team at all is said as itself.
+  const noTeam = coverageHasNoTeamOf(coverage);
 
   return (
     <Card className="min-w-0">
@@ -74,7 +77,13 @@ export function CoverageCard({ coverage }: { readonly coverage: Coverage }): Rea
         <h2 id={headingId} className="font-heading text-lg font-semibold">
           {t('danas.admin.coverage.heading')}
         </h2>
-        {coverage.rows.length === 0 ? (
+        {noTeam ? (
+          <div className="grid gap-1 text-sm">
+            <p className="font-semibold">{t('danas.admin.coverage.noTeam')}</p>
+            <p className="text-muted-foreground">{t('danas.admin.coverage.noTeamNext')}</p>
+          </div>
+        ) : null}
+        {noTeam ? null : coverage.rows.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t('danas.admin.coverage.none')}</p>
         ) : (
           <ul className="divide-y divide-border">{coverage.rows.map(renderRow)}</ul>

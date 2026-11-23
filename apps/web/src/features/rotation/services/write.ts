@@ -1,6 +1,7 @@
 import {
   ROTATION_CHANGED_TODAY,
   ROTATION_EFFECTIVE_PAST,
+  ROTATION_EFFECTIVE_UNCHOSEN,
   ROTATION_EFFECTIVE_TOO_FAR,
   ROTATION_EMPTY,
   ROTATION_NO_TEAMS,
@@ -583,6 +584,7 @@ export function rotationWriteMessageKey(
   | 'rotation.builder.error.empty'
   | 'rotation.builder.error.noTeams'
   | 'rotation.builder.error.scheduled'
+  | 'rotation.builder.error.effectiveUnchosen'
   | 'rotation.builder.error.effectivePast'
   | 'rotation.builder.error.effectiveTooFar'
   | 'rotation.builder.error.typeArchived'
@@ -597,6 +599,8 @@ export function rotationWriteMessageKey(
       return 'rotation.builder.error.noTeams';
     case ROTATION_SCHEDULED:
       return 'rotation.builder.error.scheduled';
+    case ROTATION_EFFECTIVE_UNCHOSEN:
+      return 'rotation.builder.error.effectiveUnchosen';
     case ROTATION_EFFECTIVE_PAST:
       return 'rotation.builder.error.effectivePast';
     case ROTATION_EFFECTIVE_TOO_FAR:
@@ -628,3 +632,18 @@ export function rotationPartialMessageKey(
 
 /** The confirmation a landed save renders. */
 export const ROTATION_SAVED_MESSAGE_KEY = 'rotation.builder.saved';
+
+/**
+ * Whether a shown save outcome refuses `Vrijedi od` itself (story 19.4): not
+ * chosen, before today, or too far ahead. The builder then marks the field,
+ * names the refusal on it, and moves focus there.
+ */
+export function effectiveFromRefusedOf(outcome: { readonly ok: boolean; readonly code?: string } | null): boolean {
+  if (outcome === null || outcome.ok) return false;
+
+  return (
+    outcome.code === ROTATION_EFFECTIVE_UNCHOSEN ||
+    outcome.code === ROTATION_EFFECTIVE_PAST ||
+    outcome.code === ROTATION_EFFECTIVE_TOO_FAR
+  );
+}

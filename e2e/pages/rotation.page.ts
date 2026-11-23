@@ -59,9 +59,11 @@ export class RotationPage extends BasePage {
   async addShiftType(name: string, times: readonly [string, string] | null): Promise<void> {
     await this.shiftTypeOpenButton.click();
     await this.page.getByLabel(shiftTypes.name, { exact: true }).fill(name);
+    // STORY 19.4 (O3): the dialog pre-selects no kind; the times appear once Radni is chosen.
     if (times === null) {
       await this.addShiftTypeKind.selectOption({ label: shiftTypes.nonworking });
     } else {
+      await this.addShiftTypeKind.selectOption({ label: shiftTypes.working });
       await this.page.getByLabel(shiftTypes.start, { exact: true }).fill(times[0]);
       await this.page.getByLabel(shiftTypes.end, { exact: true }).fill(times[1]);
     }
@@ -286,6 +288,19 @@ export class RotationPage extends BasePage {
 
   get effectiveFromInput(): Locator {
     return this.page.getByLabel(builder.effectiveFrom, { exact: true });
+  }
+
+  /**
+   * STORY 19.4 (O3): `Vrijedi od` opens EMPTY and a save is refused until a
+   * date is chosen. Chooses `date` — by default the organization's today, the
+   * input's `min` — unless one is chosen already. Call it while the input is
+   * on screen (on a phone, the stepper's step 3).
+   */
+  async chooseEffectiveFrom(date?: string): Promise<void> {
+    const input = this.effectiveFromInput;
+    if ((await input.inputValue()) !== '') return;
+    const today = await input.getAttribute('min');
+    await input.fill(date ?? today ?? '');
   }
 
   /** The step a team stands on, by the team's name. */

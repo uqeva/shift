@@ -262,7 +262,8 @@ test.describe('from 640 px up', () => {
     const rotation = await setUp(fixture.slug);
 
     await openBuilder(rotationPage);
-    await expect(rotationPage.effectiveFromInput).toHaveValue(rotation.today);
+    // Story 19.4 (O3): `Vrijedi od` opens empty.
+    await expect(rotationPage.effectiveFromInput).toHaveValue('');
     await rotationPage.addStep(rotation.steps[0]);
     await rotationPage.addStep(rotation.steps[2]);
     await expect(rotationPage.steps).toHaveCount(2);
@@ -280,7 +281,7 @@ test.describe('from 640 px up', () => {
     await rotationPage.discardButton.click();
     await expect(rotationPage.steps).toHaveCount(0);
     await expect(rotationPage.text(builder.patternEmpty)).toBeVisible();
-    await expect(rotationPage.effectiveFromInput).toHaveValue(rotation.today);
+    await expect(rotationPage.effectiveFromInput).toHaveValue('');
     await expect(hint).toHaveCount(0);
     await expect(rotationPage.saveButton).toBeFocused();
     await expect(rotationPage.discardButton).toHaveCount(0);
@@ -300,6 +301,8 @@ test.describe('from 640 px up', () => {
     await rotationPage.removeStepButton(1).click();
     await expect(rotationPage.steps).toHaveCount(0);
     await expect(rotationPage.discardButton).toBeVisible();
+
+    await rotationPage.chooseEffectiveFrom();
 
     await rotationPage.saveButton.click();
     await expect(rotationPage.alert).toHaveCount(1);
@@ -322,6 +325,7 @@ test.describe('from 640 px up', () => {
     await rotationPage.effectiveFromInput.fill(addDays(rotation.today, 1));
     await page.route(stall.matches, stall.handler);
     try {
+      await rotationPage.chooseEffectiveFrom();
       await rotationPage.saveButton.click();
       await stall.inFlight;
       await expect(rotationPage.discardButton).toBeDisabled();
@@ -400,7 +404,9 @@ test.describe('with no version in force', () => {
     await hold.ready;
 
     await openBuilder(rotationPage);
-    const today = await rotationPage.effectiveFromInput.inputValue();
+    // Story 19.4 (O3): the hint names a date only once one is chosen.
+    const today = (await rotationPage.effectiveFromInput.getAttribute('min')) ?? '';
+    await rotationPage.chooseEffectiveFrom(today);
     await rotationPage.openHistory();
     await expect(rotationPage.historyRow(builder.history.status.inForce)).toHaveCount(0);
     await rotationPage.closeHistory();
@@ -440,12 +446,17 @@ test.describe('at 390 px, on a touch phone', () => {
     const rotation = await setUp(fixture.slug);
 
     await openBuilder(rotationPage);
-    // Vrijedi od opens on today (hidden on step 1, read all the same).
-    await expect(rotationPage.effectiveFromInput).toHaveValue(rotation.today);
+    // Vrijedi od opens empty (story 19.4, O3; hidden on step 1, read all the same).
+    await expect(rotationPage.effectiveFromInput).toHaveValue('');
+    await expect(rotationPage.effectiveFromInput).toHaveAttribute('min', rotation.today);
     // Step 2, where the pattern is built.
     await rotationPage.nextButton(NEXT_LABELS[0]).tap();
     await rotationPage.addStep(rotation.steps[0]);
     await expect(rotationPage.steps).toHaveCount(1);
+    // Story 19.4 (O3): the hint names a date once one is chosen, on step 3.
+    await rotationPage.nextButton(NEXT_LABELS[1]).tap();
+    await rotationPage.chooseEffectiveFrom(rotation.today);
+    await rotationPage.backButton.tap();
 
     await expect(rotationPage.discardButton).toBeVisible();
     await expect(rotationPage.saveBar).toHaveAttribute('data-sticky', 'true');

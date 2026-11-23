@@ -259,7 +259,7 @@ export const FEATURE_PUBLIC = {
   'hour-bands': [
     // The generic time helpers (`minuteOfTime`, `durationValuesOf`)
     // moved to `utils/time`, so shift-types no longer reaches this module.
-    'services/list', // calendar, conflicts, hours, organization, swaps, today, pages
+    'services/list', // calendar, conflicts, hours, onboarding, organization, swaps, today, pages
     'services/write', // pages
   ],
   // Story 6.1b: *Danas*'s hours tile is *Sati*'s own surface for the
@@ -324,7 +324,7 @@ export const FEATURE_PUBLIC = {
   members: [
     // `NO_TEXT` and `shownDate` live in `utils/text`, shared by every feature
     // without reaching into this one.
-    'services/list', // conflicts, history, leave, teams, today, pages
+    'services/list', // conflicts, history, leave, onboarding, teams, today, pages
     'services/surface-keys', // leave (public: the member page's key set)
     'utils/position', // calendar, conflicts, history, swaps, teams
     'utils/rank', // calendar, conflicts, organization, swaps, teams
@@ -339,6 +339,15 @@ export const FEATURE_PUBLIC = {
     'services/role', // calendar, members, pages, router, teams, today
     'utils/destinations', // calendar, hours, leave, members, pages, today
   ],
+  // Story 19.4 (AD-24): the one progress hook, and the rules the setup steps'
+  // page composes with (the step list, each fact's state). It reads every
+  // other feature's facts through their own `services/list` query options and
+  // imports no other feature's write module (D3).
+  onboarding: [
+    'hooks/use-onboarding-progress', // pages
+    'services/progress', // pages
+    'services/steps', // pages
+  ],
   // Story 10.3: `/obavijesti` names its heading by the screen's one id.
   notifications: [
     'services/page-push', // auth, navigation, pages (story 10.4: a session's end forgets this device's push)
@@ -347,20 +356,22 @@ export const FEATURE_PUBLIC = {
     'utils/element-ids', // pages
   ],
   // Story 6.1b: *Danas*'s leave tile reads the leave year, as *Godišnji* does.
+  // STORY 19.4 (AD-24): the setup frame's lockup, and the progress hook's
+  // organization read (whether the card may be drawn at all).
   organization: [
-    'components/lockup', // navigation
-    'hooks/logo-url', // navigation
-    'services/snapshot', // conflicts, history, hour-bands, leave, members, navigation, teams, today
+    'components/lockup', // navigation, onboarding
+    'hooks/logo-url', // navigation, onboarding
+    'services/snapshot', // conflicts, history, hour-bands, leave, members, navigation, onboarding, teams, today
     'utils/accent', // navigation
   ],
   // Story 8.2d: `services/surface-keys` is *Postavke rotacije*'s one key set,
   // which the shift type hooks decide their offline freshness over with the builder.
   rotation: [
-    'services/list', // calendar, shift-types, teams
+    'services/list', // calendar, onboarding, shift-types, teams
     'services/surface-keys', // shift-types
   ],
   'shift-types': [
-    'services/list', // calendar, history, members, rotation, pages
+    'services/list', // calendar, history, members, onboarding, rotation, pages
     'services/write', // pages
   ],
   // Story 11.2: every save that can newly leave a working shift short of people
@@ -400,7 +411,7 @@ export const FEATURE_PUBLIC = {
     // absence-type writes (story 13.1b) use it like every other writer, and
     // teams reads organization's surface keys back (epic 13 retro A9).
     'services/dependents', // calendar, conflicts, hour-bands, leave, members, organization, rotation, shift-types, swaps
-    'services/list', // calendar, history, members, rotation, pages
+    'services/list', // calendar, history, members, onboarding, rotation, pages
     'services/roster', // pages, today
     'services/write', // pages
   ],

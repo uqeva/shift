@@ -139,10 +139,59 @@ export class LoginPage extends BasePage {
     return this.page.getByText(fill(hr.signup.sent.typed, { address }), { exact: true });
   }
 
-  /** *Pošalji ponovno*, while the throttle runs (its name carries the time). */
+  /**
+   * *Pošalji ponovno*, while the throttle runs. STORY 19.4 (D10): its name
+   * stays *Pošalji ponovno*; the countdown is visible text hidden from the
+   * accessibility tree, and the button is `aria-disabled` while it runs.
+   */
   get resendWaiting(): Locator {
     const [before = '', after = ''] = hr.signup.sent.resendIn.split('{time}');
-    return this.page.getByRole('button', { name: new RegExp(`^${before}\\d:\\d\\d${after}$`) });
+    return this.page
+      .getByRole('button', { name: hr.signup.sent.resend, exact: true })
+      .filter({ hasText: new RegExp(`${before}\\d:\\d\\d${after}`) })
+      .and(this.page.locator('[aria-disabled="true"]'));
+  }
+
+  /** Setup's forward control while the step's fact is missing (story 19.4, UX-DR65). */
+  get setupSkipLink(): Locator {
+    return this.page.getByRole('link', { name: hr.onboarding.frame.skip, exact: true });
+  }
+
+  /** A setup rail row by its step's name and its state's word, the number hidden (story 19.4). */
+  setupRailStep(step: string, state: string): Locator {
+    const escape = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return this.page.getByRole('link', { name: new RegExp(`^${escape(step)}\\s*${escape(state)}$`) }).first();
+  }
+
+  /** Setup's forward control once the step's fact exists: *Dalje: {step}* (story 19.4). */
+  setupNextLink(step: string): Locator {
+    return this.page.getByRole('link', { name: fill(hr.onboarding.frame.next, { step }), exact: true });
+  }
+
+  /** The *Danas* card's *Sakrij*, its confirmation, and a link to a step on it (story 19.4). */
+  get onboardingHideButton(): Locator {
+    return this.page.getByRole('button', { name: hr.onboarding.card.hide, exact: true });
+  }
+
+  get onboardingConfirmHide(): Locator {
+    return this.page.getByRole('button', { name: hr.onboarding.card.confirm, exact: true });
+  }
+
+  /**
+   * The *Danas* card's title (story 19.4): an h2 under *Danas*'s h1, so
+   * never `heading()`, which pins level 1.
+   */
+  onboardingCardTitle(title: string): Locator {
+    return this.page.getByRole('heading', { level: 2, name: title, exact: true });
+  }
+
+  onboardingCardLink(step: string): Locator {
+    return this.page.getByRole('link', { name: step, exact: true }).first();
+  }
+
+  /** The setup frame's *Izađi iz postavljanja*, to *Danas* (story 19.4). */
+  get setupExitLink(): Locator {
+    return this.page.getByRole('link', { name: hr.onboarding.frame.exit, exact: true });
   }
 
   get correctAddressButton(): Locator {

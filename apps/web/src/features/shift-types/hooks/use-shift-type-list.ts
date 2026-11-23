@@ -17,6 +17,7 @@ import {
 } from '@/features/shift-types/services/list';
 import {
   SHIFT_TYPE_NAME_FIELD,
+  SHIFT_TYPE_KIND_FIELD,
   SHIFT_TYPE_START_FIELD,
   SHIFT_TYPE_WORKING,
   SHIFT_TYPE_WRITE_REFUSED,
@@ -59,7 +60,9 @@ export function useShiftTypeList() {
   const endField = useRef<HTMLInputElement>(null);
   const creating = useRef(false);
   const [pending, setPending] = useState(false);
-  const [working, setWorking] = useState(true);
+  // STORY 19.4 (O3): no kind is pre-selected, so no times are offered until
+  // Radni is chosen.
+  const [working, setWorking] = useState(false);
   const [failure, setFailure] = useState<ShiftTypeWriteFailure | null>(null);
   const [saved, setSaved] = useState<ShiftTypeSaved | null>(null);
   const [adding, setAdding] = useState(false);
@@ -73,6 +76,10 @@ export function useShiftTypeList() {
   function openAdding(): void {
     setFailure(null);
     setSaved(null);
+    // STORY 19.4 (O3, review 1): every opening starts at Odaberi, so no times
+    // are offered from a kind left over from an earlier opening.
+    if (kindField.current !== null) kindField.current.value = NO_TEXT;
+    setWorking(false);
     setAdding(true);
   }
 
@@ -187,9 +194,13 @@ export function useShiftTypeList() {
         const field =
           next.failure === null ? SHIFT_TYPE_NAME_FIELD : refusedFieldOf(next.failure, SHIFT_TYPE_NAME_FIELD);
 
-        (field === SHIFT_TYPE_START_FIELD ? startField.current : name)?.focus();
+        if (field === SHIFT_TYPE_KIND_FIELD) kind.focus();
+        else (field === SHIFT_TYPE_START_FIELD ? startField.current : name)?.focus();
       } else {
         name.value = NO_TEXT;
+        // STORY 19.4 (O3): back to no kind, and so to no times.
+        kind.value = NO_TEXT;
+        setWorking(false);
         if (startField.current !== null) startField.current.value = NO_TEXT;
         if (endField.current !== null) endField.current.value = NO_TEXT;
         // Closed, and the outcome is on the page; focus returns to the

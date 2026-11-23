@@ -53,6 +53,10 @@ export const SETTINGS_SCREEN_PARTS = {
  */
 export const SETTINGS_SCREEN_EXEMPT: readonly { readonly file: string; readonly why: string }[] = [
   {
+    file: 'hooks/use-onboarding-dismiss.ts',
+    why: 'story 19.4: the onboarding card’s one dismiss write, drawn on Danas and swept with the setup frame (ONBOARDING); no copy',
+  },
+  {
     file: 'components/lockup.tsx',
     why: 'shared with the navigation chrome and swept on its own (LOCKUP); in the set its strings and controls would count twice',
   },

@@ -242,6 +242,8 @@ test('an admin builds a rotation, sees its figures and cycle, saves it, and it o
     await expect(await rotationPage.previewCell(teamName, row)).toContainText(name);
   }
 
+  await rotationPage.chooseEffectiveFrom();
+
   await rotationPage.saveButton.click();
   await expect(rotationPage.text(builder.saved)).toBeVisible();
 
@@ -257,6 +259,7 @@ test('an admin builds a rotation, sees its figures and cycle, saves it, and it o
   }
 
   // And saving it again unchanged is refused before anything is sent.
+  await rotationPage.chooseEffectiveFrom();
   await rotationPage.saveButton.click();
   await expect(rotationPage.text(builder.error.unchanged)).toBeVisible();
 
@@ -318,6 +321,7 @@ test('a saved rotation reports its coverage gap, duplicate and rest gap, and an 
   // next cycle every team works A, then B, then is free — so B is uncovered
   // on day 1, A on day 2, both on day 3; A is doubled on day 1 and B on day
   // 2; and A → B is 24 h of work with no free day between.
+  await rotationPage.chooseEffectiveFrom();
   await rotationPage.saveButton.click();
   const confirmation = rotationPage.savedConfirmation;
   await expect(confirmation).toBeVisible();
@@ -399,15 +403,19 @@ test('an admin schedules a change from tomorrow, sees it in the history, is refu
   }
   await expect(steps).toHaveCount(before + 2);
 
-  // `Vrijedi od` opens on today; the anchor stays where it was when it moves.
+  // `Vrijedi od` opens EMPTY (story 19.4, O3), offering today on; the anchor
+  // stays where it was when it moves.
   const effective = rotationPage.effectiveFromInput;
   const anchor = rotationPage.anchorInput;
-  await expect(effective).toHaveValue(organizationDate(0));
+  await expect(effective).toHaveValue('');
+  await expect(effective).toHaveAttribute('min', organizationDate(0));
   const anchored = await anchor.inputValue();
   await effective.fill(tomorrow);
   await expect(anchor).toHaveValue(anchored);
   // The preview starts on the effective date: its first date column is tomorrow.
   await expect(rotationPage.previewHeaders.nth(1)).toContainText(shownDate(tomorrow).slice(0, 6));
+
+  await rotationPage.chooseEffectiveFrom();
 
   await rotationPage.saveButton.click();
   await expect(rotationPage.savedConfirmation).toBeVisible();
@@ -425,6 +433,7 @@ test('an admin schedules a change from tomorrow, sees it in the history, is refu
   // offered beside the refusal.
   await newStep.selectOption({ label: a });
   await rotationPage.addStepButton.click();
+  await rotationPage.chooseEffectiveFrom();
   await rotationPage.saveButton.click();
   const refusal = rotationPage.scheduledRefusal;
   await expect(refusal).toBeVisible();
@@ -509,6 +518,7 @@ test('a save that fails after its pattern removes the pattern again, says nothin
   await page.route(matches, refuse);
   let patternId: string | undefined;
   try {
+    await rotationPage.chooseEffectiveFrom();
     await rotationPage.saveButton.click();
     const created = await patternCreated;
     expect(created.ok(), 'the pattern insert was refused').toBe(true);
@@ -709,6 +719,7 @@ test('a change saved over three overrides lists them for review; one is confirme
   await rotationPage.newStepSelect.selectOption({ label: rotation.steps[0] });
   await rotationPage.addStepButton.click();
   await rotationPage.effectiveFromInput.fill(addDays(rotation.today, 1));
+  await rotationPage.chooseEffectiveFrom();
   await rotationPage.saveButton.click();
   await expect(rotationPage.savedConfirmation).toContainText(fewForm(overrides.count, 3));
   await expect(rotationPage.overrideReviewRows).toHaveCount(3);

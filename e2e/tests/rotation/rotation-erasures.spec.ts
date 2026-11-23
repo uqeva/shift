@@ -165,6 +165,7 @@ test('a save that erases two conflicts waits until both are confirmed, by keyboa
   // Dan, Noć, then four Slobodno: today + 4 and + 5 fall free, and Dan
   // straight into Noć is the rest-gap warning the rules flag.
   await draftOf(rotationPage, rotation, [0, 1, 2, 2, 2, 2]);
+  await rotationPage.chooseEffectiveFrom();
   await rotationPage.saveButton.click();
 
   const dialog = rotationPage.erasureDialog(2);
@@ -233,6 +234,7 @@ test('a kept conflict holds the save, and going back keeps the draft and saves n
   const { rotation, person } = await setUp(fixture.slug, 4, 5);
 
   await draftAllFree(rotationPage, rotation);
+  await rotationPage.chooseEffectiveFrom();
   await rotationPage.saveButton.click();
   const dialog = rotationPage.erasureDialog(2);
   const rows = rotationPage.erasureRowsIn(dialog);
@@ -277,6 +279,7 @@ test('a conflict added while the confirmation is open shows the list again, unde
   const { rotation, person } = await setUp(fixture.slug, 4, 5);
 
   await draftAllFree(rotationPage, rotation);
+  await rotationPage.chooseEffectiveFrom();
   await rotationPage.saveButton.click();
   const first = rotationPage.erasureDialog(2);
   const firstRows = rotationPage.erasureRowsIn(first);
@@ -327,6 +330,7 @@ test('a save that keeps an existing conflict working erases nothing, and saves a
   await expect(conflictsPage.rowsOf(person.name)).toHaveCount(1);
 
   await draftOnly(rotationPage, rotation, 0);
+  await rotationPage.chooseEffectiveFrom();
   await rotationPage.saveButton.click();
 
   await expect(rotationPage.savedConfirmation).toBeVisible();
@@ -357,6 +361,7 @@ test('a roster override the change leaves pending is listed, its team still work
   // Every team on Dan from tomorrow: the seeded team still works that day,
   // but the change leaves the override pending, so the member is off its roster.
   await draftOnly(rotationPage, rotation, 0);
+  await rotationPage.chooseEffectiveFrom();
   await rotationPage.saveButton.click();
   const dialog = rotationPage.erasureDialog(1);
   const rows = rotationPage.erasureRowsIn(dialog);
@@ -382,6 +387,7 @@ test('a save whose erasures cannot be checked is refused, saves nothing, and the
 
   await draftAllFree(rotationPage, rotation);
   await page.route(records, (route) => route.fulfill({ status: 500, body: '{}' }));
+  await rotationPage.chooseEffectiveFrom();
   await rotationPage.saveButton.click();
 
   await expect(rotationPage.erasuresUnavailable).toBeVisible();

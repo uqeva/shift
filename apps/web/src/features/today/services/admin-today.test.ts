@@ -54,6 +54,7 @@ import {
   adminStatusShiftMessageKey,
   adminTodayOf,
   coverageAbsentMessageKey,
+  coverageHasNoTeamOf,
   coveragePhaseMessageKey,
   coveragePhaseOf,
   coverageShiftMessageKey,
@@ -65,6 +66,7 @@ import {
   weekCellMessageKey,
   weekOf,
   type AdminTodayView,
+  type Coverage,
 } from '@/features/today/services/admin-today';
 import {
   CASE_DUTY,
@@ -1409,5 +1411,18 @@ describe('Premalo ljudi, the words', () => {
     expect(t('danas.admin.shortStaffed.calm', { minimum: 5 })).toBe('Svaka smjena ovaj tjedan ima najmanje 5 ljudi.');
     expect(t('danas.admin.shortStaffed.heading')).toBe('Premalo ljudi');
     expect(t('danas.admin.shortStaffed.open')).toBe('Otvori kalendar');
+  });
+});
+
+describe('coverage with no team at all (story 19.4, UX-DR70)', () => {
+  const NONE = { rows: [], off: [], noRotation: [] };
+
+  it('is no team only when all three lists are empty', () => {
+    expect(coverageHasNoTeamOf(NONE)).toBe(true);
+    // Every team off today: teams exist, none works.
+    expect(coverageHasNoTeamOf({ ...NONE, off: ['Ekipa 1'] })).toBe(false);
+    // Every team with no rotation yet: teams exist.
+    expect(coverageHasNoTeamOf({ ...NONE, noRotation: ['Ekipa 1', 'Ekipa 2'] })).toBe(false);
+    expect(coverageHasNoTeamOf({ ...NONE, rows: [{} as Coverage['rows'][number]] })).toBe(false);
   });
 });

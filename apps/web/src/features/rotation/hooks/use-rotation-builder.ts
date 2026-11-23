@@ -34,6 +34,7 @@ import { ROTATION_SURFACE_KEYS, rotationSurfaceTimeZoneOf } from '@/features/rot
 import {
   ROTATION_CANCEL_STALE,
   ROTATION_WRITE_REFUSED,
+  effectiveFromRefusedOf,
   ROTATION_WRITE_UNAVAILABLE,
   cancelScheduledRotation,
   saveRotation,
@@ -79,6 +80,7 @@ import { writesOnline } from '@/lib/offline/use-write-gate';
 import { claimedOrganizationOf } from '@/lib/supabase/claims';
 import { supabaseClient } from '@/lib/supabase/client';
 import { focusLater } from '@/utils/focus-later';
+import { ROTATION_EFFECTIVE_FROM_ID } from '@/features/rotation/utils/element-ids';
 import { useCancelShortStaffed } from '@/features/rotation/hooks/use-cancel-short-staffed';
 import { useDraftShortStaffed } from '@/features/rotation/hooks/use-draft-short-staffed';
 
@@ -415,6 +417,14 @@ export function useRotationBuilder() {
     // saved and the date its versions apply from (story 2.6) — before the
     // draft re-opens below. They never block: the rows are already written.
     setOutcome(shownSaveOutcomeOf(saved, writable, current, current.effectiveFrom));
+
+    // STORY 19.4: a refused `Vrijedi od` takes focus to the field — on a
+    // phone, after the stepper reaches the step that holds it (3).
+    if (effectiveFromRefusedOf(saved)) {
+      showEffectiveFrom();
+
+      return;
+    }
 
     if (!saved.ok) return;
 
@@ -856,6 +866,13 @@ export function useRotationBuilder() {
     return (event: ChangeEvent<HTMLInputElement>): void => {
       change(withEffectiveFrom(current, event.target.value));
     };
+  }
+
+  /** The stepper on step 3, which holds `Vrijedi od`, and focus on the field (story 19.4). */
+  function showEffectiveFrom(): void {
+    for (let guard = 0; guard < 3 && rotationStepperStore.get().current < 3; guard += 1) rotationStepperStore.next();
+    if (rotationStepperStore.get().current > 3) rotationStepperStore.set(3);
+    focusLater([() => document.getElementById(ROTATION_EFFECTIVE_FROM_ID)], () => saveButton.current);
   }
 
   /**

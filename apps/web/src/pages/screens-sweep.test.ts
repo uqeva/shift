@@ -18,6 +18,7 @@ import {
 import { HOURS_SCREEN_EXEMPT, HOURS_SCREEN_PARTS } from '@/features/hours/hours-screen.fixture';
 import { LEAVE_SCREEN_EXEMPT, LEAVE_SCREEN_PARTS } from '@/features/leave/leave-screen.fixture';
 import { NOTIFICATIONS_SCREEN_EXEMPT } from '@/features/notifications/notifications-screen.fixture';
+import { ONBOARDING_SCREEN_EXEMPT } from '@/features/onboarding/onboarding-screens.fixture';
 import { CALENDAR_FEED_SCREEN_EXEMPT } from '@/features/calendar-feed/calendar-feed-screen.fixture';
 import { TODAY_SCREEN_EXEMPT } from '@/features/today/today-screen.fixture';
 import {
@@ -63,6 +64,10 @@ import {
   NOTIFICATIONS_FEATURE,
   NOTIFICATIONS_KEYS,
   NOTIFICATIONS_PAGE,
+  ONBOARDING,
+  ONBOARDING_FEATURE,
+  ONBOARDING_PAGE,
+  ONBOARDING_PROGRESS_KEYS,
   CALENDAR_FEED,
   CALENDAR_FEED_FEATURE,
   CALENDAR_FEED_KEYS,
@@ -328,7 +333,8 @@ describe('the screen is read at all, so every sweep below means something', () =
     // FORTY SINCE STORY 14.2: Povijest promjena.
     // FORTY-ONE SINCE STORY 19.2: the signup screens.
     // FORTY-THREE SINCE STORY 16.5: *Kalendar na mobitelu* and the member page's card.
-    expect(SCREENS).toHaveLength(43);
+    // FORTY-FOUR SINCE STORY 19.4: the setup frame and the *Danas* card.
+    expect(SCREENS).toHaveLength(44);
     //
     // FORTY-NINE SINCE STORY 3.6b: `@/features/calendar/services/roster-write`.
     //
@@ -413,7 +419,8 @@ describe('the screen is read at all, so every sweep below means something', () =
     // A HUNDRED AND FOUR SINCE ITS REVIEW: the month download's rules.
     // A HUNDRED AND FIVE SINCE STORY 17.1: the reminder settings rules.
     // A HUNDRED AND SIX SINCE STORY 19.3: step 1's rules.
-    expect(KEY_SOURCES).toHaveLength(106);
+    // A HUNDRED AND TEN SINCE STORY 19.4: the setup frame, its steps, its progress rules and its link rules.
+    expect(KEY_SOURCES).toHaveLength(110);
   });
 
   // Vacuous-pass guard. A renamed or moved file would make each "contains no"
@@ -759,6 +766,26 @@ describe('the screen is read at all, so every sweep below means something', () =
       found.filter((file) => !exempt.has(file)).sort(),
       'the calendar link file sets and the feature folder disagree',
     ).toEqual([...CALENDAR_FEED.filter((file) => file !== CALENDAR_FEED_PAGE), ...MEMBER_FEED_CARD].sort());
+  });
+
+  it('sweeps every part of the setup frame, so a new file cannot escape the set (story 19.4)', () => {
+    const exempt = new Set(ONBOARDING_SCREEN_EXEMPT.map((entry) => join(ONBOARDING_FEATURE, entry.file)));
+    const found = readdirSync(ONBOARDING_FEATURE, { recursive: true, encoding: 'utf8' })
+      .filter((name) => /\.tsx?$/.test(name) && !/\.test\.tsx?$/.test(name))
+      .map((name) => join(ONBOARDING_FEATURE, name));
+
+    expect(found, 'the walk reaches services/').toContain(ONBOARDING_PROGRESS_KEYS);
+    for (const file of exempt) expect(found, `${file} is exempt and does not exist`).toContain(file);
+    for (const entry of ONBOARDING_SCREEN_EXEMPT) expect(entry.why.length).toBeGreaterThan(20);
+    for (const file of ONBOARDING) {
+      expect(existsSync(file), `${file} is in the set and does not exist`).toBe(true);
+      expect(source(file).trim().length, `${file} is all but empty`).toBeGreaterThan(150);
+    }
+    expect(ONBOARDING[0], 'the page is read first').toBe(ONBOARDING_PAGE);
+    expect(
+      found.filter((file) => !exempt.has(file)).sort(),
+      'the setup frame file set and the feature folder disagree',
+    ).toEqual(ONBOARDING.filter((file) => file !== ONBOARDING_PAGE).sort());
   });
 
   it('sweeps every part of the notification settings screen, so a new file cannot escape the set', () => {

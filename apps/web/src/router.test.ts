@@ -64,6 +64,7 @@ import {
 } from '@/pages/organizacija.satni-pojasi';
 import { SetPasswordScreen, postaviLozinkuRoute } from '@/pages/postavi-lozinku';
 import { postavljanjeRoute } from '@/pages/postavljanje';
+import { setupStepRoute } from '@/pages/postavljanje.$step';
 import { registracijaRoute } from '@/pages/registracija';
 import { zaboravljenaLozinkaRoute } from '@/pages/zaboravljena-lozinka';
 import { PostavkeRotacijeScreen, postavkeRotacijeRoute } from '@/pages/postavke-rotacije';
@@ -523,6 +524,8 @@ describe('the shell route tree', () => {
       // email identity's placeholder (the layout's guard sends it there),
       // the link every Auth email opens, signup and email recovery.
       '/postavljanje',
+      // STORY 19.4. Setup's steps 2–7, outside the layout too (no shell).
+      '/postavljanje/$step',
       '/potvrda',
       '/prijava',
       '/prijava/$slug',
@@ -536,13 +539,24 @@ describe('the shell route tree', () => {
     for (const path of ['/registracija', '/potvrda', '/zaboravljena-lozinka', '/postavljanje']) {
       expect(match(path).map((matched) => matched.routeId), path).toEqual(['__root__', path]);
     }
+    // STORY 19.4 (D1): steps 2–7, outside the layout as well.
+    expect(match('/postavljanje/rotacija').map((matched) => matched.routeId)).toEqual(['__root__', '/postavljanje/$step']);
   });
 
   describe('the signup routes’ guards (story 19.2, AD-21, AD-24)', () => {
     type Guard = (options: {
-      context: { currentSession: () => Promise<Session | null>; isKnownPath?: (path: string) => boolean; endLocalSession?: () => Promise<void> };
+      context: {
+        currentSession: () => Promise<Session | null>;
+        isKnownPath?: (path: string) => boolean;
+        endLocalSession?: () => Promise<void>;
+        currentMemberRole?: (options?: unknown) => Promise<unknown>;
+      };
       search?: Record<string, unknown>;
+      params?: Record<string, string>;
+      location?: { href: string };
     }) => unknown;
+    const ADMIN_ROLE = (): Promise<unknown> => Promise.resolve({ ok: true, role: 'admin' });
+    const MEMBER_ROLE = (): Promise<unknown> => Promise.resolve({ ok: true, role: 'member_role' });
     const tokenOf = (claims: Record<string, unknown>): string =>
       `e30.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.signature`;
     const claimless = {
@@ -557,7 +571,12 @@ describe('the shell route tree', () => {
     async function outcomeOf(
       route: { options: unknown },
       session: Session | null,
-      extra: { endLocalSession?: () => Promise<void>; search?: Record<string, unknown> } = {},
+      extra: {
+        endLocalSession?: () => Promise<void>;
+        search?: Record<string, unknown>;
+        role?: (options?: unknown) => Promise<unknown>;
+        params?: Record<string, string>;
+      } = {},
     ): Promise<unknown> {
       const guard = (route.options as { beforeLoad?: Guard }).beforeLoad;
       if (typeof guard !== 'function') throw new Error('the route has no guard');
@@ -567,14 +586,18 @@ describe('the shell route tree', () => {
             context: {
               currentSession: () => Promise.resolve(session),
               isKnownPath: KNOWN_PATH,
+              currentMemberRole: extra.role ?? ADMIN_ROLE,
               ...(extra.endLocalSession === undefined ? {} : { endLocalSession: extra.endLocalSession }),
             },
             search: extra.search ?? {},
+            params: extra.params ?? {},
+            location: { href: '/postavljanje/rotacija' },
           }),
         };
       } catch (thrown) {
-        const options = (thrown as { options?: { to?: string; href?: string } }).options;
-        return options?.href === undefined ? { to: options?.to } : { href: options.href };
+        const options = (thrown as { options?: { to?: string; href?: string; params?: Record<string, string> } }).options;
+        if (options?.href !== undefined) return { href: options.href };
+        return options?.params === undefined ? { to: options?.to } : { to: options.to, params: options.params };
       }
     }
 
@@ -597,7 +620,9 @@ describe('the shell route tree', () => {
 
     it('holds only a claimless email identity at /postavljanje', async () => {
       expect(await outcomeOf(postavljanjeRoute, null)).toEqual({ to: '/prijava' });
-      expect(await outcomeOf(postavljanjeRoute, claimed)).toEqual({ href: '/' });
+      // STORY 19.4 (D1, D2): a claimed admin reaches step 2, anyone else Danas.
+      expect(await outcomeOf(postavljanjeRoute, claimed)).toEqual({ to: '/postavljanje/$step', params: { step: 'satni-pojasi' } });
+      expect(await outcomeOf(postavljanjeRoute, claimed, { role: MEMBER_ROLE })).toEqual({ to: '/danas' });
       expect(await outcomeOf(postavljanjeRoute, claimless)).toEqual({ returned: { email: 'ana@example.com' } });
       // STORY 19.3 (D6): a claimless username identity is signed out, through the context's stand-in.
       const orphan = { ...claimless, user: { id: 'ivan', email: 'ivan@dvd.shift.invalid', app_metadata: {} } } as unknown as Session;
@@ -615,8 +640,41 @@ describe('the shell route tree', () => {
 
     it('sends a claimed session to the carried return target, validated (story 19.3, D7)', async () => {
       expect(await outcomeOf(postavljanjeRoute, claimed, { search: { povratak: '/kalendar?tim=2' } })).toEqual({ href: '/kalendar?tim=2' });
-      expect(await outcomeOf(postavljanjeRoute, claimed, { search: { povratak: '//evil.example' } })).toEqual({ href: '/' });
-      expect(await outcomeOf(postavljanjeRoute, claimed, { search: { povratak: '/ne-postoji' } })).toEqual({ href: '/' });
+      // Review 1: a target the validator refuses counts as none, so the founder reaches step 2.
+      const stepTwo = { to: '/postavljanje/$step', params: { step: 'satni-pojasi' } };
+      expect(await outcomeOf(postavljanjeRoute, claimed, { search: { povratak: '//evil.example' } })).toEqual(stepTwo);
+      expect(await outcomeOf(postavljanjeRoute, claimed, { search: { povratak: '/ne-postoji' } })).toEqual(stepTwo);
+      expect(await outcomeOf(postavljanjeRoute, claimed, { search: { povratak: '/' } })).toEqual(stepTwo);
+    });
+
+    it('reads the role fresh after founding, never the pre-claim answer a stay would reuse (review 1)', async () => {
+      const asked: unknown[] = [];
+      const role = (options?: unknown): Promise<unknown> => {
+        asked.push(options);
+        return ADMIN_ROLE();
+      };
+      expect(await outcomeOf(postavljanjeRoute, claimed, { role })).toEqual({
+        to: '/postavljanje/$step',
+        params: { step: 'satni-pojasi' },
+      });
+      expect(asked).toEqual([{ reuse: false }]);
+    });
+
+    it('guards steps 2–7 as the layout does, then as an admin, and sends an unknown step to step 2 (story 19.4, D1)', async () => {
+      const step = { params: { step: 'rotacija' } };
+      expect(await outcomeOf(setupStepRoute, null, step)).toEqual({ to: '/prijava' });
+      expect(await outcomeOf(setupStepRoute, claimless, step)).toEqual({ to: '/postavljanje' });
+      expect(await outcomeOf(setupStepRoute, claimed, { ...step, role: MEMBER_ROLE })).toEqual({ to: DESTINATIONS[0].path });
+      expect(await outcomeOf(setupStepRoute, claimed, step)).toEqual({ returned: undefined });
+      expect(await outcomeOf(setupStepRoute, claimed, { params: { step: 'nepoznato' } })).toEqual({
+        to: '/postavljanje/$step',
+        params: { step: 'satni-pojasi' },
+      });
+      const flagged = {
+        ...claimed,
+        user: { id: 'founder', email: 'ana@example.com', app_metadata: { must_set_password: true } },
+      } as unknown as Session;
+      expect(await outcomeOf(setupStepRoute, flagged, step)).toEqual({ to: '/postavi-lozinku' });
     });
 
     it('keeps the confirmation line and the return target in its search (story 19.3, D7)', () => {

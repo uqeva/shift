@@ -57,6 +57,12 @@ import {
   WIRE_CODES,
   changeMemberStatus,
   chosenRole,
+  enteredRole,
+  newMemberChoiceOf,
+  NEW_MEMBER_LEAVE_FIELD,
+  NEW_MEMBER_ROLE_FIELD,
+  MEMBER_ALLOWANCE_EMPTY,
+  MEMBER_LEVEL_UNPICKED,
   createFormStateOf,
   createMember,
   editFailureOf,
@@ -732,6 +738,22 @@ describe('what the form collected, as the database stores it', () => {
     // a constraint. Falling back grants LESS, which is the harmless direction.
     expect(chosenRole('supervisor')).toBe(DEFAULT_MEMBER_ROLE);
     expect(chosenRole('')).toBe(DEFAULT_MEMBER_ROLE);
+  });
+
+  it('reads a new member’s level as none until one is chosen, never the default (story 19.4, O3)', () => {
+    expect(enteredRole('admin')).toBe('admin');
+    expect(enteredRole('member_role')).toBe('member_role');
+    expect(enteredRole('')).toBeNull();
+    expect(enteredRole('supervisor')).toBeNull();
+    expect(memberWriteMessageKey(MEMBER_LEVEL_UNPICKED)).toBe('ljudi.form.error.levelUnpicked');
+    expect(memberWriteMessageKey(MEMBER_ALLOWANCE_EMPTY)).toBe('ljudi.form.error.allowanceEmpty');
+  });
+
+  it('refuses a new member’s level, then days, in field order, before anything is sent (story 19.4, O3)', () => {
+    expect(newMemberChoiceOf('', '')).toEqual({ ok: false, code: MEMBER_LEVEL_UNPICKED, field: NEW_MEMBER_ROLE_FIELD });
+    expect(newMemberChoiceOf('member_role', ' ')).toEqual({ ok: false, code: MEMBER_ALLOWANCE_EMPTY, field: NEW_MEMBER_LEAVE_FIELD });
+    expect(newMemberChoiceOf('member_role', '-1')).toEqual({ ok: false, code: MEMBER_WRITE_INVALID, field: NEW_MEMBER_LEAVE_FIELD });
+    expect(newMemberChoiceOf('admin', '20')).toEqual({ ok: true, role: 'admin', leaveAllowanceDays: 20 });
   });
 
   it('reports a field holding no whole number as holding nothing', () => {

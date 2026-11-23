@@ -2306,7 +2306,7 @@ describe('organizations admits exactly one write path, and it is the settings su
     },
   );
 
-  it.skipIf(noDatabase)('grants authenticated UPDATE on exactly the eight writable columns', () => {
+  it.skipIf(noDatabase)('grants authenticated UPDATE on exactly the fifteen writable columns', () => {
     // The column allowlist as a fact about the database rather than about the
     // interface, and an EXACT set: a later migration re-granting the table — or
     // `grant all` written by habit — restores every column silently, and the
@@ -2367,6 +2367,9 @@ describe('organizations admits exactly one write path, and it is the settings su
         // written on its own disjoint shape.
         'minimum_members',
         'name',
+        // STORY 19.4. `0074` adds the onboarding card's dismissal with its own
+        // column grant, written on its own disjoint shape.
+        'onboarding_dismissed',
         'organization_type',
         'timezone',
         // MEMBER RANK. `0014` adds `uses_fire_ranks` with its own column grant,

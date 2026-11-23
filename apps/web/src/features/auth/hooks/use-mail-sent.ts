@@ -27,6 +27,8 @@ export function useMailSent(address: string, kind: SentKind, firstSentAt: number
   const [sentAt, setSentAt] = useState(firstSentAt);
   const [now, setNow] = useState(firstSentAt);
   const [resent, setResent] = useState(false);
+  // STORY 19.4 (D10): how many resends landed, so each one's status line is announced.
+  const [resends, setResends] = useState(0);
   const [failure, setFailure] = useState<ReturnType<typeof mailFailureMessageKey>>(null);
   const [pending, setPending] = useState(false);
   const sending = useRef(false);
@@ -62,6 +64,7 @@ export function useMailSent(address: string, kind: SentKind, firstSentAt: number
         setSentAt(instant);
         setNow(instant);
         setResent(true);
+        setResends((count) => count + 1);
 
         return;
       }
@@ -77,7 +80,7 @@ export function useMailSent(address: string, kind: SentKind, firstSentAt: number
     }
   }
 
-  return { address, signup: kind === SENT_SIGNUP, secondsLeft, waiting, resent, failure, pending, resend };
+  return { address, signup: kind === SENT_SIGNUP, secondsLeft, waiting, resent, resends, failure, pending, resend };
 }
 
 export type MailSentScreenState = ReturnType<typeof useMailSent>;

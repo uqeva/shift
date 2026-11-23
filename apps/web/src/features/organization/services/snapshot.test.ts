@@ -274,7 +274,38 @@ describe('one PostgREST row becomes the canonical snapshot', () => {
       emailNotifications: true,
       minimumMembers: 3,
       carryOver: null,
+      foundedBySignup: false,
+      onboardingDismissed: false,
     });
+  });
+
+  it('reads founded_by as a boolean and never keeps the uuid, and the dismissal as itself (story 19.4, D4)', () => {
+    const founded = organizationSnapshotOf({
+      ...PILOT_ROW,
+      founded_by: '7b0c1f5e-0000-4000-8000-000000000001',
+      onboarding_dismissed: true,
+    });
+
+    expect(founded?.foundedBySignup).toBe(true);
+    expect(founded?.onboardingDismissed).toBe(true);
+    expect(JSON.stringify(founded)).not.toContain('7b0c1f5e');
+    // Null, or a row without the columns (a fixture): operator-provisioned, not dismissed.
+    expect(organizationSnapshotOf({ ...PILOT_ROW, founded_by: null, onboarding_dismissed: false })).toMatchObject({
+      foundedBySignup: false,
+      onboardingDismissed: false,
+    });
+    expect(organizationSnapshotOf({ ...PILOT_ROW, onboarding_dismissed: 'true' })?.onboardingDismissed).toBe(false);
+  });
+
+  it('selects both columns, and writes the dismissal as its one column (story 19.4)', () => {
+    expect(ORGANIZATION_COLUMNS.split(',')).toEqual(expect.arrayContaining(['founded_by', 'onboarding_dismissed']));
+    expect(organizationEditColumns({ onboardingDismissed: true })).toEqual({ onboarding_dismissed: true });
+    // @ts-expect-error the dismissal may not carry the name
+    const withName: OrganizationWrite = { onboardingDismissed: true, name: 'x' };
+    // @ts-expect-error no write carries founded_by
+    const withFounder: OrganizationWrite = { onboardingDismissed: true, foundedBySignup: true };
+    expect(withName).toBeDefined();
+    expect(withFounder).toBeDefined();
   });
 
   it('carries the carry-over setting when all four are set, and reads anything else as none (story 13.4)', () => {
@@ -986,6 +1017,10 @@ describe('the update writes the edited fields and answers with the row', () => {
       { usesFireRanks: true, minimumMembers: 3 },
       // @ts-expect-error not the carry-over setting
       { usesFireRanks: true, carryOver: null },
+      // @ts-expect-error not the founding (story 19.4)
+      { usesFireRanks: true, foundedBySignup: true },
+      // @ts-expect-error not the onboarding dismissal (story 19.4)
+      { usesFireRanks: true, onboardingDismissed: true },
     ];
     const snapshotFields = Object.keys(organizationSnapshotOf(PILOT_ROW) ?? {}).filter(
       (field) => field !== 'usesFireRanks',

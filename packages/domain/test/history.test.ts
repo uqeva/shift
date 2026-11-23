@@ -1004,7 +1004,7 @@ describe('every real change names a field (retro A4)', () => {
     );
   });
 
-  /** Every column of the 23 audited tables as 0002–0073 leave them (0067's recorder drops `token_hash` and `last_fetched_at`), with a value of its type. */
+  /** Every column of the 23 audited tables as 0002–0074 leave them (0067's recorder drops `token_hash` and `last_fetched_at`), with a value of its type. */
   const AT = '2026-11-10T08:00:00+00:00';
   const BOOKKEEPING = { organization_id: ORG, created_by: ANA_AUTH, created_at: AT };
   const LIVE = { removed_by: null, removed_at: null };
@@ -1034,6 +1034,7 @@ describe('every real change names a field (retro A4)', () => {
       carry_over_first_leave_year: 2026,
       founded_by: ANA_AUTH,
       suspended: false,
+      onboarding_dismissed: false,
     },
     members: {
       organization_id: ORG,

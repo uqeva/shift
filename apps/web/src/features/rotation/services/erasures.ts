@@ -11,7 +11,7 @@ import {
 import { rotationTeamsOf, type RotationSnapshot } from '@/features/rotation/services/list';
 import {
   draftAssignmentOf,
-  draftRefusalOf,
+  previewRefusalOf,
   draftStepsOf,
   normalizedDraftOf,
   type RotationDraft,
@@ -169,7 +169,8 @@ export function draftShortStaffedOf(
     // ONE NORMALISED DRAFT for the refusal, the after and the window, as the save binds it.
     const draft = normalizedDraftOf(entered, rotationTeamsOf(rotation));
 
-    if (draftRefusalOf(rotation, draft, today) !== null) return null;
+    // STORY 19.4: a `Vrijedi od` not chosen yet refuses the save, never the preview.
+    if (previewRefusalOf(rotation, draft, today) !== null) return null;
 
     sameActiveTeamsOf(calendar, rotation);
 

@@ -1,10 +1,10 @@
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 
 import { OfflineWriteNote } from '@/components/offline-write-note';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import type { MailSentScreenState } from '@/features/auth/hooks/use-mail-sent';
-import { countdownOf } from '@/features/auth/services/signup';
+import { RESEND_WAIT_SECONDS, countdownOf } from '@/features/auth/services/signup';
 import { t } from '@/lib/i18n';
 import { useWriteGate } from '@/lib/offline/use-write-gate';
 
@@ -29,7 +29,9 @@ export function MailSentPanel({
   readonly screen: MailSentScreenState;
   readonly onCorrect: () => void;
 }): ReactNode {
-  const { address, signup, secondsLeft, waiting, resent, failure, pending, resend } = screen;
+  const { address, signup, secondsLeft, waiting, resent, resends, failure, pending, resend } = screen;
+  // STORY 19.4 (D10, the 19.2 deferral): the wait is said once, statically.
+  const waitId = useId();
   // Offline, the resend says why it does nothing (story 8.3a's gate).
   const gate = useWriteGate();
 
@@ -45,7 +47,13 @@ export function MailSentPanel({
         </Button>
         <p className="text-muted-foreground">{t('signup.sent.note')}</p>
       </div>
-      {resent ? <Notice role="status">{t('signup.sent.resent')}</Notice> : null}
+      {/* KEYED BY THE RESEND (D10): each landed resend mounts the status
+          line anew, so a second one is announced again. */}
+      {resent ? (
+        <Notice key={resends} role="status">
+          {t('signup.sent.resent')}
+        </Notice>
+      ) : null}
       {failure === null ? null : <Notice role="alert">{t(failure)}</Notice>}
       <OfflineWriteNote gate={gate} />
       <Button
@@ -53,14 +61,26 @@ export function MailSentPanel({
         variant="outline"
         className="h-11 w-full aria-disabled:opacity-50"
         aria-disabled={gate.disabled || waiting || pending}
-        aria-describedby={gate.describedBy()}
+        aria-describedby={gate.describedBy(waiting ? waitId : null)}
         aria-busy={pending}
         onClick={() => {
           void resend();
         }}
       >
-        {waiting ? t('signup.sent.resendIn', { time: countdownOf(secondsLeft) }) : t('signup.sent.resend')}
+        {/* THE NAME STAYS `Pošalji ponovno` (D10): the countdown is visible
+            text hidden from the accessibility tree, so no screen reader
+            re-reads the button each second; the wait is its description. */}
+        <span className="sr-only">{t('signup.sent.resend')}</span>
+        <span aria-hidden>
+          {waiting ? t('signup.sent.resendIn', { time: countdownOf(secondsLeft) }) : t('signup.sent.resend')}
+        </span>
       </Button>
+      {/* ONLY WHILE IT WAITS, and said once: the time left is never re-read each second. */}
+      {waiting ? (
+        <p id={waitId} className="sr-only">
+          {t('signup.sent.resendWait', { seconds: RESEND_WAIT_SECONDS })}
+        </p>
+      ) : null}
     </div>
   );
 }

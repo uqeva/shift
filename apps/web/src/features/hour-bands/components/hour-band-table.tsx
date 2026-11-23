@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Clock, PencilSimple } from '@/components/ui/icon';
 import { IconTile } from '@/components/ui/icon-tile';
 import { StackedField, StackedFields, StackedList, StackedRow } from '@/components/ui/stacked-list';
@@ -46,6 +46,13 @@ export function HourBandTable({ rows }: { readonly rows: readonly HourBandDispla
           {t('organization.hourBands.count', { count: rows.length })}
         </Badge>
       </CardHeader>
+      {/* STORY 19.4 (UX-DR67, 70): no band yet says the fact and what the first does. */}
+      {rows.length === 0 ? (
+        <CardContent className="grid gap-1 border-t p-4 text-sm">
+          <p className="font-semibold">{t('organization.hourBands.empty')}</p>
+          <p className="text-muted-foreground">{t('organization.hourBands.emptyNext')}</p>
+        </CardContent>
+      ) : null}
       {rows.length === 0 ? null : isPhone ? (
         <StackedList aria-label={heading} className="border-t">
           {rows.map((row) => (

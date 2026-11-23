@@ -77,6 +77,11 @@ export const SHIFT_TYPE_WRITE_INVALID = 'SHIFT_TYPE_WRITE_INVALID';
 export const SHIFT_TYPE_WRITE_UNAVAILABLE = 'SHIFT_TYPE_WRITE_UNAVAILABLE';
 /** The route names a type the list does not hold. */
 export const SHIFT_TYPE_UNKNOWN = 'SHIFT_TYPE_UNKNOWN';
+/**
+ * No kind was chosen (story 19.4, O3, FR-97): the add dialog pre-selects
+ * neither, so the kind is the person's choice. Refused before anything is sent.
+ */
+export const SHIFT_TYPE_KIND_MISSING = 'SHIFT_TYPE_KIND_MISSING';
 
 export type ShiftTypeWriteFailure =
   | typeof SHIFT_TYPE_NAME_EMPTY
@@ -93,7 +98,8 @@ export type ShiftTypeWriteFailure =
   | typeof SHIFT_TYPE_WRITE_REFUSED
   | typeof SHIFT_TYPE_WRITE_INVALID
   | typeof SHIFT_TYPE_WRITE_UNAVAILABLE
-  | typeof SHIFT_TYPE_UNKNOWN;
+  | typeof SHIFT_TYPE_UNKNOWN
+  | typeof SHIFT_TYPE_KIND_MISSING;
 
 export type ShiftTypeWriteOutcome =
   | { readonly ok: true }
@@ -171,9 +177,15 @@ export type ShiftTypeKind = typeof SHIFT_TYPE_WORKING | typeof SHIFT_TYPE_NONWOR
 /** The two kinds, in the order the add form offers them. */
 export const SHIFT_TYPE_KINDS: readonly ShiftTypeKind[] = [SHIFT_TYPE_WORKING, SHIFT_TYPE_NONWORKING];
 
-/** The kind a `<select>` value names; anything else reads as working, the default. */
-export function shiftTypeKindOf(value: string): ShiftTypeKind {
-  return value === SHIFT_TYPE_NONWORKING ? SHIFT_TYPE_NONWORKING : SHIFT_TYPE_WORKING;
+/**
+ * The kind a `<select>` value names, or `null` for none chosen (story 19.4,
+ * O3): nothing is pre-selected, so an empty or unknown value is no kind.
+ */
+export function shiftTypeKindOf(value: string): ShiftTypeKind | null {
+  if (value === SHIFT_TYPE_NONWORKING) return SHIFT_TYPE_NONWORKING;
+  if (value === SHIFT_TYPE_WORKING) return SHIFT_TYPE_WORKING;
+
+  return null;
 }
 
 /** The label of a kind. Exhaustive. */
@@ -492,7 +504,8 @@ export async function cancelScheduledTimes(
 /** What the add form holds. */
 export interface EnteredShiftType {
   readonly name: string;
-  readonly kind: ShiftTypeKind;
+  /** `null` until one is chosen (story 19.4, O3): refused, nothing sent. */
+  readonly kind: ShiftTypeKind | null;
   /** Read only for a working type. */
   readonly start: string;
   readonly end: string;
@@ -526,6 +539,7 @@ export async function createShiftType(
   const name = enteredShiftTypeName(entered.name);
 
   if (name === null) return { ok: false, code: SHIFT_TYPE_NAME_EMPTY };
+  if (entered.kind === null) return { ok: false, code: SHIFT_TYPE_KIND_MISSING };
 
   const working = entered.kind === SHIFT_TYPE_WORKING;
   const times = working ? enteredTimesOf(entered.start, entered.end) : null;
@@ -626,8 +640,10 @@ export const SHIFT_TYPE_NAME_FIELD = 'name';
 export const SHIFT_TYPE_START_FIELD = 'start';
 export const SHIFT_TYPE_END_FIELD = 'end';
 export const SHIFT_TYPE_DATE_FIELD = 'date';
+export const SHIFT_TYPE_KIND_FIELD = 'kind';
 
 export type ShiftTypeField =
+  | typeof SHIFT_TYPE_KIND_FIELD
   | typeof SHIFT_TYPE_NAME_FIELD
   | typeof SHIFT_TYPE_START_FIELD
   | typeof SHIFT_TYPE_END_FIELD
@@ -645,6 +661,7 @@ export function marksField(failure: ShiftTypeWriteFailure | null, field: ShiftTy
     return field === SHIFT_TYPE_START_FIELD || field === SHIFT_TYPE_END_FIELD;
   }
   if (failure === SHIFT_TYPE_DATE_INVALID) return field === SHIFT_TYPE_DATE_FIELD;
+  if (failure === SHIFT_TYPE_KIND_MISSING) return field === SHIFT_TYPE_KIND_FIELD;
 
   return false;
 }
@@ -662,6 +679,7 @@ export function refusedFieldOf(
   }
   if (failure === SHIFT_TYPE_TIME_INVALID) return SHIFT_TYPE_START_FIELD;
   if (failure === SHIFT_TYPE_DATE_INVALID) return SHIFT_TYPE_DATE_FIELD;
+  if (failure === SHIFT_TYPE_KIND_MISSING) return SHIFT_TYPE_KIND_FIELD;
 
   return fallback;
 }
@@ -686,7 +704,8 @@ export function shiftTypeWriteMessageKey(
   | 'rotation.shiftTypes.error.refused'
   | 'rotation.shiftTypes.error.invalid'
   | 'rotation.shiftTypes.error.saveUnavailable'
-  | 'rotation.shiftTypes.error.unknown' {
+  | 'rotation.shiftTypes.error.unknown'
+  | 'rotation.shiftTypes.error.kindMissing' {
   switch (failure) {
     case SHIFT_TYPE_NAME_EMPTY:
       return 'rotation.shiftTypes.error.nameEmpty';
@@ -718,6 +737,8 @@ export function shiftTypeWriteMessageKey(
       return 'rotation.shiftTypes.error.saveUnavailable';
     case SHIFT_TYPE_UNKNOWN:
       return 'rotation.shiftTypes.error.unknown';
+    case SHIFT_TYPE_KIND_MISSING:
+      return 'rotation.shiftTypes.error.kindMissing';
     default: {
       const unhandled: never = failure;
 
