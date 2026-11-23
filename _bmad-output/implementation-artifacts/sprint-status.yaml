@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 14:26
-last_updated: 11-23-2026 21:45
+last_updated: 11-23-2026 22:29
 project: shift
 project_key: NOKEY
 tracking_system: file-system
@@ -705,13 +705,13 @@ development_status:
   18-5-loans-are-visible-wherever-rosters-are-read: done  # #332
   epic-18-retrospective: done
 
-  epic-19: in-progress  # self-service signup (CAP-28); staging only; production opening is D-S5 (security review, then the founder's go)
+  epic-19: done  # accepted with open items, 2026-11-23 (retro): #341, #344, #349, #352, #354 merged with CI green (after AP2 #338 and the UX review #340); signup is staging-only and staging's door stays shut until a mail domain exists (retro A2); founder items open (retro A1 promotion of 0066/0068/0071/0073/0074, A3 the D-S5 security review and its decisions, A4 the terms/privacy link, O2); production opening is D-S5 (checklist section H), the founder's separate go
   19-1-the-signup-door-opens-safely-on-staging: done  # #341
   19-2-a-stranger-creates-an-account: done  # #344
   19-3-a-verified-account-creates-its-organization: done  # #349
-  19-4-the-onboarding-wizard-guides-setup-and-pre-fills-nothing: review  # built, CI pending
-  19-5-abandoned-signups-are-cleaned-up-and-the-operator-keeps-cont: review  # built, CI pending
-  epic-19-retrospective: optional
+  19-4-the-onboarding-wizard-guides-setup-and-pre-fills-nothing: done  # #354
+  19-5-abandoned-signups-are-cleaned-up-and-the-operator-keeps-cont: done  # #352
+  epic-19-retrospective: done
 
   # Self-hosting (Epic 20), added 2026-11-20 by
   # _bmad-output/planning-artifacts/sprint-change-proposal-2026-11-20-self-hosting.md
@@ -1423,3 +1423,82 @@ action_items:
     owner: "Perolipotic (process); dev for toml edits"
     status: done  # bmad-build.toml: no pattern kills, provisioning inventories (+ unrun-DB-test layer), orchestrator gitleaks before every push; chore/retro-housekeeping-and-pdfmake (spec-retro-housekeeping-2026-11-23; built, CI pending)
     ref: "_bmad-output/implementation-artifacts/epic-17-retro-2026-11-22.md"
+  - id: "epic-19-retro-item-91-a1-approve-promoting-0066-0068-0071-0073"
+    epic: 19
+    action: "A1 Approve promoting 0066, 0068, 0071, 0073 and 0074 past staging, in
+      the queue with epic 14 A2 (0061), epic 18 A3 (0062-0064), epic 16 A3 (0065,
+      0067) and epic 17 A1 (0069, 0070, 0072); 0073 arms the nightly housekeeping
+      deletion job wherever applied"
+    owner: "Perolipotic (founder)"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-19-retro-2026-11-23.md"
+  - id: "epic-19-retro-item-92-a2-once-there-is-a-mail-domain-founder-p"
+    epic: 19
+    action: "A2 Once there is a mail domain: founder picks domain and Resend account;
+      operator sets staging GoTrue SMTP key, SHIFT_AUTH_EMAIL_FROM and RESEND_API_KEY
+      and opens the door (deferred-work :1862, DEPLOY.md 9.4/9.9); real confirmation,
+      recovery and resend emails; the enumeration probe and B5 on staging (:1950,
+      :1989); measure B8 timing; A7/A8 limit and client-IP probes, G2 log search;
+      one housekeeping night in cron.job_run_details"
+    owner: "Perolipotic (founder) for domain and credentials; then operator or dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-19-retro-2026-11-23.md"
+  - id: "epic-19-retro-item-93-a3-run-the-d-s5-security-review-of-19-1"
+    epic: 19
+    action: "A3 Run the D-S5 security review of 19.1-19.5 against SECURITY-REVIEW-EPIC-19.md
+      A-H with A2's results; founder decides A10 (DoS, AAAA), B2/F1, B8, C9 and the
+      signed-in device (:1962, :1986), suspension residuals (:2088), the report for
+      A10 (:2097), production door observation (:1883), second factor, and epic 17
+      A3; dev closes D6 (full rls-isolation on a self-provisioned fixture, :2064);
+      production opens only by section H, ending in the founder's go"
+    owner: "Perolipotic (founder) decides; dev runs the review and D6"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-19-retro-2026-11-23.md"
+  - id: "epic-19-retro-item-94-a4-o2-founder-decision-2026-11-23-before"
+    epic: 19
+    action: "A4 O2 (founder decision 2026-11-23): before production signup, /registracija
+      links to terms and a privacy notice; founder supplies the texts or URLs; a story
+      builds the link (hr.json, test) and adds it to checklist section H"
+    owner: "Perolipotic (founder) for the texts; PO to schedule; dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-19-retro-2026-11-23.md"
+  - id: "epic-19-retro-item-95-a5-docs-reconciliation-after-the-founder"
+    epic: 19
+    action: "A5 Docs reconciliation after the founder's decisions (cite founder-decisions-2026-11-23.md
+      once on main): UX README, epics.md epic 19 header (D-S10 pending, :3150) and
+      UX pending lines (:3156, :3251), EXPERIENCE/DESIGN pending markers to accepted
+      2026-11-23; mark deferred-work :2091 settled (deletion rules accepted); re-own
+      :1959/:1971/:2106/:2109; record F2 beside AD-24; on founder confirmation move
+      19.4's Preskoci za sada bullet into its frozen Epic AC Deviations"
+    owner: "dev; the frozen-block move needs the founder's confirmation"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-19-retro-2026-11-23.md"
+  - id: "epic-19-retro-item-96-a6-po-triage-of-unowned-epic-19-deferral"
+    epic: 19
+    action: "A6 PO triage of unowned epic 19 deferrals: :1832 username PATCH, :1886
+      template outage, :1889 busybox in CI, :1968 remaining signup e2e, :2067 timezone
+      parity under edge-runtime, :2070 step 1 D2 half, :2079 C8 and admin createUser,
+      :1971 recovery dead-link sentence, :2106 Sati fresh-org line, :2109 rotation
+      picker"
+    owner: "PO (founder)"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-19-retro-2026-11-23.md"
+  - id: "epic-19-retro-item-97-a7-before-production-20-8-gives-housekee"
+    epic: 19
+    action: "A7 Before production, 20.8 gives housekeeping a durable per-run record
+      and an alert on a failed run, failed > 0 or a stopped job (deferred-work :2094;
+      Postgres drops its LOG lines)"
+    owner: "20.8 (dev/operator)"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-19-retro-2026-11-23.md"
+  - id: "epic-19-retro-item-98-a8-process-bmad-build-toml-set-a-story-d"
+    epic: 19
+    action: "A8 Process (bmad-build.toml): set a story done and rewrite its spec in
+      a status chore right after its PR merges green, and list merged-but-review stories
+      in each PR (19.5 lagged through #353 and #354); add the DB-free root test refusing
+      absolute local paths in _bmad-output/_bmad (deferred-work :2100; #354 committed
+      one); a story adding a grant, route guard or auth path gets a security pass;
+      a spec names the root files it ran locally"
+    owner: "Perolipotic (process); dev for toml edits and the test"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-19-retro-2026-11-23.md"

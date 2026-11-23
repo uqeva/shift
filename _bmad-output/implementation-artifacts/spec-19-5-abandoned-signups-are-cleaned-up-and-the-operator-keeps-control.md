@@ -2,7 +2,7 @@
 title: '19.5 Abandoned signups are cleaned up and the operator keeps control'
 type: 'feature'
 created: '2026-11-21'
-status: 'in-review'
+status: 'done'
 baseline_commit: 'b5e0c94df104a638e7332e1abe4191ef643548bb'
 review_loop_iteration: 1
 context:
@@ -10,7 +10,7 @@ context:
   - '{project-root}/_bmad-output/planning-artifacts/architecture/architecture-shift-2026-09-02/SECURITY-REVIEW-EPIC-19.md'
 ---
 
-Status: review, built, reviewed (five layers) and security-reviewed (2026-11-22), rebased onto 17.3's merge (#350); CI pending. Unattended run: the checkpoint was taken as approved, the founder having said not to ask questions; the orchestrating session wrote the spec and implemented it directly rather than through a fresh implementation subagent.
+Status: done. Merged as #352, squashed to `1f28f17bcce0ed51897190333b31052797109c03` (2026-11-22), with `CI passed` green on the branch's first and only pipeline run (run 44978789771, head `83d08fd`: 13 jobs passed, 5 deploy and smoke jobs skipped on a PR branch). No fix was pushed only for CI. Every DB case written unrun passed there: `test/housekeeping.test.ts` (6), `test/suspended-organization.test.ts` (11), the moved sweep in `test/claimless-account.test.ts` (11) and `test/provisioning.test.ts` (323). Set `done` by the epic 19 retrospective (2026-11-23), which rewrote this spec as merged. Built and reviewed (five layers), security-reviewed (2026-11-22) and rebased onto 17.3's merge (#350) before the push. Unattended run: the checkpoint was taken as approved, the founder having said not to ask questions; the orchestrating session wrote the spec and implemented it directly rather than through a fresh implementation subagent.
 
 Baseline: `origin/main` at #349 (19.3 merged, 0071). Story 17.3 runs in parallel and takes migration 0072, so this story's migration is **0073**. On the orchestrator's word that 17.3 merges first, 0073's `claim_notifications` is re-created from **0072's** definition (`origin/feat/17-3-reminder-delivery` at `33a1cf4`, the `REMINDER_LATE` settle kept), so this branch must be rebased onto 17.3's merge before CI can pass: without 0072 the migration chain fails at 0073 (`private.reminder_late`) and three scaffold cases fail. No `hr.json` edit (17.3 holds the hot file); no UI change.
 
@@ -94,7 +94,7 @@ Decisions (the founder said decide and record):
 **Commands (2026-11-22, after review):**
 - `pnpm typecheck`, `pnpm lint`, `pnpm build` -- pass. `pnpm --filter @shift/domain test` -- 22 files, 975 tests pass. `pnpm --filter ./apps/web test` -- 184 files, 6859 tests pass.
 - The eight allowed root files, built first, with 17.3's `0072` copied in uncommitted (the state after the rebase) -- 8 files, 3106 tests pass. Without it (this branch alone) -- 3 scaffold cases fail, as expected: the no-gap case, 0070's "no later definition" case and 0073's word-for-word case (its claim's source is 0072).
-- Written unrun, CI is their first run: `test/housekeeping.test.ts`, `test/suspended-organization.test.ts`, the moved sweep in `test/claimless-account.test.ts`, `test/provisioning.test.ts`'s entries.
+- Written unrun, CI is their first run: `test/housekeeping.test.ts`, `test/suspended-organization.test.ts`, the moved sweep in `test/claimless-account.test.ts`, `test/provisioning.test.ts`'s entries. CI: all passed on run 44978789771 (#352), the branch's first run.
 
 **Manual checks:**
 - In-process PGlite (scratch, not committed) over a stand-in for Supabase's `auth`, `storage`, `cron`, `net` and `vault`: 0001–0073 apply (0072 from 17.3's branch); a re-sent link 9 days old goes, one 2 days old and a banned account stay; a row whose delete raises is counted `failed` and the rest still go; the provision script makes two organizations; the job deletes exactly the 8-day unconfirmed and the 31-day confirmed email identities of twelve, keeps members, synthesized (three spellings), no-address, malformed and `founded_by` accounts, cascades identities, purges one of two attempts, and a second run deletes nothing; the suspend script turns the admin's reads (5 rows) to 0, the hook to `SIGN_IN_REFUSED`, the feed to null, the reminder read to nothing, the swap check to false, a queued row to `ORGANIZATION_SUSPENDED`, `notify_members` to no row, while the other organization is unchanged; unsuspend restores all of it and the settled row stays settled; the report prints.
@@ -158,4 +158,4 @@ Unattended, on `git diff origin/main...HEAD`, against `SECURITY-REVIEW-EPIC-19.m
 - An explicit `swap_parties_active` case: the suspended sweep plus the static definer scan cover it.
 - The deletion job being armed before the founder accepts: the founder delegated it ("Ask First: none"). On every stack the door is closed or the accounts are members, so only true abandoned signups qualify, and the breaker now bounds an error.
 
-**Verification (2026-11-22, after the patches).** `pnpm typecheck`, `pnpm lint` and `pnpm build` pass. The ten root files pass: 10 files, 3180 tests. The changed function, run in a scratch PGlite (not committed) over stand-in tables, halted at a ceiling below its count with nothing deleted, then deleted the two healthy accounts and counted the restricted one `failed`. Unrun, with CI as their first run: `test/housekeeping.test.ts` (the three new cases), `test/suspended-organization.test.ts` (the extended settle and report cases), the moved sweep, and `test/provisioning.test.ts`.
+**Verification (2026-11-22, after the patches).** `pnpm typecheck`, `pnpm lint` and `pnpm build` pass. The ten root files pass: 10 files, 3180 tests. The changed function, run in a scratch PGlite (not committed) over stand-in tables, halted at a ceiling below its count with nothing deleted, then deleted the two healthy accounts and counted the restricted one `failed`. Unrun, with CI as their first run: `test/housekeeping.test.ts` (the three new cases), `test/suspended-organization.test.ts` (the extended settle and report cases), the moved sweep, and `test/provisioning.test.ts`. CI: all passed on run 44978789771 (#352). The lock races (F2) ran there for the first time; PGlite's single connection could not run them.
