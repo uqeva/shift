@@ -177,6 +177,14 @@ export class LoginPage extends BasePage {
     return this.page.getByRole('button', { name: hr.onboarding.card.confirm, exact: true });
   }
 
+  /**
+   * The *Danas* card's title (story 19.4): an h2 under *Danas*'s h1, so
+   * never `heading()`, which pins level 1.
+   */
+  onboardingCardTitle(title: string): Locator {
+    return this.page.getByRole('heading', { level: 2, name: title, exact: true });
+  }
+
   onboardingCardLink(step: string): Locator {
     return this.page.getByRole('link', { name: step, exact: true }).first();
   }

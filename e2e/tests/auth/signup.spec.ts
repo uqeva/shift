@@ -224,7 +224,7 @@ test('a mailed signup link sets the password, and step 1 founds the organization
     await loginPage.setupExitLink.click();
     await expect(page).toHaveURL('/danas');
     await expect(loginPage.heading(hr.nav.danas)).toBeVisible();
-    await expect(loginPage.heading(plural(hr.onboarding.card.title, 5), { exact: true })).toBeVisible();
+    await expect(loginPage.onboardingCardTitle(plural(hr.onboarding.card.title, 5))).toBeVisible();
 
     // Back to step 2 from the card; one band is the fact: the rail says
     // *postavljeno*, the forward control *Dalje: Smjene*, the card one fewer.
@@ -234,15 +234,15 @@ test('a mailed signup link sets the password, and step 1 founds the organization
     await expect(loginPage.setupRailStep(hr.onboarding.step.hourBands, hr.onboarding.state.set)).toBeVisible();
     await expect(loginPage.setupNextLink(hr.onboarding.step.teams)).toBeVisible();
     await loginPage.setupExitLink.click();
-    await expect(loginPage.heading(plural(hr.onboarding.card.title, 4), { exact: true })).toBeVisible();
+    await expect(loginPage.onboardingCardTitle(plural(hr.onboarding.card.title, 4))).toBeVisible();
 
     // Sakrij, confirmed: the card is gone, and stays gone after a reload.
     await loginPage.onboardingHideButton.click();
     await loginPage.onboardingConfirmHide.click();
-    await expect(loginPage.heading(plural(hr.onboarding.card.title, 4), { exact: true })).toHaveCount(0);
+    await expect(loginPage.onboardingCardTitle(plural(hr.onboarding.card.title, 4))).toHaveCount(0);
     await page.reload();
     await expect(loginPage.heading(hr.nav.danas)).toBeVisible();
-    await expect(loginPage.heading(plural(hr.onboarding.card.title, 4), { exact: true })).toHaveCount(0);
+    await expect(loginPage.onboardingCardTitle(plural(hr.onboarding.card.title, 4))).toHaveCount(0);
   } finally {
     await removeSignup(address);
   }
