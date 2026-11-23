@@ -231,7 +231,11 @@ runs:
 
     # ------------------------------------------------------------ migrations
     # The URL carries no password: the CLI reads it from PGPASSWORD, so it is
-    # never an argument. Host and port were shape-checked by require-config.
+    # never an argument. `sslmode=disable`: the stack's Postgres speaks no TLS
+    # and the CLI refuses it otherwise (seen by story 20.5 on the loopback);
+    # `tailscale serve --tcp` forwards it as it is, inside the tailnet's
+    # encryption (not yet run: staging is not served on the tailnet). The host
+    # must be the tailnet's: the password crosses in clear otherwise. Host and port were shape-checked by require-config.
     # Also the preflight of everything a later step needs from the runner and
     # the database (psql, a connection), so nothing is found missing after the
     # migration has been applied.
@@ -244,8 +248,8 @@ runs:
         DB_PORT: ${{ inputs.db-port }}
       run: |
         command -v psql > /dev/null || { echo "::error::psql is not on the runner"; exit 1; }
-        psql "postgresql://postgres@$DB_HOST:$DB_PORT/postgres" -XAtc 'select 1' > /dev/null
-        pnpm exec supabase migration list --db-url "postgresql://postgres@$DB_HOST:$DB_PORT/postgres" \
+        psql "postgresql://postgres@$DB_HOST:$DB_PORT/postgres?sslmode=disable" -XAtc 'select 1' > /dev/null
+        pnpm exec supabase migration list --db-url "postgresql://postgres@$DB_HOST:$DB_PORT/postgres?sslmode=disable" \
           --output-format json > "$RUNNER_TEMP/migrations-before.json"
 
     # H-12: a production migration runs only after a backup recorded within
@@ -268,7 +272,7 @@ runs:
         PGCONNECT_TIMEOUT: '10'
         DB_HOST: ${{ inputs.db-host }}
         DB_PORT: ${{ inputs.db-port }}
-      run: pnpm exec supabase db push --db-url "postgresql://postgres@$DB_HOST:$DB_PORT/postgres" --yes
+      run: pnpm exec supabase db push --db-url "postgresql://postgres@$DB_HOST:$DB_PORT/postgres?sslmode=disable" --yes
 
     - name: supabase migration list (local and remote must agree)
       shell: bash
@@ -278,7 +282,7 @@ runs:
         DB_HOST: ${{ inputs.db-host }}
         DB_PORT: ${{ inputs.db-port }}
       run: |
-        pnpm exec supabase migration list --db-url "postgresql://postgres@$DB_HOST:$DB_PORT/postgres" \
+        pnpm exec supabase migration list --db-url "postgresql://postgres@$DB_HOST:$DB_PORT/postgres?sslmode=disable" \
           --output-format json > "$RUNNER_TEMP/migrations.json"
         node scripts/ci/check-migrations.mjs "$RUNNER_TEMP/migrations.json"
 
@@ -309,7 +313,7 @@ runs:
         PGCONNECT_TIMEOUT: '10'
         DB_HOST: ${{ inputs.db-host }}
         DB_PORT: ${{ inputs.db-port }}
-      run: DB_URL="postgresql://postgres@$DB_HOST:$DB_PORT/postgres" bash scripts/ci/deploy-images.sh deploy-functions
+      run: DB_URL="postgresql://postgres@$DB_HOST:$DB_PORT/postgres?sslmode=disable" bash scripts/ci/deploy-images.sh deploy-functions
 
     # ------------------------------------------------------------------- web
     # After the migration and the functions (§5.2c, and from 0045 the outbox

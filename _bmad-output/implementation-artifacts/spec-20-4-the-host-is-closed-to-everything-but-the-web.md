@@ -2,7 +2,7 @@
 title: 'Story 20.4: The host is closed to everything but the web (scripts only)'
 type: 'feature'
 created: '2026-11-21'
-status: 'in-review'
+status: 'done'
 baseline_commit: '888752be3a45740ed96d6e98aa8896d7085b5e56'
 review_loop_iteration: 0
 context:
@@ -142,7 +142,7 @@ Tests never run the scripts (the founder's rule); instead `test/host-hardening.t
 - `uvx --from shellcheck-py shellcheck deploy/host/*.sh` -- expected: clean.
 - `pnpm typecheck && pnpm lint` -- expected: pass.
 
-**Manual checks:** nothing is applied on any host; applying is the founder's go (DEPLOY §9.8), preceded by a `security-review` of the rules.
+**Manual checks:** at merge nothing was applied on any host. **Status: done.** PR #331, squash `5dfb1def7b47d6927afaf7d30524647a23488f94`, merged 2026-11-21 with the `CI passed` check green (`test/host-hardening.test.ts` among the files that run). The founder then applied the scripts from the provider's console and confirmed on 2026-11-23: only 80 and 443 are public; the Coolify UI and API and SSH are reached over the tailnet only (recorded by story 20.5, which set the status). Re-running `verify-exposure.sh` with `--studio-url` and `--postgres-port` waits for staging's `tailscale serve` (20.5's deferred entry).
 
 ## Suggested Review Order
 

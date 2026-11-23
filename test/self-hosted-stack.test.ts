@@ -901,6 +901,26 @@ describe('the self-hosted stack (story 20.1): limits and environment templates',
   const staging = envTemplate('staging.env.example');
   const production = envTemplate('production.env.example');
 
+  it('gives the slow starters a start period at staging’s CPU share (story 20.5’s rehearsal)', () => {
+    // Measured on the server at staging's limits: Storage ~95 s, pg-meta ~135 s,
+    // Kong ~70 s before their checks passed. Without a start period they are
+    // reported unhealthy first, `up --wait` fails and the functions (which wait
+    // on Kong being healthy) never start.
+    const seconds = (value: unknown): number => {
+      const match = /^(\d+)s$/.exec(String(value));
+      return match === null ? 0 : Number(match[1]);
+    };
+    const measured: Record<string, number> = { 'supabase-storage': 95, 'supabase-meta': 135, 'supabase-kong': 70 };
+    for (const [name, startedAfter] of Object.entries(measured)) {
+      const check = (service(name) as Service & { healthcheck?: { start_period?: unknown } }).healthcheck;
+      expect(seconds(check?.start_period), `${name}'s start_period`).toBeGreaterThanOrEqual(startedAfter * 1.5);
+    }
+    // pg-meta's check is the image's own, made explicit to carry the period.
+    const meta = service('supabase-meta') as Service & { healthcheck?: { test?: string[] } };
+    expect(meta.healthcheck?.test?.[0]).toBe('CMD-SHELL');
+    expect(meta.healthcheck?.test?.[1]).toContain("fetch('http://127.0.0.1:8080/health')");
+  });
+
   it('limits every service’s memory and CPU, staging (the defaults) below production', () => {
     let stagingMemory = 0;
     let productionMemory = 0;

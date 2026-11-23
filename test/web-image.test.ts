@@ -290,7 +290,7 @@ describe('the shift-web image (story 20.3): the Dockerfile', () => {
   });
 
   it('renders the headers from the built dist/_headers with the script', () => {
-    expect(instructions).toContain('COPY --chmod=0644 deploy/web/render-headers.sh apps/web/dist/_headers /tmp/render/');
+    expect(instructions).toContain('COPY --chmod=0755 deploy/web/render-headers.sh apps/web/dist/_headers /tmp/render/');
     expect(instructions).toContain(
       'RUN sh /tmp/render/render-headers.sh /tmp/render/_headers > /tmp/security-headers.conf',
     );
