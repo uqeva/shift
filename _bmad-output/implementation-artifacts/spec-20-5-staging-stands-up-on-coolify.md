@@ -247,6 +247,23 @@ Outlook/Google/iPhone; the enumeration probe and real email (no provider);
 `tailscale serve`; the pg-meta network split; the calendar-feed limit (the
 founder's number); `APP_ORIGINS`.
 
+**Staging refresh (2026-11-24, after #357 and #358).** Founder-approved
+staging operations; DEPLOY.md §9.11 records the lessons.
+
+| Step | Result |
+| --- | --- |
+| backup | `shift-ops backup staging --manual pre-migration`: 69 tables, 1,644 rows. |
+| compose | `main`'s compose through `PATCH /services/<uuid>` and a restart, then FOUND: Kong had no `functions-v1-calendar-feed` route. Coolify keeps the stored content of a `content:` file it already wrote; `kong.yml` sent with `PATCH /services/<uuid>/storages`, Kong restarted, the route present (entry). |
+| migrations | `0075`, `0076` pushed over the loopback; `check-migrations.mjs`: 76, local and remote agree. |
+| images | functions unchanged since the 20.5 baseline (no change under `supabase/functions`, `packages`, `deploy/functions`): not rebuilt. `shift-web` rebuilt from `main` (the name-character change), `check-bundle.mjs` clean, deployed. |
+| rotation | §3a's and §3b's rotation blocks, Vault first: both updated; the new values set in Coolify (`envs/bulk`), the service restarted; the container's values and Vault's compared equal in place, never printed; `remind` 200 `REMIND_RAN`, `notify` 200 `NOTIFY_RAN`. Two 401s and three refused connections fell in the window (the restarts), as §3a says. |
+| leak | Re-run in sessions with `log_statement = all`, `log_min_messages = error`: the success and a failing block (`ARMING_SECRET_MISSING`, a throwaway value) wrote 12 statements and the error to the log, with no value; none in `pg_stat_activity`. Under staging's own settings (`log_min_messages = fatal`) nothing was logged. The first arming's log was gone with the recreated container, unsearched. |
+| feed limit | 130 feed requests from one address in a minute: 120 × 404, 10 × 429 (`API rate limit exceeded`, no rate-limit headers); 130 `notify` and 30 `admin-auth` in the same minute: all 401, none 429. |
+| client IP | Kong logged the host's public IPv4 for all 132 feed requests; a client's own `X-Forwarded-For` was not believed (checks.sh). |
+| job errors | root cause: Kong's 60 s upstream keep-alive outlived PostgREST's 30 to 60 s idle close; fixed with `KONG_UPSTREAM_KEEPALIVE_IDLE_TIMEOUT=20` (DEPLOY.md §9.11, entry resolved). Kong now closes an idle connection to PostgREST itself at about 20 s. |
+| jobs check | `shift-ops jobs-check staging` every 5 minutes, 12:08 to 12:44 UTC: the first four FAILED on the maintenance window's own calls (two 401s between Vault and the container, three refused connections during restarts; the check alerted to the journal at 12:08, as designed), then from 12:28 every run passed (`RECOVERED`), the calls check covering 12:08 to 12:44. 47 cron calls after the last restart, all 200; the 12:30 timer run passed too. |
+| checks.sh | PASS: §9.5 steps 7 and 7b, PGRST303 20 × 200, feed 404 medians 281/306 ms with one signature, no marker or `calendar-feed/` in the logs, the client address, the CSP sweep (0 violations, 0 failures, 14 routes, PDF, xlsx, logo). |
+
 **Commands.**
 - `pnpm exec vitest run test/self-hosted-stack.test.ts test/supabase-scaffold.test.ts test/resource-hygiene.test.ts test/key-hygiene.test.ts test/coolify-deploy.test.ts test/web-image.test.ts test/static-hosting.test.ts` -- all pass after the review patches (the local `dist` removed, so the built-`dist` cases skip; CI builds its own).
 - `eslint` on the changed test files -- clean. Full `pnpm typecheck` / `pnpm lint`: left to CI.

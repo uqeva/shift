@@ -3258,6 +3258,10 @@ Let's Encrypt certificates; the migrations, Vault and the demo organization are
 in place, and §9.5's checks and story 20.5's pass on staging (its spec,
 Verification). Starting the service and deploying the application need the
 Coolify token's `deploy` ability (a read/write token is refused with 403).
+**Refreshed 2026-11-24** to `main`'s compose (the `calendar-feed` limit), with
+migrations `0075` and `0076` pushed after a `pre-migration` backup (§9.12), a
+new `shift-web` image, both invoke secrets rotated (below) and Kong's upstream
+keep-alive shortened (below).
 
 **What exists in Coolify.** A project `shift` with an environment `staging`
 (the founder's choice; the epic had named a project `shift-staging`), holding:
@@ -3323,15 +3327,49 @@ the functions container's environment and given to `psql` on stdin (§3a, §3b).
 Each secret goes in as the one data row of a `COPY` into a temporary table,
 checked in the shell first, so it never enters a statement (§3a, *A secret
 never enters a statement*; founder decision 2026-11-23). Staging was first
-armed before that rule, with the value interpolated into the statement by psql:
-if any of those statements failed, the value may be in staging's database log,
-so rotate both invoke secrets once with §3a's and §3b's rotation blocks.
+armed before that rule, with the value interpolated into the statement by psql,
+so both invoke secrets were rotated once on 2026-11-24 with §3a's and §3b's
+rotation blocks (new values set as `SERVICE_PASSWORD_64_NOTIFYINVOKE` and
+`SERVICE_PASSWORD_64_REMINDINVOKE` through `PATCH /services/<uuid>/envs/bulk`,
+then the service restarted; `notify` and `remind` answered the cron 200).
+The blocks were then run again in sessions with `log_statement = all` and
+`log_min_messages = error`, once succeeding and once failing
+(`ARMING_SECRET_MISSING`): the database log held every statement and the
+error, and no value. The log of the first arming could not be searched: a
+Coolify restart recreates the containers, and their logs go with them
+(search a container's log BEFORE restarting it).
 
 **The demo organization** (§7.5, `demo_target=staging`) is seeded with `psql`
 inside the database container (validated on the rehearsal stack: 17 members,
 and the admin signs in with an `organization_id` claim), the password passed as
 a psql variable on stdin. The founder then signs in at `https://staging.<domain>/prijava/dvd-demo` as
 `admin`; the password is in a 0600 file on the host, never in the repository.
+
+**Changing the compose of a running stack.** `PATCH /services/<uuid>` with a
+new `docker_compose_raw` re-renders the compose, but **not** a `content:` file
+Coolify already wrote (`kong.yml`, the entrypoints, `log-redaction.conf`): its
+parser keeps the content it stored for a file it knows (v4.7.6), so the old
+file stays and nothing says so. On the 2026-11-24 refresh the new
+`calendar-feed` route was missing from Kong after the PATCH and a restart.
+For each `content:` file the change touches, compare the compose's content
+with the file under `/data/coolify/services/<uuid>/` and send the new content
+with `PATCH /services/<uuid>/storages` (`{"type": "file", "uuid": <the file
+storage's uuid, from GET …/storages>, "content": …}`; it needs `deploy`, and
+Coolify writes the file at once), then restart the service (or, for Kong
+alone, the Kong container: its entrypoint renders `kong.yml` at start).
+Check the running container (`grep -c functions-v1-calendar-feed
+/usr/local/kong/kong.yml`) before calling a change applied.
+
+**Kong lets go of an idle upstream connection first.** PostgREST closes an
+idle keep-alive connection after 30 to 60 s (31.5 s measured), and Kong 2.8
+kept one for 60 s: a request Kong sent on a connection PostgREST closed that
+instant was answered 502, and a POST is not retried. That was the first
+jobs check's `notify` 500 `CLAIM_FAILED` and `remind` 503
+`REMINDER_INPUTS_UNAVAILABLE` (Kong logged `502` on `/rest/v1/rpc/…` in
+0.002 to 0.16 s; PostgREST and Postgres logged nothing, and the database was
+not busy: not the 0.25 CPU). `KONG_UPSTREAM_KEEPALIVE_IDLE_TIMEOUT=20` makes
+Kong close first (seen on staging: Kong's side of an idle connection to
+PostgREST goes to `TIME-WAIT` at about 20 s).
 
 **Coolify's API, as found on v4.7.6.** `POST /projects`, `POST
 /projects/<uuid>/environments`, `POST /services` (`docker_compose_raw` base64,
@@ -3379,8 +3417,13 @@ statement reaches a log with its arguments: Postgres runs with
 `log_min_messages=fatal` (and `log_statement=ddl`, `pgaudit.log=none`), and
 PostgREST at its default `error` level.
 
-**Not set on staging, by decision.** The `calendar-feed` rate limit (the number
-is the founder's; `deferred-work.md`), the email provider and the open signup
+**The `calendar-feed` limit** (120 a minute per client IP, founder decision
+2026-11-23) is in force since the 2026-11-24 refresh: 130 feed requests from one
+address inside a minute were answered 120 × 404 and 10 × 429, while 130
+`notify` and 30 `admin-auth` requests in the same minute all got their 401s;
+Kong logged the client's own address for each.
+
+**Not set on staging, by decision.** The email provider and the open signup
 door (no domain yet). Backups and monitoring arrived with 20.7 and 20.8
 (§9.12, §9.13).
 

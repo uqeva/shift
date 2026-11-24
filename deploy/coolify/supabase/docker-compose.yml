@@ -635,6 +635,14 @@ services:
       # four a client got up to four times each limit. One worker keeps every
       # limit exact and the memory flat; the stack's load is a pilot's.
       - KONG_NGINX_WORKER_PROCESSES=1
+      # An idle upstream connection is dropped after 20 s (Kong's default is
+      # 60 s). PostgREST closes one idle 30 to 60 s (31.5 s measured on
+      # staging); a request Kong sent on a connection closed that instant was
+      # answered 502 and, a POST, never retried: the cron's rare `notify`
+      # CLAIM_FAILED and `remind` REMINDER_INPUTS_UNAVAILABLE (staging,
+      # 2026-11-23). Below every upstream's own idle limit, Kong always lets go
+      # first. A new connection inside the stack's network costs little.
+      - KONG_UPSTREAM_KEEPALIVE_IDLE_TIMEOUT=20
       # The per-IP limits (AD-21 as amended by 19.1: Kong 2.8 has no 5-minute
       # window). Each defaults to staging's value; production's are set by the
       # D-S5 checklist. The entrypoint refuses anything but a positive integer.
