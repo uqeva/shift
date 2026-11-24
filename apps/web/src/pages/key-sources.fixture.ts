@@ -385,10 +385,13 @@ export const KEY_SOURCES = [
     //
     // TWELVE SINCE STORY 18.4: 0064's archive refusal while a loan to the team
     // is current (`smjene.error.lentTo`).
+    //
+    // THIRTEEN SINCE 0076: a name carrying a control character
+    // (`smjene.error.control`).
     name: 'the team write rules',
     file: TEAM_WRITE_KEYS,
     keys: memberListKeys,
-    strings: 12,
+    strings: 13,
   },
   {
     // STORY 1.8. FOUR on the roster: the heading while there is no roster to
@@ -661,7 +664,9 @@ export const KEY_SOURCES = [
     file: SHIFT_TYPE_WRITE_KEYS,
     keys: memberListKeys,
     // STORY 19.4: no kind chosen (O3).
-    strings: 23,
+    // 0076: a name carrying a control character
+    // (`rotation.shiftTypes.error.nameControl`).
+    strings: 24,
   },
   {
     // STORY 2.3b. THIRTY-SIX on the builder since the renegotiation — the
