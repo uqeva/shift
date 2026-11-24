@@ -969,6 +969,18 @@ describe('the self-hosted stack (story 20.1): limits and environment templates',
     expect(environment('supabase-kong').get('KONG_NGINX_WORKER_PROCESSES')).toBe('1');
   });
 
+  it('drops an idle upstream connection before PostgREST does, so a reused one is never already closed (staging refresh, 2026-11-24)', () => {
+    // PostgREST (warp) closes an idle keep-alive connection after 30 to 60 s
+    // (31.5 s measured on staging), Kong 2.8 keeps one for 60 s by default. A
+    // POST sent on a connection PostgREST closed that instant is answered 502
+    // and is not retried: the cron's `notify` CLAIM_FAILED and `remind`
+    // REMINDER_INPUTS_UNAVAILABLE. Kong must give the connection up first.
+    const idle = Number(environment('supabase-kong').get('KONG_UPSTREAM_KEEPALIVE_IDLE_TIMEOUT'));
+    expect(Number.isInteger(idle)).toBe(true);
+    expect(idle).toBeGreaterThan(0);
+    expect(idle).toBeLessThan(30);
+  });
+
   it('gives the slow starters a start period at staging’s CPU share (story 20.5’s rehearsal)', () => {
     // Measured on the server at staging's limits: Storage ~95 s, pg-meta ~135 s,
     // Kong ~70 s before their checks passed. Without a start period they are
