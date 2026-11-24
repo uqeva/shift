@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { parse as parseYaml } from 'yaml';
 
-import { NAME_WHITESPACE } from '../apps/web/src/utils/name.ts';
+import { NAME_CONTROL_CHARACTER_CLASS, NAME_WHITESPACE } from '../apps/web/src/utils/name.ts';
 import {
   EVENING_BEFORE_MINUTE,
   HISTORY_HIDDEN_COLUMNS,
@@ -7082,7 +7082,9 @@ $$;`,
       .filter((name) => MIGRATION_NAME.test(name))
       .sort();
     for (const [name, source, edits] of RECREATED) {
-      const definedIn = numbered.filter((file) => definitionOf(raw(file), name) !== '');
+      // Up to 0073 itself: a later migration may re-create a caller again
+      // (0075 re-creates the two reminder functions), under its own pin.
+      const definedIn = numbered.filter((file) => file <= MIGRATION && definitionOf(raw(file), name) !== '');
       expect(definedIn.slice(-2), `${name}: ${source} is not its latest definition before 0073`).toEqual([source, MIGRATION]);
       let expected = definitionOf(raw(source), name).replace(/^create (or replace )?function /, 'create or replace function ');
       for (const [before, after] of edits) {
@@ -7245,5 +7247,151 @@ $$;`,
     for (const key of ['door', 'last_24_hours', 'recent_accounts', 'accounts_by_day', 'organizations_by_day', 'organizations_founded_by_signup', 'most_attempts']) {
       expect(report).toContain(`'${key}'`);
     }
+  });
+});
+
+describe('reminders need a live account (0075, founder decision 2026-11-23, epic 17 retro A3 (b))', () => {
+  const MIGRATION = '0075_reminders_need_a_live_account.sql';
+  const SOURCE = '0073_housekeeping_and_suspension.sql';
+  const raw = (name: string): string => readFileSync(join(supabaseRoot, 'migrations', name), 'utf8');
+  const definitionOf = (sql: string, name: string): string => {
+    const lines = sql.split('\n');
+    const start = lines.findIndex((line) => new RegExp(`^create (or replace )?function ${name.replace('.', '\\.')}\\(`).test(line));
+    if (start < 0) return '';
+    const end = lines.findIndex((line, index) => index > start && line === '$$;');
+    return lines.slice(start, end + 1).join('\n');
+  };
+  /** 16.3's account check, as `private.calendar_feed_member_live` writes it. */
+  const ACCOUNT_LIVE = /u\.deleted_at is null\s+and \(u\.banned_until is null or u\.banned_until <= now\(\)\)/;
+
+  /** Each function 0075 re-creates from 0073, and its exact (before, after) edits. */
+  const RECREATED: readonly (readonly [string, readonly (readonly [string, string])[]])[] = [
+    [
+      'public.reminder_inputs',
+      [
+        [
+          `       where pg_catalog.cardinality(r.leads) > 0
+    ) due`,
+          `       where pg_catalog.cardinality(r.leads) > 0
+         -- 0075 (founder decision 2026-11-23): only a live account, as the feed's.
+         and exists (
+           select 1
+             from auth.users u
+            where u.id = m.auth_user_id
+              and u.deleted_at is null
+              and (u.banned_until is null or u.banned_until <= now())
+         )
+    ) due`,
+        ],
+      ],
+    ],
+    [
+      'public.enqueue_shift_reminders',
+      [
+        [
+          `       or not private.organization_live(v_organization)
+       or v_today is null
+`,
+          `       or not private.organization_live(v_organization)
+       -- 0075 (founder decision 2026-11-23): and a banned or deleted account's.
+       or not exists (
+         select 1
+           from public.members m
+           join auth.users u on u.id = m.auth_user_id
+          where m.id = v_member
+            and u.deleted_at is null
+            and (u.banned_until is null or u.banned_until <= now())
+       )
+       or v_today is null
+`,
+        ],
+      ],
+    ],
+  ];
+
+  it('re-creates both reminder functions from 0073, word for word but for the account check', () => {
+    const numbered = migrationNames()
+      .filter((name) => MIGRATION_NAME.test(name))
+      .sort();
+    for (const [name, edits] of RECREATED) {
+      const definedIn = numbered.filter((file) => file <= MIGRATION && definitionOf(raw(file), name) !== '');
+      expect(definedIn.slice(-2), `${name}: ${SOURCE} is not its latest definition before 0075`).toEqual([SOURCE, MIGRATION]);
+      let expected = definitionOf(raw(SOURCE), name);
+      for (const [before, after] of edits) {
+        expect(expected.split(before).length - 1, `${name}: the edit's anchor is not unique`).toBe(1);
+        expected = expected.replace(before, () => after);
+      }
+      const ours = definitionOf(raw(MIGRATION), name);
+      expect(ours, name).toBe(expected);
+      expect(stripLineComments(ours), `${name} does not check the account`).toMatch(ACCOUNT_LIVE);
+    }
+    // These two and nothing else, and no new function (no inventory change).
+    expect(RECREATED.map(([name]) => name).sort()).toEqual(
+      [...raw(MIGRATION).matchAll(/^create (?:or replace )?function ([a-z_]+\.[a-z_]+)\(/gm)].map((match) => match[1]).sort(),
+    );
+    expect(raw(MIGRATION)).not.toMatch(/^create function /m);
+  });
+
+  it('checks the account exactly as the feed does', () => {
+    expect(stripLineComments(definitionOf(raw(SOURCE), 'private.calendar_feed_member_live'))).toMatch(ACCOUNT_LIVE);
+  });
+
+  it('keeps both executable by service_role alone', () => {
+    const sql = stripLineComments(raw(MIGRATION));
+    expect(sql).toContain('revoke execute on function public.reminder_inputs() from public, anon, authenticated;');
+    expect(sql).toContain('grant execute on function public.reminder_inputs() to service_role;');
+    expect(sql).toContain('revoke execute on function public.enqueue_shift_reminders(jsonb) from public, anon, authenticated;');
+    expect(sql).toContain('grant execute on function public.enqueue_shift_reminders(jsonb) to service_role;');
+    expect(sql).not.toMatch(/grant execute on function [^;]* to (?:anon|authenticated|public)\b/);
+  });
+});
+
+describe('names refuse control characters (0076, epic 17 retro A4)', () => {
+  const raw = (): string => readFileSync(join(supabaseRoot, 'migrations', '0076_names_refuse_control_characters.sql'), 'utf8');
+  const sql = (): string => stripLineComments(raw());
+
+  it('writes the client’s class, character for character, everywhere it names one', () => {
+    // A bracket literal, alone or as a run (`…]+`).
+    const literals = [...sql().matchAll(/'(\[[^']*\])\+?'/g)].map((match) => match[1]);
+    // Per table: the guard's test and fold, the update's test and fold, the check.
+    expect(literals).toHaveLength(10);
+    expect([...new Set(literals)]).toEqual([NAME_CONTROL_CHARACTER_CLASS]);
+  });
+
+  it('adds one named check per table, and no other table', () => {
+    const checks = [...sql().matchAll(/alter table public\.([a-z_]+)\s+add constraint ([a-z_]+) check \(name !~ '([^']+)'\);/g)].map(
+      (match) => [match[1], match[2], match[3]],
+    );
+    expect(checks).toEqual([
+      ['teams', 'teams_name_characters', NAME_CONTROL_CHARACTER_CLASS],
+      ['shift_types', 'shift_types_name_characters', NAME_CONTROL_CHARACTER_CLASS],
+    ]);
+    // Added validated: no row is left that the check would refuse.
+    expect(sql()).not.toMatch(/\bnot valid\b/i);
+  });
+
+  it('guards, then folds, then checks, and trims in 0024’s white-space class', () => {
+    const text = sql();
+    const at = (needle: string): number => {
+      const index = text.indexOf(needle);
+      expect(index, needle).toBeGreaterThan(-1);
+      return index;
+    };
+    const order = [
+      at("message = 'NAME_CONTROL_FOLD_CONFLICT'"),
+      at('update public.teams t'),
+      at('update public.shift_types s'),
+      at('add constraint teams_name_characters'),
+      at('add constraint shift_types_name_characters'),
+    ];
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    const whiteSpace = [...NAME_WHITESPACE].map((character) => `\\${character.codePointAt(0)?.toString(16).toUpperCase().padStart(4, '0') ?? ''}`).join('');
+    for (const fold of [...text.matchAll(/^update public\.(?:teams|shift_types) [\s\S]*?;$/gm)].map((match) => match[0])) {
+      expect(fold).toContain(`U&'${whiteSpace}'`);
+      expect(fold).toContain(`'${NAME_CONTROL_CHARACTER_CLASS}+', ' ', 'g'`);
+    }
+    // The guard reads each table's in-use rows the unique index binds.
+    expect(text.match(/and not o\.archived/g)).toHaveLength(2);
+    expect(text.match(/private\.name_key\(pg_catalog\.regexp_replace\(/g)).toHaveLength(2);
   });
 });

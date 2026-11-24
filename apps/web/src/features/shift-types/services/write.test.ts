@@ -26,6 +26,7 @@ import {
   SHIFT_TYPE_NAME_FIELD,
   SHIFT_TYPE_NAME_TAKEN,
   SHIFT_TYPE_NAME_TOO_LONG,
+  SHIFT_TYPE_NAME_CONTROL,
   SHIFT_TYPE_NONWORKING,
   SHIFT_TYPE_RENAMED,
   SHIFT_TYPE_STALE,
@@ -756,6 +757,7 @@ describe('fields, keys and messages', () => {
     const failures: ShiftTypeWriteFailure[] = [
       SHIFT_TYPE_NAME_EMPTY,
       SHIFT_TYPE_NAME_TOO_LONG,
+      SHIFT_TYPE_NAME_CONTROL,
       SHIFT_TYPE_NAME_TAKEN,
       SHIFT_TYPE_TIME_INVALID,
       SHIFT_TYPE_DATE_INVALID,
@@ -833,5 +835,39 @@ describe('fields, keys and messages', () => {
 
     expect(paused.paused, 'the state is not the paused one').toBe(true);
     expect(shiftTypeFormStateOf(paused, 'pilot-dan')).toEqual({ type: DAN, refusal: null });
+  });
+});
+
+describe('a type name holds no line break inside it (0076, epic 17 retro A4)', () => {
+  it.each([['Noćna\nsmjena'], ['Noćna\u0085smjena'], ['Noćna\u2029smjena'], ['Noćna\u001B']])(
+    'refuses %j before sending anything, on add and rename',
+    async (entered) => {
+      const types = tableAnswering(ONE_ROW);
+      const versions = tableAnswering(ONE_ROW);
+
+      expect(
+        await createShiftType(
+          { types, versions },
+          ORGANIZATION,
+          { name: entered, kind: SHIFT_TYPE_WORKING, start: '07:00', end: '19:00' },
+          TODAY,
+        ),
+      ).toEqual({ ok: false, code: SHIFT_TYPE_NAME_CONTROL });
+      expect(await renameShiftType(types, DAN, entered)).toEqual({ ok: false, code: SHIFT_TYPE_NAME_CONTROL });
+      expect(types.calls).toEqual([]);
+      expect(versions.calls).toEqual([]);
+    },
+  );
+
+  it('reads the database\'s character check as this refusal, marks the name and gives it its own message', () => {
+    expect(
+      shiftTypeWriteFailureOf({
+        code: '23514',
+        message: 'new row for relation "shift_types" violates check constraint "shift_types_name_characters"',
+      }),
+    ).toBe(SHIFT_TYPE_NAME_CONTROL);
+    expect(marksField(SHIFT_TYPE_NAME_CONTROL, SHIFT_TYPE_NAME_FIELD)).toBe(true);
+    expect(refusedFieldOf(SHIFT_TYPE_NAME_CONTROL, SHIFT_TYPE_DATE_FIELD)).toBe(SHIFT_TYPE_NAME_FIELD);
+    expect(shiftTypeWriteMessageKey(SHIFT_TYPE_NAME_CONTROL)).toBe('rotation.shiftTypes.error.nameControl');
   });
 });

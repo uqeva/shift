@@ -1,5 +1,5 @@
 import { teamById, type TeamRow, type TeamsSurfaceState } from '@/features/teams/services/list';
-import { enteredName, namesLengthCheck } from '@/utils/name';
+import { enteredName, hasControlCharacter, namesCharacterCheck, namesLengthCheck } from '@/utils/name';
 
 /**
  * Creating, renaming and archiving a team — every decision the two team
@@ -23,6 +23,13 @@ import { enteredName, namesLengthCheck } from '@/utils/name';
 export const TEAM_NAME_EMPTY = 'TEAM_NAME_EMPTY';
 /** The name is longer than `0036`'s maximum (`teams_name_length`). */
 export const TEAM_NAME_TOO_LONG = 'TEAM_NAME_TOO_LONG';
+/**
+ * The name holds a line break or another control character inside it
+ * (`0076`'s `teams_name_characters`, epic 17 retro A4): it would reach an
+ * email's subject. Refused before anything is sent, and by the database from
+ * any other caller.
+ */
+export const TEAM_NAME_CONTROL = 'TEAM_NAME_CONTROL';
 /** Another team still in use in this organization carries the name. */
 export const TEAM_NAME_TAKEN = 'TEAM_NAME_TAKEN';
 /** The team changed since the screen was drawn (archived, or out of reach). */
@@ -54,6 +61,7 @@ export const TEAM_LENT_TO = 'TEAM_LENT_TO';
 export type TeamWriteFailure =
   | typeof TEAM_NAME_EMPTY
   | typeof TEAM_NAME_TOO_LONG
+  | typeof TEAM_NAME_CONTROL
   | typeof TEAM_NAME_TAKEN
   | typeof TEAM_STALE
   | typeof TEAM_WRITE_REFUSED
@@ -120,15 +128,18 @@ const VALUE_CLASSES = ['22', '23'];
  *
  * `23505` IS THE NAME, because the only unique on the columns a session writes
  * is `teams_organization_name_key` — the other two keys are `id`, which the
- * session never names. `23514` IS THE NAME: `teams_name_length` (`0036`) when
- * the refusal names it, else `teams_name_not_blank`, the table's only other
- * check. Each is reported as what it is rather than as a generic "correct a
+ * session never names. `23514` IS THE NAME: `teams_name_length` (`0036`) or
+ * `teams_name_characters` (`0076`) when the refusal names it, else
+ * `teams_name_not_blank`, the table's only other check. Each is reported as what it is rather than as a generic "correct a
  * value", so the refusal names the problem.
  */
 export function teamWriteFailureOf(error: TeamWriteError): TeamWriteFailure {
   if (error.code === UNIQUE_VIOLATION) return TEAM_NAME_TAKEN;
   if (error.code === CHECK_VIOLATION) {
-    return namesLengthCheck(error.message) ? TEAM_NAME_TOO_LONG : TEAM_NAME_EMPTY;
+    if (namesLengthCheck(error.message)) return TEAM_NAME_TOO_LONG;
+    if (namesCharacterCheck(error.message)) return TEAM_NAME_CONTROL;
+
+    return TEAM_NAME_EMPTY;
   }
   if (error.code === INSUFFICIENT_PRIVILEGE) return TEAM_WRITE_REFUSED;
   if (error.code !== undefined && VALUE_CLASSES.includes(error.code.slice(0, 2))) {
@@ -197,6 +208,7 @@ export async function createTeam(
   const name = enteredTeamName(entered);
 
   if (name === null) return { ok: false, code: TEAM_NAME_EMPTY };
+  if (hasControlCharacter(name)) return { ok: false, code: TEAM_NAME_CONTROL };
 
   return settled(() =>
     table.insert({ organization_id: organizationId, name }).select(RETURNED_COLUMNS),
@@ -212,6 +224,7 @@ export async function renameTeam(
   const name = enteredTeamName(entered);
 
   if (name === null) return { ok: false, code: TEAM_NAME_EMPTY };
+  if (hasControlCharacter(name)) return { ok: false, code: TEAM_NAME_CONTROL };
   if (team.archived) return { ok: false, code: TEAM_STALE };
 
   return settled(() => table.update({ name }).eq(ID_COLUMN, team.id).select(RETURNED_COLUMNS));
@@ -235,6 +248,7 @@ export function teamWriteMessageKey(
 ):
   | 'smjene.error.empty'
   | 'smjene.error.tooLong'
+  | 'smjene.error.control'
   | 'smjene.error.taken'
   | 'smjene.error.stale'
   | 'smjene.error.refused'
@@ -245,6 +259,7 @@ export function teamWriteMessageKey(
   | 'smjene.error.lentTo' {
   if (failure === TEAM_NAME_EMPTY) return 'smjene.error.empty';
   if (failure === TEAM_NAME_TOO_LONG) return 'smjene.error.tooLong';
+  if (failure === TEAM_NAME_CONTROL) return 'smjene.error.control';
   if (failure === TEAM_NAME_TAKEN) return 'smjene.error.taken';
   if (failure === TEAM_STALE) return 'smjene.error.stale';
   if (failure === TEAM_WRITE_REFUSED) return 'smjene.error.refused';

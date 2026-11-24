@@ -1533,6 +1533,42 @@ services:
                           kong.service.request.clear_header("authorization")
                         end
 
+            ## The calendar feed (story 16.4), limited per client IP: 120 a
+            ## minute (founder decision 2026-11-23, epic 16 retro A2), on this
+            ## route only. `limit_by: ip` reads the address Kong resolved through
+            ## the 19.1 client-IP chain (`KONG_TRUSTED_IPS`, `X-Forwarded-For`),
+            ## so one IP is one caller, and many calendar apps behind one NAT
+            ## still fit. Kong matches on the normalized path and tries regex
+            ## paths before every prefix: whatever the router would serve as
+            ## `calendar-feed` (its first segment, exactly) lands here. The
+            ## lookahead leaves only `/functions/v1/` to strip, so the upstream
+            ## path is the catch-all's below, byte for byte.
+            - name: functions-v1-calendar-feed
+              url: http://supabase-edge-functions:9000/
+              read_timeout: 150000
+              routes:
+                - name: functions-v1-calendar-feed
+                  strip_path: true
+                  paths:
+                    - '/functions/v1/(?=calendar-feed(?:/|$))'
+              plugins:
+                - name: cors
+                  config:
+                    origins:
+                      - $SHIFT_APP_URL
+                    methods:
+                      - GET
+                      - POST
+                      - OPTIONS
+                    credentials: false
+                    max_age: 3600
+                - name: rate-limiting
+                  config:
+                    minute: 120
+                    limit_by: ip
+                    policy: local
+                    hide_client_headers: true
+
             ## Edge Functions. The router (story 20.2, `deploy/functions/main`)
             ## decides which function exists and which needs a session; Kong
             ## forwards with no key-auth (the cron job's invoke secret, and from

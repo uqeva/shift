@@ -14,6 +14,7 @@ import {
   TEAM_ARCHIVED,
   TEAM_IN_USE,
   TEAM_LENT_TO,
+  TEAM_NAME_CONTROL,
   TEAM_NAME_EMPTY,
   TEAM_NAME_TAKEN,
   TEAM_NAME_TOO_LONG,
@@ -264,6 +265,7 @@ describe('a database refusal names its problem', () => {
       TEAM_UNKNOWN,
       TEAM_IN_USE,
       TEAM_NAME_TOO_LONG,
+      TEAM_NAME_CONTROL,
     ];
     const keys = failures.map((failure) => teamWriteMessageKey(failure));
 
@@ -394,5 +396,35 @@ describe('a landed write says what landed', () => {
   it('confirms a rename and an archive with different sentences', () => {
     expect(teamSavedMessageKey(TEAM_RENAMED)).toBe('smjene.saved');
     expect(teamSavedMessageKey(TEAM_ARCHIVED)).toBe('smjene.archivedDone');
+  });
+});
+
+describe('a team name holds no line break inside it (0076, epic 17 retro A4)', () => {
+  it.each([['Tim\nA'], ['Tim\rA'], ['Tim\tA'], ['Tim\u0085A'], ['Tim\u2028A'], ['Tim\u0007']])(
+    'refuses %j before sending anything, on create and rename',
+    async (entered) => {
+      const table = tableAnswering(ONE_ROW);
+
+      expect(await createTeam(table, ORGANIZATION, entered)).toEqual({ ok: false, code: TEAM_NAME_CONTROL });
+      expect(await renameTeam(table, ACTIVE, entered)).toEqual({ ok: false, code: TEAM_NAME_CONTROL });
+      expect(table.calls).toEqual([]);
+    },
+  );
+
+  it('stores a name whose line breaks are only at its ends, trimmed', async () => {
+    const table = tableAnswering(ONE_ROW);
+
+    expect(await createTeam(table, ORGANIZATION, '\nTim A\r\n')).toEqual({ ok: true });
+    expect(table.calls[0]?.values).toEqual({ organization_id: ORGANIZATION, name: 'Tim A' });
+  });
+
+  it('reads the database\'s character check as this refusal, with its own message', () => {
+    expect(
+      teamWriteFailureOf({
+        code: '23514',
+        message: 'new row for relation "teams" violates check constraint "teams_name_characters"',
+      }),
+    ).toBe(TEAM_NAME_CONTROL);
+    expect(teamWriteMessageKey(TEAM_NAME_CONTROL)).toBe('smjene.error.control');
   });
 });

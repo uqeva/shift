@@ -4,7 +4,7 @@
 - **Author:** Developer (correct-course, headless), for Perolipotic
 - **Mode:** Batch, unattended. The founder asked for no questions, so each product choice below is recorded as a decision with its rationale. The security-sensitive ones are listed in §6 for the founder to ratify, each with a recommended default.
 - **Scope classification:** Major. It adds four epics (16–19), 22 FRs (FR-80 to FR-101), amends PRD §5.1, §5.2, §5.4, §5.9, §5.16, §6, §7 and §11, and amends AD-1 (scope note), AD-2, AD-7, AD-9, AD-10, AD-12, AD-14, AD-16, AD-17 and AD-18.
-- **Status:** Scope approved by the founder on 2026-11-20. The PRD changes in §5.2 are applied in this branch. The §6 founder decisions are **pending ratification**. Until they are ratified, the recommended default stands for planning but no story in Epic 16, 17 or 19 that depends on one starts. Epic 18 depends on none of them.
+- **Status:** Scope approved by the founder on 2026-11-20. The PRD changes in §5.2 are applied in this branch. The §6 founder decisions were **pending ratification** when this was written; **they were ratified on 2026-11-21** (§ Ratification), and the decisions left open by the epics' retrospectives and reviews were taken on 2026-11-23 (§ Founder decisions, 2026-11-23). Until they were ratified, the recommended default stands for planning but no story in Epic 16, 17 or 19 that depends on one starts. Epic 18 depends on none of them.
 - **Pilot:** the pilot goes live on v1 in parallel. Nothing here blocks it. Nothing here changes a shipped behaviour until its story ships, and the one production-configuration change (opening the signup door, Epic 19) is a separate founder decision (D-S5).
 
 ---
@@ -75,7 +75,7 @@ Items 1 and 2 share one root cause. Both need the schedule projected **outside t
 | 4.3 MVP review | [x] | v1 is unchanged and goes live. This is v2, built after or alongside the pilot |
 | 4.4 Path | [x] | Direct adjustment, as a post-v1 expansion (§4) |
 | 5.x Proposal components | [x] | This document |
-| 6.x Approval and handoff | [!] | Scope approved. §6 founder decisions pending ratification |
+| 6.x Approval and handoff | [x] | Scope approved. §6 founder decisions ratified 2026-11-21; the open follow-ups decided 2026-11-23 |
 
 ## 3. Impact Analysis
 
@@ -511,3 +511,14 @@ A `security-review` of 16.3–16.4 and of 19.1–19.5 precedes production in eve
 ## Ratification (2026-11-21)
 
 The founder accepted D-S1 to D-S10 at the recommended defaults ("D-S defaulti prihvaćeni"). D-S1 sub-choices from architect pass 1 are taken at their defaults: the feed token is stored as a plain SHA-256 hash that no role can read; Kong logs at `crit` so no token path is logged; a member with no team of their own may hold a live feed (they can be lent). D-S5 stands as written: signup ships to staging only, and production opens only on the founder's separate go after the security review.
+
+## Founder decisions (2026-11-23)
+
+The founder took every recommendation then open ("go with your recommendations"); the index is `founder-decisions-2026-11-23.md`. For this proposal's decisions:
+
+- **D-S1 (the feed).** 16.5's accepted token risks (the Google `cid` link, the clipboard) are signed off, and the feed is limited to 120 requests a minute per client IP on its route alone, in Kong.
+- **D-S5 (production signup).** One more gate before production opens: a terms and privacy link on `/registracija` (the UX review's O2). Staging shows none. The epic 19 UX review is accepted, with F2 confirmed: members join by admin-issued credentials, never an email invitation.
+- **D-S6 (reminders).** A member whose auth account is banned or deleted gets no reminders (17.2's Design Note 9 reversed, migration `0075`), and the Vault arming of `remind` and `notify` never puts the invoke secret into a statement (DEPLOY.md §3a).
+- **D-S7 (housekeeping).** 19.5's deletion rules, circuit breaker, kept revoked feed tokens, 30-day attempts purge and suspension shown in history are accepted as built.
+- **Epic 18 (no D-S gate).** The member-wide loan read is ratified, and the team terminology stays (*Smjena* the label, *tim* in loan prose).
+- **The repository stays public** (free CI; nothing secret is in it).

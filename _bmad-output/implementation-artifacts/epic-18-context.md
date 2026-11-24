@@ -34,7 +34,7 @@ An admin lends one member to another team of the same organization for an inclus
   - every Short-staffed Shift caused in either team;
   - Roster Overrides on covered dates that the change makes inapplicable, for the admin to keep or remove. None is silently discarded.
 - The member is notified when a loan is made, changed or removed, and the change history records each event.
-- Loans are admin-only. A member-role account is refused every loan write at the data layer, including direct API calls. A member sees its own loans and other members' current team. Loan reasons are visible only to admins.
+- Loans are admin-only. A member-role account is refused every loan write at the data layer, including direct API calls. A member sees its own loans and other members' current team. Loan reasons are visible only to admins. *(Ratified 2026-11-23 by the founder, epic 18 retro A1: members read every live loan's member, team and dates through `calendar_team_loans()`, never its reason or author.)*
 - Loans are not multi-membership and never cross organizations.
 
 ## Technical Decisions
@@ -43,7 +43,7 @@ An admin lends one member to another team of the same organization for an inclus
 - **Classification:** a Loan is an **Exception**, date-ranged like a Leave Record. It is never versioned and is not a rule version. 18.2 adds the Loan row to the spine's table that classifies every rule kind as versioned or current-state.
 - **Table `team_loans` (18.2):**
   - organization-scoped, with `organization_id` as the first column;
-  - RLS on: admins write; members read only their own loans;
+  - RLS on: admins write and read the table; members read every live loan's member, team and dates through `calendar_team_loans()`, never its reason or author (ratified 2026-11-23);
   - attribution from column defaults (`created_by default auth.uid()`, `created_at default now()`, with an RLS `WITH CHECK (created_by = auth.uid())`);
   - the two standard audit triggers (`<table>_audit` and `<table>_audit_update`), attached in the migration that creates the table.
 - **Illegal states by schema shape:** use an `EXCLUDE USING gist (member_id WITH =, during WITH &&)` exclusion constraint for overlap per member, as leave records do. Refuse a loan to the home team or to an archived team by shape or constraint. Do not use client-only validation or a new computing trigger.

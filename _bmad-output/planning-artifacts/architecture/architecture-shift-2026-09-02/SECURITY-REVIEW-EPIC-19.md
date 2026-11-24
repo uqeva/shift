@@ -3,7 +3,8 @@
 - **Status:** checklist, written by Architect pass 2 (AP2) on 2026-11-21. It is not a review result.
 - **Used by:** the `security-review` of 19.1–19.5 that D-S5 requires before production opens (ratified 2026-11-21), and each 19.x story's code review for its own rows.
 - **Governing ADs:** AD-10, AD-11, AD-12, AD-16, AD-17 and AD-21–AD-25 in `ARCHITECTURE-SPINE.md`.
-- **This repository is public.** The review records findings and evidence. It never records host addresses, CIDRs, keys or tokens.
+- **This repository is public.** The review records findings and evidence. It never records host addresses, CIDRs, keys or tokens. **The founder decided on 2026-11-23 that it stays public** (free CI; nothing secret is in it).
+- **Founder decisions of 2026-11-23** (`founder-decisions-2026-11-23.md`), recorded where they bind: the UX review accepted (F2: no email invitations; O2: a terms and privacy link on `/registracija`, H item 5b); 19.5's deletion rules, circuit breaker, kept revoked feed tokens, 30-day attempts purge and suspension shown in history, accepted (F1, E3); the Vault arming that never puts a secret into a statement (G4); no reminders for a banned or deleted account (G5); the calendar feed's per-IP limit (A7a); 16.5's token risks signed off (G6).
 
 Each row needs evidence: a test that runs in CI, a probe run on the local stack or on staging, or a file and line. "Looks right" is not evidence.
 
@@ -17,6 +18,7 @@ Each row needs evidence: a test that runs in CI, a probe run on the local stack 
 | A4 | `require-config.mjs` refuses `VITE_SIGNUP_ENABLED=true` for production | test |
 | A5 | The hook refuses a synthesized address, an address whose local part fails the username check, a closed door and the accounts ceiling, all with one message. It writes nothing. Its execute grant is `supabase_auth_admin` only | DB test, catalog |
 | A6 | `POST /admin/users` (admin-auth's `createUser`) still works with the hook on, so the hook does not run there | local-stack probe |
+| A7a | **Decided 2026-11-23 (founder).** The calendar feed (16.4, not a signup route) is limited too: 120 a minute per client IP on its own route `functions-v1-calendar-feed`, `limit_by: ip` through the same client-IP chain (A8), every other function unlimited | `test/self-hosted-stack.test.ts` (the route, the plugin, which paths take it); 20.5 probes the 429 on the stack |
 | A7 | Kong's `rate-limiting` is on the four routes, with the staging values, `limit_by: ip` and `hide_client_headers`, and it answers 429 when exceeded. No Traefik label middleware exists (Coolify would chain it onto every route) | Kong render test, rehearsal probe |
 | A8 | GoTrue's per-IP limit and its audit log see the client address, not the proxy. `KONG_TRUSTED_IPS` is the proxy network only, never `0.0.0.0/0` or `::/0`. A client-sent `X-Real-IP` and a spoofed `X-Forwarded-For` are not trusted | staging probe |
 | A9 | `GOTRUE_RATE_LIMIT_EMAIL_SENT` and `SMTP_MAX_FREQUENCY` are set explicitly. The budget fits Resend's plan together with `notify`'s volume | config, figures |
@@ -101,7 +103,7 @@ Each row needs evidence: a test that runs in CI, a probe run on the local stack 
 
 | # | Check | Evidence |
 |---|---|---|
-| F1 | The job deletes only accounts with no member row that are past 7 days (unconfirmed) or 30 days (confirmed) | DB test |
+| F1 | The job deletes only accounts with no member row that are past 7 days (unconfirmed) or 30 days (confirmed). **Accepted by the founder 2026-11-23** as built: email identities only, never banned, never a `founded_by`, 7 days from the last link, 30 from confirmation, the circuit breaker; revoked feed tokens kept; `organization_attempts` purged after 30 days; suspension shown only as two history entries | DB test |
 | F2 | An account that is inside `create_organization` is skipped and never deleted (`skip locked`, then the re-check) | DB test |
 | F3 | No session role can execute the job's function | catalog |
 | F4 | The operator scripts work only over the tailnet and change only `suspended` | runbook |
@@ -126,6 +128,9 @@ Migration `0073_housekeeping_and_suspension.sql`. Beside the unrun DB files, the
 | G1 | GoTrue's SMTP key is its own sending-only, domain-restricted Resend key per stack, held only in the auth resource's Coolify environment | runbook, key-hygiene test |
 | G2 | No email address, password or `token_hash` is written to Kong's, Traefik's, GoTrue's or the SPA's logs beyond GoTrue's own audit table | staging log search |
 | G3 | The SPA bundle check still passes. No new key is in the bundle | CI |
+| G4 | **Decided 2026-11-23 (founder; epic 17 retro A3 (a)).** An invoke secret never enters a statement: DEPLOY.md §3a, §3b and §9.5 send it as `COPY … FROM STDIN` data into a temporary table and call `vault.create_secret((select value from arming), …)`, so `log_min_error_statement`, `log_statement = all`, `pg_stat_activity` and `pg_stat_statements` never hold it (§3a, *A secret never enters a statement*) | `test/self-hosted-stack.test.ts` runs each arming block under bash |
+| G5 | **Decided 2026-11-23 (founder; epic 17 retro A3 (b)).** A member whose auth account is banned or deleted is sent no reminder: `0075` adds the feed's account check to `reminder_inputs` and `enqueue_shift_reminders` (reverses 17.2 Design Note 9) | `test/shift-reminders.test.ts`, scaffold diff against 0073 |
+| G6 | **Signed off 2026-11-23 (founder; epic 16 retro A1).** 16.5's accepted risks: the feed token in the Google `cid` link and in the OS clipboard | `deferred-work.md` (16.5 review 2) |
 
 ## H. Production opening (D-S5): every box, then the founder's go
 
@@ -135,4 +140,5 @@ Migration `0073_housekeeping_and_suspension.sql`. Beside the unrun DB files, the
 4. Backups (20.7) and monitoring (20.8) run on production.
 5. The decision on a second factor for email identities is recorded (spine, Deferred). F1 (timing, if Kong cannot relay) and A10 (accepted denial of service) are decided.
 5a. Production restores only from production dumps; a staging dump would carry `signup_settings.open = true`.
+5b. **A terms and privacy link is on `/registracija`** (founder decision 2026-11-23, UX review O2). Required before production signup opens; staging shows none. Its text and URL are the founder's and legal's.
 6. **The founder says go.** Then, in this order: a reviewed PR lets production build with `VITE_SIGNUP_ENABLED`; the operator sets the production GoTrue environment and restarts auth; then the operator opens `signup_settings` by SQL. Closing again is the reverse order. `signup_settings.open = false` alone stops new accounts and organizations at once.

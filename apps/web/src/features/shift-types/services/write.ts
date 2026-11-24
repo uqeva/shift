@@ -7,7 +7,7 @@ import {
   type ShiftTypesSurfaceState,
 } from '@/features/shift-types/services/list';
 import type { ShiftTypeVersion } from '@shift/domain';
-import { enteredName } from '@/utils/name';
+import { enteredName, hasControlCharacter } from '@/utils/name';
 import { minuteOfTime } from '@/utils/time';
 
 /**
@@ -48,6 +48,13 @@ import { minuteOfTime } from '@/utils/time';
 export const SHIFT_TYPE_NAME_EMPTY = 'SHIFT_TYPE_NAME_EMPTY';
 /** The name is longer than `0036`'s maximum (`shift_types_name_length`). */
 export const SHIFT_TYPE_NAME_TOO_LONG = 'SHIFT_TYPE_NAME_TOO_LONG';
+/**
+ * The name holds a line break or another control character inside it
+ * (`0076`'s `shift_types_name_characters`, epic 17 retro A4): it would reach
+ * a reminder email's subject. Refused before anything is sent, and by the
+ * database from any other caller.
+ */
+export const SHIFT_TYPE_NAME_CONTROL = 'SHIFT_TYPE_NAME_CONTROL';
 /** Another type in use in this organization carries the name, ignoring case and padding. */
 export const SHIFT_TYPE_NAME_TAKEN = 'SHIFT_TYPE_NAME_TAKEN';
 /** A start or end is not a whole minute of the day (client-side, or a time check). */
@@ -86,6 +93,7 @@ export const SHIFT_TYPE_KIND_MISSING = 'SHIFT_TYPE_KIND_MISSING';
 export type ShiftTypeWriteFailure =
   | typeof SHIFT_TYPE_NAME_EMPTY
   | typeof SHIFT_TYPE_NAME_TOO_LONG
+  | typeof SHIFT_TYPE_NAME_CONTROL
   | typeof SHIFT_TYPE_NAME_TAKEN
   | typeof SHIFT_TYPE_TIME_INVALID
   | typeof SHIFT_TYPE_DATE_INVALID
@@ -209,6 +217,7 @@ const VALUE_CLASSES = ['22', '23'];
 const NAME_UNIQUE = 'shift_types_organization_name_key';
 const NAME_CHECK = 'shift_types_name_not_blank';
 const NAME_LENGTH_CHECK = 'shift_types_name_length';
+const NAME_CHARACTERS_CHECK = 'shift_types_name_characters';
 const TIME_CHECKS = [
   'shift_type_versions_start_before_midnight',
   'shift_type_versions_end_before_midnight',
@@ -241,6 +250,7 @@ export function shiftTypeWriteFailureOf(error: ShiftTypeWriteError): ShiftTypeWr
   if (error.code === CHECK_VIOLATION) {
     if (named.includes(NAME_CHECK)) return SHIFT_TYPE_NAME_EMPTY;
     if (named.includes(NAME_LENGTH_CHECK)) return SHIFT_TYPE_NAME_TOO_LONG;
+    if (named.includes(NAME_CHARACTERS_CHECK)) return SHIFT_TYPE_NAME_CONTROL;
     if (TIME_CHECKS.some((check) => named.includes(check))) return SHIFT_TYPE_TIME_INVALID;
     if (named.includes(DATE_CHECK)) return SHIFT_TYPE_DATE_INVALID;
 
@@ -539,6 +549,7 @@ export async function createShiftType(
   const name = enteredShiftTypeName(entered.name);
 
   if (name === null) return { ok: false, code: SHIFT_TYPE_NAME_EMPTY };
+  if (hasControlCharacter(name)) return { ok: false, code: SHIFT_TYPE_NAME_CONTROL };
   if (entered.kind === null) return { ok: false, code: SHIFT_TYPE_KIND_MISSING };
 
   const working = entered.kind === SHIFT_TYPE_WORKING;
@@ -600,6 +611,7 @@ export async function renameShiftType(
   const name = enteredShiftTypeName(entered);
 
   if (name === null) return { ok: false, code: SHIFT_TYPE_NAME_EMPTY };
+  if (hasControlCharacter(name)) return { ok: false, code: SHIFT_TYPE_NAME_CONTROL };
   if (type.archived) return { ok: false, code: SHIFT_TYPE_STALE };
 
   return settled(() => table.update({ name }).eq(ID_COLUMN, type.id).select(RETURNED_COLUMNS));
@@ -654,7 +666,12 @@ export type ShiftTypeField =
  * both times, since either may be the one; a refusal about no field marks none.
  */
 export function marksField(failure: ShiftTypeWriteFailure | null, field: ShiftTypeField): boolean {
-  if (failure === SHIFT_TYPE_NAME_EMPTY || failure === SHIFT_TYPE_NAME_TOO_LONG || failure === SHIFT_TYPE_NAME_TAKEN) {
+  if (
+    failure === SHIFT_TYPE_NAME_EMPTY ||
+    failure === SHIFT_TYPE_NAME_TOO_LONG ||
+    failure === SHIFT_TYPE_NAME_CONTROL ||
+    failure === SHIFT_TYPE_NAME_TAKEN
+  ) {
     return field === SHIFT_TYPE_NAME_FIELD;
   }
   if (failure === SHIFT_TYPE_TIME_INVALID) {
@@ -674,7 +691,12 @@ export function refusedFieldOf(
   failure: ShiftTypeWriteFailure,
   fallback: ShiftTypeField,
 ): ShiftTypeField {
-  if (failure === SHIFT_TYPE_NAME_EMPTY || failure === SHIFT_TYPE_NAME_TOO_LONG || failure === SHIFT_TYPE_NAME_TAKEN) {
+  if (
+    failure === SHIFT_TYPE_NAME_EMPTY ||
+    failure === SHIFT_TYPE_NAME_TOO_LONG ||
+    failure === SHIFT_TYPE_NAME_CONTROL ||
+    failure === SHIFT_TYPE_NAME_TAKEN
+  ) {
     return SHIFT_TYPE_NAME_FIELD;
   }
   if (failure === SHIFT_TYPE_TIME_INVALID) return SHIFT_TYPE_START_FIELD;
@@ -692,6 +714,7 @@ export function shiftTypeWriteMessageKey(
 ):
   | 'rotation.shiftTypes.error.nameEmpty'
   | 'rotation.shiftTypes.error.nameTooLong'
+  | 'rotation.shiftTypes.error.nameControl'
   | 'rotation.shiftTypes.error.nameTaken'
   | 'rotation.shiftTypes.error.timeInvalid'
   | 'rotation.shiftTypes.error.dateInvalid'
@@ -711,6 +734,8 @@ export function shiftTypeWriteMessageKey(
       return 'rotation.shiftTypes.error.nameEmpty';
     case SHIFT_TYPE_NAME_TOO_LONG:
       return 'rotation.shiftTypes.error.nameTooLong';
+    case SHIFT_TYPE_NAME_CONTROL:
+      return 'rotation.shiftTypes.error.nameControl';
     case SHIFT_TYPE_NAME_TAKEN:
       return 'rotation.shiftTypes.error.nameTaken';
     case SHIFT_TYPE_TIME_INVALID:

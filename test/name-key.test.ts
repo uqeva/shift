@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 import { FIXTURES, connect, localApiEndpoint, noDatabase } from './database.js';
 
-import { NAME_MAX_LENGTH, isBlankName, nameKey } from '../apps/web/src/utils/name.ts';
+import { NAME_CONTROL_CHARACTER_CLASS, NAME_MAX_LENGTH, hasControlCharacter, isBlankName, nameKey } from '../apps/web/src/utils/name.ts';
 
 /**
  * `0024`: every name check strips all white space, and name uniqueness compares
@@ -124,6 +124,7 @@ const BLANK_TABLES = [
   {
     table: 'teams',
     constraint: 'teams_name_not_blank',
+    characters: 'teams_name_characters',
     write: (client: Client, admin: Admin, name: string) =>
       attempt(client, 'insert into teams (organization_id, name) values ($1, $2)', [admin.organizationId, name]),
   },
@@ -140,6 +141,7 @@ const BLANK_TABLES = [
   {
     table: 'shift_types',
     constraint: 'shift_types_name_not_blank',
+    characters: 'shift_types_name_characters',
     write: (client: Client, admin: Admin, name: string) =>
       attempt(client, 'insert into shift_types (organization_id, name, is_working) values ($1, $2, false)', [
         admin.organizationId,
@@ -163,12 +165,17 @@ const UNIQUE_TABLES = BLANK_TABLES.filter((entry) =>
 ).map((entry) => ({ ...entry, unique: `${entry.table}_organization_name_key` }));
 
 describe('every name check refuses a name of white space alone (0024)', () => {
-  it.skipIf(noDatabase).each(BLANK_TABLES)('$table', async ({ constraint, write }) => {
+  it.skipIf(noDatabase).each(BLANK_TABLES)('$table', async (entry) => {
+    const { constraint, write } = entry;
+    // 0076: Postgres tests a table's CHECK constraints in alphabetical order,
+    // so on teams and shift types a blank name holding a control character
+    // (a tab, a line break, a NEL) is refused by `*_name_characters` first.
+    const characters = 'characters' in entry ? entry.characters : undefined;
     await asPilotAdmin(async (client, admin) => {
       for (const [index, { label, name }] of BLANK_NAMES.entries()) {
         expect(await write(client, admin, name, index), `${label} was stored`).toEqual({
           code: '23514',
-          constraint,
+          constraint: characters !== undefined && hasControlCharacter(name) ? characters : constraint,
         });
       }
       for (const [index, name] of ACCEPTED_NAMES.entries()) {
@@ -179,10 +186,14 @@ describe('every name check refuses a name of white space alone (0024)', () => {
 });
 
 describe('name uniqueness compares trimmed, NFC, lower-cased names (0024)', () => {
-  it.skipIf(noDatabase).each(UNIQUE_TABLES)('$table', async ({ unique, write }) => {
+  it.skipIf(noDatabase).each(UNIQUE_TABLES)('$table', async (entry) => {
+    const { unique, write } = entry;
+    // 0076 refuses a tab in a team's or a type's name (23514, before the
+    // unique index), so those two are padded with an ideographic space.
+    const trailing = 'characters' in entry ? '\u3000' : '\t';
     await asPilotAdmin(async (client, admin) => {
       expect(await write(client, admin, 'Probni X', 0), 'the first name was refused').toBeNull();
-      for (const [index, padded] of ['Probni X\t', '\u00A0probni x', 'PROBNI X\u202F'].entries()) {
+      for (const [index, padded] of [`Probni X${trailing}`, '\u00A0probni x', 'PROBNI X\u202F'].entries()) {
         expect(await write(client, admin, padded, 1 + index), `${JSON.stringify(padded)} was stored`).toEqual({
           code: '23505',
           constraint: unique,
@@ -406,6 +417,8 @@ describe('existing rows the new rules would refuse stop the migration (0024)', (
       label: 'a blank team',
       setup: [
         'alter table teams drop constraint teams_name_not_blank',
+        // 0076's check would refuse the tab first; 0024's guard is under test.
+        'alter table teams drop constraint teams_name_characters',
         `insert into teams (organization_id, name) values ($1, E'\\t')`,
       ],
       detail: 'teams (blank name)',
@@ -443,6 +456,7 @@ describe('existing rows the new rules would refuse stop the migration (0024)', (
       label: 'two active teams with one key',
       setup: [
         'drop index teams_organization_name_key',
+        'alter table teams drop constraint teams_name_characters',
         `insert into teams (organization_id, name) values ($1, 'Probni X'), ($1, E'Probni X\\t')`,
       ],
       detail: 'teams (duplicate name)',
@@ -518,7 +532,7 @@ describe('existing rows the new rules would refuse stop the migration (0024)', (
     {
       label: 'an archived team sharing a key with an active one',
       setup: [
-        `insert into teams (organization_id, name, archived) values ($1, 'Probni X', false), ($1, E'probni x\\t', true)`,
+        `insert into teams (organization_id, name, archived) values ($1, 'Probni X', false), ($1, E'probni x\\u3000', true)`,
       ],
     },
     {
@@ -567,5 +581,174 @@ describe('the database and the client share one maximum name length (0036)', () 
     } finally {
       await client.end();
     }
+  });
+});
+
+/**
+ * `0076` (epic 17 retro A4): a team's or a shift type's name holds no control
+ * character inside it, so none reaches an email's subject. Written unrun: the
+ * shared local stack never has a migration applied by a story, so CI's fresh
+ * stack is the first to run these.
+ */
+describe('a team or a type name refuses a control character inside it (0076)', () => {
+  const CHARACTER_TABLES = [
+    {
+      table: 'teams',
+      constraint: 'teams_name_characters',
+      write: (client: Client, admin: Admin, name: string) =>
+        attempt(client, 'insert into teams (organization_id, name) values ($1, $2)', [admin.organizationId, name]),
+    },
+    {
+      table: 'shift_types',
+      constraint: 'shift_types_name_characters',
+      write: (client: Client, admin: Admin, name: string) =>
+        attempt(client, 'insert into shift_types (organization_id, name, is_working) values ($1, $2, false)', [
+          admin.organizationId,
+          name,
+        ]),
+    },
+  ];
+
+  it.skipIf(noDatabase).each(CHARACTER_TABLES)('$table, as the admin a request writes as', async ({ constraint, write }) => {
+    await asPilotAdmin(async (client, admin) => {
+      for (const [index, inside] of ['\n', '\r', '\t', '\u0007', '\u007F', '\u0085', '\u2028', '\u2029'].entries()) {
+        expect(await write(client, admin, `Probno${inside}ime ${String(index)}`), JSON.stringify(inside)).toEqual({
+          code: '23514',
+          constraint,
+        });
+      }
+      // A control character at an edge is refused too: the database trims nothing.
+      expect(await write(client, admin, 'Probno ime\n'), 'a trailing line break was stored').toEqual({ code: '23514', constraint });
+      expect(await write(client, admin, 'Probno ime č'), 'a name with no control was refused').toBeNull();
+    });
+  });
+
+  it.skipIf(noDatabase)('checks the class the client asks, over the whole BMP', async () => {
+    const client = await connect();
+    try {
+      const { rows: definitions } = await client.query<{ name: string; definition: string }>(
+        `select conname as name, pg_get_constraintdef(oid) as definition
+           from pg_constraint
+          where connamespace = 'public'::regnamespace and conname like '%\\_name\\_characters'
+          order by conname`,
+      );
+      expect(definitions.map((row) => row.name)).toEqual(['shift_types_name_characters', 'teams_name_characters']);
+      for (const row of definitions) {
+        expect(row.definition, row.name).toBe(`CHECK ((name !~ '${NAME_CONTROL_CHARACTER_CLASS}'::text))`);
+      }
+      const { rows } = await client.query<{ code: number }>(
+        `select c as code from generate_series(1, 65535) c
+          where c not between 55296 and 57343 and chr(c) ~ $1
+          order by c`,
+        [NAME_CONTROL_CHARACTER_CLASS],
+      );
+      const BMP = Array.from({ length: 0xffff }, (_, index) => index + 1).filter(
+        (codePoint) => codePoint < 0xd800 || codePoint > 0xdfff,
+      );
+      const browser = BMP.filter((codePoint) => hasControlCharacter(String.fromCodePoint(codePoint)));
+      expect(browser.map((code) => code.toString(16))).toEqual(rows.map((row) => row.code.toString(16)));
+    } finally {
+      await client.end();
+    }
+  });
+});
+
+describe('existing names are folded, or the migration stops (0076)', () => {
+  const migration = readFileSync(join(repoRoot, 'supabase', 'migrations', '0076_names_refuse_control_characters.sql'), 'utf8');
+  const guard = /^do \$\$[\s\S]*?^\$\$;$/m.exec(migration)?.[0];
+  const folds = [...migration.matchAll(/^update public\.(?:teams|shift_types) [\s\S]*?;$/gm)].map((match) => match[0]);
+
+  it('carries one guard block and one fold per table', () => {
+    expect(guard, 'no guard block in 0076').toBeDefined();
+    expect(folds).toHaveLength(2);
+  });
+
+  /**
+   * Plant rows as the owner, with 0076's checks dropped (inside a transaction
+   * that is rolled back), then run the guard and, when it passes, the folds.
+   * Answers the guard's refusal, or the planted rows' names after the folds.
+   */
+  async function afterMigration(
+    plant: readonly string[],
+  ): Promise<{ refusal: { code?: string; message?: string; detail?: string } | null; names: string[] }> {
+    const client = await connect();
+    try {
+      await client.query('begin');
+      const admin = await pilotAdmin(client);
+      // Still the owner, so the dropped checks stay dropped; the claims only
+      // give `created_by`'s `auth.uid()` default someone to name, as 0024's.
+      await client.query('select set_config($1, $2, true)', [
+        'request.jwt.claims',
+        JSON.stringify({ sub: admin.authUserId, role: 'authenticated' }),
+      ]);
+      await client.query('alter table teams drop constraint teams_name_characters');
+      await client.query('alter table shift_types drop constraint shift_types_name_characters');
+      for (const statement of plant) await client.query(statement, [admin.organizationId]);
+      await client.query('savepoint guard');
+      const refusal = await client.query(guard ?? '').then(
+        () => null,
+        (cause: { code?: string; message?: string; detail?: string }) => cause,
+      );
+      if (refusal !== null) {
+        await client.query('rollback to savepoint guard');
+        return { refusal, names: [] };
+      }
+      for (const fold of folds) await client.query(fold);
+      const { rows } = await client.query<{ name: string }>(
+        `select name from teams where organization_id = $1 and name like 'Probn%'
+         union all
+         select name from shift_types where organization_id = $1 and name like 'Probn%'
+         order by 1`,
+        [admin.organizationId],
+      );
+      return { refusal: null, names: rows.map((row) => row.name) };
+    } finally {
+      await client.query('rollback');
+      await client.end();
+    }
+  }
+
+  it.skipIf(noDatabase)('folds each run of control characters to one space and trims the ends', async () => {
+    const { refusal, names } = await afterMigration([
+      `insert into teams (organization_id, name) values ($1, E'Probni\\nX'), ($1, E'Probni\\r\\n\\tY\\u0085')`,
+      `insert into shift_types (organization_id, name, is_working) values ($1, E'Probna\\u2028Z', false)`,
+    ]);
+    expect(refusal).toBeNull();
+    expect(names).toEqual(['Probna Z', 'Probni X', 'Probni Y']);
+  });
+
+  it.skipIf(noDatabase).each([
+    {
+      label: 'a team that folds to a blank name',
+      plant: [`insert into teams (organization_id, name) values ($1, E'\\u0001\\u0002')`],
+      detail: 'teams',
+    },
+    {
+      label: 'a team that folds onto another team in use',
+      plant: [`insert into teams (organization_id, name) values ($1, 'Probni X'), ($1, E'Probni\\nX')`],
+      detail: 'teams',
+    },
+    {
+      label: 'two types that fold onto one key',
+      plant: [`insert into shift_types (organization_id, name, is_working) values ($1, E'Probni\\nX', false), ($1, E'probni\\tx', false)`],
+      detail: 'shift_types',
+    },
+  ])('stops, changing nothing, on $label', async ({ plant, detail }) => {
+    const { refusal } = await afterMigration(plant);
+    expect(refusal?.code, 'the guard let the rows through').toBe('23514');
+    expect(refusal?.message).toBe('NAME_CONTROL_FOLD_CONFLICT');
+    expect(refusal?.detail).toContain(detail);
+  });
+
+  it.skipIf(noDatabase)('lets an archived row share the folded key, as the unique index does', async () => {
+    const { refusal, names } = await afterMigration([
+      `insert into teams (organization_id, name, archived) values ($1, 'Probni X', false), ($1, E'Probni\\nX', true)`,
+    ]);
+    expect(refusal).toBeNull();
+    expect(names).toEqual(['Probni X', 'Probni X']);
+  });
+
+  it.skipIf(noDatabase)('runs clean, folding nothing, over the data the checks already admit', async () => {
+    expect(await afterMigration([])).toEqual({ refusal: null, names: [] });
   });
 });

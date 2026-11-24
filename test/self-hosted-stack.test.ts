@@ -814,6 +814,50 @@ describe('the self-hosted stack (story 20.2): the functions route, its CORS and 
     ]);
   });
 
+  it('limits the calendar feed to 120 a minute per client IP, on its own route only (founder decision 2026-11-23, epic 16 retro A2)', () => {
+    const config = renderedKong();
+    const feed = kongService(config, 'functions-v1-calendar-feed');
+    // The catch-all's upstream, and only `/functions/v1/` stripped (the
+    // lookahead matches nothing), so the router sees the same path as before.
+    expect(feed.url).toBe(functionsRoute(config)?.url);
+    expect(feed.routes).toEqual([
+      { name: 'functions-v1-calendar-feed', strip_path: true, paths: ['/functions/v1/(?=calendar-feed(?:/|$))'] },
+    ]);
+    expect(new RegExp(`^${feed.routes?.[0]?.paths?.[0] ?? ''}`).exec('/functions/v1/calendar-feed/abc')?.[0]).toBe('/functions/v1/');
+    expect(feed.plugins?.map((plugin) => plugin.name)).toEqual(['cors', 'rate-limiting']);
+    // The same CORS as the catch-all: the app's origin alone, rendered.
+    expect(feed.plugins?.[0]?.config).toEqual(functionsRoute(config)?.plugins?.[0]?.config);
+    expect(feed.plugins?.[0]?.config?.['origins']).toEqual([FAKE.SHIFT_APP_URL]);
+    // Keyed on the client address Kong resolved through the 19.1 chain
+    // (`KONG_TRUSTED_IPS`, `X-Forwarded-For`), counted in this Kong alone.
+    expect(pluginOf(feed, 'rate-limiting')).toEqual({ minute: 120, limit_by: 'ip', policy: 'local', hide_client_headers: true });
+    // The catch-all stays unlimited: no other function is throttled.
+    expect(pluginOf(kongService(config, 'functions-v1'), 'rate-limiting')).toBeUndefined();
+
+    // Every spelling the router serves as `calendar-feed` (its first segment,
+    // exactly, after Kong's normalization) takes the limited route.
+    const feedPaths = [
+      '/functions/v1/calendar-feed',
+      '/functions/v1/calendar-feed/',
+      '/functions/v1/calendar-feed/0123456789abcdef',
+      '/functions/v1//calendar-feed/x',
+      '/functions/v1/calendar%2Dfeed/x',
+      '/functions/v1/calendar-feed/x/y',
+    ];
+    for (const method of ['GET', 'OPTIONS']) {
+      for (const path of feedPaths) expect(kongRouteFor(config, method, path), `${method} ${path}`).toBe('functions-v1-calendar-feed');
+    }
+    const otherPaths = [
+      '/functions/v1/calendar-feedx/abc',
+      '/functions/v1/calendar-feeds',
+      '/functions/v1/remind',
+      '/functions/v1/notify',
+      '/functions/v1/admin-auth',
+      '/functions/v1/x/calendar-feed/abc',
+    ];
+    for (const path of otherPaths) expect(kongRouteFor(config, 'POST', path), path).toBe('functions-v1');
+  });
+
   it('refuses to start Kong with an app origin that is not a plain http(s) origin', () => {
     // Kong 2.8's cors plugin reads an origin with any character outside
     // [A-Za-z0-9.:/-] as a REGEX; a path never equals a browser's Origin.
@@ -1890,6 +1934,8 @@ describe('the self-hosted stack (story 19.1): Kong is the anti-enumeration bound
       'auth-v1-token': { minute: 60, hour: 1440 },
       'auth-v1-verify': { minute: 15, hour: 360 },
       'rest-v1-create-organization': { hour: 10 },
+      // Not a compose variable: the founder's number (2026-11-23), pinned above.
+      'functions-v1-calendar-feed': { minute: 120 },
     };
     const limited = config.services.filter((definition) => pluginOf(definition, 'rate-limiting') !== undefined).map(({ name }) => name);
     expect(limited.sort()).toEqual(Object.keys(expected).sort());
@@ -2125,6 +2171,71 @@ describe('the self-hosted stack (story 19.1): Kong is the anti-enumeration bound
     }
     expect(runKongLua(own, { path: '/rest/v1/rpc/create_organization', method: 'POST', body: '{}' }).exit).toBeUndefined();
     expect(runKongLua(own, { path: '/rest/v1/rpc/create%5Forganization', method: 'POST', body: '{}' }).exit?.status).toBe(404);
+  });
+});
+
+describe('DEPLOY.md arms Vault without the secret in any statement (founder decision 2026-11-23, epic 17 retro A3 (a))', () => {
+  const doc = readFileSync(DEPLOY_DOC, 'utf8');
+  /**
+   * Each shell block that loads a secret into Vault: `{ … } | $DC exec … psql …`
+   * around a `copy arming` line, its body only (the lines between the braces).
+   * A body is taken only when every line is an `echo` or a `printf`: those are
+   * the only lines this test may hand to bash.
+   */
+  const lines = doc.split('\n');
+  const blocks = lines.flatMap((line, at) => {
+    if (!line.trim().startsWith('echo "copy arming (value) from stdin')) return [];
+    let open = at;
+    while (open > 0 && (lines[open] ?? '').trim() !== '{') open -= 1;
+    let close = at;
+    while (close < lines.length - 1 && !(lines[close] ?? '').trim().startsWith('} | $DC exec')) close += 1;
+    return [{ guard: lines[open - 1] ?? '', body: lines.slice(open + 1, close) }];
+  });
+  const COPY = "copy arming (value) from stdin with (format csv, delimiter E'\\x01', quote E'\\x02');";
+  const ONLY_OUTPUT = /^\s*(?:echo|printf) /;
+
+  it('never interpolates a psql variable into a statement, and never writes an invoke secret but from the COPY table', () => {
+    // No statement a block sends interpolates a psql variable (the prose may name the old way).
+    expect(doc).not.toMatch(/echo "[^"\n]*:'secret'/);
+    expect(doc).not.toMatch(/\\\\?set secret/);
+    const writes = doc.split('\n').filter((line) => /vault\.(?:create|update)_secret\(/.test(line) && line.includes('_invoke_secret'));
+    expect(writes.length).toBeGreaterThanOrEqual(6);
+    for (const line of writes) expect(line, line).toContain('(select value from arming)');
+  });
+
+  it('sends the value as the COPY’s one data row and in no statement, in every arming block (run under bash)', () => {
+    // §3a arm and rotate, §3b arm and rotate, §9.5 notify and remind.
+    expect(blocks).toHaveLength(6);
+    const VALUE = 'Zz9_probe-value-that-is-long-enough-0123456789';
+    for (const { guard, body: bodyLines } of blocks) {
+      const body = bodyLines.join('\n');
+      // The value is checked in the shell first, on stdin, and nothing is sent otherwise.
+      expect(guard.trim(), body).toMatch(/^printf '%s' "\$SERVICE_PASSWORD_64_[A-Z]+" \| grep -Eqx '\[A-Za-z0-9_-\]\{32,\}' \|\| \{ echo 'not an invoke secret: nothing sent' >&2; false; \} &&$/);
+      // Nothing but output: never a command the runbook means for a real stack.
+      expect(bodyLines.length, body).toBeLessThanOrEqual(10);
+      expect(bodyLines.filter((line) => !ONLY_OUTPUT.test(line)), body).toEqual([]);
+      if (bodyLines.some((line) => !ONLY_OUTPUT.test(line)) || bodyLines.length > 10) continue;
+      const name = /"\$(SERVICE_PASSWORD_64_[A-Z]+)"/.exec(body)?.[1];
+      expect(name, body).toBeDefined();
+      const out = execFileSync('bash', ['-c', `{\n${body}\n}`], {
+        encoding: 'utf8',
+        env: { PATH: process.env['PATH'] ?? '', [name ?? '']: VALUE },
+      });
+      const printed = out.split('\n').filter((line) => line !== '');
+      const copy = printed.indexOf(COPY);
+      expect(printed[0], body).toBe('create temp table arming (value text not null) on commit drop;');
+      expect(copy, body).toBe(1);
+      // The value is the copy's one row, ended by `\.`, and on no other line.
+      expect(printed.slice(copy + 1, copy + 3)).toEqual([VALUE, '\\.']);
+      expect(printed.filter((line) => line.includes(VALUE))).toEqual([VALUE]);
+      expect(printed.some((line) => line.includes('(select value from arming)')), body).toBe(true);
+      // The same shape everywhere: the value's check, and a create after a delete.
+      expect(printed[copy + 3], body).toBe(
+        "do $$ begin if (select count(*) from arming where value ~ '^[A-Za-z0-9_-]{32,}$') <> 1 then raise exception 'ARMING_VALUE_INVALID'; end if; end $$;",
+      );
+      if (body.includes('vault.create_secret')) expect(printed.some((line) => line.startsWith('delete from vault.secrets where name in (')), body).toBe(true);
+      if (body.includes('vault.update_secret')) expect(printed.some((line) => line.includes("raise exception 'ARMING_SECRET_MISSING'")), body).toBe(true);
+    }
   });
 });
 

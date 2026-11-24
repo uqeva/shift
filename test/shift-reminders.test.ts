@@ -332,6 +332,46 @@ describe.each(FIXTURES)('the $fixture reminder job (0070)', ({ slug, admin, memb
     });
   });
 
+  // 0075 (founder decision 2026-11-23, epic 17 retro A3 (b)): reverses 17.2's
+  // Design Note 9. The account check is the feed's (0067/0073).
+  it.skipIf(noDatabase)('reads and writes nothing for a member whose account is banned or deleted, and a lapsed ban is no ban (0075)', async () => {
+    await inRolledBackTransaction(async (client) => {
+      const who = await member(client, slug, memberName);
+      await remindable(client, who, ['H1'], true);
+      const { teamId, shiftTypeId } = await teamAndType(client, who.organizationId);
+      const date = await todayOf(client, who.organizationId, 1);
+      const item: Item = { memberId: who.id, date, teamId, shiftTypeId, lead: 'H1', start: 420, end: 1140, startsAt: await isoFromNow(client, '1 day') };
+      const read = async (): Promise<boolean> => {
+        const { rows } = await client.query<{ answer: { members: { memberId: string }[] } }>('select public.reminder_inputs() as answer');
+        return rows[0]?.answer.members.some((row) => row.memberId === who.id) ?? false;
+      };
+
+      for (const [column, value] of [
+        ['banned_until', "now() + interval '1 day'"],
+        ['deleted_at', 'now()'],
+      ] as const) {
+        // Owner scene: the account banned (or deleted), before the switch of role.
+        await actAsOwner(client);
+        await client.query(`update auth.users set ${column} = ${value} where id = $1`, [who.authUserId]);
+        await actAsService(client);
+        expect(await read(), `a ${column} account is read`).toBe(false);
+        expect(await enqueue(client, [item]), `a ${column} account's item is written`).toBe(0);
+        await actAsOwner(client);
+        expect(await remindersOf(client, who), `a ${column} account has a reminder`).toEqual([]);
+        // Owner scene: restored.
+        await client.query(`update auth.users set ${column} = null where id = $1`, [who.authUserId]);
+      }
+
+      // Owner scene: a ban that has passed, as `current_member_access()` reads it.
+      await client.query("update auth.users set banned_until = now() - interval '1 day' where id = $1", [who.authUserId]);
+      await actAsService(client);
+      expect(await read(), 'a lapsed ban is no ban: the member is read').toBe(true);
+      expect(await enqueue(client, [item]), 'a lapsed ban is no ban: the item is written').toBe(1);
+      await actAsOwner(client);
+      expect((await remindersOf(client, who)).map((row) => row.channel)).toEqual(['email', 'push']);
+    });
+  });
+
   it.skipIf(noDatabase)('drops a reminder email while the reminder email switch is off, and keeps the push', async () => {
     await inRolledBackTransaction(async (client) => {
       const who = await member(client, slug, memberName);
