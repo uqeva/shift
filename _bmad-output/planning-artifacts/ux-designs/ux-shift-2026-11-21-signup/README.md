@@ -55,11 +55,12 @@ The steps 2–6 mockups sketch where the shipped sections sit, under one explain
 ## Open items for the founder
 
 - **O1. The pilot literal on *Prijava*.** `auth.organization.placeholder` reads `npr. dvd-kastel-novi`, and every stranger meets it after confirming. Recommended: `npr. naziv-organizacije`, which changes what the pilot sees too. This is outside 19.4's `signup`/`onboarding` sweep, so 19.2 should take it. **Taken by 19.2 (2026-11-21):** the placeholder reads `npr. naziv-organizacije`.
-- **O2. Terms and privacy on `/registracija`.** The review adds no checkbox and no link, because none exists in the product. Whether self-service signup needs a privacy notice or terms link before production (D-S5) is a founder and legal decision.
+- **O2. Terms and privacy on `/registracija`.** The review adds no checkbox and no link, because none exists in the product. Whether self-service signup needs a privacy notice or terms link before production (D-S5) is a founder and legal decision. **Decided 2026-11-23 (founder, `founder-decisions-2026-11-23.md`):** a terms and privacy link is REQUIRED on `/registracija` before production signup opens (D-S5, `SECURITY-REVIEW-EPIC-19.md` H 5b); staging shows none.
 - **O3. Defaults in shipped dialogs.** FR-97 says no onboarding step pre-selects a count, duration, boundary or name. 19.4's spec must check the shipped add dialogs embedded in steps 2–6 for anything selected by default and clear it: the shift type's kind and times, the rotation's *Vrijedi od*, and the new member's level. Because the dialogs are shared (D9), that changes them everywhere.
 - **Recorded, not open:**
   - The resend countdown (60 s) and the 429 copy (`za sat vremena`) follow AD-21's configured limits. The copy changes if the limits change.
-  - Founder decisions F1 (mail timing) and F2 (the meaning of "or invitation") are unchanged. The design assumes F2's default, admin-issued credentials.
+  - Founder decisions F1 (mail timing) and F2 (the meaning of "or invitation") are unchanged. The design assumes F2's default, admin-issued credentials. **F2 confirmed 2026-11-23:** no email invitations.
+- **Accepted by the founder on 2026-11-23** (#340; `founder-decisions-2026-11-23.md`).
 
 ## Rendering
 

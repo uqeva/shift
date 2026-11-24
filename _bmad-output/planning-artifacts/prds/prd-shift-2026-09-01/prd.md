@@ -1132,7 +1132,7 @@ A Loan is visible wherever the Member's shifts are.
 - The Member's own schedule and dashboard state which Team they are with and until when.
 - The directory shows the Member's own Team and, during a Loan, the Team they are currently with.
 - The hours explanation (FR-42b) names a shift's source as a Loan.
-- A Member Role account sees its own Loans and other Members' current Team; Loan reasons are visible only to Admins.
+- A Member Role account sees its own Loans and other Members' current Team; Loan reasons are visible only to Admins. *(Amended 2026-11-23, founder decision, epic 18 retro A1:)* a Member Role account also reads every live Loan's Member, Team and dates in its Organization, never its reason or author, because the rosters it is shown already reveal them.
 
 ### 5.24 Self-service Signup and Onboarding (added 2026-11-20, sprint-change-proposal-2026-11-20-v2-scope)
 

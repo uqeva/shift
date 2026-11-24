@@ -2750,6 +2750,8 @@ Added 2026-11-20 by `sprint-change-proposal-2026-11-20-v2-scope.md` (§5.6). Arc
 
 **Planning status (2026-11-21, Architect pass 1 done):** AP1 has amended AD-1, AD-6, AD-7, AD-14, AD-17 and AD-18, and added AD-19 and AD-20 to the spine. **16.2 is ready.** 16.3 still waits for D-S1, 16.4 for D-S1, D-S2 and D-S8, and 16.5 for D-S1 and D-S2, each also after its predecessor. The spine marks every clause that depends on one of those decisions "pending founder ratification".
 
+**Founder decisions (2026-11-23, `founder-decisions-2026-11-23.md`):** epic 16 retro A1, 16.5's accepted token risks (the Google `cid` link, the clipboard), signed off; A2, the calendar feed limited to 120 requests a minute per client IP on its route alone, built in the compose's Kong config with a test pin (20.5 verifies it on the stack).
+
 **Ratified 2026-11-21:** the founder accepted D-S1–D-S10 at the proposal's defaults, so the D-S waits above are lifted; 16.3–16.5 and 17.1–17.3 now wait only on the story before them. Epic 19 still waits on Architect pass 2.
 
 ### Story 16.1: The month prints
@@ -2911,6 +2913,8 @@ Added 2026-11-20 by `sprint-change-proposal-2026-11-20-v2-scope.md` (§5.6). Reu
 
 **Planning status (2026-11-23):** Architect pass 1 is done and the founder ratified D-S6 on 2026-11-21 (`epic-17-context.md`, Decisions; the spine's AD-14 and AD-18 clauses; epic 17 retrospective R2), so no story waits for either; the spine's `remind` and reminder clauses (AD-14, AD-18) mark their channel rules "ratified by the founder 2026-11-21 (D-S6)". 17.1–17.3 are built and merged (epic 17 retrospective, 2026-11-22).
 
+**Founder decisions (2026-11-23, `founder-decisions-2026-11-23.md`):** epic 17 retro A3 decided: (b) a member whose auth account is banned or deleted gets no reminders, reversing 17.2's Design Note 9 (migration `0075`); (a) DEPLOY.md arms Vault without the invoke secret ever entering a statement (§3a). Retro A4 is built in part: team and shift-type names refuse control characters (`0076`); member names stay open.
+
 ### Story 17.1: A member chooses their reminders
 
 As a member,
@@ -3012,6 +3016,8 @@ Added 2026-11-20 by `sprint-change-proposal-2026-11-20-v2-scope.md` (§5.6). Dep
 
 **Planning status (2026-11-20):** ready. 18.1 can start now; 18.2–18.5 follow in order.
 
+**Founder decisions (2026-11-23, `founder-decisions-2026-11-23.md`):** epic 18 retro A1, the member-wide loan read (`calendar_team_loans()`: member, team and dates, no reason or author) is ratified, and 18.2's AC 2 below is amended to say so; A2, the terminology stays (*Smjena* the team label, *tim* in loan prose), closed.
+
 ### Story 18.1: The loan rule in the domain
 
 As the product,
@@ -3051,7 +3057,7 @@ So that it is removable and never touches a rotation.
 
 **Given** a member-role account
 **When** it writes a loan through the UI or a direct API call
-**Then** it is refused (Q2, D7), and it can read only its own loans
+**Then** it is refused (Q2, D7), and it reads every live loan's member, loan team and dates in its organization through `calendar_team_loans()`, never a loan's reason or author *(amended 2026-11-23, founder decision, epic 18 retro A1; it read "can read only its own loans")*
 
 **Given** the snapshot the browser reads
 **When** loans exist
@@ -3153,7 +3159,7 @@ Added 2026-11-20 by `sprint-change-proposal-2026-11-20-v2-scope.md` (§5.6). Arc
 
 **Planning status (2026-11-21, Architect pass 2 done):** the founder ratified D-S1–D-S10 at their defaults. AP2 amended AD-10, AD-11, AD-12, AD-14, AD-16 and AD-17, and added AD-21 to AD-25. Its security-review checklist is `architecture/architecture-shift-2026-09-02/SECURITY-REVIEW-EPIC-19.md`. 19.1 is ready; its staging application waits for 20.5. 19.2, 19.3 and 19.5 follow their dependencies. 19.4 also waits for the UX review with mockups. The "Blocked on: Architect pass 2, D-S…" lines below are cleared by this. **Governed by** now also reads AD-21 (the door), AD-22 (neutral answers), AD-23 (`create_organization`), AD-24 (onboarding) and AD-25 (housekeeping and suspension).
 
-**Planning status (2026-11-21, UX review done, pending founder acceptance):** the UX review that AD-24 requires before 19.4's spec freezes is `ux-designs/ux-shift-2026-11-21-signup/`. It covers `/registracija`, `/potvrda`, `/zaboravljena-lozinka`, steps 1–7 at phone and desktop width, the *Danas* card and the empty states. It adds UX-DR62–70, and EXPERIENCE.md and DESIGN.md carry its rules as pending. It waits for the founder's acceptance and its open items O1–O3 (README). Once accepted, 19.4's UX gate is cleared.
+**Planning status (2026-11-23, UX review accepted):** the founder accepted the UX review on 2026-11-23 (#340, `founder-decisions-2026-11-23.md`): F2 confirmed (no email invitations; members join by admin-issued credentials), and O2 decided: a terms and privacy link on `/registracija` is required before production signup opens (a D-S5 gate, `SECURITY-REVIEW-EPIC-19.md` H 5b), with none on staging. 19.5's decisions were accepted the same day (deletion rules, circuit breaker, kept revoked feed tokens, 30-day attempts purge, suspension in history). Before: **Planning status (2026-11-21, UX review done, pending founder acceptance):** the UX review that AD-24 requires before 19.4's spec freezes is `ux-designs/ux-shift-2026-11-21-signup/`. It covers `/registracija`, `/potvrda`, `/zaboravljena-lozinka`, steps 1–7 at phone and desktop width, the *Danas* card and the empty states. It adds UX-DR62–70, and EXPERIENCE.md and DESIGN.md carry its rules as pending. It waits for the founder's acceptance and its open items O1–O3 (README). Once accepted, 19.4's UX gate is cleared.
 
 ### Story 19.1: The signup door opens safely on staging
 
@@ -3248,7 +3254,7 @@ So that I reach a working schedule without help from Shift.
 
 **Depends on:** 19.3, and a UX review with mockups before the spec freezes. **Blocked on:** Architect pass 2 (through 19.1–19.3), the UX review, D-S9.
 
-**UX review (2026-11-21): pending founder acceptance.** It is done in `ux-designs/ux-shift-2026-11-21-signup/` (UX-DR65, 67–70 here; UX-DR62–64 in 19.2; UX-DR66 in 19.3). The "UX review" blocker clears when the founder accepts it. Its open items O1–O3 are in that folder's README.
+**UX review (2026-11-21): accepted by the founder 2026-11-23** (`founder-decisions-2026-11-23.md`; F2 confirmed, O2: a terms and privacy link before production signup opens). It is done in `ux-designs/ux-shift-2026-11-21-signup/` (UX-DR65, 67–70 here; UX-DR62–64 in 19.2; UX-DR66 in 19.3). The "UX review" blocker is cleared. Of its open items (that folder's README): O1 was taken by 19.2, O2 is decided (the link, before production), and O3 was built by 19.4; the *Novi korak* picker and the *Sati* empty state stay with the founder in `deferred-work.md`.
 
 **Acceptance Criteria:**
 

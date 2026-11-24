@@ -683,7 +683,7 @@ development_status:
   #         the founder's go.
   #   D-S1..D-S10 = proposal §6 founder decisions, ratified at the defaults 2026-11-21.
   # Ready now: 16.2 (AP1 done 2026-11-21) and 19.1 (AP2 done 2026-11-21); D-S1–D-S10 ratified by the founder 2026-11-21.
-  epic-16: done  # accepted with open items, 2026-11-21 (retro): #335, #339, #342, #343, #345 merged with CI green; founder items open (retro A1 sign-off of 16.5's accepted token risks, A2 the feed's per-IP limit, A3 promotion of 0065/0067); production waits on 20.5's checks (A4)
+  epic-16: done  # accepted with open items, 2026-11-21 (retro): #335, #339, #342, #343, #345 merged with CI green; founder 2026-11-23 (founder-decisions-2026-11-23.md): A1 signed off, A2 120/min per client IP on the feed route (built, CI pending); still open A3 promotion of 0065/0067; production waits on 20.5's checks (A4)
   16-1-the-month-prints: done  # #335
   16-2-the-domain-package-runs-on-the-server: done  # #339
   16-3-a-member-s-feed-token-is-a-revocable-secret: done  # #342
@@ -691,13 +691,13 @@ development_status:
   16-5-a-member-subscribes-from-kalendar-na-mobitelu: done  # #345
   epic-16-retrospective: done
 
-  epic-17: done  # accepted with open items, 2026-11-22 (retro): #347, #348, #350 merged with CI green; founder items open (retro A1 promotion of 0069/0070/0072, A3 the Vault-arming log risk and banned-account reminders at the D-S5 review); real delivery waits on the first staging/production deploy (A2)
+  epic-17: done  # accepted with open items, 2026-11-22 (retro): #347, #348, #350 merged with CI green; founder 2026-11-23 (founder-decisions-2026-11-23.md): A3 decided (Vault arming by COPY in DEPLOY.md; no reminders for a banned or deleted account, 0075; built, CI pending); still open A1 promotion of 0069/0070/0072; real delivery waits on the first staging/production deploy (A2)
   17-1-a-member-chooses-their-reminders: done  # #347
   17-2-the-remind-job-writes-reminders-that-fall-due: done  # #348
   17-3-reminders-reach-the-member-by-push-or-email: done  # #350
   epic-17-retrospective: done
 
-  epic-18: done  # accepted with open items, 2026-11-21 (retro): #323, #325, #328, #330, #332 merged with CI green; founder decisions open (retro A1 member-wide loan read, A2 tim/Smjena, A3 promotion check)
+  epic-18: done  # accepted with open items, 2026-11-21 (retro): #323, #325, #328, #330, #332 merged with CI green; founder 2026-11-23 (founder-decisions-2026-11-23.md): A1 member-wide loan read ratified, A2 terminology kept; still open A3 promotion check
   18-1-the-loan-rule-in-the-domain: done  # #323
   18-2-a-loan-is-a-recorded-exception: done  # #325
   18-3-an-admin-lends-a-member-to-another-team: done  # #328
@@ -705,7 +705,7 @@ development_status:
   18-5-loans-are-visible-wherever-rosters-are-read: done  # #332
   epic-18-retrospective: done
 
-  epic-19: done  # accepted with open items, 2026-11-23 (retro): #341, #344, #349, #352, #354 merged with CI green (after AP2 #338 and the UX review #340); signup is staging-only and staging's door stays shut until a mail domain exists (retro A2); founder items open (retro A1 promotion of 0066/0068/0071/0073/0074, A3 the D-S5 security review and its decisions, A4 the terms/privacy link, O2); production opening is D-S5 (checklist section H), the founder's separate go
+  epic-19: done  # accepted with open items, 2026-11-23 (retro): #341, #344, #349, #352, #354 merged with CI green (after AP2 #338 and the UX review #340); signup is staging-only and staging's door stays shut until a mail domain exists (retro A2); founder items open (retro A1 promotion of 0066/0068/0071/0073/0074, A3 the D-S5 security review and its decisions, A4 the terms/privacy link, O2); production opening is D-S5 (checklist section H), the founder's separate go Founder 2026-11-23 (founder-decisions-2026-11-23.md): UX review (#340) accepted, F2 no email invitations, O2 terms/privacy link before production signup (retro A4), 19.5's decisions accepted.
   19-1-the-signup-door-opens-safely-on-staging: done  # #341
   19-2-a-stranger-creates-an-account: done  # #344
   19-3-a-verified-account-creates-its-organization: done  # #349
@@ -726,7 +726,7 @@ development_status:
   20-1-the-self-hosted-stack-is-defined-in-the-repository: done  # #324
   20-2-edge-functions-run-behind-a-keyless-router: done  # #327; security-review of the router before production (20.9); live probe in 20.5's rehearsal (DEPLOY.md §9.5 step 7b)
   20-3-the-spa-ships-as-a-static-image-with-its-headers: done  # #329; CSP Report-Only, enforced only after 20.5 verifies it
-  20-4-the-host-is-closed-to-everything-but-the-web: done  # applied and confirmed 2026-11-23 (founder); verify-exposure.sh re-run with Studio/Postgres waits for staging on the tailnet (20.5)
+  20-4-the-host-is-closed-to-everything-but-the-web: done  # applied and confirmed 2026-11-23 (founder); verify-exposure.sh re-run with Studio/Postgres waits for staging on the tailnet (20.5); its deferred pg_net revoke cannot be a migration (postgres is not the grantor; deferred-work, 2026-11-24): an operator step as supabase_admin
   20-5-staging-stands-up-on-coolify: review  # staging up, CI pending
   20-6-the-pipeline-deploys-through-coolify: review  # built (inert until configured), reviewed twice (2nd: CI/CD security), CI pending; enabling waits: Coolify API token (it must carry `deploy`, 20.5), Tailscale OAuth client, GHCR read token on the host, 20.5
   20-7-backups-leave-the-host-and-a-restore-is-rehearsed: backlog  # interim after 20.5; off-host waits: H-11 + target credential, H-12
@@ -1270,7 +1270,7 @@ action_items:
       PRD prd.md:1135 and 18.2 AC 2 'only its own loans'; ratified -> amend PRD, epic
       AC, epic-18-context; reversed -> a story (R1)"
     owner: "Perolipotic (founder)"
-    status: open
+    status: done  # founder 2026-11-23 (founder-decisions-2026-11-23.md item 3): ratified; PRD prd.md:1135, epics.md 18.2 AC 2 and epic-18-context.md amended to the member-wide read (no reason, no author)
     ref: "_bmad-output/implementation-artifacts/epic-18-retro-2026-11-21.md"
   - id: "epic-18-retro-item-73-a2-decide-the-team-terminology-loan-copy"
     epic: 18
@@ -1278,7 +1278,7 @@ action_items:
       says Smjena (EXPERIENCE.md:92, history.field.team -> 'Smjena: Smjena C', smjene.error.lentTo
       'Tim ...'); then a copy story (R2, deferred-work 1775)"
     owner: "Perolipotic (founder)"
-    status: open
+    status: done  # founder 2026-11-23 (founder-decisions-2026-11-23.md item 3): terminology stays (Smjena the team label, tim in loan prose); closed, no copy story; deferred-work 1775 marked
     ref: "_bmad-output/implementation-artifacts/epic-18-retro-2026-11-21.md"
   - id: "epic-18-retro-item-74-a3-before-0062-0064-are-promoted-past-lo"
     epic: 18
@@ -1325,7 +1325,7 @@ action_items:
     action: "A1 Sign off or reverse 16.5 accepted risks: the feed token in the Google
       cid href and in the OS clipboard (retro S2; deferred-work :2007)"
     owner: "Perolipotic (founder)"
-    status: open
+    status: done  # founder 2026-11-23 (founder-decisions-2026-11-23.md item 2): signed off; deferred-work marked
     ref: "_bmad-output/implementation-artifacts/epic-16-retro-2026-11-21.md"
   - id: "epic-16-retro-item-80-a2-confirm-the-calendar-feed-per-ip-rate"
     epic: 16
@@ -1333,7 +1333,7 @@ action_items:
       120/min per client IP on that route only, via the 19.1 client-IP chain, or accept
       unthrottled at pilot scale; 20.5 applies it (deferred-work :1925)"
     owner: "Perolipotic (founder); 20.5 applies"
-    status: open
+    status: done  # founder 2026-11-23 (founder-decisions-2026-11-23.md item 2): 120/min per client IP on the calendar-feed route only; built in the compose's Kong config with a test pin (spec-founder-decisions-and-hardening-2026-11-23; built, CI pending); 20.5 verifies it on the running stack
     ref: "_bmad-output/implementation-artifacts/epic-16-retro-2026-11-21.md"
   - id: "epic-16-retro-item-81-a3-approve-promoting-0065-and-0067-past"
     epic: 16
@@ -1394,7 +1394,7 @@ action_items:
       or use a bind parameter, deferred-work :2058); confirm or reverse 17.2 Design
       Note 9 (a banned or deleted account whose member is active still gets its reminders)"
     owner: "Perolipotic (founder); dev applies"
-    status: open
+    status: done  # founder 2026-11-23 (founder-decisions-2026-11-23.md item 5): (a) DEPLOY.md 3a/3b/9.5 arm Vault by COPY into a temp table, never in statement text; (b) Design Note 9 reversed, 0075 (no reminders for a banned or deleted account); spec-founder-decisions-and-hardening-2026-11-23; built, CI pending
     ref: "_bmad-output/implementation-artifacts/epic-17-retro-2026-11-22.md"
   - id: "epic-17-retro-item-88-a4-story-fold-or-refuse-control-characte"
     epic: 17
@@ -1402,7 +1402,7 @@ action_items:
       notice email subject, at the database or in notify for every code (deferred-work
       :2055)"
     owner: "PO to schedule; dev"
-    status: open
+    status: open  # in part 2026-11-23: team and shift-type names refuse control characters (0076, UI validation; spec-founder-decisions-and-hardening-2026-11-23; built, CI pending); member names still open
     ref: "_bmad-output/implementation-artifacts/epic-17-retro-2026-11-22.md"
   - id: "epic-17-retro-item-89-a5-docs-hygiene-epics-md-epic-17-header"
     epic: 17
@@ -1460,7 +1460,7 @@ action_items:
       links to terms and a privacy notice; founder supplies the texts or URLs; a story
       builds the link (hr.json, test) and adds it to checklist section H"
     owner: "Perolipotic (founder) for the texts; PO to schedule; dev"
-    status: open
+    status: open  # founder decision recorded (founder-decisions-2026-11-23.md, SECURITY-REVIEW-EPIC-19.md H 5b); the texts and the story still open
     ref: "_bmad-output/implementation-artifacts/epic-19-retro-2026-11-23.md"
   - id: "epic-19-retro-item-95-a5-docs-reconciliation-after-the-founder"
     epic: 19
@@ -1471,7 +1471,7 @@ action_items:
       :1959/:1971/:2106/:2109; record F2 beside AD-24; on founder confirmation move
       19.4's Preskoci za sada bullet into its frozen Epic AC Deviations"
     owner: "dev; the frozen-block move needs the founder's confirmation"
-    status: open
+    status: open  # in part on feat/founder-decisions-and-hardening: UX README, epics.md 19 notes, EXPERIENCE/DESIGN markers, deferred-work 19.5 decisions settled, F2 beside AD-24; still open: the D-S10 header line, re-owning the listed deferrals, the frozen-block move
     ref: "_bmad-output/implementation-artifacts/epic-19-retro-2026-11-23.md"
   - id: "epic-19-retro-item-96-a6-po-triage-of-unowned-epic-19-deferral"
     epic: 19

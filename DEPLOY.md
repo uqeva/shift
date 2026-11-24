@@ -329,26 +329,95 @@ It goes to two places, with the same value: the Environment secret
 `NOTIFY_INVOKE_SECRET` (the pipeline makes it a function secret), and that
 project's Vault.
 
-**4. Vault.** In the project's dashboard, *SQL Editor*, run once (replace both
-placeholders in the editor; never in a committed file or a migration):
+**4. Vault.** Once per environment, through `psql` on stdin, as *A secret
+never enters a statement* below says (never the SQL editor, which sends the
+value inside the statement; never in a committed file or a migration). `$DC`
+is `docker compose` for the environment's Supabase stack on its host (§9.5);
+`notify_url` is the internal gateway (§9.6, *Cron*). Read the value into the
+shell without echoing it (`read -rs SERVICE_PASSWORD_64_NOTIFYINVOKE`, pasted
+from Coolify's environment view of the Supabase resource):
 
-```sql
-select vault.create_secret('https://<ref>.supabase.co/functions/v1/notify', 'notify_url');
-select vault.create_secret('<the invoke secret>', 'notify_invoke_secret');
+```bash
+printf '%s' "$SERVICE_PASSWORD_64_NOTIFYINVOKE" | grep -Eqx '[A-Za-z0-9_-]{32,}' || { echo 'not an invoke secret: nothing sent' >&2; false; } &&
+{
+  echo "create temp table arming (value text not null) on commit drop;"
+  echo "copy arming (value) from stdin with (format csv, delimiter E'\\x01', quote E'\\x02');"
+  printf '%s\n' "$SERVICE_PASSWORD_64_NOTIFYINVOKE"
+  echo '\.'
+  echo "do \$\$ begin if (select count(*) from arming where value ~ '^[A-Za-z0-9_-]{32,}\$') <> 1 then raise exception 'ARMING_VALUE_INVALID'; end if; end \$\$;"
+  echo "delete from vault.secrets where name in ('notify_url', 'notify_invoke_secret');"
+  echo "select vault.create_secret('http://supabase-kong:8000/functions/v1/notify', 'notify_url');"
+  echo "select vault.create_secret((select value from arming), 'notify_invoke_secret');"
+} | $DC exec -T supabase-db psql -U postgres -v ON_ERROR_STOP=1 -q -1 -f -
+unset SERVICE_PASSWORD_64_NOTIFYINVOKE
 ```
 
-To rotate the invoke secret, update both places, Vault first:
+To rotate the invoke secret, update both places, Vault first (the new value
+read with `read -rs` as above):
 
-```sql
-select vault.update_secret(
-  (select id from vault.secrets where name = 'notify_invoke_secret'),
-  '<the new invoke secret>'
-);
+```bash
+printf '%s' "$SERVICE_PASSWORD_64_NOTIFYINVOKE" | grep -Eqx '[A-Za-z0-9_-]{32,}' || { echo 'not an invoke secret: nothing sent' >&2; false; } &&
+{
+  echo "create temp table arming (value text not null) on commit drop;"
+  echo "copy arming (value) from stdin with (format csv, delimiter E'\\x01', quote E'\\x02');"
+  printf '%s\n' "$SERVICE_PASSWORD_64_NOTIFYINVOKE"
+  echo '\.'
+  echo "do \$\$ begin if (select count(*) from arming where value ~ '^[A-Za-z0-9_-]{32,}\$') <> 1 then raise exception 'ARMING_VALUE_INVALID'; end if; end \$\$;"
+  echo "do \$\$ begin if not exists (select 1 from vault.secrets where name = 'notify_invoke_secret') then raise exception 'ARMING_SECRET_MISSING'; end if; end \$\$;"
+  echo "select vault.update_secret((select id from vault.secrets where name = 'notify_invoke_secret'), (select value from arming));"
+} | $DC exec -T supabase-db psql -U postgres -v ON_ERROR_STOP=1 -q -1 -f -
+unset SERVICE_PASSWORD_64_NOTIFYINVOKE
 ```
 
-then the Environment secret, then redeploy (or `supabase secrets set`). Between
-the two steps the function answers the job `401` and nothing is claimed: no
-email is lost, it waits for the next minute.
+then the container's variable, then redeploy. Between the two steps the
+function answers the job `401` and nothing is claimed: no email is lost, it
+waits for the next minute.
+
+**A secret never enters a statement** (founder decision 2026-11-23, epic 17
+retro A3 (a); the D-S5 review). Every Vault write of an invoke secret, here,
+in §3b and in §9.5, follows one shape, and no other is used. Every
+environment is a self-hosted stack (epic 20), so these blocks are the arming
+for each of them; a hosted project's SQL editor, which sends the value inside
+the statement, is not used.
+
+- **The value is checked in the shell before anything is sent.** The line
+  before each block pipes it to `grep` (on stdin, never as an argument) and
+  sends nothing unless it is §3a step 3's charset, 32 characters or more. A
+  malformed `COPY` row is the one way the server would quote a data row back
+  (an error's `CONTEXT: COPY arming, line 1: "…"`), so no such row is sent.
+- **The value travels as `COPY` data, never as statement text.** The block
+  creates a temporary table, sends `copy arming (value) from stdin` (CSV, with a delimiter and a
+  quote character no pasted value holds, so no character of the value can make
+  `COPY` misparse the row and echo it in an error's `CONTEXT`) and then
+  the value as that copy's one data row (psql reads it from the same stdin,
+  up to `\.`), and calls `vault.create_secret((select value from arming), …)`
+  or `vault.update_secret(…, (select value from arming))`. So every statement
+  the server receives (what `log_min_error_statement` writes beside a failed
+  statement, which is Postgres's default; what `log_statement = all` would
+  write for every statement; `pg_stat_activity.query`; `pg_stat_statements`)
+  holds the table's name and never the value. Postgres logs no well-formed
+  `COPY` data row under any `log_*` setting, and the shell check and the CSV
+  format keep the row well formed.
+- **Why not a psql variable or a bind parameter.** `:'secret'` is
+  interpolated by psql on the client, so the server received, and on an
+  error logged, the value inside the statement: the risk this replaces. A
+  `\bind` parameter is out of the statement text, but `log_statement = all`
+  logs it as the statement's `parameters:` detail (`log_parameter_max_length`
+  is unlimited by default), so it is safe only while nobody raises the level.
+- **Where else the value could appear, and why it does not.** The temporary
+  table is this session's alone, is never WAL-logged and is dropped at commit
+  (`on commit drop`; a failure rolls back the whole `-1` transaction, which
+  drops it too). The `do` block checks the value's shape (§3a step 3's
+  charset, 32 characters or more) and refuses with a fixed message that
+  names no value; an error inside Vault's own functions reports their
+  statements with their parameter names, not values, and the only key on
+  `vault.secrets` is the name, which the `delete` first keeps from colliding.
+  The value is never on a command line (`printf` and `echo` are shell
+  builtins, so no process's arguments hold it), never in shell history
+  (`read -rs`), and `psql -q` without `-a`, `-e` or `-E` echoes nothing.
+- **What stays.** Vault holds the value, decrypted for its readers, by
+  design; and the container's environment holds it, as every function
+  secret is held.
 
 **5. VAPID (story 10.4).** Web Push signs every send with a VAPID key pair, one
 per environment. Generate it once:
@@ -410,21 +479,27 @@ A shift reminder (CAP-26, AD-14 and AD-18 as amended) is written by the
    (story 17.3, migration `0072`). Arming before it would queue reminders an
    older `notify` retries as `MESSAGE_UNKNOWN` until they fail.
 2. Vault, through `psql` on stdin, never on a command line (the internal
-   gateway, never the public origin; the secret as a psql variable). `$DC`
-   is `docker compose` for the environment's Supabase stack on its host, as
-   §9.5 defines it for the rehearsal. Put the value into the shell without
+   gateway, never the public origin; the secret as `COPY` data, never in a
+   statement: §3a, *A secret never enters a statement*). `$DC` is `docker
+   compose` for the environment's Supabase stack on its host, as §9.5
+   defines it for the rehearsal. Put the value into the shell without
    echoing it or leaving it in history (`read -rs SERVICE_PASSWORD_64_REMINDINVOKE`,
-   then paste it from Coolify's environment view). The two deletes make the
+   then paste it from Coolify's environment view). The delete makes the
    step safe to run again (a second `vault.create_secret` of the same name
-   fails), and `-1` runs the three statements as one transaction, so a failure
-   leaves Vault as it was rather than half armed:
+   fails), and `-1` runs the block as one transaction, so a failure leaves
+   Vault as it was rather than half armed:
 
    ```bash
+   printf '%s' "$SERVICE_PASSWORD_64_REMINDINVOKE" | grep -Eqx '[A-Za-z0-9_-]{32,}' || { echo 'not an invoke secret: nothing sent' >&2; false; } &&
    {
-     printf '\\set secret %s\n' "$SERVICE_PASSWORD_64_REMINDINVOKE"
+     echo "create temp table arming (value text not null) on commit drop;"
+     echo "copy arming (value) from stdin with (format csv, delimiter E'\\x01', quote E'\\x02');"
+     printf '%s\n' "$SERVICE_PASSWORD_64_REMINDINVOKE"
+     echo '\.'
+     echo "do \$\$ begin if (select count(*) from arming where value ~ '^[A-Za-z0-9_-]{32,}\$') <> 1 then raise exception 'ARMING_VALUE_INVALID'; end if; end \$\$;"
      echo "delete from vault.secrets where name in ('remind_url', 'remind_invoke_secret');"
      echo "select vault.create_secret('http://supabase-kong:8000/functions/v1/remind', 'remind_url');"
-     echo "select vault.create_secret(:'secret', 'remind_invoke_secret');"
+     echo "select vault.create_secret((select value from arming), 'remind_invoke_secret');"
    } | $DC exec -T supabase-db psql -U postgres -v ON_ERROR_STOP=1 -q -1 -f -
    unset SERVICE_PASSWORD_64_REMINDINVOKE
    ```
@@ -459,9 +534,15 @@ A shift reminder (CAP-26, AD-14 and AD-18 as amended) is written by the
 value read with `read -rs`, never on a command line):
 
 ```bash
+printf '%s' "$SERVICE_PASSWORD_64_REMINDINVOKE" | grep -Eqx '[A-Za-z0-9_-]{32,}' || { echo 'not an invoke secret: nothing sent' >&2; false; } &&
 {
-  printf '\\set secret %s\n' "$SERVICE_PASSWORD_64_REMINDINVOKE"
-  echo "select vault.update_secret((select id from vault.secrets where name = 'remind_invoke_secret'), :'secret');"
+  echo "create temp table arming (value text not null) on commit drop;"
+  echo "copy arming (value) from stdin with (format csv, delimiter E'\\x01', quote E'\\x02');"
+  printf '%s\n' "$SERVICE_PASSWORD_64_REMINDINVOKE"
+  echo '\.'
+  echo "do \$\$ begin if (select count(*) from arming where value ~ '^[A-Za-z0-9_-]{32,}\$') <> 1 then raise exception 'ARMING_VALUE_INVALID'; end if; end \$\$;"
+  echo "do \$\$ begin if not exists (select 1 from vault.secrets where name = 'remind_invoke_secret') then raise exception 'ARMING_SECRET_MISSING'; end if; end \$\$;"
+  echo "select vault.update_secret((select id from vault.secrets where name = 'remind_invoke_secret'), (select value from arming));"
 } | $DC exec -T supabase-db psql -U postgres -v ON_ERROR_STOP=1 -q -1 -f -
 unset SERVICE_PASSWORD_64_REMINDINVOKE
 ```
@@ -2385,12 +2466,19 @@ curl -s -D - -o /dev/null -X OPTIONS "$API/functions/v1/admin-auth" -H "Origin: 
   -H 'Access-Control-Request-Method: POST' | grep -i '^access-control-allow-origin'
 # -> Access-Control-Allow-Origin: <the app's origin>   ✅ and never `*`
 # The cron path: Vault's notify_url is the INTERNAL gateway, never the public
-# origin. The invoke secret goes in on stdin as a psql variable.
+# origin. The invoke secret goes in on stdin as COPY data, never inside a
+# statement (§3a, "A secret never enters a statement").
+printf '%s' "$SERVICE_PASSWORD_64_NOTIFYINVOKE" | grep -Eqx '[A-Za-z0-9_-]{32,}' || { echo 'not an invoke secret: nothing sent' >&2; false; } &&
 {
-  printf '\\set secret %s\n' "$SERVICE_PASSWORD_64_NOTIFYINVOKE"
+  echo "create temp table arming (value text not null) on commit drop;"
+  echo "copy arming (value) from stdin with (format csv, delimiter E'\\x01', quote E'\\x02');"
+  printf '%s\n' "$SERVICE_PASSWORD_64_NOTIFYINVOKE"
+  echo '\.'
+  echo "do \$\$ begin if (select count(*) from arming where value ~ '^[A-Za-z0-9_-]{32,}\$') <> 1 then raise exception 'ARMING_VALUE_INVALID'; end if; end \$\$;"
+  echo "delete from vault.secrets where name in ('notify_url', 'notify_invoke_secret');"
   echo "select vault.create_secret('http://supabase-kong:8000/functions/v1/notify', 'notify_url');"
-  echo "select vault.create_secret(:'secret', 'notify_invoke_secret');"
-} | $DC exec -T supabase-db psql -U postgres -v ON_ERROR_STOP=1 -q -f -
+  echo "select vault.create_secret((select value from arming), 'notify_invoke_secret');"
+} | $DC exec -T supabase-db psql -U postgres -v ON_ERROR_STOP=1 -q -1 -f -
 sleep 75   # the notify job runs every minute
 $DC exec -T supabase-db psql -U postgres -At -c "
   select status_code from net._http_response order by id desc limit 1;
@@ -2399,11 +2487,16 @@ $DC exec -T supabase-db psql -U postgres -At -c "
 $DC logs supabase-kong | grep -c 'functions/v1/notify'
 # -> at least 1  ✅ the job's calls are in Kong's log
 # Story 17.3: the reminder job, armed as §3b arms it, and its call proved once.
+printf '%s' "$SERVICE_PASSWORD_64_REMINDINVOKE" | grep -Eqx '[A-Za-z0-9_-]{32,}' || { echo 'not an invoke secret: nothing sent' >&2; false; } &&
 {
-  printf '\\set secret %s\n' "$SERVICE_PASSWORD_64_REMINDINVOKE"
+  echo "create temp table arming (value text not null) on commit drop;"
+  echo "copy arming (value) from stdin with (format csv, delimiter E'\\x01', quote E'\\x02');"
+  printf '%s\n' "$SERVICE_PASSWORD_64_REMINDINVOKE"
+  echo '\.'
+  echo "do \$\$ begin if (select count(*) from arming where value ~ '^[A-Za-z0-9_-]{32,}\$') <> 1 then raise exception 'ARMING_VALUE_INVALID'; end if; end \$\$;"
   echo "delete from vault.secrets where name in ('remind_url', 'remind_invoke_secret');"
   echo "select vault.create_secret('http://supabase-kong:8000/functions/v1/remind', 'remind_url');"
-  echo "select vault.create_secret(:'secret', 'remind_invoke_secret');"
+  echo "select vault.create_secret((select value from arming), 'remind_invoke_secret');"
 } | $DC exec -T supabase-db psql -U postgres -v ON_ERROR_STOP=1 -q -1 -f -
 ID=$($DC exec -T supabase-db psql -U postgres -At -c "select private.invoke_remind();")
 [ -n "$ID" ] || { echo "no request: Vault does not hold both remind secrets"; exit 1; }
@@ -3222,6 +3315,12 @@ step** (a change to what the tailnet exposes), and after it 20.4's
 **Vault** gets `notify_url` and `remind_url` on the internal gateway
 (`http://supabase-kong:8000/functions/v1/…`) and both invoke secrets, read from
 the functions container's environment and given to `psql` on stdin (§3a, §3b).
+Each secret goes in as the one data row of a `COPY` into a temporary table,
+checked in the shell first, so it never enters a statement (§3a, *A secret
+never enters a statement*; founder decision 2026-11-23). Staging was first
+armed before that rule, with the value interpolated into the statement by psql:
+if any of those statements failed, the value may be in staging's database log,
+so rotate both invoke secrets once with §3a's and §3b's rotation blocks.
 
 **The demo organization** (§7.5, `demo_target=staging`) is seeded with `psql`
 inside the database container (validated on the rehearsal stack: 17 members,

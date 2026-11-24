@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { NAME_MAX_LENGTH, enteredName, isBlankName, nameKey, namesLengthCheck, trimName } from '@/utils/name';
+import {
+  NAME_MAX_LENGTH,
+  enteredName,
+  hasControlCharacter,
+  isBlankName,
+  nameKey,
+  namesCharacterCheck,
+  namesLengthCheck,
+  trimName,
+} from '@/utils/name';
 
 /**
  * The client half of `0024`'s `name_key`. The half that runs both over every
@@ -115,5 +124,44 @@ describe('the one maximum name length (0036)', () => {
     // An unquoted mention, as a typed name in `details` would carry it, is not one.
     expect(namesLengthCheck('Failing row contains (teams_name_length).')).toBe(false);
     expect(namesLengthCheck(undefined)).toBe(false);
+  });
+});
+
+describe('a name holds no control character inside it (0076, epic 17 retro A4)', () => {
+  it('refuses C0, DEL, C1 and the line and paragraph separators, and nothing else in the BMP', () => {
+    const refused: number[] = [];
+    for (let codePoint = 1; codePoint <= 0xffff; codePoint += 1) {
+      if (codePoint >= 0xd800 && codePoint <= 0xdfff) continue;
+      if (hasControlCharacter(`a${String.fromCodePoint(codePoint)}b`)) refused.push(codePoint);
+    }
+    const expected = [
+      ...Array.from({ length: 0x1f }, (_, index) => index + 1),
+      ...Array.from({ length: 0x9f - 0x7f + 1 }, (_, index) => index + 0x7f),
+      0x2028,
+      0x2029,
+    ];
+    expect(refused).toEqual(expected);
+  });
+
+  it('is asked of the stored name: a line break at either end is trimmed away first', () => {
+    const stored = enteredName('\tNoćna\n');
+    expect(stored).toBe('Noćna');
+    expect(hasControlCharacter(stored ?? '')).toBe(false);
+    expect(hasControlCharacter('Noćna\nsmjena')).toBe(true);
+    expect(hasControlCharacter('Noćna\u0085smjena')).toBe(true);
+    // Ordinary white space and letters outside ASCII are names, not controls.
+    expect(hasControlCharacter('Noćna smjena č')).toBe(false);
+  });
+
+  it('recognises a character check by the constraint PostgreSQL quotes in the message', () => {
+    for (const table of ['teams', 'shift_types']) {
+      expect(
+        namesCharacterCheck(`new row for relation "${table}" violates check constraint "${table}_name_characters"`),
+        table,
+      ).toBe(true);
+    }
+    expect(namesCharacterCheck('new row for relation "teams" violates check constraint "teams_name_length"')).toBe(false);
+    expect(namesCharacterCheck('Failing row contains (teams_name_characters).')).toBe(false);
+    expect(namesCharacterCheck(undefined)).toBe(false);
   });
 });

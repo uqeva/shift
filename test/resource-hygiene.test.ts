@@ -862,6 +862,9 @@ const SANCTIONED_SCREEN_KEYS = [
   'smjene.error.unavailable',
   'smjene.error.empty',
   'smjene.error.tooLong',
+  // 0076 (epic 17 retro A4): a line break or another control character
+  // inside a team's name, which would reach an email's subject.
+  'smjene.error.control',
   'smjene.error.taken',
   'smjene.error.stale',
   'smjene.error.refused',
@@ -1054,6 +1057,8 @@ const SANCTIONED_SCREEN_KEYS = [
   'rotation.shiftTypes.error.unavailable',
   'rotation.shiftTypes.error.nameEmpty',
   'rotation.shiftTypes.error.nameTooLong',
+  // 0076 (epic 17 retro A4): the same refusal for a shift type's name.
+  'rotation.shiftTypes.error.nameControl',
   'rotation.shiftTypes.error.nameTaken',
   'rotation.shiftTypes.error.timeInvalid',
   'rotation.shiftTypes.error.dateInvalid',

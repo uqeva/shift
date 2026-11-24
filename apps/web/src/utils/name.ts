@@ -100,3 +100,34 @@ export const NAME_MAX_LENGTH = 100;
 export function namesLengthCheck(message: string | undefined): boolean {
   return /check constraint "[a-z_]+_name_length"/.test(message ?? '');
 }
+
+/**
+ * The characters `0076`'s `<table>_name_characters` checks refuse inside a
+ * team's or a shift type's name: Unicode's control characters (C0, DEL, C1;
+ * U+0000 never reaches the database) and the line and paragraph separators,
+ * which would break an email subject the name is interpolated into (epic 17
+ * retro A4). The class string is the migration's own, character for
+ * character; `test/supabase-scaffold.test.ts` compares the two, and
+ * `test/name-key.test.ts` runs both over every BMP code point.
+ */
+export const NAME_CONTROL_CHARACTER_CLASS = '[\\u0001-\\u001F\\u007F-\\u009F\\u2028\\u2029]';
+
+const NAME_CONTROL_CHARACTER = new RegExp(NAME_CONTROL_CHARACTER_CLASS, 'u');
+
+/**
+ * Whether a name holds a character `0076` refuses. Asked of the name as it
+ * will be stored ({@link enteredName}): a line break at either end is trimmed
+ * away first, so only one inside the name is refused.
+ */
+export function hasControlCharacter(value: string): boolean {
+  return NAME_CONTROL_CHARACTER.test(value);
+}
+
+/**
+ * Whether a `23514` refusal's MESSAGE names one of `0076`'s character checks,
+ * read as {@link namesLengthCheck} reads the length checks: the quoted
+ * constraint name, never `details`.
+ */
+export function namesCharacterCheck(message: string | undefined): boolean {
+  return /check constraint "[a-z_]+_name_characters"/.test(message ?? '');
+}
