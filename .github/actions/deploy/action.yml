@@ -253,8 +253,9 @@ runs:
           --output-format json > "$RUNNER_TEMP/migrations-before.json"
 
     # H-12: a production migration runs only after a backup recorded within
-    # the last 24 hours (scripts/ci/backup-gate.mjs). Story 20.7 replaces the
-    # operator's manual backup with an automated one at this step.
+    # the last 24 hours (scripts/ci/backup-gate.mjs). The operator takes it on
+    # the host (`shift-ops backup production --manual pre-migration`, DEPLOY.md
+    # §9.12): this job cannot reach the host, by design (story 20.7).
     - name: A backup precedes a production migration
       shell: bash
       env:

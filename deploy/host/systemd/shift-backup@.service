@@ -1,0 +1,23 @@
+# Story 20.7: one backup set of the <instance> stack (`shift-ops backup <env>`),
+# started by shift-backup@<env>.timer. Read-only towards the stack: pg_dump in
+# its database container, tar of its volumes. DEPLOY.md §9.12.
+#
+# A failure runs shift-alert@ (the founder's alert hook, DEPLOY.md §9.13).
+[Unit]
+Description=Shift: back up the %i stack
+After=docker.service
+Wants=docker.service
+OnFailure=shift-alert@%n.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/shift-ops backup %i
+UMask=0077
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+TimeoutStartSec=1h
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=yes

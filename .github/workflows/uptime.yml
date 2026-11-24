@@ -1,0 +1,60 @@
+# Story 20.8 (H-13's fallback without a new provider): is Shift up, seen from
+# outside the host? DEPLOY.md §9.13 is the runbook.
+#
+# Every 30 minutes, for each configured environment: the app root (200 with
+# the SPA shell), the API's auth/v1/health (200) and notify answering 401
+# INVOKE_SECRET_REFUSED (Kong, edge-runtime and the router are up, with no
+# credential). A failure fails this job and opens or updates the issue
+# "Uptime: <environment> is down"; recovery comments on it and closes it.
+#
+# The repository is PUBLIC, and so are this workflow's logs and issues. The
+# origins and the publishable key are repository SECRETS, never variables:
+# a step's env values (variables included) are printed in its public log, and
+# secrets are masked. scripts/ci/uptime.mjs masks every origin, host and key
+# again before printing anything, and names none in an issue.
+#
+# Inert until the founder sets the repository variable UPTIME_ENABLED=true;
+# enabled with no environment configured, it fails. GitHub may delay a
+# scheduled run, and disables the schedule after 60 days without activity in
+# the repository (DEPLOY.md §9.13).
+
+name: Uptime
+
+on:
+  schedule:
+    # Off the hour and the half hour, when GitHub's scheduled queue is longest.
+    - cron: '7,37 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+jobs:
+  uptime:
+    name: Uptime
+    if: vars.UPTIME_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/ci
+
+      - name: Check
+        env:
+          UPTIME_ENABLED: ${{ vars.UPTIME_ENABLED }}
+          UPTIME_STAGING_APP_URL: ${{ secrets.UPTIME_STAGING_APP_URL }}
+          UPTIME_STAGING_API_URL: ${{ secrets.UPTIME_STAGING_API_URL }}
+          UPTIME_STAGING_PUBLISHABLE_KEY: ${{ secrets.UPTIME_STAGING_PUBLISHABLE_KEY }}
+          UPTIME_PRODUCTION_APP_URL: ${{ secrets.UPTIME_PRODUCTION_APP_URL }}
+          UPTIME_PRODUCTION_API_URL: ${{ secrets.UPTIME_PRODUCTION_API_URL }}
+          UPTIME_PRODUCTION_PUBLISHABLE_KEY: ${{ secrets.UPTIME_PRODUCTION_PUBLISHABLE_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/ci/uptime.mjs

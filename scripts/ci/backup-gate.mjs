@@ -8,11 +8,12 @@
 // (local, not yet remote). With none pending, nothing changes the schema and
 // the gate passes. With some pending in production, it passes only when
 // `PRE_MIGRATION_BACKUP_AT` (the production Environment variable the operator
-// sets after taking a backup in Coolify, DEPLOY.md §8.2) is a UTC timestamp no
+// sets after taking a manual backup on the host, DEPLOY.md §8.2 and §9.12) is a UTC timestamp no
 // older than 24 hours and not in the future. Staging never needs one: it holds
 // no personal data and is rebuilt from migrations (DEPLOY.md §5.4).
 //
-// This is the hook story 20.7 replaces with an automated backup. Exit codes:
+// Story 20.7 kept this gate: the deploy job cannot reach the host to take the
+// backup itself (DEPLOY.md §9.12, "Before a production migration"). Exit codes:
 // 0 pass, 1 refused, 2 usage error (including a listing with no migration).
 
 import { appendFileSync, readFileSync } from 'node:fs';
@@ -42,7 +43,7 @@ export function backupGate({ environment, pending, backupAt, now }) {
   if (environment !== 'production') return { ok: true, message: `${what}; ${environment} needs no pre-migration backup` };
 
   const how =
-    'Take a backup of the production database in Coolify (DEPLOY.md §8.2), set the production ' +
+    'Take a backup on the host (`shift-ops backup production --manual pre-migration`, DEPLOY.md §9.12), set the production ' +
     'Environment variable PRE_MIGRATION_BACKUP_AT to its UTC time (YYYY-MM-DDTHH:MMZ), then re-run this job.';
   const value = (backupAt ?? '').trim();
   if (value === '') return { ok: false, message: `${what} and PRE_MIGRATION_BACKUP_AT is not set. ${how}` };

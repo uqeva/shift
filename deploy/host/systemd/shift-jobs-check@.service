@@ -1,0 +1,21 @@
+# Story 20.8: the <instance> stack's cron jobs (notify, remind, housekeeping),
+# its pg_net answers and the age of its newest backup (`shift-ops jobs-check
+# <env>`). Read-only: every query runs in a read-only transaction.
+# DEPLOY.md §9.13.
+#
+# A failure runs shift-alert@ (the founder's alert hook).
+[Unit]
+Description=Shift: check the %i stack's jobs and backups
+After=docker.service
+Wants=docker.service
+OnFailure=shift-alert@%n.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/shift-ops jobs-check %i
+UMask=0077
+TimeoutStartSec=5min
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=yes

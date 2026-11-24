@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# /etc/shift-ops/alert-hook (root, 0700): how a failed shift-backup@ or
+# shift-jobs-check@ reaches the founder (stories 20.7, 20.8; DEPLOY.md §9.13).
+# shift-alert@.service runs it with the failed unit's name as $1 and the
+# unit's last journal lines on stdin. Exit non-zero if the alert was not sent.
+#
+# Pick ONE delivery, uncomment it, and delete the rest. A credential (a topic,
+# a token, an address) lives in this file only, never in the repository.
+set -euo pipefail
+unit=$1
+body=$(cat)
+
+# 1. E-mail through a relay the host already has (`mail` from mailutils or
+#    bsd-mailx, configured for an SMTP relay):
+#      printf '%s\n' "$body" | mail -s "Shift: $unit failed" "<founder's address>"
+#      exit 0
+
+# 2. A push notification through ntfy (a private, unguessable topic; the
+#    topic's name is the secret):
+#      curl -fsS --max-time 20 -H "Title: Shift: $unit failed" --data-binary "$body" "https://<ntfy server: ntfy.sh, or one in the EU>/<private topic>"
+#      exit 0
+
+# 3. Telegram, through a bot the founder created:
+#      curl -fsS --max-time 20 --data-urlencode "chat_id=<chat id>" \
+#        --data-urlencode "text=Shift: $unit failed: $body" \
+#        "https://<Telegram Bot API host>/bot<token>/sendMessage"
+#      exit 0
+
+printf 'alert-hook: no delivery configured for %s (%d bytes of log)\n' "$unit" "${#body}" >&2
+exit 1

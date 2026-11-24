@@ -1,0 +1,13 @@
+# Story 20.7 (H-12): the nightly backup, 01:30 Europe/Zagreb, before the
+# `housekeeping` job (03:15 UTC). Persistent: a night the host was down is
+# caught up at the next boot.
+[Unit]
+Description=Shift: nightly backup of the %i stack
+
+[Timer]
+OnCalendar=*-*-* 1:30 Europe/Zagreb
+Persistent=true
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target
