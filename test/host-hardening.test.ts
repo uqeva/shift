@@ -472,7 +472,13 @@ describe('shift-host.sh', () => {
     const listed = /readonly SOURCES=\(([^)]*)\)/.exec(script)?.[1]?.split(/\s+/).filter(Boolean) ?? [];
     const files = (dir: string): string[] =>
       readdirSync(join(hostRoot, dir)).map((entry) => `${dir}/${entry}`);
-    const shipped = ['firewall', 'sshd', 'sysctl', 'apt', 'systemd'].flatMap(files).sort();
+    // Stories 20.7/20.8's shift-ops.sh installs its own units (test/host-ops.test.ts).
+    const opsSources = /readonly SOURCES=\(([^)]*)\)/.exec(read('shift-ops.sh'))?.[1]?.split(/\s+/).filter(Boolean) ?? [];
+    expect(opsSources.length).toBeGreaterThan(0);
+    const shipped = ['firewall', 'sshd', 'sysctl', 'apt', 'systemd']
+      .flatMap(files)
+      .filter((path) => !opsSources.includes(path))
+      .sort();
     expect([...listed].sort()).toEqual(shipped);
   });
 });

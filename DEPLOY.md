@@ -1863,15 +1863,18 @@ the log.
 `PRE_MIGRATION_BACKUP_AT`, a `production` Environment variable). When a
 release carries migrations, `deploy-production` stops before `db push` unless
 this records a backup taken in the last 24 hours. Before approving such a
-release: take a backup of the production database in Coolify (or a
-`pg_dump -Fc` over the tailnet to a founder device, never into the
-repository or an artifact), set `PRE_MIGRATION_BACKUP_AT` to its UTC time as
+release: take a manual backup on the host,
+`shift-ops backup production --manual pre-migration` (§9.12; its set name is
+its UTC time), set `PRE_MIGRATION_BACKUP_AT` to that time as
 `YYYY-MM-DDTHH:MMZ`, then approve (or re-run the job). A time up to five
 minutes ahead of the runner's clock is accepted (clock skew); later is
 refused. **Clear the variable after the release**: the gate cannot tell
 which release a backup was taken for, so a value left set lets any other
 release with migrations through for 24 hours. Releases without migrations
-ignore it. Story 20.7 replaces this manual step with an automated backup.
+ignore it. Story 20.7 kept this step manual: the deploy job cannot reach the
+host, and a dump taken on the runner would leave personal data on GitHub's
+machines. Automating it needs a forced-command SSH key for `tag:ci`, a
+permission only the founder can grant (§9.12, `deferred-work.md`).
 
 Repository-level, only two things, neither a deploy credential:
 
@@ -3133,7 +3136,7 @@ set shift.housekeeping_ceiling = 2000;
 select private.delete_abandoned_accounts();
 ```
 
-During a restore from backup (20.7), pause the job first
+During a restore from backup (20.7, §9.12), pause the job first
 (`select cron.alter_job((select jobid from cron.job where jobname = 'housekeeping'), active => false);`)
 and re-enable it (`active => true`) once the restored data has been checked.
 
@@ -3145,8 +3148,10 @@ for each account it skipped. The self-hosted stack's Postgres runs with
 `log_min_messages=fatal` (`deploy/coolify/supabase/docker-compose.yml`), so
 those lines **do not reach the container's log there**. pg_cron's
 `cron.job_run_details` records only whether the statement succeeded, so a
-nightly run's counts are not kept anywhere. A durable record and an alert on
-`failed` or a halt belong to monitoring (20.8, `deferred-work.md`). To see the
+nightly run's counts are not kept anywhere. Since story 20.8 the host's jobs
+check (§9.13) alerts on a failed run (a halt included) and on a job that
+stopped running; a durable record of the counts, and so an alert on
+`failed > 0`, still needs a migration (`deferred-work.md`). To see the
 counts, run the job by hand: it answers them. To check that it runs:
 
 ```sql
@@ -3356,11 +3361,10 @@ with the stack's own secret, `iss supabase`, the role claim) and set through
 `PATCH /services/<uuid>/envs/bulk`, never printed. A new stack created from
 today's compose gets them from Coolify.
 
-**Backups.** Whether Coolify's scheduled backup can dump a database that lives
-inside a compose service is still unrecorded (20.7 decides on it): its API lists
-volume backups for a service's storages (`/services/<uuid>/storages/<uuid>/backups`)
-and no database backup for a service's Postgres, which points to the `pg_dump`
-sidecar; 20.7 confirms in the UI.
+**Backups.** Coolify's API lists volume backups for a service's storages
+(`/services/<uuid>/storages/<uuid>/backups`) and no database backup for a
+service's Postgres. 20.7 therefore backs the stack up from the host with its
+own `pg_dump` (§9.12), whatever the UI offers.
 
 **Roles that read every row (16.4's host check).** On the self-hosted image a
 role that is a superuser, bypasses RLS or holds `pg_read_all_data` can read
@@ -3377,4 +3381,324 @@ PostgREST at its default `error` level.
 
 **Not set on staging, by decision.** The `calendar-feed` rate limit (the number
 is the founder's; `deferred-work.md`), the email provider and the open signup
-door (no domain yet), backups (20.7) and monitoring (20.8).
+door (no domain yet). Backups and monitoring arrived with 20.7 and 20.8
+(§9.12, §9.13).
+
+### 9.12 Backups and the restore drill (story 20.7)
+
+(§9.11, staging on Coolify, is story 20.5's.) Coolify cannot schedule a
+backup of a Postgres that lives inside a compose service (20.5 found only
+volume backups in its API), so each stack is backed up by the host itself:
+`deploy/host/shift-ops.sh`, installed as `/usr/local/sbin/shift-ops`, run by
+`shift-backup@<env>.timer`. **This is the interim (H-11 undecided):** the sets
+stay on the host, and the founder's computer pulls them over the tailnet. The
+off-host bucket is a second step, built but off.
+
+**What a set holds.** Every night at 01:30 Europe/Zagreb (`Persistent=true`:
+a night the host was down is caught up at boot; not H-12's 02:30, which does
+not exist on the spring-forward night, and systemd then skips the run:
+`systemd-analyze calendar` showed it), one directory
+`/var/backups/shift/<env>/daily/<UTC time>/` (root, 0700; files 0600):
+
+| File | What | Why |
+| --- | --- | --- |
+| `db.dump` | `pg_dump -Fc` of the `postgres` database as `supabase_admin`, by the database container's own `pg_dump` (the stack's pinned image), under a 50-minute `timeout` inside the container | the data; custom format, read back with `pg_restore -l` before the set counts |
+| `roles.sql` | `pg_dumpall --roles-only --no-role-passwords` | `pg_dump` holds no role, and a fresh image lacks some (`supabase_functions_admin`). **No password** is in it: a new stack sets its own at init |
+| `supabase-db-config.tar.gz` | the `<uuid>_supabase-db-config` volume | **pgsodium's root key**, which Vault's secrets are encrypted under: the same night's dump and key, together |
+| `supabase-storage-data.tar.gz` | the `<uuid>_supabase-storage-data` volume | the uploaded logos |
+| `row-counts.tsv` | rows per table, counted from the dump itself | what the drill compares against |
+| `MANIFEST`, `SHA256SUMS` | the environment, the database image (its tag and its exact id), the latest migration, tables, rows; a checksum of every file | the drill refuses a set that does not match |
+
+Reading the dump back and counting its rows run in a throwaway container of
+the same image with no network, never in the stack's database container: the
+live database does only the `pg_dump`.
+
+The database's own volume is not copied: a file copy of a running cluster is
+inconsistent, and the dump is its copy. Coolify's `APP_KEY` is never in a set
+(it decrypts Coolify's own data; its copy is the founder's password manager,
+H-8). **A set is as secret as the database**: it holds every member's data
+and Vault's key. A set is written as `.partial-<name>` and renamed only when
+complete, so an interrupted night never counts and never makes retention
+delete a good set; the next run removes what an interrupted one left (a
+timeout, an OOM kill, a reboot). A run refuses to start on a disk 95 % full.
+
+**Kept:** 7 daily; the Sunday set (Europe/Zagreb) also as a weekly one (hard
+links, no second copy; 4 kept), and any daily set when the newest weekly one
+is a week old (a missed Sunday); 5 manual. A backup waits up to 30 minutes
+for a running drill. Everything the tool does is
+read-only towards the stack: `docker exec` of `pg_dump`, `pg_dumpall`,
+`pg_restore` and read-only `psql`, and `tar` of the volumes' mount points.
+Nothing stops or restarts a stack container.
+
+**Install it** (root, on the host, from a checkout of `main`):
+
+```bash
+install -d -m 0700 /etc/shift-ops
+cp deploy/host/ops.env.example /etc/shift-ops/<env>.env && chmod 0600 /etc/shift-ops/<env>.env
+# Set SERVICE_UUID to the stack's Coolify service id (the suffix of its
+# container names: `docker ps --format '{{.Names}}' | grep supabase-db-`).
+deploy/host/shift-ops.sh install <env>       # the tool, the units, both timers
+shift-ops config <env>                       # the effective settings
+shift-ops backup <env>                       # one set now
+shift-ops list <env>                         # the sets, and the last drill
+systemctl list-timers 'shift-*'
+```
+
+`install --no-jobs-check` installs the backup timer alone. To remove:
+`systemctl disable --now shift-backup@<env>.timer shift-jobs-check@<env>.timer`.
+A failed night runs `shift-alert@` (§9.13), and the jobs check fails when the
+newest daily set is older than 26 hours, so a timer that stopped is noticed.
+
+**Before a production migration** (§8.2 step 6): `shift-ops backup production
+--manual pre-migration` writes `manual/<UTC time>-pre-migration/` and prints
+the line to set, `PRE_MIGRATION_BACKUP_AT=<YYYY-MM-DDTHH:MMZ>`. The deploy job cannot take it itself:
+the tailnet ACL admits `tag:ci` to Postgres and the Coolify API only, and a
+dump on the runner would leave personal data on GitHub's machines outside the
+EU. Automating it means a forced-command SSH key for `tag:ci`, the founder's
+decision (`deferred-work.md`).
+
+#### The nightly pull to the founder's computer (the interim off-host copy)
+
+The host holds no credential for this copy: the founder's computer pulls, so a
+compromised host cannot delete it. Over the tailnet, with the host's OpenSSH
+(port 22 is admitted only from the tailnet, §9.8), and a key that can only
+read the backups:
+
+```bash
+# On the founder's computer, once: a key for this only (no passphrase, so the
+# schedule can use it; it can read the backups and nothing else).
+ssh-keygen -t ed25519 -f ~/.ssh/shift-backup-pull -C shift-backup-pull -N ''
+```
+
+On the host, one line in `/root/.ssh/authorized_keys` (`rrsync` ships with
+Ubuntu's rsync), restricted to reading `/var/backups/shift`:
+
+```text
+command="/usr/bin/rrsync -ro /var/backups/shift",restrict ssh-ed25519 AAAA… shift-backup-pull
+```
+
+Then, on the founder's computer (its disk encrypted: FileVault, BitLocker or
+LUKS, so the copy is encrypted at rest):
+
+```bash
+rsync -a -e "ssh -i ~/.ssh/shift-backup-pull" root@<the host's tailnet name>:staging/ ~/ShiftBackups/staging/
+```
+
+Paths are relative to `/var/backups/shift`. 20.4's sshd drop-in allows it
+(`PermitRootLogin prohibit-password`: root by key only). Not Tailscale SSH: it
+ignores `authorized_keys`, and with it the restriction. The key reads every
+set, production's included: keep it only on that computer, and replace it
+(a new line, the old one removed) if the computer is lost or once a year. Schedule it daily after
+03:00 Europe/Zagreb (cron, or a launchd agent on macOS), and prune the
+computer's copy by hand: it keeps whatever the host has pruned.
+
+#### The off-host bucket (H-11): off until a credential exists
+
+When the founder has decided H-11 (default: Backblaze B2, EU Central, the
+bucket's default encryption on), a second step copies every new set to the
+bucket after the local one is complete. The host only ever **adds**
+(`rclone copy --immutable`): give it a key **without** `deleteFiles`, scoped
+to the one bucket, and let the bucket's lifecycle rule keep 30 days. A
+failed copy fails the run (and alerts); the local set stays.
+
+```bash
+# rclone: a pinned release from rclone.org, not the distribution's older one.
+install -m 0600 /dev/null /etc/shift-ops/rclone.conf
+cat >/etc/shift-ops/rclone.conf <<'EOF'
+[shift-offsite]
+type = b2
+account = <the application key's id>
+key = <the application key>
+hard_delete = false
+EOF
+# Then in /etc/shift-ops/<env>.env, instead of OFFSITE=off:
+#   OFFSITE=rclone
+#   RCLONE_REMOTE=shift-offsite:<bucket>/<env>
+shift-ops backup <env>     # proves it once
+```
+
+Nothing of this exists on the host until the founder turns it on.
+
+#### The restore drill
+
+```bash
+shift-ops drill <env>                                     # the newest daily set
+shift-ops drill <env> /var/backups/shift/<env>/weekly/<set>
+```
+
+It never touches a stack. It checks the set's `SHA256SUMS` and that both
+archives read back, creates a volume
+and a container of its own (`shift-drill-<env>-<time>`, the set's database
+image, `--network none`, pg_cron told not to launch the restored jobs, a
+throwaway password from an env file), restores the set's db-config into the
+volume before the first start, applies `roles.sql`, runs `pg_restore --clean
+--if-exists --exit-on-error`, and then requires:
+
+- every table's row count equal to the dump's (`row-counts.tsv`, and the dump
+  read again);
+- every Vault secret to decrypt with the restored key (counted, never read
+  out).
+
+The container and the volume are removed however it ends. The result (a
+failure with its reason) and its duration go to
+`/var/backups/shift/<env>/drills.log`. It uses the set's exact image when the
+host still has it, and says so when it does not. Run it before go-live
+and then quarterly (H-12), and after any change to this tool.
+
+This drill restores the database alone. 20.9's pre-go-live drill restores the
+**off-host** copy into a full throwaway stack and signs the smoke account in
+(`deferred-work.md`).
+
+#### Restoring a stack for real
+
+The order matters; time it against H-12's RTO (4 h on the same host, 1
+working day on a new host).
+
+1. **A new stack**, if the old one is gone: §9.11's way, from the same
+   compose. Before its **first** start, create its db-config volume
+   (`docker volume create <new uuid>_supabase-db-config`) and untar the set's
+   `supabase-db-config.tar.gz` into its mount point (`tar --numeric-owner
+   -xzf …`): Vault then decrypts with the key it was written under. Without
+   it, re-create the Vault secrets afterwards (§3a, §3b).
+2. **Only Postgres running.** Stop every other container of the stack, so
+   nothing writes while the data is replaced. **Then stop pg_cron from running
+   jobs** before any job row comes back with the data (the restored
+   `housekeeping` could delete accounts, and `notify`/`remind` resend):
+   `alter system set cron.launch_active_jobs = off; select pg_reload_conf();`
+3. Roles, then the data, as `supabase_admin` inside the database container:
+
+   ```bash
+   docker exec -i supabase-db-<uuid> psql -X -U supabase_admin -d postgres -q < roles.sql   # "already exists" is expected
+   docker exec -i supabase-db-<uuid> pg_restore -U supabase_admin -d postgres --clean --if-exists --exit-on-error < db.dump
+   ```
+
+4. **Pause `housekeeping`** (§9.10), then let pg_cron run the other jobs again:
+   `select cron.alter_job((select jobid from cron.job where jobname = 'housekeeping'), active => false);`
+   `alter system reset cron.launch_active_jobs; select pg_reload_conf();`
+5. The storage volume: while Storage is stopped, empty
+   `<uuid>_supabase-storage-data` and untar `supabase-storage-data.tar.gz`
+   into it.
+6. Start the stack (§9.4's order rules hold: the access-token hook's function
+   exists, so GoTrue can start). Check Vault
+   (`select count(*), count(decrypted_secret) from vault.decrypted_secrets;`,
+   equal), `notify` and `remind` answering the cron (§3a, §3b), and a
+   sign-in. A new stack has a new JWT secret, so every member signs in again.
+7. Re-enable `housekeeping` once the data has been checked.
+8. Record the time taken.
+
+### 9.13 When Shift is down: monitoring (story 20.8)
+
+H-13's fallback without a new provider, until the founder creates an
+UptimeRobot account: two watchers, one outside the host and one on it.
+
+**Outside: `.github/workflows/uptime.yml`, every 30 minutes** (at :07 and
+:37; GitHub may start a scheduled run late). For each configured environment
+it checks, each retried once after 20 seconds:
+
+| Check | Request | Up when |
+| --- | --- | --- |
+| `app` | `GET https://<app>/` | 200 with the SPA shell (`<div id="root">`) |
+| `auth` | `GET https://<api>/auth/v1/health`, the publishable key as `apikey` (Kong wants one) | 200 |
+| `notify` | `POST https://<api>/functions/v1/notify`, no credential | 401 `INVOKE_SECRET_REFUSED`: Kong, edge-runtime and the router all answered. This is also what watches the gateway now that Kong logs at `crit` |
+
+A failure fails the run (an `::error::` per check) and opens the issue
+**"Uptime: <environment> is down"**, or updates the open one (a comment when
+the set of failing checks changes, the body otherwise). When every check
+passes again, it comments "Recovered" and closes it. GitHub e-mails the
+founder for a new issue and a comment when they watch the repository, and for
+a failed scheduled run (to whoever last changed the workflow's schedule).
+
+**The repository is public, and so are its run logs and issues.** The
+origins and the key are therefore repository **secrets**, not variables: a
+step's environment, variables included, is printed in its public log, while
+secrets are masked. The script masks every origin, host and key again, and
+writes only the environment, the check, a status code, a known error code or
+an error class (`ECONNREFUSED`, `TIMEOUT`) to the log and the issue.
+
+To turn it on (GitHub → Settings → Secrets and variables → Actions):
+
+| Kind | Name | Value |
+| --- | --- | --- |
+| secret | `UPTIME_STAGING_APP_URL` | `https://staging.<domain>` (an origin, no path) |
+| secret | `UPTIME_STAGING_API_URL` | `https://api.staging.<domain>` |
+| secret | `UPTIME_STAGING_PUBLISHABLE_KEY` | staging's publishable key (public by design, kept masked) |
+| secret | `UPTIME_PRODUCTION_APP_URL`, `…_API_URL`, `…_PUBLISHABLE_KEY` | the same three for production, from 20.9 |
+| variable | `UPTIME_ENABLED` | `true` |
+
+An environment with one or two of its three secrets set fails the run (a
+half-configured environment would go unwatched); one with none is skipped;
+enabled with none at all, the run fails. Run it once by hand (Actions →
+Uptime → Run workflow) after setting them. GitHub disables a schedule after
+60 days without activity in the repository: re-enable it in the Actions tab.
+
+**Within 10 minutes (NFR-34) needs UptimeRobot**, H-13's default: its free
+plan checks every 5 minutes. When the founder has an account, add three
+monitors with the same three checks (the `notify` one a keyword monitor on
+`INVOKE_SECRET_REFUSED`, POST, expecting 401; the `auth` one with the
+`apikey` header), alerting to the founder's e-mail, and keep this workflow as
+the second opinion.
+
+**On the host: `shift-jobs-check@<env>.timer`, every 15 minutes**
+(installed with the backup, §9.12; read-only, every query in a read-only
+transaction). `shift-ops jobs-check <env>` fails when:
+
+- a cron job (`notify`, `remind`, `housekeeping`) is missing or inactive, its
+  last run **failed** (a `HOUSEKEEPING_HALTED` included, with its message),
+  or its last success is older than 10 minutes (`notify`), 20 (`remind`) or
+  26 hours (`housekeeping`; one that has never run yet is only noted);
+- two or more of the cron's HTTP calls (`pg_net`'s answers, kept six hours)
+  in the last 20 minutes were not 200, timed out or failed to connect: a
+  `remind` or `notify` answered 401 (the Vault secret drifted from the
+  container's), 500 or 503. Only the status and the body's `code` are shown;
+- the newest daily backup set is older than 26 hours;
+- the disk under the backups or under Docker is more than 85 % used
+  (`DISK_MAX_PERCENT`).
+
+A long job (`housekeeping`) that has never run is only noted while the
+database has been up less than its limit; after that, it fails.
+
+Housekeeping's nightly counts (`failed > 0`) are still not kept anywhere: a
+durable record of them needs a migration (`deferred-work.md`).
+
+**How a failure reaches the founder.** Both units have
+`OnFailure=shift-alert@%n.service`, which writes `SHIFT_ALERT <unit> failed`
+to the journal and runs `/etc/shift-ops/alert-hook` if it exists: an
+executable the founder writes from `deploy/host/alert-hook.example` (e-mail
+through a relay, an ntfy topic or a Telegram bot), root's, 0700 (refused if
+anyone else may read or write it). It gets the unit's name and its last
+journal lines, which can carry a job's error message: prefer e-mail or a
+provider in the EU, and a private topic. The jobs check alerts when its
+failing checks change, and again every 6 hours while they stay the same
+(`ALERT_REPEAT_HOURS`; in between, its run says "still failing" and
+succeeds); when they clear, the hook gets one `RECOVERED` message. Until it
+exists, a failure is only in the journal (`journalctl -u 'shift-*'`). Its
+credential (an address, a topic, a token) lives in that file only. Try it
+with `systemctl start shift-alert@test.service`.
+
+**Coolify's notifications** (a failed deploy, a stopped container, disk above
+80 %) need an e-mail (SMTP) or chat channel in Coolify → Settings →
+Notifications; the founder's, when one exists (`deferred-work.md`).
+
+#### The site is down
+
+1. **Which part?** The issue names the checks. `app` alone: the `shift-web`
+   application. `auth` and `notify` together: Kong or the whole stack.
+   `notify` alone: the functions container (`supabase-edge-functions-<uuid>`).
+   All three with `ECONNREFUSED`, `TIMEOUT` or `ENOTFOUND`: the host, Traefik
+   or DNS.
+2. **Is the host up?** Over the tailnet: `ssh root@<the host's tailnet name>`.
+   No answer: the provider's console (reboot from there if it hangs; §9.8's
+   firewall comes back with Docker).
+3. **The containers:** `docker ps -a --format '{{.Names}}\t{{.Status}}'`. A
+   stopped or unhealthy one: its log (`docker logs --tail 100 <name>`), then
+   restart it **in Coolify** (the service, or the application), never by
+   hand-editing the stack.
+4. **Traefik and certificates:** `docker logs --tail 100 coolify-proxy` (an
+   ACME error, a renewal failure).
+5. **Disk and memory:** `df -h /`, `free -m`, `docker system df`. A full disk
+   stops Postgres first; old images (`docker image prune`) are the usual
+   space.
+6. **Kong at `crit`** logs almost nothing; for a session, raise it in Coolify
+   (`KONG_LOG_LEVEL=info`), restart Kong, read, and set it back.
+7. **Recovered?** The next run closes the issue; run the workflow by hand to
+   confirm at once. Write what happened in the issue before it closes.

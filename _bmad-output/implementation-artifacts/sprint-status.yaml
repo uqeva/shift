@@ -729,8 +729,8 @@ development_status:
   20-4-the-host-is-closed-to-everything-but-the-web: done  # applied and confirmed 2026-11-23 (founder); verify-exposure.sh re-run with Studio/Postgres waits for staging on the tailnet (20.5); its deferred pg_net revoke cannot be a migration (postgres is not the grantor; deferred-work, 2026-11-24): an operator step as supabase_admin
   20-5-staging-stands-up-on-coolify: review  # staging up, CI pending
   20-6-the-pipeline-deploys-through-coolify: review  # built (inert until configured), reviewed twice (2nd: CI/CD security), CI pending; enabling waits: Coolify API token (it must carry `deploy`, 20.5), Tailscale OAuth client, GHCR read token on the host, 20.5
-  20-7-backups-leave-the-host-and-a-restore-is-rehearsed: backlog  # interim after 20.5; off-host waits: H-11 + target credential, H-12
-  20-8-someone-hears-when-shift-is-down: backlog  # waits: 20.5, H-13, Coolify alert channel
+  20-7-backups-leave-the-host-and-a-restore-is-rehearsed: review  # built, CI pending; installed on the staging host, backup + drill PASS 2026-11-23; interim (local sets + tailnet pull + drill); off-host waits: H-11 + target credential
+  20-8-someone-hears-when-shift-is-down: review  # built, CI pending; the founder set its three staging secrets and UPTIME_ENABLED (2026-11-24), so it runs once merged; interim (GitHub Actions every 30 min + host jobs-check); UptimeRobot and Coolify notifications wait: H-13, an alert channel
   20-9-production-stands-up-on-coolify: backlog  # waits: 20.1-20.8, production DNS, Resend prod domain/key, all H decisions, restore drill passed, founder go
   epic-20-retrospective: optional
 action_items:

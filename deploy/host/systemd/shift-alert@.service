@@ -1,0 +1,13 @@
+# Stories 20.7 and 20.8: run by OnFailure= of shift-backup@ and
+# shift-jobs-check@, with the failed unit's name as the instance. Writes
+# SHIFT_ALERT to the journal and runs /etc/shift-ops/alert-hook, if the founder
+# has written one (alert-hook.example). DEPLOY.md §9.13.
+[Unit]
+Description=Shift: alert that %i failed
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/shift-ops alert %i
+TimeoutStartSec=2min
+NoNewPrivileges=yes
+PrivateTmp=yes
