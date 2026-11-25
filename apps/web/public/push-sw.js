@@ -25,7 +25,7 @@ self.addEventListener('push', (event) => {
   }
   if (data === null || typeof data !== 'object') data = {};
 
-  const title = typeof data.title === 'string' && data.title !== '' ? data.title : 'Shift';
+  const title = typeof data.title === 'string' && data.title !== '' ? data.title : 'Smjenko';
   const options = {
     body: typeof data.body === 'string' ? data.body : '',
     icon: '/pwa-192x192.png',

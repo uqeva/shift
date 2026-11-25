@@ -27,9 +27,14 @@ export const FEED_UID_DOMAIN = 'shift';
 export const DOWNLOAD_UID_DOMAIN = 'shift-download';
 export type UidDomain = typeof FEED_UID_DOMAIN | typeof DOWNLOAD_UID_DOMAIN;
 
-/** The fixed product name a client shows as the calendar's name, never the URL. */
-export const CALENDAR_NAME = 'Shift';
-export const PRODUCT_ID = '-//Shift//calendar-feed//HR';
+/**
+ * The fixed product name a client shows as the calendar's name, never the URL.
+ * Smjenko since story 21.24 (AD-20 as amended): `Shift` before it. A client
+ * that already subscribes reads the new name and PRODID on its next refresh;
+ * no UID changes, so no event is duplicated.
+ */
+export const CALENDAR_NAME = 'Smjenko';
+export const PRODUCT_ID = '-//Smjenko//calendar-feed//HR';
 /** Between the shift type's name and the team's in an event's SUMMARY. */
 export const SUMMARY_SEPARATOR = ' · ';
 /**

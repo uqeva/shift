@@ -3326,7 +3326,12 @@ const SANCTIONED_KEYS = [...SANCTIONED_PLURAL_KEYS, ...SANCTIONED_SCREEN_KEYS];
  */
 const RESERVED_STEMS: readonly string[] = ['konflik'];
 
-/** The one namespace whose messages may say `smjen` as the Team (story 1.7a). */
+/**
+ * The team screens' namespace (story 1.7a). It said the Team as `Smjena` until
+ * STORY 21.22 (E-6, the founder's decision of 2026-11-25): a team is *Tim* /
+ * *Timovi* since, so this namespace, like every other, never says `smjen`.
+ * The key names (`smjene.*`) and the route (`/smjene`) are identifiers and stay.
+ */
 const TEAM_NAMESPACE = 'smjene.';
 
 /**
@@ -3337,17 +3342,26 @@ const TEAM_NAMESPACE = 'smjene.';
 const SHIFT_TYPE_NAMESPACE = 'rotation.shiftTypes.';
 
 /**
- * The rotation builder's namespace (story 2.3b). There `smjen` names the TEAM
- * — the builder binds teams to steps — exactly as in {@link TEAM_NAMESPACE},
- * and `tip… smjen…` is refused: the builder never says the Shift Type, it
- * shows each step's type by its name.
+ * The rotation builder's namespace (story 2.3b). It binds teams to steps, and
+ * since STORY 21.22 says each as *tim*, so it never says `smjen` (but for
+ * {@link ROTATION_OVERRIDE_TAKEN_KEY}, a rostered shift), and `tip… smjen…`
+ * is refused: the builder shows each step's type by its name.
  */
 const ROTATION_BUILDER_NAMESPACE = 'rotation.builder.';
 
 /**
- * The calendar's namespace (story 3.1). Its columns are TEAMS, so `smjen`
- * names the Team there as in {@link TEAM_NAMESPACE}, and `tip… smjen…` is
- * refused: a cell shows its shift type by name.
+ * The override review's one refusal that names a rostered SHIFT (story 3.5c):
+ * "Ta osoba već je u promjeni za ovu smjenu." ONE KEY: `smjen` is the shift
+ * there, as on the resolution screen, and `tip… smjen…` is refused.
+ */
+const ROTATION_OVERRIDE_TAKEN_KEY = 'rotation.builder.overrides.refused.taken';
+
+/**
+ * The calendar's namespace (story 3.1). Its columns are teams, said as *tim*
+ * since STORY 21.22 (a key that names a team never says `smjen`, see
+ * {@link teamLabelled}); `smjen` there is a rostered or offered SHIFT (the
+ * swap, a collision), and `tip… smjen…` is refused: a cell shows its shift
+ * type by name.
  */
 const CALENDAR_NAMESPACE = 'kalendar.';
 
@@ -3360,18 +3374,10 @@ const CALENDAR_NAMESPACE = 'kalendar.';
 const HOURS_NAMESPACE = 'sati.';
 
 /**
- * The filter bar's namespace (story 7.5), shared by *Kalendar* and *Sati*:
- * its first chip is `Smjena`, the Team, and an empty table says a person
- * `nije u smjeni Smjena B` — so `smjen` names the Team there, as in
- * `kalendar`, and `tip… smjen…` is refused: no filter is by shift type.
- */
-const FILTER_NAMESPACE = 'filter.';
-
-/**
  * *Danas*'s namespace (story 6.1a). It states the viewer's own next SHIFT —
- * `Sljedeća smjena`, the epic's own words — and that they are on no team, so
- * `smjen` names a worked shift or the Team there, as on *Sati*, and
- * `tip… smjen…` is refused: a shift type is shown by its name.
+ * `Sljedeća smjena`, the epic's own words — so `smjen` names a worked shift
+ * there, as on *Sati*; that the viewer is on no team it says as *tim* since
+ * STORY 21.22; and `tip… smjen…` is refused: a shift type is shown by its name.
  */
 const DANAS_NAMESPACE = 'danas.';
 
@@ -3384,28 +3390,6 @@ const DANAS_NAMESPACE = 'danas.';
 const RESOLUTION_NAMESPACE = 'zaOdluku.resolution.';
 
 /**
- * The member directory's namespace (story 7.17). It lists who is on which
- * team, so `smjen` names the Team there, as under `smjene`, and `tip… smjen…`
- * is refused: the directory never names a shift type.
- */
-const DIRECTORY_NAMESPACE = 'ljudi.directory.';
-
-/**
- * The admin's leave overview (story 7.15). Its *Smjena* column and *Bez
- * smjene* name each member's Team today, so `smjen` names the Team there, and
- * `tip… smjen…` is refused: the overview never names a shift type.
- */
-const LEAVE_OVERVIEW_NAMESPACE = 'godisnji.overview.';
-
-/**
- * STORY 16.1: the printed month (`print.*`) says *Moj raspored*'s filter in
- * words, `Moj raspored: {ime} · {smjena}` or `… · bez smjene`, as *Kalendar*'s own
- * sentence does, so `smjen` names the Team there, and `tip… smjen…` is
- * refused: a shift type is shown by its name.
- */
-const PRINT_NAMESPACE = 'print.';
-
-/**
  * The leave card's replacement guard (story 5.4e), ONE KEY and no namespace:
  * it names the rostered shift a replacement stays on — `ostaje na smjeni
  * {team}`, the spec's own words — so `smjen` names that shift there, as on
@@ -3413,14 +3397,6 @@ const PRINT_NAMESPACE = 'print.';
  * `ljudi.leaveRecord` message still may not say `smjen` at all.
  */
 const LEAVE_REPLACEMENT_KEY = 'ljudi.leaveRecord.replacementStays';
-
-/**
- * The add dialog's no-team line (story 7.13b), ONE KEY: "Osoba je bez
- * smjene. Smjenu joj dodjeljuješ na njezinoj stranici." — the spec's own
- * words, where `smjen` is the Team. `tip… smjen…` is still refused there, and
- * every other `ljudi.form` message still may not say `smjen` at all.
- */
-const MEMBER_NO_TEAM_KEY = 'ljudi.form.noTeam';
 
 /**
  * The deactivation's consequence in numbers (story 7.13c), ONE KEY: "… a u
@@ -3455,12 +3431,6 @@ const CALENDAR_TYPE_TERM_KEYS: readonly string[] = ['kalendar.detail.changes.emp
  * {@link CALENDAR_OVERRIDE_NAMESPACE}'s terms (`smjen` only inside it).
  */
 const ROTATION_DESCRIPTION_KEY = 'shell.description.postavkeRotacije';
-
-/**
- * The *Više* sheet's line under Ljudi: the directory lists people by Team, so
- * it says the Team as the directory does, and never the Shift Type.
- */
-const PEOPLE_DESCRIPTION_KEY = 'shell.description.ljudi';
 
 /**
  * A *Za odluku* item's kind (story 9.5), ONE KEY and no namespace: a
@@ -3615,15 +3585,14 @@ const SWAP_DECISION_KEYS: readonly string[] = [
 const ROTATION_OVERRIDE_NAMESPACE = 'rotation.builder.overrides.';
 /**
  * STORY 14.2: *Povijest promjena* names records of every kind — the Team
- * (`Smjena`) and the Shift Type (`Tip smjene`) both — so it takes the
- * builder's overrides rule: the term `tip… smjen…` admitted, and `smjen`
- * otherwise only as the Team's noun.
+ * (*Tim* since story 21.22) and the Shift Type (`Tip smjene`) both — so the
+ * term `tip… smjen…` is admitted there, and `smjen` nowhere else.
  */
 const HISTORY_NAMESPACE = 'history.';
 /**
- * STORY 19.4 (AD-24): the setup frame walks through the Team (*Smjene*) and the
- * Shift Type (*Tipovi smjena*) on one screen, as `history` names both: the
- * term `tip… smjen…`, and `smjen` otherwise only as the Team's noun. The
+ * STORY 19.4 (AD-24): the setup frame walks through the Team (*Timovi* since
+ * story 21.22) and the Shift Type (*Tipovi smjena*) on one screen, as
+ * `history` names both: the term `tip… smjen…`, and `smjen` nowhere else. The
  * calendar's empty state says where a schedule comes from, both included.
  */
 const ONBOARDING_NAMESPACE = 'onboarding.';
@@ -3643,62 +3612,106 @@ const CALENDAR_OVERRIDE_ARCHIVED_KEY = 'kalendar.detail.override.refused.archive
 const SHIFT_TYPE_TERM = /(?<![\p{L}\p{N}])tip(?:a|u|om|ovi|ova|ove|ovima)?\s+smjen\p{L}*/gu;
 
 /**
- * Whether a message says `smjen` where it may not: anywhere outside the three
- * namespaces; as the Shift Type (`tip smjene`) inside the team one and the
- * rotation builder's; and anywhere but inside `tip… smjen…` in the shift type
- * one. Keyed so the sweep
- * and its self-test run the same predicate.
+ * STORY 21.24: the product's name, *Smjenko*, in any case form (*Smjenku*,
+ * *Smjenka*). It shares the stem, so it is taken out before every check below:
+ * it is a name, never the Team, a shift or the Shift Type.
+ */
+const PRODUCT_NAME = /smjenk\p{L}*/gu;
+
+/**
+ * STORY 21.22 (E-6): the keys whose message names a TEAM although the key
+ * path does not say so. With every key whose path names one (`team`, `teams`,
+ * `noTeam`, …), they are {@link teamLabelled}: since the rename they say *tim*
+ * / *Timovi* and never `smjen`, wherever they sit.
+ */
+const TEAM_LABEL_KEYS: readonly string[] = [
+  'danas.unscheduled',
+  'danas.admin.status.unscheduled',
+  'danas.admin.coverage.none',
+  'danas.admin.week.region',
+  'kalendar.mode.sve',
+  'kalendar.ownNote',
+  'kalendar.detail.rosterChange.refused.archived',
+  'zaOdluku.swap.archived',
+  'filter.replaceNote',
+  'shell.description.ljudi',
+];
+
+/**
+ * The team-only namespaces: every message there names teams, never a shift.
+ * Until STORY 21.22 they said the Team as `smjena`; since, none says `smjen`.
+ */
+const TEAM_ONLY_NAMESPACES: readonly string[] = [
+  TEAM_NAMESPACE,
+  'filter.',
+  'ljudi.directory.',
+  'godisnji.overview.',
+  'print.',
+];
+
+/** Whether a message names a team (story 21.22): by its key path, its namespace, or the list. */
+function teamLabelled(key: string): boolean {
+  return (
+    /team/i.test(key) ||
+    TEAM_LABEL_KEYS.includes(key) ||
+    TEAM_ONLY_NAMESPACES.some((namespace) => key.startsWith(namespace)) ||
+    (key.startsWith(ROTATION_BUILDER_NAMESPACE) && key !== ROTATION_OVERRIDE_TAKEN_KEY)
+  );
+}
+
+/**
+ * Whether a message says `smjen` where it may not. SINCE STORY 21.22 `smjen`
+ * never names the Team (*Tim*, *Timovi*): a message that names a team
+ * ({@link teamLabelled}) never says it outside the Shift Type's term, and
+ * anywhere else it names a worked or rostered SHIFT, only in the scopes that
+ * speak of one. The Shift Type's term `tip… smjen…` is admitted only in the
+ * scopes that name the Shift Type. The product's name is taken out first.
+ * Keyed so the sweep and its self-test run the same predicate.
  */
 function teamTermOutOfTurn(key: string, message: string): boolean {
-  const lowered = message.toLowerCase();
+  const lowered = message.toLowerCase().replace(PRODUCT_NAME, '');
+  const withoutTerm = lowered.replace(SHIFT_TYPE_TERM, '');
 
-  if (
-    key.startsWith(ROTATION_OVERRIDE_NAMESPACE) ||
-    key.startsWith(HISTORY_NAMESPACE) ||
-    key.startsWith(ONBOARDING_NAMESPACE) ||
-    key === CALENDAR_SOURCES_KEY ||
-    key === CALENDAR_OVERRIDE_ARCHIVED_KEY
-  ) {
-    // The term taken out, `smjen` may remain only as the Team's noun.
-    return /smjen(?!a\b|e\b|u\b|om\b|ama\b)/.test(lowered.replace(SHIFT_TYPE_TERM, ''));
-  }
-
+  // The Shift Type's scopes: `smjen` only inside the term.
   if (
     key.startsWith(SHIFT_TYPE_NAMESPACE) ||
     key.startsWith(CALENDAR_OVERRIDE_NAMESPACE) ||
+    (key.startsWith(ROTATION_OVERRIDE_NAMESPACE) && key !== ROTATION_OVERRIDE_TAKEN_KEY) ||
+    key.startsWith(HISTORY_NAMESPACE) ||
+    key.startsWith(ONBOARDING_NAMESPACE) ||
     CALENDAR_TYPE_TERM_KEYS.includes(key) ||
-    key === ROTATION_DESCRIPTION_KEY
+    key === ROTATION_DESCRIPTION_KEY ||
+    key === CALENDAR_SOURCES_KEY ||
+    key === CALENDAR_OVERRIDE_ARCHIVED_KEY
   ) {
-    return lowered.replace(SHIFT_TYPE_TERM, '').includes('smjen');
+    return withoutTerm.includes('smjen');
   }
 
+  // A team is never `smjen` (story 21.22), nor is the Shift Type said here.
+  if (teamLabelled(key)) return lowered.includes('smjen');
+
+  // The scopes that speak of a worked or rostered shift: `smjen` is that
+  // shift, and the Shift Type's term is refused.
   if (
-    !key.startsWith(TEAM_NAMESPACE) &&
-    !key.startsWith(ROTATION_BUILDER_NAMESPACE) &&
-    !key.startsWith(CALENDAR_NAMESPACE) &&
-    !key.startsWith(HOURS_NAMESPACE) &&
-    !key.startsWith(FILTER_NAMESPACE) &&
-    !key.startsWith(DANAS_NAMESPACE) &&
-    !key.startsWith(RESOLUTION_NAMESPACE) &&
-    !key.startsWith(DIRECTORY_NAMESPACE) &&
-    !key.startsWith(LEAVE_OVERVIEW_NAMESPACE) &&
-    !key.startsWith(PRINT_NAMESPACE) &&
-    key !== LEAVE_REPLACEMENT_KEY &&
-    key !== MEMBER_NO_TEAM_KEY &&
-    key !== DEACTIVATION_CONSEQUENCE_KEY &&
-    key !== PEOPLE_DESCRIPTION_KEY &&
-    key !== QUEUE_COLLISION_KIND_KEY &&
-    !MEMBER_ERASURE_COLLISION_KEYS.includes(key) &&
-    !MINIMUM_MEMBERS_KEYS.includes(key) &&
-    !SHORT_STAFFED_KEYS.includes(key) &&
-    !SWAP_NOTIFICATION_KEYS.includes(key) &&
-    !SWAP_DECISION_KEYS.includes(key) &&
-    !HALF_DAY_KEYS.includes(key)
+    key.startsWith(CALENDAR_NAMESPACE) ||
+    key.startsWith(HOURS_NAMESPACE) ||
+    key.startsWith(DANAS_NAMESPACE) ||
+    key.startsWith(RESOLUTION_NAMESPACE) ||
+    key === LEAVE_REPLACEMENT_KEY ||
+    key === DEACTIVATION_CONSEQUENCE_KEY ||
+    key === QUEUE_COLLISION_KIND_KEY ||
+    key === ROTATION_OVERRIDE_TAKEN_KEY ||
+    MEMBER_ERASURE_COLLISION_KEYS.includes(key) ||
+    MINIMUM_MEMBERS_KEYS.includes(key) ||
+    SHORT_STAFFED_KEYS.includes(key) ||
+    SWAP_NOTIFICATION_KEYS.includes(key) ||
+    SWAP_DECISION_KEYS.includes(key) ||
+    HALF_DAY_KEYS.includes(key)
   ) {
-    return lowered.includes('smjen');
+    return /\btip\w*\s+smjen/.test(lowered);
   }
 
-  return /\btip\w*\s+smjen/.test(lowered);
+  return lowered.includes('smjen');
 }
 
 /** The reserved stem a message carries, or `null`. Lowercased, so an inflected
@@ -3712,8 +3725,12 @@ function reservedStemIn(message: string, stems: readonly string[] = RESERVED_STE
   return stems.find((stem) => lowered.includes(stem)) ?? null;
 }
 
+/** The file's text, read once per run; parsed afresh on each call so no test can mutate another's copy. */
+let resourceText: string | null = null;
+
 function resource(): Record<string, unknown> {
-  return JSON.parse(readFileSync(RESOURCE, 'utf8')) as Record<string, unknown>;
+  resourceText ??= readFileSync(RESOURCE, 'utf8');
+  return JSON.parse(resourceText) as Record<string, unknown>;
 }
 
 
@@ -3830,6 +3847,12 @@ describe('the messages obey the voice rules that bind every string', () => {
     // AMENDED BY STORY 14.2: `history` names both, under the same rule.
     //
     // AMENDED BY STORY 16.1: `print` names the Team, as `kalendar` does.
+    //
+    // REWRITTEN BY STORY 21.22 (E-6): the Team is *Tim* / *Timovi*, so no
+    // message says `smjen` for a team any more, in any namespace; `smjen` is
+    // a worked or rostered shift where a scope speaks of one, and the term
+    // `tip… smjen…` the Shift Type where a scope names it. The product's
+    // name, *Smjenko* (story 21.24), shares the stem and is taken out first.
     const found = leafKeys(resource())
       .map((key) => ({ key, message: String(messageAt(key)) }))
       .filter(({ key, message }) => teamTermOutOfTurn(key, message));
@@ -3951,26 +3974,26 @@ describe('the messages obey the voice rules that bind every string', () => {
     // STORY 1.7a's SEVEN, a fifth authoring of the same voice. The archive offer
     // is the one that would most naturally have been the noun `Arhiviranje` —
     // the prompt's subject, not a control.
-    expect(messageAt('smjene.add')).toBe('Dodaj smjenu');
-    expect(messageAt('smjene.edit')).toBe('Uredi smjenu {name}');
+    expect(messageAt('smjene.add')).toBe('Dodaj tim');
+    expect(messageAt('smjene.edit')).toBe('Uredi tim {name}');
     // An archived team's row opens it for viewing, in the same voice.
-    expect(messageAt('smjene.view')).toBe('Prikaži smjenu {name}');
+    expect(messageAt('smjene.view')).toBe('Prikaži tim {name}');
     expect(messageAt('smjene.save')).toBe('Spremi');
-    expect(messageAt('smjene.archive')).toBe('Arhiviraj smjenu {name}');
-    expect(messageAt('smjene.archiveConfirm')).toBe('Potvrdi arhiviranje smjene {name}');
+    expect(messageAt('smjene.archive')).toBe('Arhiviraj tim {name}');
+    expect(messageAt('smjene.archiveConfirm')).toBe('Potvrdi arhiviranje tima {name}');
     expect(messageAt('smjene.archiveCancel')).toBe('Odustani od arhiviranja');
     // STORY 1.7b's FIVE, a sixth authoring of the same voice. The move offer is
     // the one that would most naturally have been the noun `Premještaj` — the
     // prompt's subject, not a control.
-    expect(messageAt('smjene.membership.move')).toBe('Promijeni smjenu osobe {name}');
-    expect(messageAt('smjene.membership.moveConfirm')).toBe('Potvrdi promjenu smjene osobe {name}');
+    expect(messageAt('smjene.membership.move')).toBe('Promijeni tim osobe {name}');
+    expect(messageAt('smjene.membership.moveConfirm')).toBe('Potvrdi promjenu tima osobe {name}');
     expect(messageAt('smjene.membership.withdraw')).toBe(
-      'Poništi zakazanu promjenu smjene za osobu {name}',
+      'Poništi zakazanu promjenu tima za osobu {name}',
     );
     expect(messageAt('smjene.membership.withdrawConfirm')).toBe(
-      'Potvrdi poništavanje promjene smjene za osobu {name}',
+      'Potvrdi poništavanje promjene tima za osobu {name}',
     );
-    expect(messageAt('smjene.membership.cancel')).toBe('Odustani od promjene smjene');
+    expect(messageAt('smjene.membership.cancel')).toBe('Odustani od promjene tima');
     // STORY 2.1b's SIX, a seventh authoring of the same voice. The removal
     // offer is the one that would most naturally have been the noun
     // `Uklanjanje` — the prompt's subject, not a control.
@@ -4089,15 +4112,36 @@ describe('the detector reads the file it thinks it does', () => {
     expect('Tip smjene'.toLowerCase()).toContain('smjen');
   });
 
-  it('would notice smjen outside the team namespace, and the Shift Type inside it', () => {
-    // The self-test for the narrowed sweep, on every polarity it decides.
+  it('would notice smjen for a team anywhere, and the Shift Type outside its scopes', () => {
+    // The self-test for the sweep, on every polarity it decides.
     expect(teamTermOutOfTurn('ljudi.caption', 'Popis smjena')).toBe(true);
     expect(teamTermOutOfTurn('smjena.heading', 'Smjena')).toBe(true);
-    expect(teamTermOutOfTurn('smjene.heading', 'Smjene')).toBe(false);
-    expect(teamTermOutOfTurn('smjene.count', '{count, plural, one {# smjena}}')).toBe(false);
+    expect(teamTermOutOfTurn('ljudi.caption', 'Popis osoba')).toBe(false);
+    // STORY 21.22 (E-6): the team screens say *Tim* / *Timovi*, never `smjen`,
+    // and never the Shift Type.
+    expect(teamTermOutOfTurn('smjene.heading', 'Timovi')).toBe(false);
+    expect(teamTermOutOfTurn('smjene.count', '{count, plural, one {# tim} few {# tima} other {# timova}}')).toBe(false);
+    expect(teamTermOutOfTurn('smjene.heading', 'Smjene')).toBe(true);
+    expect(teamTermOutOfTurn('smjene.count', '{count, plural, one {# smjena}}')).toBe(true);
     expect(teamTermOutOfTurn('smjene.name', 'Tip smjene')).toBe(true);
     expect(teamTermOutOfTurn('smjene.name', 'Tipovi smjena')).toBe(true);
-    expect(teamTermOutOfTurn('ljudi.caption', 'Popis osoba')).toBe(false);
+    // A key that names a team, in a scope where `smjen` is a shift, still may
+    // not say it; and the listed team labels whose path does not say so.
+    expect(teamTermOutOfTurn('kalendar.noTeam', 'Nisi član nijedne smjene.')).toBe(true);
+    expect(teamTermOutOfTurn('kalendar.noTeam', 'Nisi član nijednog tima.')).toBe(false);
+    expect(teamTermOutOfTurn('kalendar.mode.sve', 'Sve smjene')).toBe(true);
+    expect(teamTermOutOfTurn('kalendar.mode.sve', 'Svi timovi')).toBe(false);
+    expect(teamTermOutOfTurn('danas.admin.week.region', 'Ovaj tjedan po smjenama')).toBe(true);
+    expect(teamTermOutOfTurn('sati.organization.team', 'Smjena')).toBe(true);
+    expect(teamTermOutOfTurn('filter.chip.teamAll', 'Smjena: sve')).toBe(true);
+    expect(teamTermOutOfTurn('filter.chip.teamAll', 'Tim: svi')).toBe(false);
+    expect(teamTermOutOfTurn('filter.team', 'Tip smjene')).toBe(true);
+    expect(teamTermOutOfTurn('ljudi.directory.lede', 'Tko je u kojoj smjeni.')).toBe(true);
+    expect(teamTermOutOfTurn('print.ownNoTeam', 'Moj raspored: {name} · bez smjene')).toBe(true);
+    // STORY 21.24: the product's name shares the stem and is never the Team.
+    expect(teamTermOutOfTurn('auth.brand.name', 'Smjenko')).toBe(false);
+    expect(teamTermOutOfTurn('signup.email.recovery.body', 'Za račun u Smjenku zatražena je nova lozinka.')).toBe(false);
+    expect(teamTermOutOfTurn('signup.email.recovery.body', 'Za račun u Smjenku iz smjene A')).toBe(true);
     // STORY 2.2b's namespace, on both polarities: the term passes in any
     // inflection; a bare `smjena` beside it, or instead of it, does not; and
     // the term anywhere outside the namespace is still out of turn.
@@ -4113,17 +4157,24 @@ describe('the detector reads the file it thinks it does', () => {
     expect(teamTermOutOfTurn('rotation.shiftTypes.name', 'Tipovima smjena')).toBe(false);
     expect(teamTermOutOfTurn('rotation.pattern.heading', 'Tip smjene')).toBe(true);
     expect(teamTermOutOfTurn('organization.hourBands.name', 'Tip smjene')).toBe(true);
-    // STORY 2.3b: the builder may say the Team, and never the Shift Type.
-    expect(teamTermOutOfTurn('rotation.builder.offsetsHeading', 'Smjene i pomaci')).toBe(false);
-    expect(teamTermOutOfTurn('rotation.builder.offsetOf', 'Pomak smjene {name}')).toBe(false);
+    // STORY 2.3b, as renamed by 21.22: the builder says the Team as *tim*,
+    // and never the Shift Type; its one rostered-shift refusal may say `smjen`.
+    expect(teamTermOutOfTurn('rotation.builder.offsetsHeading', 'Timovi i pomaci')).toBe(false);
+    expect(teamTermOutOfTurn('rotation.builder.offsetsHeading', 'Smjene i pomaci')).toBe(true);
+    expect(teamTermOutOfTurn('rotation.builder.offsetOf', 'Pomak smjene {name}')).toBe(true);
     expect(teamTermOutOfTurn('rotation.builder.patternLede', 'Isti tip smjene može se ponoviti.')).toBe(true);
+    expect(teamTermOutOfTurn('rotation.builder.overrides.refused.taken', 'U promjeni je za ovu smjenu.')).toBe(false);
+    expect(teamTermOutOfTurn('rotation.builder.overrides.refused.taken', 'Tip smjene')).toBe(true);
+    expect(teamTermOutOfTurn('rotation.builder.overrides.amend.type', 'Tip smjene')).toBe(false);
+    expect(teamTermOutOfTurn('rotation.builder.overrides.refused.archived', 'Smjena ili tip smjene je arhiviran.')).toBe(true);
+    expect(teamTermOutOfTurn('rotation.builder.overrides.refused.archived', 'Tim ili tip smjene je arhiviran.')).toBe(false);
     // STORY 3.5b: the day detail's override copy says the Shift Type, and
-    // `smjen` only inside the term; the rest of `kalendar` still never does.
+    // `smjen` only inside the term; elsewhere in `kalendar` `smjen` is a shift.
     expect(teamTermOutOfTurn('kalendar.detail.override.set.type', 'Tip smjene')).toBe(false);
     expect(teamTermOutOfTurn('kalendar.detail.override.set.heading', 'Promijeni tip smjene')).toBe(false);
     expect(teamTermOutOfTurn('kalendar.detail.override.remove.prompt', 'Ukloniti izmjenu smjene A?')).toBe(true);
     expect(teamTermOutOfTurn('kalendar.detail.title', 'Tip smjene')).toBe(true);
-    expect(teamTermOutOfTurn('kalendar.detail.off', 'Smjena taj dan ne radi.')).toBe(false);
+    expect(teamTermOutOfTurn('kalendar.swap.given', 'Tvoja smjena')).toBe(false);
     expect(teamTermOutOfTurn('rotation.builder.patternLede', 'Tipovi smjena')).toBe(true);
     expect(teamTermOutOfTurn('rotation.builder.patternLede', 'Isti tip može se ponoviti.')).toBe(false);
     expect(teamTermOutOfTurn('rotation.builderx.heading', 'Smjena')).toBe(true);
@@ -4136,14 +4187,38 @@ describe('the detector reads the file it thinks it does', () => {
     expect(teamTermOutOfTurn('sati.shiftCount', '{count, plural, one {# smjena}}')).toBe(false);
     expect(teamTermOutOfTurn('sati.shifts', 'Tip smjene')).toBe(true);
     expect(teamTermOutOfTurn('satix.shifts', 'Smjene')).toBe(true);
-    // STORY 7.5: the filter bar names the Team, never the Shift Type.
-    expect(teamTermOutOfTurn('filter.chip.teamAll', 'Smjena: sve')).toBe(false);
-    expect(teamTermOutOfTurn('filter.team', 'Tip smjene')).toBe(true);
     expect(teamTermOutOfTurn('filterx.team', 'Smjena')).toBe(true);
     // Story 5.4e: the one guard line names the shift; its siblings still may not.
     expect(teamTermOutOfTurn('ljudi.leaveRecord.replacementStays', 'Dino ostaje na smjeni Smjena C')).toBe(false);
     expect(teamTermOutOfTurn('ljudi.leaveRecord.replacementStays', 'Tip smjene')).toBe(true);
     expect(teamTermOutOfTurn('ljudi.leaveRecord.replacementsUnknown', 'na smjeni')).toBe(true);
+    // History and onboarding name the Team and the Shift Type: the term only.
+    expect(teamTermOutOfTurn('history.record.shiftType', 'Tip smjene')).toBe(false);
+    expect(teamTermOutOfTurn('history.record.team', 'Smjena')).toBe(true);
+    expect(teamTermOutOfTurn('onboarding.step.teams', 'Smjene')).toBe(true);
+    expect(teamTermOutOfTurn('onboarding.step.shiftTypes', 'Tipovi smjena')).toBe(false);
+  });
+
+  it('names every team Tim or Timovi, and the namespaces that name only teams say it (story 21.22)', () => {
+    // E-6's literal sweep, read off the file: every message that names a team
+    // ({@link teamLabelled}) is free of `smjen`, the product's name and the
+    // Shift Type's term (`Tim ili tip smjene`) aside, and there are enough of them that the sweep cannot pass empty.
+    const labelled = leafKeys(resource()).filter((key) => teamLabelled(key));
+    const saying = labelled.filter((key) =>
+      String(messageAt(key)).toLowerCase().replace(PRODUCT_NAME, '').replace(SHIFT_TYPE_TERM, '').includes('smjen'),
+    );
+
+    expect(labelled.length).toBeGreaterThan(150);
+    expect(saying).toEqual([]);
+    // The labels the epic names: navigation and page title, the dialogs, the
+    // filters, the history's fields, print and the wizard's step.
+    expect(messageAt('smjene.heading')).toBe('Timovi');
+    expect(messageAt('smjene.addHeading')).toBe('Novi tim');
+    expect(messageAt('filter.team')).toBe('Tim');
+    expect(messageAt('history.field.team')).toBe('Tim');
+    expect(messageAt('print.ownNoTeam')).toBe('Moj raspored: {name} · bez tima');
+    expect(messageAt('onboarding.step.teams')).toBe('Timovi');
+    for (const key of TEAM_LABEL_KEYS) expect(messageAt(key), key).toBeTypeOf('string');
   });
 
   it('resolves a nested key path to its message and a wrong one to nothing', () => {

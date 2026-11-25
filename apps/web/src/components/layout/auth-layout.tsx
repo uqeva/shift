@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import { CalendarBlank } from '@/components/ui/icon';
+import { BrandMark } from '@/components/brand-mark';
 import { t } from '@/lib/i18n';
 
 /**
@@ -16,7 +16,8 @@ import { t } from '@/lib/i18n';
  * 16 px from the viewport like the desktop sidebar and as tall as the screen,
  * over the page's blobs: chrome BESIDE the content, never over it. Its text is
  * `foreground`-strength (DESIGN rule 2: muted text needs the .85 reading
- * alpha), and the tile is the ink pair of the default Button. No glow and no
+ * alpha), and the tile is Smjenko's mark (`brand-mark.tsx`, story 21.24) beside
+ * the name in the heading face at 600, the wordmark's weight. No glow and no
  * `blur-*`: the glass utility's fallbacks (the opaque card, or `Canvas` with a
  * `CanvasText` border) are the panel's.
  *
@@ -30,10 +31,8 @@ export function AuthLayout({ children }: { readonly children: ReactNode }) {
     <main className="flex flex-1">
       <div className="glass-chrome hidden w-[420px] shrink-0 flex-col rounded-3xl p-10 text-foreground lg:my-4 lg:ml-4 lg:flex">
         <div className="mb-12 flex items-center gap-3">
-          <span className="flex size-10 items-center justify-center rounded-lg bg-ink text-ink-foreground">
-            <CalendarBlank aria-hidden className="size-5" />
-          </span>
-          <p className="font-heading text-lg font-extrabold text-foreground">{t('auth.brand.name')}</p>
+          <BrandMark className="size-10" />
+          <p className="font-heading text-xl font-semibold text-foreground">{t('auth.brand.name')}</p>
         </div>
         <p className="mb-4 font-heading text-3xl font-extrabold leading-tight text-foreground">
           {t('auth.brand.headline')}

@@ -75,7 +75,7 @@ function row(id: number, overrides: Partial<HistoryRow> = {}): HistoryRow {
     id: String(id),
     time: '16.11.2026 09:05',
     author: 'Ana Anić',
-    kind: 'Smjena · promijenjeno',
+    kind: 'Tim · promijenjeno',
     subject: 'Ćiril Žužić, Smjena Č',
     reconstructed: false,
     marker: false,

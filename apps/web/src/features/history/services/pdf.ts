@@ -287,7 +287,9 @@ export function historyDocumentOf(model: HistoryExport) {
     pageOrientation: 'landscape',
     pageSize: 'A4',
     pageMargins: [...PAGE_MARGINS],
-    info: { title: model.title },
+    // Story 21.24: the creator is the product's name, so a PDF reader's
+    // properties say *Smjenko*, not only the writer library (the producer).
+    info: { title: model.title, creator: model.creator },
     defaultStyle: { font: HISTORY_PDF_FONT, fontSize: FONT_SIZE },
     footer: (page: number, pages: number) => ({
       text: model.pageText(page, pages),

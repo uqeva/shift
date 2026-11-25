@@ -93,7 +93,7 @@ describe('the team read', () => {
   });
 
   it('answers zero rows as an empty list, never as a refusal', async () => {
-    // An organization may run no teams at all; the screen says `0 smjena`.
+    // An organization may run no teams at all; the screen says `0 timova`.
     expect(await readTeams(tableAnswering({ data: [], error: null, count: 0 }))).toEqual({
       ok: true,
       teams: [],
@@ -204,23 +204,23 @@ describe('the list splits into active and archived, and any count is just a coun
 
 describe('the counts read in words, with the plural each count takes', () => {
   it.each([
-    [0, '0 smjena'],
-    [1, '1 smjena'],
-    [2, '2 smjene'],
-    [4, '4 smjene'],
-    [5, '5 smjena'],
-    [9, '9 smjena'],
-    [21, '21 smjena'],
-    [22, '22 smjene'],
+    [0, '0 timova'],
+    [1, '1 tim'],
+    [2, '2 tima'],
+    [4, '4 tima'],
+    [5, '5 timova'],
+    [9, '9 timova'],
+    [21, '21 tim'],
+    [22, '22 tima'],
   ])('renders %i teams as %s', (count, expected) => {
     expect(t('smjene.count', { count })).toBe(expected);
   });
 
   it.each([
-    [0, 'Arhivirano: 0 smjena'],
-    [1, 'Arhivirano: 1 smjena'],
-    [4, 'Arhivirano: 4 smjene'],
-    [9, 'Arhivirano: 9 smjena'],
+    [0, 'Arhivirano: 0 timova'],
+    [1, 'Arhivirano: 1 tim'],
+    [4, 'Arhivirano: 4 tima'],
+    [9, 'Arhivirano: 9 timova'],
   ])('renders %i archived teams as %s', (count, expected) => {
     expect(t('smjene.archivedCount', { count })).toBe(expected);
   });

@@ -236,7 +236,7 @@ describe('the roster refusals and notices, as the dialog says them', () => {
     reason: 'Upiši razlog, 1–200 znakova.',
     taken: 'Taj je član već u promjeni za ovu smjenu. Osvježi prikaz.',
     gone: 'Promjena je već uklonjena.',
-    archived: 'Smjena je u međuvremenu arhivirana. Osvježi prikaz.',
+    archived: 'Tim je u međuvremenu arhiviran. Osvježi prikaz.',
     denied: 'Ne možeš mijenjati sastav. Za to trebaš ovlasti administratora.',
     failed: 'Promjena nije uspjela. Pokušaj ponovno.',
   };

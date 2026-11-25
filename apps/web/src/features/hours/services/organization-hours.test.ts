@@ -278,7 +278,7 @@ describe('the rows', () => {
     expect(dora.shiftCount).toBe(0);
     expect(t('sati.organization.noTeam')).toBe('—');
     // C587: a screen reader hears a word, never "dash".
-    expect(t('sati.organization.noTeamWord')).toBe('bez smjene');
+    expect(t('sati.organization.noTeamWord')).toBe('bez tima');
     for (const team of viewOf(pilot, NO_LEAVE_RECORDS).teams) {
       expect(viewOf(pilot, NO_LEAVE_RECORDS, { mjesec: MONTH, smjena: team.id }).rows.map((row) => row.memberId)).not.toContain(DORA);
     }
@@ -646,10 +646,10 @@ describe('the matrix edges', () => {
     expect(hoursEmptyFactMessageKey(null)).toBe('filter.empty.noTeam');
     expect(
       t('filter.empty.notInTeam', { person: 'Luka Knežević', team: 'Smjena B', monthIn: t('filter.monthIn.10'), year: '2026' }),
-    ).toBe('Luka Knežević nije u smjeni Smjena B u listopadu 2026.');
-    expect(t('filter.empty.inTeam', { person: 'Luka Knežević', team: 'Smjena A' })).toBe('Luka Knežević je u smjeni Smjena A.');
+    ).toBe('Luka Knežević nije u timu Smjena B u listopadu 2026.');
+    expect(t('filter.empty.inTeam', { person: 'Luka Knežević', team: 'Smjena A' })).toBe('Luka Knežević je u timu Smjena A.');
     expect(t('filter.empty.noTeam', { person: 'Luka Knežević', monthIn: t('filter.monthIn.10'), year: '2026' })).toBe(
-      'Luka Knežević nije ni u jednoj smjeni u listopadu 2026.',
+      'Luka Knežević nije ni u jednom timu u listopadu 2026.',
     );
     expect(t('filter.empty.removeTeam', { team: 'Smjena B' })).toBe('Ukloni filtar: Smjena B');
 

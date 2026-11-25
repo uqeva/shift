@@ -272,10 +272,10 @@ describe('the messages', () => {
     await initLocalization();
 
     expect([1, 2, 5, 21].map((count) => t('rotation.builder.history.teamCount', { count }))).toEqual([
-      '1 smjena',
-      '2 smjene',
-      '5 smjena',
-      '21 smjena',
+      '1 tim',
+      '2 tima',
+      '5 timova',
+      '21 tim',
     ]);
   });
 });

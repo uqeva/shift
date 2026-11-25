@@ -108,6 +108,9 @@ describe('the Auth email templates (story 19.1)', () => {
       }[file];
       expect(env.get(variable), variable).toBe(`\${SHIFT_APP_URL:?}/${AUTH_EMAIL_DIRECTORY}/${file}`);
     }
+    // Story 21.24: GoTrue's display name is the product's, a fixed value in the compose.
+    expect(env.get('GOTRUE_SMTP_SENDER_NAME')).toBe(String((resource as { auth: { brand: { name: string } } }).auth.brand.name));
+    expect(env.get('GOTRUE_SMTP_SENDER_NAME')).toBe('Smjenko');
     const subjects = authEmailSubjects(resource);
     expect(Object.keys(subjects).length).toBe(3);
     for (const [variable, subject] of Object.entries(subjects)) {

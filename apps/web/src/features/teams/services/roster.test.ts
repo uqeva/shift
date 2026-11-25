@@ -397,12 +397,12 @@ describe('the caller\'s own team today', () => {
 
   it('says no team in words, never as a blank', () => {
     expect(ownTeamLineMessageKey(ownTeamLineOf(null))).toBe('smjene.membership.none');
-    expect(t(ownTeamLineMessageKey(ownTeamLineOf(null)))).toBe('Bez smjene');
+    expect(t(ownTeamLineMessageKey(ownTeamLineOf(null)))).toBe('Bez tima');
     expect(ownTeamLineOf({ id: 'a', name: 'Tim A' })).toEqual({ team: { id: 'a', name: 'Tim A' } });
     expect(ownTeamLineMessageKey(ownTeamLineOf({ id: 'a', name: 'Tim A' }))).toBe(
       'smjene.today.label',
     );
-    expect(t('smjene.today.label')).toBe('Tvoja smjena');
+    expect(t('smjene.today.label')).toBe('Tvoj tim');
   });
 
   it('refuses no session, an error, a rejection, zero or two rows, or a malformed row', async () => {

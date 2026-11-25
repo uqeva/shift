@@ -11,8 +11,10 @@ describe('plural', () => {
   it('picks the one, few and other forms Croatian uses', () => {
     expect(plural(hr.smjene.roster.count, 1)).toBe('1 osoba');
     expect(plural(hr.smjene.roster.count, 21)).toBe('21 osoba');
-    expect(plural(hr.smjene.archivedCount, 3)).toBe('Arhivirano: 3 smjene');
-    expect(plural(hr.smjene.archivedCount, 12)).toBe('Arhivirano: 12 smjena');
+    // Story 21.22: a team is *tim* — one, few and other.
+    expect(plural(hr.smjene.archivedCount, 21)).toBe('Arhivirano: 21 tim');
+    expect(plural(hr.smjene.archivedCount, 3)).toBe('Arhivirano: 3 tima');
+    expect(plural(hr.smjene.archivedCount, 12)).toBe('Arhivirano: 12 timova');
     expect(plural(hr.organization.hourBands.count, 5)).toBe('5 pojaseva');
     expect(plural(hr.smjene.roster.count, 0)).toBe('0 osoba');
   });

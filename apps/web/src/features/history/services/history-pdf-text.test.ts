@@ -101,7 +101,7 @@ function model(author: string): HistoryExport {
           id: '1',
           time: '16.11.2026 09:05',
           author,
-          kind: 'Smjena · promijenjeno',
+          kind: 'Tim · promijenjeno',
           subject: 'Smjena A',
           reconstructed: false,
           marker: false,

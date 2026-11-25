@@ -543,12 +543,12 @@ describe('the letters (story 3.2a)', () => {
 });
 
 describe("Moj raspored's sentence (deferred-work E822)", () => {
-  it("names the viewer's team for the month, and that the filters are Sve smjene's", () => {
+  it("names the viewer's team for the month, and that the filters belong to Svi timovi", () => {
     const month = calendarMonthOf(pilot, {}, TODAY);
     const team = pilot.teams.find((one) => one.id === pilot.viewer.memberships[0]!.teamId)!.name;
 
     expect(month.ownTeamName).toBe(team);
-    expect(t('kalendar.ownNote', { team })).toBe(`Tvoj raspored · ${team}. Filtri vrijede za „Sve smjene”.`);
+    expect(t('kalendar.ownNote', { team })).toBe(`Tvoj raspored · ${team}. Filtri vrijede za „Svi timovi”.`);
   });
 
   it('takes the team of the last active date, as the filter does: B after a move in the middle of the month', async () => {
@@ -560,12 +560,12 @@ describe("Moj raspored's sentence (deferred-work E822)", () => {
     expect(month.ownTeamName).toBe(moved.teams.find((one) => one.id === 'pilot-smjena-b')!.name);
   });
 
-  it('says what is true on no team: bez smjene', async () => {
+  it('says what is true on no team: bez tima', async () => {
     const none = await snapshotOf(PILOT, { viewers: [viewerRow([])] });
     const month = calendarMonthOf(none, {}, TODAY);
 
     expect(month.ownTeamName).toBeNull();
-    expect(t('kalendar.ownNoteNoTeam')).toBe('Tvoj raspored · bez smjene. Filtri vrijede za „Sve smjene”.');
+    expect(t('kalendar.ownNoteNoTeam')).toBe('Tvoj raspored · bez tima. Filtri vrijede za „Svi timovi”.');
   });
 });
 
@@ -1160,7 +1160,7 @@ describe('the person filter (story 3.3b)', () => {
       days: { ok: true, days: null, inactive: false },
     });
     expect(t(dayListEmptyMessageKey(false, true), { name: 'Toni Bezsmjene' })).toBe(
-      'Toni Bezsmjene ovaj mjesec nije ni u jednoj smjeni.',
+      'Toni Bezsmjene ovaj mjesec nije ni u jednom timu.',
     );
   });
 
@@ -1426,7 +1426,7 @@ describe('the roster as at a date (story 3.4a)', () => {
       expect(day.inactive, day.date).toBe(inactive);
       if (inactive) expect(t(dayEmptyMessageKey(day)), day.date).toBe('Neaktivno');
     }
-    expect(t(dayEmptyMessageKey({ inactive: false }))).toBe('Bez smjene');
+    expect(t(dayEmptyMessageKey({ inactive: false }))).toBe('Bez tima');
     const returned = calendarMonthOf(snapshot, { mjesec: '2026-09', osoba: RETURNED }, TODAY).person;
 
     if (returned === null || !returned.days.ok) throw new Error('no day list');
@@ -1443,7 +1443,7 @@ describe('the roster as at a date (story 3.4a)', () => {
     expect(t(dayListEmptyMessageKey(true, false))).toBe('Ovaj mjesec tvoj status je neaktivan.');
     // Before any membership, active: no team, as before.
     expect(calendarMonthOf(pilot, { mjesec: '2019-12' }, TODAY).days).toEqual({ ok: true, days: null, inactive: false });
-    expect(t(dayListEmptyMessageKey(false, false))).toBe('Nisi član nijedne smjene.');
+    expect(t(dayListEmptyMessageKey(false, false))).toBe('Nisi član nijednog tima.');
     expect(t(dayListEmptyMessageKey(true, true), { name: 'Ana Horvat' })).toBe('Osoba Ana Horvat ovaj mjesec nije aktivna.');
   });
 

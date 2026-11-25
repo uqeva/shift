@@ -54,7 +54,7 @@
       "error": "Odjava trenutačno nije moguća. Pokušaj ponovno."
     },
     "brand": {
-      "name": "Shift",
+      "name": "Smjenko",
       "headline": "Raspored kojem možeš vjerovati.",
       "subline": "Tko radi i kada, sati i godišnji odmor na jednom mjestu."
     }
@@ -109,7 +109,7 @@
       "leaveKicker": "Godišnji odmor",
       "leaveHint": "preostalo · iskorišteno {used} od {allowance}"
     },
-    "unscheduled": "Još nisi ni u jednoj smjeni, pa za tebe ne postoji raspored.",
+    "unscheduled": "Još nisi ni u jednom timu, pa za tebe ne postoji raspored.",
     "unavailable": "Danas trenutačno nije moguće učitati. Pokušaj ponovno.",
     "retry": "Pokušaj ponovno",
     "admin": {
@@ -123,7 +123,7 @@
         "duty": "Na dužnosti do {time}",
         "leave": "Danas imaš upisanu odsutnost",
         "free": "Danas ne radiš",
-        "unscheduled": "Nisi raspoređen ni u jednu smjenu."
+        "unscheduled": "Nisi raspoređen ni u jedan tim."
       },
       "needsYou": {
         "heading": "Treba tebe",
@@ -157,9 +157,9 @@
         "absentResolved": "{name} ima upisanu odsutnost · odlučeno",
         "full": "✓ puna smjena",
         "nobody": "Nitko nije raspoređen",
-        "none": "Danas nijedna smjena ne radi.",
-        "noTeam": "Još nema nijedne smjene.",
-        "noTeamNext": "Kad postaviš smjene i rotaciju, ovdje piše tko danas radi.",
+        "none": "Danas nijedan tim ne radi.",
+        "noTeam": "Još nema nijednog tima.",
+        "noTeamNext": "Kad postaviš timove i rotaciju, ovdje piše tko danas radi.",
         "off": "Slobodno: {teams}",
         "noRotation": "Bez rotacije: {teams}",
         "link": "Otvori kalendar smjena"
@@ -179,8 +179,8 @@
       },
       "week": {
         "heading": "Ovaj tjedan",
-        "region": "Ovaj tjedan po smjenama",
-        "team": "Smjena",
+        "region": "Ovaj tjedan po timovima",
+        "team": "Tim",
         "cellTimed": "{weekday} {date}, {team}, {type} {range}",
         "cell": "{weekday} {date}, {team}, {type}",
         "cellTimedConflict": "{weekday} {date}, {team}, {type} {range}, čeka odluku",
@@ -226,7 +226,7 @@
       "denied": "Ne možeš to učiniti sa zamjenom {day} · {team}.",
       "failed": "Zamjena {day} · {team} nije spremljena. Pokušaj ponovno.",
       "staleWithdraw": "Smjene su se u međuvremenu promijenile, pa se zamjena više ne može primijeniti; možeš je povući.",
-      "unknownTeam": "Nepoznata smjena"
+      "unknownTeam": "Nepoznat tim"
     }
   },
   "filter": {
@@ -234,28 +234,28 @@
     "open": "Filtri",
     "openActive": "Filtri, aktivno: {count}",
     "chip": {
-      "team": "Smjena: {value}",
-      "teamAll": "Smjena: sve",
+      "team": "Tim: {value}",
+      "teamAll": "Tim: svi",
       "person": "Osoba: {value}"
     },
     "remove": {
-      "team": "Ukloni filtar smjena: {value}",
+      "team": "Ukloni filtar timova: {value}",
       "person": "Ukloni filtar osoba: {value}"
     },
-    "teamPicker": "Odaberi smjenu",
+    "teamPicker": "Odaberi tim",
     "personPicker": "Odaberi osobu",
-    "allTeams": "Sve smjene ({count})",
+    "allTeams": "Svi timovi ({count})",
     "allPeople": "Sve osobe ({count})",
-    "teamGroup": "Smjene",
+    "teamGroup": "Timovi",
     "personCount": "{count, plural, one {# osoba} few {# osobe} other {# osoba}}",
-    "noTeam": "Bez smjene",
+    "noTeam": "Bez tima",
     "search": "Traži osobu ({count})",
     "matches": "{shown} od {total}",
     "summary": {
-      "all": "Prikazano: sve smjene ({teams}) · {people, plural, one {# osoba} few {# osobe} other {# osoba}}",
+      "all": "Prikazano: svi timovi ({teams}) · {people, plural, one {# osoba} few {# osobe} other {# osoba}}",
       "team": "Prikazano: {team} · {shown, plural, one {# osoba} few {# osobe} other {# osoba}} od {total}",
       "person": "Prikazano: {person} · {team}",
-      "personNoTeam": "Prikazano: {person} · Bez smjene",
+      "personNoTeam": "Prikazano: {person} · Bez tima",
       "both": "Prikazano: {team} i {person} · {shown, plural, one {# osoba} few {# osobe} other {# osoba}}"
     },
     "clear": "Poništi filtre",
@@ -264,17 +264,17 @@
     "noMatch": "Nema rezultata",
     "sheetTitle": "Filtri",
     "sheetClose": "Zatvori filtre",
-    "team": "Smjena",
+    "team": "Tim",
     "person": "Osoba",
-    "replaceNote": "U Kalendaru osoba zamjenjuje smjenu.",
+    "replaceNote": "U Kalendaru osoba zamjenjuje tim.",
     "teamReplaced": "Zamijenjeno osobom",
     "sheetReset": "Poništi",
     "sheetShow": "{count, plural, one {Prikaži # osobu} few {Prikaži # osobe} other {Prikaži # osoba}}",
     "empty": {
       "filtered": "Odabrani filtri ne prikazuju nijednu osobu.",
-      "notInTeam": "{person} nije u smjeni {team} {monthIn} {year}.",
-      "inTeam": "{person} je u smjeni {team}.",
-      "noTeam": "{person} nije ni u jednoj smjeni {monthIn} {year}.",
+      "notInTeam": "{person} nije u timu {team} {monthIn} {year}.",
+      "inTeam": "{person} je u timu {team}.",
+      "noTeam": "{person} nije ni u jednom timu {monthIn} {year}.",
       "removeTeam": "Ukloni filtar: {team}"
     },
     "monthIn": {
@@ -342,32 +342,32 @@
       "period": "Razdoblje: {value}",
       "member": "Osoba: {value}",
       "memberAll": "Osoba: sve",
-      "team": "Smjena: {value}",
-      "teamAll": "Smjena: sve",
+      "team": "Tim: {value}",
+      "teamAll": "Tim: svi",
       "kind": "Vrsta: {value}",
       "kindAll": "Vrsta: sve"
     },
     "remove": {
       "period": "Vrati razdoblje na zadnjih 30 dana: {value}",
       "member": "Ukloni filtar osoba: {value}",
-      "team": "Ukloni filtar smjena: {value}",
+      "team": "Ukloni filtar timova: {value}",
       "kind": "Ukloni filtar vrsta: {value}"
     },
     "picker": {
       "period": "Odaberi razdoblje",
       "member": "Odaberi osobu",
-      "team": "Odaberi smjenu",
+      "team": "Odaberi tim",
       "kind": "Odaberi vrstu"
     },
     "heading": {
       "period": "Razdoblje",
       "member": "Osoba",
-      "team": "Smjena",
+      "team": "Tim",
       "kind": "Vrsta"
     },
     "all": {
       "member": "Sve osobe",
-      "team": "Sve smjene",
+      "team": "Svi timovi",
       "kind": "Sve vrste"
     },
     "period": {
@@ -386,14 +386,14 @@
       "organization": "Organizacija",
       "member": "Osoba",
       "memberStatus": "Status osobe",
-      "teamMembership": "Smjena osobe",
-      "team": "Smjena",
+      "teamMembership": "Tim osobe",
+      "team": "Tim",
       "hourBand": "Satni pojas",
       "shiftType": "Tip smjene",
       "shiftTypeVersion": "Vrijeme tipa smjene",
       "rotationPattern": "Uzorak rotacije",
       "rotationStep": "Korak rotacije",
-      "rotationAssignment": "Rotacija smjene",
+      "rotationAssignment": "Rotacija tima",
       "shiftTypeOverride": "Promjena tipa smjene",
       "rosterOverride": "Zamjena osobe",
       "leaveRecord": "Odsutnost",
@@ -455,8 +455,8 @@
       "memberIn": "Ulazi",
       "proposer": "Predlaže",
       "addressee": "Prima",
-      "team": "Smjena",
-      "returnTeam": "Smjena povrata",
+      "team": "Tim",
+      "returnTeam": "Tim povrata",
       "active": "Aktivna",
       "position": "Položaj",
       "stepPosition": "Redni broj koraka",
@@ -510,7 +510,7 @@
       "no": "ne",
       "range": "{from} – {to}",
       "unknownMember": "Nepoznata osoba",
-      "unknownTeam": "Nepoznata smjena",
+      "unknownTeam": "Nepoznat tim",
       "unknownShiftType": "Nepoznat tip smjene",
       "unknownAbsenceType": "Nepoznata vrsta odsutnosti",
       "rotationStep": "Korak {position}: {name}",
@@ -541,23 +541,23 @@
     "nextYear": "Sljedeća godina",
     "columnDate": "Datum",
     "noRotation": "Bez rotacije",
-    "noTeams": "Nijedna smjena nije u upotrebi, pa kalendar nema što prikazati.",
-    "noTeamsWhy": "Raspored nastaje iz smjena, tipova smjena i rotacije.",
-    "noTeam": "Nisi član nijedne smjene.",
-    "ownNote": "Tvoj raspored · {team}. Filtri vrijede za „Sve smjene”.",
-    "ownNoteNoTeam": "Tvoj raspored · bez smjene. Filtri vrijede za „Sve smjene”.",
+    "noTeams": "Nijedan tim nije u upotrebi, pa kalendar nema što prikazati.",
+    "noTeamsWhy": "Raspored nastaje iz timova, tipova smjena i rotacije.",
+    "noTeam": "Nisi član nijednog tima.",
+    "ownNote": "Tvoj raspored · {team}. Filtri vrijede za „Svi timovi”.",
+    "ownNoteNoTeam": "Tvoj raspored · bez tima. Filtri vrijede za „Svi timovi”.",
     "inactive": "Ovaj mjesec tvoj status je neaktivan.",
     "day": {
-      "noTeam": "Bez smjene",
+      "noTeam": "Bez tima",
       "inactive": "Neaktivno"
     },
     "mode": {
       "label": "Prikaz kalendara",
       "moj": "Moj raspored",
-      "sve": "Sve smjene"
+      "sve": "Svi timovi"
     },
     "person": {
-      "noTeam": "{name} ovaj mjesec nije ni u jednoj smjeni.",
+      "noTeam": "{name} ovaj mjesec nije ni u jednom timu.",
       "inactive": "Osoba {name} ovaj mjesec nije aktivna."
     },
     "legend": "Oznake",
@@ -610,7 +610,7 @@
           "saving": "Spremanje…",
           "cancel": "Odustani",
           "close": "Zatvori promjenu sastava",
-          "noTeam": "bez smjene",
+          "noTeam": "bez tima",
           "overlap": "{name} tada već radi: {team}, {day} {range}. Ti bi se sati brojali dvaput."
         },
         "remove": {
@@ -627,7 +627,7 @@
           "reason": "Upiši razlog, 1–200 znakova.",
           "taken": "Taj je član već u promjeni za ovu smjenu. Osvježi prikaz.",
           "gone": "Promjena je već uklonjena.",
-          "archived": "Smjena je u međuvremenu arhivirana. Osvježi prikaz.",
+          "archived": "Tim je u međuvremenu arhiviran. Osvježi prikaz.",
           "notOffered": "Sastav ovog dana više se ne može mijenjati. Prikazan je dan kakav je sada.",
           "denied": "Ne možeš mijenjati sastav. Za to trebaš ovlasti administratora.",
           "failed": "Promjena nije uspjela. Pokušaj ponovno."
@@ -683,7 +683,7 @@
           "taken": "Za taj dan već postoji izmjena. Osvježi prikaz.",
           "notOffered": "Tip smjene ovog dana više se ne može mijenjati. Prikazan je dan kakav je sada.",
           "gone": "Izmjena je već uklonjena.",
-          "archived": "Smjena ili tip smjene je u međuvremenu arhiviran. Osvježi prikaz.",
+          "archived": "Tim ili tip smjene je u međuvremenu arhiviran. Osvježi prikaz.",
           "denied": "Ne možeš mijenjati izmjene. Za to trebaš ovlasti administratora.",
           "failed": "Promjena nije uspjela. Pokušaj ponovno."
         },
@@ -787,7 +787,7 @@
       "caption": "Godišnji odmor osoba aktivnih danas u tekućoj godini",
       "search": "Traži osobu",
       "person": "Osoba",
-      "team": "Smjena",
+      "team": "Tim",
       "allowance": "Pravo",
       "carried": "Preneseno",
       "carriedCell": {
@@ -797,7 +797,7 @@
       },
       "used": "Iskorišteno",
       "balance": "Preostalo",
-      "noTeam": "Bez smjene",
+      "noTeam": "Bez tima",
       "summary": "Prikazano: {count, plural, one {# osoba} few {# osobe} other {# osoba}} · {records, plural, one {upisana # odsutnost} few {upisane # odsutnosti} other {upisano # odsutnosti}} · iskorišteno ukupno {used, plural, one {# dan} few {# dana} other {# dana}} od {allowance}",
       "summaryCarried": "Prikazano: {count, plural, one {# osoba} few {# osobe} other {# osoba}} · {records, plural, one {upisana # odsutnost} few {upisane # odsutnosti} other {upisano # odsutnosti}} · iskorišteno ukupno {used, plural, one {# dan} few {# dana} other {# dana}} od {allowance} · preneseno ukupno {carried, plural, one {# dan} few {# dana} other {# dana}}",
       "stateChip": "Stanje: {value}",
@@ -965,7 +965,7 @@
       "denied": "Nemaš ovlasti odlučiti o ovoj zamjeni.",
       "memberInactive": "Netko od članova nije aktivan na datum zamjene. Odobrenje nije moguće, a zamjenu možeš odbiti.",
       "taken": "Raspored te smjene je u međuvremenu promijenjen. Odobrenje nije moguće, a zamjenu možeš odbiti.",
-      "archived": "Smjena ove zamjene je arhivirana. Odobrenje nije moguće, a zamjenu možeš odbiti.",
+      "archived": "Tim ove zamjene je arhiviran. Odobrenje nije moguće, a zamjenu možeš odbiti.",
       "failed": "Odluku nije bilo moguće spremiti. Pokušaj ponovno.",
       "unchecked": "Ne mogu provjeriti što bi zamjena uklonila s popisa Za odluku.",
       "retry": "Pokušaj ponovno",
@@ -1092,13 +1092,13 @@
     "organization": {
       "caption": "Sati svih osoba: {month} {year}",
       "member": "Osoba",
-      "team": "Smjena",
+      "team": "Tim",
       "shifts": "Smjene",
       "total": "Ukupno",
       "footer": "Ukupno za prikazane osobe",
       "conflicts": "Čeka odluku",
       "noTeam": "—",
-      "noTeamWord": "bez smjene",
+      "noTeamWord": "bez tima",
       "emptyMonth": "U ovom mjesecu nema nijedne osobe.",
       "export": {
         "days": "{name} (dani)",
@@ -1114,13 +1114,13 @@
   "ljudi": {
     "lede": "Osobe u organizaciji, njihove razine ovlasti i dani godišnjeg odmora.",
     "directory": {
-      "lede": "Tko je u kojoj smjeni.",
+      "lede": "Tko je u kojem timu.",
       "search": "Traži osobu",
-      "own": "tvoja smjena",
-      "noMatch": "Nijedna osoba u smjenama nema to ime.",
+      "own": "tvoj tim",
+      "noMatch": "Nijedna osoba u timovima nema to ime.",
       "clear": "Poništi pretragu",
-      "noTeams": "Organizacija nema nijednu aktivnu smjenu.",
-      "unavailable": "Popis smjena trenutačno nije moguće učitati. Pokušaj ponovno.",
+      "noTeams": "Organizacija nema nijedan aktivan tim.",
+      "unavailable": "Popis timova trenutačno nije moguće učitati. Pokušaj ponovno.",
       "retry": "Pokušaj ponovno"
     },
     "caption": "Popis osoba u organizaciji",
@@ -1201,7 +1201,7 @@
       "save": "Spremi",
       "cancel": "Odustani",
       "createdFor": "Račun je izrađen: {name} · {username}",
-      "noTeam": "Osoba je bez smjene. Smjenu joj dodjeljuješ na njezinoj stranici.",
+      "noTeam": "Osoba je bez tima. Tim joj dodjeljuješ na njezinoj stranici.",
       "saved": "Promjene su spremljene.",
       "credential": "Početna lozinka",
       "credentialOnce": "Zapiši lozinku. Poslije nije moguće ponovno je prikazati. Kod prve prijave osoba postavlja svoju lozinku.",
@@ -1708,17 +1708,17 @@
       "nonWorkingStepsLabel": "Slobodnih koraka",
       "cycleHoursLabel": "Sati po ciklusu",
       "cycleHoursUnknown": "Nepoznato: radni tip bez vremena",
-      "offsetsHeading": "Smjene i pomaci",
+      "offsetsHeading": "Timovi i pomaci",
       "anchor": "Referentni datum",
-      "anchorNote": "Zajednički za sve smjene. Pomak je korak na kojem je smjena na referentni datum.",
+      "anchorNote": "Zajednički za sve timove. Pomak je korak na kojem je tim na referentni datum.",
       "effectiveFrom": "Vrijedi od",
       "howTitle": "Kako to funkcionira?",
-      "howBody": "Na referentni datum svaka smjena stoji na svom pomaku, odnosno koraku uzorka. Od tog dana sve smjene prolaze kroz uzorak, jedan korak po danu.",
-      "columnTeam": "Smjena",
+      "howBody": "Na referentni datum svaki tim stoji na svom pomaku, odnosno koraku uzorka. Od tog dana svi timovi prolaze kroz uzorak, jedan korak po danu.",
+      "columnTeam": "Tim",
       "columnOffset": "Pomak",
       "columnOnAnchor": "Na referentni datum",
       "spread": "Rasporedi ravnomjerno",
-      "offsetOf": "Pomak smjene {name}",
+      "offsetOf": "Pomak tima {name}",
       "stepOption": "Korak {position}: {name}",
       "offsetsEmpty": "Pomak se bira nakon prvog koraka.",
       "previewHeading": "Pregled ciklusa",
@@ -1739,10 +1739,10 @@
       "saved": "Rotacija je spremljena.",
       "warnings": {
         "summary": "{count, plural, one {# upozorenje} few {# upozorenja} other {# upozorenja}} za sljedeći ciklus:",
-        "coverageGap": "{count, plural, one {# dan} few {# dana} other {# dana}} u sljedećem ciklusu s radnim tipom na kojem nije nijedna smjena:",
-        "duplicateCoverage": "{count, plural, one {# dan} few {# dana} other {# dana}} u sljedećem ciklusu s dvije ili više smjena na istom tipu:",
+        "coverageGap": "{count, plural, one {# dan} few {# dana} other {# dana}} u sljedećem ciklusu s radnim tipom na kojem nije nijedan tim:",
+        "duplicateCoverage": "{count, plural, one {# dan} few {# dana} other {# dana}} u sljedećem ciklusu s dva ili više timova na istom tipu:",
         "date": "{date}: {types}",
-        "doubledType": "{type} ({count, plural, one {# smjena} few {# smjene} other {# smjena}}: {teams})",
+        "doubledType": "{type} ({count, plural, one {# tim} few {# tima} other {# timova}}: {teams})",
         "restGap": "{duration} rada bez slobodnog dana između ({types})",
         "restGapUnknown": "Rad bez slobodnog dana između ({types}), trajanje nepoznato",
         "restGapEndless": "Uzorak je bez slobodnog dana: {duration} rada u svakom ciklusu ({types})",
@@ -1821,7 +1821,7 @@
         "refused": {
           "denied": "Ne možeš mijenjati izmjene. Za to trebaš ovlasti administratora.",
           "gone": "Izmjena je već pregledana ili uklonjena. Prikaz je osvježen.",
-          "archived": "Smjena ili tip smjene je arhiviran. Osvježi prikaz.",
+          "archived": "Tim ili tip smjene je arhiviran. Osvježi prikaz.",
           "changed": "Rotacija je u međuvremenu promijenjena. Prikaz je osvježen, pregledaj izmjenu ponovno.",
           "reason": "Upiši razlog, 1–200 znakova.",
           "sameAsProjected": "To je već tip smjene prema rotaciji.",
@@ -1873,9 +1873,9 @@
         "columnStatus": "Status",
         "columnAuthor": "Spremio",
         "columnSaved": "Spremljeno",
-        "columnTeams": "Smjene",
+        "columnTeams": "Timovi",
         "savedAt": "{date} u {time}",
-        "teamCount": "{count, plural, one {# smjena} few {# smjene} other {# smjena}}",
+        "teamCount": "{count, plural, one {# tim} few {# tima} other {# timova}}",
         "unknownAuthor": "Nepoznata osoba",
         "status": {
           "scheduled": "zakazano",
@@ -1904,7 +1904,7 @@
         "unavailable": "Rotaciju trenutačno nije moguće učitati. Pokušaj ponovno.",
         "retry": "Pokušaj ponovno",
         "empty": "Uzorak mora imati barem jedan korak.",
-        "noTeams": "Za rotaciju je potrebna barem jedna smjena u upotrebi.",
+        "noTeams": "Za rotaciju je potreban barem jedan tim u upotrebi.",
         "scheduled": "Promjena rotacije već je zakazana za kasniji datum, pa rotaciju sada nije moguće spremiti. Poništi zakazanu promjenu pa spremi ponovno.",
         "effectiveUnchosen": "Odaberi datum od kojeg rotacija vrijedi.",
         "effectivePast": "Rotacija ne može vrijediti od datuma prije današnjeg. Odaberi današnji ili kasniji datum.",
@@ -1914,7 +1914,7 @@
         "changedToday": "Rotacija je danas već promijenjena. Sljedeća promjena moguća je od sutra.",
         "refused": "Promjena nije spremljena. Odjavi se i prijavi ponovno.",
         "saveUnavailable": "Spremanje trenutačno nije moguće. Pokušaj ponovno.",
-        "nothingChanged": "Rotacija nijedne smjene nije promijenjena."
+        "nothingChanged": "Rotacija nijednog tima nije promijenjena."
       }
     }
   },
@@ -1941,7 +1941,7 @@
       "sati": "Sati svih osoba po mjesecu, izvoz u Excel",
       "godisnji": "Godišnji odmori i stanja dana",
       "zaOdluku": "Stavke koje čekaju odluku",
-      "ljudi": "Osobe i njihove smjene",
+      "ljudi": "Osobe i njihovi timovi",
       "povijestPromjena": "Tko je što promijenio i kada",
       "postavkeRotacije": "Tipovi smjena, uzorak, pomaci",
       "organizacija": "Naziv, godina godišnjeg, satni pojasevi"
@@ -1972,97 +1972,97 @@
     "signInNeedsConnection": "Za prijavu je potrebna veza."
   },
   "smjene": {
-    "heading": "Smjene",
-    "lede": "Ekipe koje rade zajedno. Osoba je u jednoj smjeni, od datuma koji joj je zadan.",
-    "empty": "Još nema nijedne smjene.",
-    "emptyNext": "Raspored se crta po smjenama, pa bez njih kalendar nema što prikazati.",
-    "open": "Nova smjena",
-    "addHeading": "Nova smjena",
+    "heading": "Timovi",
+    "lede": "Ljudi koji rade zajedno, po istom rasporedu. Osoba je u jednom timu, od datuma koji joj je zadan.",
+    "empty": "Još nema nijednog tima.",
+    "emptyNext": "Raspored se crta po timovima, pa bez njih kalendar nema što prikazati.",
+    "open": "Novi tim",
+    "addHeading": "Novi tim",
     "close": "Zatvori",
     "cancel": "Odustani",
     "actions": "Radnje",
     "archiveShort": "Arhiviraj",
-    "count": "{count, plural, one {# smjena} few {# smjene} other {# smjena}}",
-    "archivedCount": "{count, plural, one {Arhivirano: # smjena} few {Arhivirano: # smjene} other {Arhivirano: # smjena}}",
+    "count": "{count, plural, one {# tim} few {# tima} other {# timova}}",
+    "archivedCount": "{count, plural, one {Arhivirano: # tim} few {Arhivirano: # tima} other {Arhivirano: # timova}}",
     "activeHeading": "U upotrebi",
-    "name": "Naziv smjene",
-    "add": "Dodaj smjenu",
-    "created": "Smjena je dodana.",
-    "edit": "Uredi smjenu {name}",
-    "view": "Prikaži smjenu {name}",
-    "editHeading": "Uređivanje smjene",
-    "viewHeading": "Arhivirana smjena",
+    "name": "Naziv tima",
+    "add": "Dodaj tim",
+    "created": "Tim je dodan.",
+    "edit": "Uredi tim {name}",
+    "view": "Prikaži tim {name}",
+    "editHeading": "Uređivanje tima",
+    "viewHeading": "Arhivirani tim",
     "save": "Spremi",
     "saved": "Naziv je spremljen.",
-    "archivedDone": "Smjena je arhivirana.",
-    "archive": "Arhiviraj smjenu {name}",
-    "archivePrompt": "Smjena {name} bit će arhivirana. Arhiviranu smjenu nije moguće preimenovati ni vratiti u upotrebu.",
-    "archiveConfirm": "Potvrdi arhiviranje smjene {name}",
+    "archivedDone": "Tim je arhiviran.",
+    "archive": "Arhiviraj tim {name}",
+    "archivePrompt": "Tim {name} bit će arhiviran. Arhivirani tim nije moguće preimenovati ni vratiti u upotrebu.",
+    "archiveConfirm": "Potvrdi arhiviranje tima {name}",
     "archiveCancel": "Odustani od arhiviranja",
-    "archivedNote": "Ova smjena je arhivirana i ne može se mijenjati.",
+    "archivedNote": "Ovaj tim je arhiviran i ne može se mijenjati.",
     "error": {
-      "unavailable": "Popis smjena trenutačno nije moguće učitati. Pokušaj ponovno.",
+      "unavailable": "Popis timova trenutačno nije moguće učitati. Pokušaj ponovno.",
       "retry": "Pokušaj ponovno",
-      "empty": "Naziv smjene ne može biti prazan.",
-      "tooLong": "Naziv smjene može imati najviše 100 znakova.",
-      "control": "Naziv smjene mora biti u jednom retku, bez skrivenih znakova poput prijeloma retka.",
-      "taken": "Smjena s tim nazivom već postoji u organizaciji.",
-      "stale": "Smjena se u međuvremenu promijenila. Provjeri je i pokušaj ponovno.",
+      "empty": "Naziv tima ne može biti prazan.",
+      "tooLong": "Naziv tima može imati najviše 100 znakova.",
+      "control": "Naziv tima mora biti u jednom retku, bez skrivenih znakova poput prijeloma retka.",
+      "taken": "Tim s istim nazivom već postoji u organizaciji.",
+      "stale": "Tim se u međuvremenu promijenio. Provjeri ga i pokušaj ponovno.",
       "refused": "Promjena nije spremljena. Odjavi se i prijavi ponovno.",
       "invalid": "Unesena vrijednost nije dopuštena.",
       "saveUnavailable": "Spremanje trenutačno nije moguće. Pokušaj ponovno.",
-      "unknown": "Ova smjena ne postoji u organizaciji.",
-      "inUse": "Smjenu nije moguće arhivirati dok je netko u njoj ili je u nju zakazan. Premjesti te osobe u drugu smjenu ili je arhiviraj kad u njoj više nikoga nema.",
+      "unknown": "Ovaj tim ne postoji u organizaciji.",
+      "inUse": "Tim nije moguće arhivirati dok je netko u njemu ili je u njega zakazan. Premjesti te osobe u drugi tim ili ga arhiviraj kad u njemu više nikoga nema.",
       "lentTo": "Tim nije moguće arhivirati dok mu je netko posuđen danas ili kasnije. Skrati ili ukloni te posudbe, pa ga arhiviraj."
     },
     "membership": {
-      "column": "Smjena",
-      "none": "Bez smjene",
-      "allTeams": "Sve smjene",
-      "current": "Smjena: {team}",
-      "currentPosition": "Smjena: {team}, položaj: {position}",
-      "scheduled": "Od {date} osoba će biti u smjeni {team}.",
-      "scheduledPosition": "Od {date} osoba će biti u smjeni {team}, položaj: {position}.",
-      "scheduledPositionOnly": "Od {date} osoba će u smjeni {team} imati položaj: {position}.",
-      "scheduledChange": "Od {date} zakazana je promjena u smjeni {team}.",
-      "scheduledNone": "Od {date} osoba će biti bez smjene.",
+      "column": "Tim",
+      "none": "Bez tima",
+      "allTeams": "Svi timovi",
+      "current": "Tim: {team}",
+      "currentPosition": "Tim: {team}, položaj: {position}",
+      "scheduled": "Od {date} osoba će biti u timu {team}.",
+      "scheduledPosition": "Od {date} osoba će biti u timu {team}, položaj: {position}.",
+      "scheduledPositionOnly": "Od {date} osoba će u timu {team} imati položaj: {position}.",
+      "scheduledChange": "Od {date} zakazana je promjena u timu {team}.",
+      "scheduledNone": "Od {date} osoba će biti bez tima.",
       "markerMove": "Od {date}: {team}",
-      "markerNone": "Od {date}: bez smjene",
+      "markerNone": "Od {date}: bez tima",
       "markerChange": "Od {date}: novi položaj",
-      "team": "Nova smjena",
-      "choose": "Odaberi smjenu",
-      "currentChoice": "{team} · sadašnja",
+      "team": "Novi tim",
+      "choose": "Odaberi tim",
+      "currentChoice": "{team} · sadašnji",
       "date": "Vrijedi od",
       "changes": "Što se mijenja",
       "lastIn": "Zadnja u {team} · {weekday} {date} · {type} · {range}",
       "lastInNoRange": "Zadnja u {team} · {weekday} {date} · {type}",
       "firstIn": "Prva u {team} · {weekday} {date} · {type} · {range}",
       "firstInNoRange": "Prva u {team} · {weekday} {date} · {type}",
-      "move": "Promijeni smjenu osobe {name}",
+      "move": "Promijeni tim osobe {name}",
       "change": "Promijeni",
-      "dialogHeading": "Promijeni smjenu",
+      "dialogHeading": "Promijeni tim",
       "now": "{name} · sada {team}",
       "nowPosition": "{name} · sada {team}, {position}",
-      "nowNone": "{name} · sada bez smjene",
-      "moveConfirm": "Potvrdi promjenu smjene osobe {name}",
-      "withdraw": "Poništi zakazanu promjenu smjene za osobu {name}",
-      "withdrawPrompt": "Zakazana promjena smjene osobe {name} od {date} bit će poništena.",
-      "withdrawConfirm": "Potvrdi poništavanje promjene smjene za osobu {name}",
-      "cancel": "Odustani od promjene smjene",
+      "nowNone": "{name} · sada bez tima",
+      "moveConfirm": "Potvrdi promjenu tima osobe {name}",
+      "withdraw": "Poništi zakazanu promjenu tima za osobu {name}",
+      "withdrawPrompt": "Zakazana promjena tima osobe {name} od {date} bit će poništena.",
+      "withdrawConfirm": "Potvrdi poništavanje promjene tima za osobu {name}",
+      "cancel": "Odustani od promjene tima",
       "save": "Spremi",
-      "saved": "Promjena smjene je spremljena.",
+      "saved": "Promjena tima je spremljena.",
       "error": {
-        "past": "Datum promjene smjene ne smije biti u prošlosti.",
-        "taken": "Za taj datum već postoji promjena smjene. Odaberi drugi datum.",
-        "order": "Datum mora biti nakon zadnje promjene smjene.",
-        "unchanged": "Osoba je već u toj smjeni. Odaberi drugu smjenu.",
-        "positionUnchanged": "Osoba je već u toj smjeni na tom položaju. Odaberi drugu smjenu ili drugi položaj.",
-        "positionRequired": "Odaberi položaj osobe u smjeni. Postavke organizacije su se možda promijenile, pa ih provjeri i pokušaj ponovno.",
-        "scheduled": "Promjena smjene već je zakazana. Najprije je poništi.",
-        "inEffect": "Promjena smjene je već na snazi i ne može se poništiti.",
-        "archived": "Ta smjena je arhivirana. Odaberi smjenu u upotrebi.",
-        "stale": "Smjena osobe se u međuvremenu promijenila. Provjeri je i pokušaj ponovno.",
-        "unpicked": "Odaberi smjenu."
+        "past": "Datum promjene tima ne smije biti u prošlosti.",
+        "taken": "Za taj datum već postoji promjena tima. Odaberi drugi datum.",
+        "order": "Datum mora biti nakon zadnje promjene tima.",
+        "unchanged": "Osoba je već u tom timu. Odaberi drugi tim.",
+        "positionUnchanged": "Osoba je već u tom timu na tom položaju. Odaberi drugi tim ili drugi položaj.",
+        "positionRequired": "Odaberi položaj osobe u timu. Postavke organizacije su se možda promijenile, pa ih provjeri i pokušaj ponovno.",
+        "scheduled": "Promjena tima već je zakazana. Najprije je poništi.",
+        "inEffect": "Promjena tima je već na snazi i ne može se poništiti.",
+        "archived": "Taj tim je arhiviran. Odaberi tim u upotrebi.",
+        "stale": "Tim osobe se u međuvremenu promijenio. Provjeri ga i pokušaj ponovno.",
+        "unpicked": "Odaberi tim."
       }
     },
     "position": {
@@ -2074,18 +2074,18 @@
     },
     "roster": {
       "count": "{count, plural, one {# osoba} few {# osobe} other {# osoba}}",
-      "archived": "Ova smjena je arhivirana.",
+      "archived": "Ovaj tim je arhiviran.",
       "back": "Vrati se na Danas",
       "withRank": "{name} · {rank}",
       "rankUnknown": "nepoznat čin",
       "withPosition": "{name} · {position}",
       "withRankAndPosition": "{name} · {rank} · {position}",
       "error": {
-        "unavailable": "Popis osoba u smjeni trenutačno nije moguće učitati. Pokušaj ponovno."
+        "unavailable": "Popis osoba u timu trenutačno nije moguće učitati. Pokušaj ponovno."
       }
     },
     "today": {
-      "label": "Tvoja smjena"
+      "label": "Tvoj tim"
     }
   },
   "sort": {
@@ -2382,7 +2382,7 @@
     "action": "Ispiši",
     "title": "Raspored · {month} {year}",
     "own": "Moj raspored: {name} · {team}",
-    "ownNoTeam": "Moj raspored: {name} · bez smjene",
+    "ownNoTeam": "Moj raspored: {name} · bez tima",
     "printedAt": "Ispisano: {date} u {time}"
   },
   "feed": {
@@ -2420,7 +2420,7 @@
       "step2": "Otvori calendar.google.com u pregledniku: aplikacija Google kalendar na mobitelu ne može dodati kalendar po poveznici.",
       "step3": "Kod Ostali kalendari pritisni +, pa Iz URL-a.",
       "step4": "Zalijepi poveznicu i pritisni Dodaj kalendar.",
-      "step5": "U aplikaciji se zatim pojavi kalendar Shift. Ako ga ne vidiš, u postavkama aplikacije uključi njegovu sinkronizaciju."
+      "step5": "U aplikaciji se zatim pojavi kalendar Smjenko. Ako ga ne vidiš, u postavkama aplikacije uključi njegovu sinkronizaciju."
     },
     "apple": {
       "heading": "Apple kalendar (iPhone)",
@@ -2428,7 +2428,7 @@
       "step1": "Na iPhoneu pritisni Dodaj u Apple kalendar i potvrdi s Pretplati se.",
       "step2": "Ili otvori Postavke → Kalendar → Računi → Dodaj račun → Ostalo → Dodaj pretplaćeni kalendar i zalijepi poveznicu."
     },
-    "googleLag": "Google kalendar osvježava pretplate rjeđe — promjene se mogu pojaviti i do dan kasnije. Shift je uvijek točan.",
+    "googleLag": "Google kalendar osvježava pretplate rjeđe — promjene se mogu pojaviti i do dan kasnije. Smjenko je uvijek točan.",
     "omits": "Kalendar sadrži samo dane kad radiš, s početkom i krajem. Ne sadrži godišnji odmor ni druge odsutnosti, ni druge osobe.",
     "regenerate": "Izradi novu poveznicu",
     "regeneratePrompt": "Izraditi novu poveznicu? Stara poveznica odmah prestaje raditi, a kalendar koji je koristi više se ne osvježava.",
@@ -2465,23 +2465,23 @@
   "signup": {
     "email": {
       "confirmation": {
-        "subject": "Potvrdi adresu e-pošte za Shift",
+        "subject": "Potvrdi adresu e-pošte za Smjenko",
         "heading": "Potvrdi adresu e-pošte",
-        "body": "Ovom adresom otvoren je račun u Shiftu. Ako je zahtjev tvoj, potvrdi adresu i nastavi s postavljanjem organizacije.",
+        "body": "Ovom adresom otvoren je račun u Smjenku. Ako je zahtjev tvoj, potvrdi adresu i nastavi s postavljanjem organizacije.",
         "action": "Potvrdi adresu",
         "ignore": "Ako zahtjev nije tvoj, zanemari ovu poruku. Bez potvrde račun se ne može koristiti."
       },
       "recovery": {
-        "subject": "Nova lozinka za Shift",
+        "subject": "Nova lozinka za Smjenko",
         "heading": "Postavi novu lozinku",
-        "body": "Za račun u Shiftu s ovom adresom zatražena je nova lozinka.",
+        "body": "Za račun u Smjenku s ovom adresom zatražena je nova lozinka.",
         "action": "Postavi novu lozinku",
         "ignore": "Ako zahtjev nije tvoj, zanemari ovu poruku. Lozinka ostaje ista."
       },
       "emailChange": {
-        "subject": "Potvrdi novu adresu e-pošte za Shift",
+        "subject": "Potvrdi novu adresu e-pošte za Smjenko",
         "heading": "Potvrdi novu adresu e-pošte",
-        "body": "Za račun u Shiftu zatražena je promjena adrese e-pošte na ovu adresu.",
+        "body": "Za račun u Smjenku zatražena je promjena adrese e-pošte na ovu adresu.",
         "action": "Potvrdi novu adresu",
         "ignore": "Ako zahtjev nije tvoj, zanemari ovu poruku. Adresa ostaje ista."
       },
@@ -2491,7 +2491,7 @@
     "heading": "Nova organizacija",
     "lede": "Registracijom stvaraš novu organizaciju u kojoj si administrator.",
     "member": {
-      "heading": "Tvoja organizacija već koristi Shift?",
+      "heading": "Tvoja organizacija već koristi Smjenko?",
       "body": "Ne registriraj se. Korisničko ime i lozinku dobivaš od svog administratora."
     },
     "form": {
@@ -2701,7 +2701,7 @@
     "step": {
       "organization": "Organizacija",
       "hourBands": "Satni pojasi",
-      "teams": "Smjene",
+      "teams": "Timovi",
       "shiftTypes": "Tipovi smjena",
       "rotation": "Rotacija",
       "members": "Ljudi",
@@ -2718,9 +2718,9 @@
       "example": "Primjer: dva pojasa, jedan od 06:00 i drugi od 20:00, dijele dan na dva razdoblja. Jedan pojas pokriva cijeli dan."
     },
     "teams": {
-      "lede": "Ekipe koje rade zajedno. Svaka osoba je u jednoj od njih, od datuma koji joj je zadan.",
-      "explainerTitle": "Što je smjena?",
-      "explainerBody": "Smjena je ekipa ljudi koja radi po istom rasporedu. Nazovi ih kako ih zovete vi; broj smjena je tvoj.",
+      "lede": "Ljudi koji rade zajedno, po istom rasporedu. Svaka osoba je u jednom timu, od datuma koji joj je zadan.",
+      "explainerTitle": "Što je tim?",
+      "explainerBody": "Tim su ljudi koji rade po istom rasporedu. Nazovi timove kako ih zovete vi; broj timova je tvoj.",
       "example": "Primjer: „Ekipa 1”, „Sjever”, „Tim B”."
     },
     "shiftTypes": {
@@ -2730,25 +2730,25 @@
       "example": "Primjer: radni „Jutarnja” 06:00–14:00 i neradni „Odmor”."
     },
     "rotation": {
-      "lede": "Uzorak tipova smjena koji se ponavlja, i pomak svake smjene u njemu.",
+      "lede": "Uzorak tipova smjena koji se ponavlja, i pomak svakog tima u njemu.",
       "explainerTitle": "Kako radi rotacija?",
-      "explainerBody": "Uzorak je niz tipova smjena, dan po dan, koji se ponavlja. Svaka smjena prolazi isti uzorak, pomaknuta za nekoliko dana. Prije spremanja vidiš sljedeći ciklus i pokrivenost svakog dana.",
-      "example": "Primjer: uzorak od tri koraka i tri smjene s pomacima 1, 2 i 3 daje svaki dan točno jednu smjenu na svakom koraku.",
+      "explainerBody": "Uzorak je niz tipova smjena, dan po dan, koji se ponavlja. Svaki tim prolazi isti uzorak, pomaknut za nekoliko dana. Prije spremanja vidiš sljedeći ciklus i pokrivenost svakog dana.",
+      "example": "Primjer: uzorak od tri koraka i tri tima s pomacima 1, 2 i 3 daje svaki dan točno jedan tim na svakom koraku.",
       "missing": "Za rotaciju još nedostaje:",
-      "missingTeam": "barem jedna smjena u upotrebi",
+      "missingTeam": "barem jedan tim u upotrebi",
       "missingWorkingType": "barem jedan radni tip smjene",
       "missingLink": "Korak {n}: {step}",
       "missingNote": "Kad to postaviš, ovdje slažeš uzorak.",
       "typesHeading": "Tipovi smjena",
       "typesCount": "{count, plural, one {# tip smjene u upotrebi} few {# tipa smjene u upotrebi} other {# tipova smjena u upotrebi}}",
       "typesNote": "Tipove smjena dodaješ i mijenjaš u koraku 4.",
-      "unavailable": "Smjene ili tipove smjena trenutačno nije moguće učitati, pa se ne vidi što rotaciji nedostaje."
+      "unavailable": "Timove ili tipove smjena trenutačno nije moguće učitati, pa se ne vidi što rotaciji nedostaje."
     },
     "members": {
       "lede": "Osobe koje se prijavljuju u organizaciju.",
       "explainerTitle": "Kako se ljudi prijavljuju?",
       "explainerBody": "Za svaku osobu upisuješ ime i korisničko ime; aplikacija daje početnu lozinku koju vidiš jednom. Osoba se prijavljuje s kraticom organizacije i pri prvoj prijavi postavlja svoju lozinku.",
-      "example": "Smjenu osobi daješ na njezinoj stranici, nakon dodavanja.",
+      "example": "Tim osobi daješ na njezinoj stranici, nakon dodavanja.",
       "signInLink": "Poveznica za prijavu",
       "copy": "Kopiraj",
       "copied": "Poveznica je kopirana.",
@@ -2762,7 +2762,7 @@
       "summaryLabel": "Pregled koraka",
       "organizationLine": "{name} · {slug}",
       "hourBandsCount": "{count, plural, one {# pojas} few {# pojasa} other {# pojaseva}}",
-      "teamsCount": "{count, plural, one {# smjena} few {# smjene} other {# smjena}}",
+      "teamsCount": "{count, plural, one {# tim} few {# tima} other {# timova}}",
       "shiftTypesCount": "{count, plural, one {# tip smjene} few {# tipa smjene} other {# tipova smjena}}",
       "membersCount": "{count, plural, one {# osoba} few {# osobe} other {# osoba}}",
       "rotationFrom": "vrijedi od {date}",

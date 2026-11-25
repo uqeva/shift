@@ -4,7 +4,7 @@ import { escapeRegExp, fill, hr, plural } from '../utils/i18n.ts';
 
 const filter = hr.filter;
 
-/** `Smjena: ` — what the Smjena chip's name starts with. */
+/** `Tim: ` — what the Tim chip's name starts with (`Smjena: ` before story 21.22). */
 const TEAM_CHIP = new RegExp(`^${escapeRegExp(filter.chip.team.replace('{value}', ''))}`);
 
 /** `Osoba: ` — what the Osoba chip's name starts with. */
@@ -13,7 +13,7 @@ const PERSON_CHIP = new RegExp(`^${escapeRegExp(filter.chip.person.replace('{val
 /** `Prikazano:` — what every summary starts with. */
 const SUMMARY = new RegExp(`^${escapeRegExp(filter.summary.all.split(' ')[0] ?? '')}`);
 
-/** `Sve smjene` — the Smjena picker's first option, whatever it counts. */
+/** `Svi timovi` — the Tim picker's first option, whatever it counts. */
 const ALL_TEAMS = new RegExp(`^${escapeRegExp(filter.allTeams.replace(/ \(\{count\}\)$/, ''))}`);
 
 /** `Filtri`, or `Filtri, aktivno: 2` while filters are on (story 15.7). */

@@ -11,7 +11,6 @@ import at from "@phosphor-icons/core/fill/at-fill.svg?raw"
 import bell from "@phosphor-icons/core/fill/bell-fill.svg?raw"
 import briefcase from "@phosphor-icons/core/fill/briefcase-fill.svg?raw"
 import buildings from "@phosphor-icons/core/fill/buildings-fill.svg?raw"
-import calendarBlank from "@phosphor-icons/core/fill/calendar-blank-fill.svg?raw"
 import calendarDots from "@phosphor-icons/core/fill/calendar-dots-fill.svg?raw"
 import calendar from "@phosphor-icons/core/fill/calendar-fill.svg?raw"
 import calendarPlus from "@phosphor-icons/core/fill/calendar-plus-fill.svg?raw"
@@ -108,7 +107,8 @@ import x from "@phosphor-icons/core/fill/x-fill.svg?raw"
  * GripVertical → DotsSixVertical, Chevron* → Caret*, PanelLeftClose/Open →
  * CaretLineLeft/Right, ArrowUpDown → ArrowsDownUp, AtSign → At,
  * BriefcaseBusiness → Briefcase, Building2 → Buildings, CalendarClock →
- * CalendarBlank (the sign-in mark) or ClockCountdown (a scheduled change),
+ * CalendarBlank (the sign-in mark until story 21.24 replaced it with Smjenko's
+ * own, `components/brand-mark.tsx`; no longer exported) or ClockCountdown (a scheduled change),
  * CalendarDays → CalendarDots, CalendarRange → CalendarDots,
  * ClipboardCheck → ClipboardText, Download → DownloadSimple, Ellipsis →
  * DotsThree, EyeOff → EyeSlash, History → ClockCounterClockwise, Home → House,
@@ -179,7 +179,6 @@ export const Bell = glyph(bell, "bell")
 export const Briefcase = glyph(briefcase, "briefcase")
 export const Buildings = glyph(buildings, "buildings")
 export const Calendar = glyph(calendar, "calendar")
-export const CalendarBlank = glyph(calendarBlank, "calendar-blank")
 export const CalendarDots = glyph(calendarDots, "calendar-dots")
 export const CalendarPlus = glyph(calendarPlus, "calendar-plus")
 export const CaretDown = glyph(caretDown, "caret-down")

@@ -203,8 +203,9 @@
 @import 'tailwindcss';
 
 /* Tailwind's `dark:` follows `prefers-color-scheme` by default, which would
- * disagree with a pinned theme. Nothing uses `dark:` today; this keeps the
- * first one that does on the same hook as the tokens. */
+ * disagree with a pinned theme. This keeps `dark:` on the same hook as the
+ * tokens. Its first use is Smjenko's mark (story 21.24, `brand-mark.tsx`): the
+ * hairline that draws the tile's edge on dark glass. */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 /* STORY 16.1: `print-month:` is `print:` inside the printed month alone

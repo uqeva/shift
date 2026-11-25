@@ -133,15 +133,15 @@ describe("the printed month's header", () => {
     });
   });
 
-  it("says Sve smjene's filter as the bar's own summary, with none on too", () => {
-    expect(calendarFilterWordsOf(monthWith({}))).toBe('Prikazano: sve smjene (2) · 3 osobe');
+  it("says the Svi timovi filter as the bar's own summary, with none on too", () => {
+    expect(calendarFilterWordsOf(monthWith({}))).toBe('Prikazano: svi timovi (2) · 3 osobe');
     expect(calendarFilterWordsOf(monthWith({ chosen: 'b' }))).toBe('Prikazano: Smjena B · 2 osobe od 3');
     expect(calendarFilterWordsOf(monthWith({ person: 'luka' }))).toBe('Prikazano: Luka Knežević · Smjena A');
   });
 
   it("says Moj raspored's whose by name and which team, without the screen's note on the filters", () => {
     expect(ownScheduleWordsOf('Lana Članica', 'Smjena A')).toBe('Moj raspored: Lana Članica · Smjena A');
-    expect(ownScheduleWordsOf('Lana Članica', null)).toBe('Moj raspored: Lana Članica · bez smjene');
+    expect(ownScheduleWordsOf('Lana Članica', null)).toBe('Moj raspored: Lana Članica · bez tima');
   });
 });
 
@@ -160,10 +160,10 @@ describe('the header the page prints, from the rendered month', () => {
     });
   });
 
-  it("prints the filter bar's summary in Sve smjene", () => {
+  it("prints the filter bar's summary in Svi timovi", () => {
     const header = calendarPrintHeaderOf({ refused: false, snapshot, month: monthIn(MODE_SVE), mode: MODE_SVE, printedAt: PRINTED });
 
-    expect(header?.filter).toBe('Prikazano: sve smjene (4) · 1 osoba');
+    expect(header?.filter).toBe('Prikazano: svi timovi (4) · 1 osoba');
   });
 
   it('prints no header, and so offers no Ispiši, while no month is drawn or the read was refused', () => {
@@ -175,7 +175,7 @@ describe('the header the page prints, from the rendered month', () => {
     expect(calendarPrintHeaderOf({ refused: false, snapshot, month, mode: null, printedAt: PRINTED })).toBeNull();
   });
 
-  it('offers no print of Moj raspored when the viewer is missing from the members, and still prints Sve smjene', () => {
+  it('offers no print of Moj raspored when the viewer is missing from the members, and still prints Svi timovi', () => {
     const nameless = { ...snapshot, members: snapshot.members.filter((member) => member.id !== snapshot.viewer.memberId) };
 
     expect(calendarPrintHeaderOf({ refused: false, snapshot: nameless, month: monthIn(MODE_MOJ), mode: MODE_MOJ, printedAt: PRINTED })).toBeNull();

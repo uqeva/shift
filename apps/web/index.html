@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Shift</title>
+    <title>Smjenko</title>
     <!-- Static Croatian, like the title and the boot fallback: crawlers and
          link previews read it without running the bundle. `lang` on <html> is
          only the pre-script default; `lib/i18n/document-language.ts` rewrites
@@ -13,13 +13,17 @@
          `vite-plugin-pwa` generates `site.webmanifest` and injects its link
          into the built page (story 8.1, `vite.config.ts`), so a manual one
          would be a duplicate. iOS reads no manifest icon, so the home-screen
-         icon is linked explicitly. -->
+         icon is linked explicitly. The icons are Smjenko's mark (story 21.24):
+         `favicon.ico` (16, 32 and 48; declared `32x32`, which keeps a browser
+         that reads SVG on the SVG) for what reads no SVG, and the SVG for
+         every browser that does; both same-origin, under `img-src 'self'`. -->
     <meta
       name="description"
       content="Planiranje dežurstava, odsustava i pokrivenosti za dobrovoljna vatrogasna društva."
     />
     <meta name="theme-color" content="#e8edf5" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0a1020" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />
     <!-- The theme, resolved before the first paint. `data-theme` on <html> is
@@ -104,7 +108,7 @@
         }
       </style>
       <p style="margin: 0; padding: 2rem; text-align: center; font: 1rem/1.5 system-ui, sans-serif">
-        Shift ne radi bez JavaScripta. Uključi JavaScript u pregledniku i osvježi stranicu.
+        Smjenko ne radi bez JavaScripta. Uključi JavaScript u pregledniku i osvježi stranicu.
       </p>
     </noscript>
     <!-- The boot fallback (story 1.1d), and the one Croatian literal outside
@@ -115,7 +119,7 @@
          which `createRoot().render()` clears on a successful mount, so it
          needs no removal step and no eslint exception. -->
     <div id="root">
-      <p id="boot-fallback">Shift se nije pokrenuo. Osvježi stranicu.</p>
+      <p id="boot-fallback">Smjenko se nije pokrenuo. Osvježi stranicu.</p>
     </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

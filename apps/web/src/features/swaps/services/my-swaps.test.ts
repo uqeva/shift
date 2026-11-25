@@ -537,7 +537,7 @@ describe('the card’s rows (the I/O matrix)', () => {
     const [row] = mySwapRowsOf(snapshot, swapsOf([rowOf({ team_id: 'gone-team' })]), TODAY, []);
 
     expect(row?.given.team).toBeNull();
-    expect(t('danas.swaps.unknownTeam')).toBe('Nepoznata smjena');
+    expect(t('danas.swaps.unknownTeam')).toBe('Nepoznat tim');
   });
 
   it('No swaps: no rows', () => {

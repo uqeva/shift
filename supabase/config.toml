@@ -90,15 +90,15 @@ otp_length = 10
 # (`node scripts/auth-email-templates.mjs` rewrites them). Each subject is
 # `hr.json`'s word for word. `test/auth-email.test.ts` pins all six values.
 [auth.email.template.confirmation]
-subject = "Potvrdi adresu e-pošte za Shift"
+subject = "Potvrdi adresu e-pošte za Smjenko"
 content_path = "./supabase/templates/auth-email/confirmation.html"
 
 [auth.email.template.recovery]
-subject = "Nova lozinka za Shift"
+subject = "Nova lozinka za Smjenko"
 content_path = "./supabase/templates/auth-email/recovery.html"
 
 [auth.email.template.email_change]
-subject = "Potvrdi novu adresu e-pošte za Shift"
+subject = "Potvrdi novu adresu e-pošte za Smjenko"
 content_path = "./supabase/templates/auth-email/email-change.html"
 
 [auth.sms]

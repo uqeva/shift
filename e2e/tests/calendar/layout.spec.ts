@@ -645,7 +645,7 @@ test.describe('Moj raspored on a phone (deferred-work E816, E822)', () => {
     expect(await inHead(calendarPage.monthTrigger), 'the month toolbar scrolled away').toBe(true);
   });
 
-  test('says whose schedule it is, the team, and that the filters are Sve smjene’s, in the filters’ place', async ({
+  test('says whose schedule it is, the team, and that the filters belong to Svi timovi, in the filters’ place', async ({
     calendarPage,
   }) => {
     await calendarPage.goto('?prikaz=moj');

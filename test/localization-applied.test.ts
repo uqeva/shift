@@ -1473,7 +1473,7 @@ const AUTHORED_VOCABULARY = [
   // refusal that says the credential did not move.
   //
   // `nije` IS NOT AMONG THEM, and the reason is worth naming rather than
-  // leaving to be rediscovered: `index.html`'s boot fallback says "Shift se
+  // leaving to be rediscovered: `index.html`'s boot fallback says "Smjenko se
   // nije pokrenuo", and that string may not come from a key at all — the
   // translation layer is what failed. Every word on this list is swept out of
   // the HTML as well as counted in the chunk, so `nije` cannot join it while
@@ -1572,12 +1572,18 @@ const AUTHORED_VOCABULARY = [
   'Smjena',
   'Smjene',
   'smjena',
+  // STORY 21.22 (E-6): the Team is *Tim* / *Timovi* since, so the team
+  // screens' own words are these. (`Smjena`, `Smjene` and `smjena` above stay
+  // earned by the shifts and the Shift Type.)
+  'Timovi',
+  'timu',
+  'timova',
   // STORY 1.8: the roster and the Danas line are the first screens that speak
   // to the caller about their own team, and the first to send them back to
   // Danas by name.
   'Tvoja',
   'Vrati',
-  'arhivirana',
+  // `arhivirana` left with story 21.22: an archived team is `arhiviran`.
   'smjeni',
   // STORY 2.3b: the rotation builder's own words, every one closing a gap —
   // none was in either list, so a hard-coded `Pomak` on the offsets column or
@@ -1632,7 +1638,7 @@ const AUTHORED_VOCABULARY = [
   'ista',
   'isti',
   'jedan',
-  'jedna',
+  // `jedna` left with story 21.22: `nijedan tim`, never `nijedna smjena`.
   'kasniji',
   'koje',
   'kojem',
@@ -1702,7 +1708,7 @@ const AUTHORED_VOCABULARY = [
   'upozorenja',
   'sljedećem',
   'nijedna',
-  'dvije',
+  // `dvije` left with story 21.22: `s dva ili više timova`.
   'istom',
   'slobodnog',
   'između',
@@ -1771,7 +1777,7 @@ const NAVIGATION_AND_TERMINOLOGY: readonly string[] = [];
 /** The static Croatian in `index.html` (story 1.1d): the boot fallback, shown
  *  when localization init rejects or the bundle never loads at all. It cannot
  *  come from a key, because the translation layer is what failed. */
-const BOOT_FALLBACK = 'Shift se nije pokrenuo. Osvježi stranicu.';
+const BOOT_FALLBACK = 'Smjenko se nije pokrenuo. Osvježi stranicu.';
 
 function occurrences(haystack: string, needle: string): number {
   return haystack.split(needle).length - 1;
@@ -2095,7 +2101,7 @@ describe('the resource file is the only user-facing Croatian in the build', () =
 
     const source = readFileSync(html, 'utf8');
 
-    expect(source).toContain('<title>Shift</title>');
+    expect(source).toContain('<title>Smjenko</title>');
     // `lang="hr"` is 1.1a's and stays; anything else user-facing would be new.
     expect(source).toContain('lang="hr"');
     // The fallback is the deliberate exception, and it is asserted PRESENT:

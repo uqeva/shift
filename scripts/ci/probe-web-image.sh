@@ -128,6 +128,9 @@ expect "/$asset" 200 application/javascript 'public, max-age=31536000, immutable
 expect "/$stylesheet" 200 text/css 'public, max-age=31536000, immutable'
 expect /site.webmanifest 200 application/manifest+json no-cache
 expect /favicon.svg 200 image/svg+xml no-cache
+# Story 21.24: the mark for what reads no SVG, served same-origin; an image
+# (nginx names it image/x-icon or image/vnd.microsoft.icon), never the shell.
+expect /favicon.ico 200 image/ no-cache
 expect /pwa-192x192.png 200 image/png no-cache
 # A missing asset is a plain 404, never index.html, and never immutable.
 expect /assets/nope.js 404 text/plain no-cache

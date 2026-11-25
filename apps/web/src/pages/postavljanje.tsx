@@ -1,8 +1,8 @@
 import { createRoute, redirect } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
 
+import { BrandMark } from '@/components/brand-mark';
 import { Button } from '@/components/ui/button';
-import { CalendarBlank } from '@/components/ui/icon';
 import { Notice } from '@/components/ui/notice';
 import { CreateOrganizationForm } from '@/features/auth/components/create-organization-form';
 import { useCreateOrganization } from '@/features/auth/hooks/use-create-organization';
@@ -39,10 +39,8 @@ export function SetupScreen(): ReactNode {
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span className="flex size-10 items-center justify-center rounded-lg bg-ink text-ink-foreground">
-            <CalendarBlank aria-hidden className="size-5" />
-          </span>
-          <p className="font-heading text-lg font-extrabold">{t('auth.brand.name')}</p>
+          <BrandMark className="size-10" />
+          <p className="font-heading text-xl font-semibold">{t('auth.brand.name')}</p>
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-3">
           <p className="min-w-0 break-words text-sm text-muted-foreground">{email}</p>

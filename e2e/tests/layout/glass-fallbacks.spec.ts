@@ -99,29 +99,46 @@ test.describe('under reduced transparency, at 390 px', () => {
 test.describe('the sign-in brand panel under forced colours, from 1280 px', () => {
   test.use({ viewport: { width: 1280, height: 800 } });
 
-  test('the ink tile keeps its icon in CanvasText, apart from Canvas', async ({ page, loginPage }) => {
+  test('the Smjenko mark keeps its own colours, the S apart from its tile', async ({ page, loginPage }) => {
     await loginPage.goto();
     await expect(loginPage.signInHeading).toBeVisible();
-    const icon = loginPage.brandTileIcon;
-    await expect(icon).toHaveCount(1);
+    const mark = loginPage.brandMark;
+    await expect(mark).toHaveCount(1);
 
+    // Story 21.24: the mark replaced the ink tile's icon. It is an image-like
+    // brand mark, so forced colours leave it alone (`forced-color-adjust:
+    // none`): a repainted mark would draw the S and its tile in one colour.
     await page.emulateMedia({ forcedColors: 'active' });
-    const drawn = await icon.evaluate((element) => {
-      const probe = document.createElement('div');
-      probe.style.cssText = 'background-color: Canvas; color: CanvasText; forced-color-adjust: none;';
-      document.body.append(probe);
-      const keywords = getComputedStyle(probe);
-      const canvas = keywords.backgroundColor;
-      const canvasText = keywords.color;
-      probe.remove();
+    const drawn = await mark.evaluate((element) => {
+      const [tile] = element.querySelectorAll('rect');
+      const [upper, lower] = element.querySelectorAll('path');
 
-      return { colour: getComputedStyle(element).color, fill: getComputedStyle(element).fill, canvas, canvasText };
+      return {
+        adjust: getComputedStyle(element).forcedColorAdjust,
+        tile: tile === undefined ? null : getComputedStyle(tile).fill,
+        upper: upper === undefined ? null : getComputedStyle(upper).stroke,
+        lower: lower === undefined ? null : getComputedStyle(lower).stroke,
+      };
     });
 
-    expect(drawn.canvasText, 'CanvasText and Canvas resolve alike, so nothing is tested').not.toBe(drawn.canvas);
-    expect(drawn.colour, 'the tile icon is not CanvasText').toBe(drawn.canvasText);
-    expect(drawn.fill, 'the tile icon is not painted in its currentColor').toBe(drawn.canvasText);
-    expect(drawn.colour, 'the tile icon vanishes into Canvas').not.toBe(drawn.canvas);
+    expect(drawn.adjust, 'forced colours may repaint the mark').toBe('none');
+    expect(drawn.tile, 'the tile is not the ink navy').toBe('rgb(15, 23, 42)');
+    expect(drawn.upper, 'the upper arc is not the accent blue').toBe('rgb(63, 160, 250)');
+    expect(drawn.lower, 'the lower arc is not white').toBe('rgb(255, 255, 255)');
     await expect(loginPage.brandName).toBeVisible();
+  });
+
+  test('the Smjenko mark draws its hairline on dark glass, and only there', async ({ page, loginPage }) => {
+    await loginPage.goto();
+    await expect(loginPage.signInHeading).toBeVisible();
+    const hairline = (): Promise<string> =>
+      loginPage.brandMark.evaluate((element) => getComputedStyle(element.querySelectorAll('rect')[1] as Element).display);
+
+    // Story 21.24: the navy tile meets dark glass at 1.03:1, so the dark theme
+    // draws a white 16 % hairline around it; the light theme does not.
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
+    expect(await hairline(), 'the hairline shows in the light theme').toBe('none');
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+    expect(await hairline(), 'the hairline is hidden in the dark theme').not.toBe('none');
   });
 });

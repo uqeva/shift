@@ -96,6 +96,8 @@ export interface HistoryExport {
   readonly continued: string;
   /** The header line the writer adds when it replaced a character the font cannot draw (`./history-pdf-text`). */
   readonly glyphNote: string;
+  /** The product's name, *Smjenko*, as the PDF's creator in its metadata (story 21.24); never drawn. */
+  readonly creator: string;
 }
 
 /** The file's extension: a format, not copy. */
@@ -189,6 +191,7 @@ export function historyExportOf({ view, filters, generatedAt }: HistoryExportInp
     pageText: (page, pages) => t('history.export.page', { page, pages }),
     continued: t('history.export.continued'),
     glyphNote: t('history.export.glyphNote'),
+    creator: t('auth.brand.name'),
   };
 }
 
