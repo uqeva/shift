@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   STICKY_HEAD_HEIGHT_VAR,
   STICKY_SUMMARY_PX,
+  filtersAboveCoveredBy,
   filtersCoveredBy,
   stickyHeadHeightOf,
 } from '@/utils/sticky-head';
@@ -35,5 +36,14 @@ describe('filtersCoveredBy', () => {
     expect(filtersCoveredBy(120, 121)).toBe(false);
     expect(filtersCoveredBy(120, 120)).toBe(true);
     expect(filtersCoveredBy(120, -40)).toBe(true);
+  });
+});
+
+describe('filtersAboveCoveredBy (story 21.23)', () => {
+  it('is true once the head\'s Card has scrolled above the viewport, so the toolbar above it has too', () => {
+    expect(filtersAboveCoveredBy(240)).toBe(false);
+    expect(filtersAboveCoveredBy(0)).toBe(false);
+    expect(filtersAboveCoveredBy(-1)).toBe(true);
+    expect(filtersAboveCoveredBy(-600)).toBe(true);
   });
 });

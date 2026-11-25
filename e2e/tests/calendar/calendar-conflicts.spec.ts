@@ -263,7 +263,7 @@ test("a member reads their own leave hatched with no conflict, nothing new on th
     expect(await calendar.legendNames()).toEqual([LEAVE]);
 
     // SVE SMJENE: nothing new — no conflict, no leave, no legend.
-    await calendar.modes().sve.click();
+    await (await calendar.openModes()).sve.click();
     await expect(calendar.grid).toBeVisible();
     for (const date of [today, isoDaysAfter(today, 8)]) {
       await calendar.showMonthOf(date, today);

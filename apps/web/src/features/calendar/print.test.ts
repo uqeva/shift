@@ -267,15 +267,15 @@ describe('the print stylesheet and the page it prints', () => {
 
   it('marks the month for the stylesheet and keeps the controls off paper', () => {
     expect(page).toMatch(/<main\s+data-print-month/);
-    expect(page).toContain('<PageHeader className="print:hidden">');
-    expect(page).toContain('<div className="min-w-0 print:hidden">');
-    expect(page).toContain("{t('print.action')}");
-    // ONE *Ispiši*, its slot chosen by `usePhone()`: from 640 px the end of the Card's head row,
-    // below it the page header's action. Never in the phone's sticky head, whose 160 px budget
-    // (deferred-work E816) a third row beside the month toolbar and the mode switch broke.
-    expect(page.split("{t('print.action')}").length - 1, 'Ispiši is drawn twice').toBe(1);
-    expect(page).toContain('{isPhone && printAction !== null ? <PageActions>{printAction}</PageActions> : null}');
-    expect(page).toMatch(/\{isPhone \? monthNav : null\}[\s\S]*?\{isPhone \? null : printAction\}\s*<\/div>\s*<\/StickyHead>/);
+    // STORY 21.23: the compact toolbar — title, month, `Filtri`, the menus, the count and the chips — is not printed.
+    expect(page).toMatch(/<CalendarFilters\b[\s\S]*?className: 'print:hidden',/);
+    // ONE *Ispiši*, in the toolbar's `Izvoz ▾` at every width (story 21.23), never in the phone's
+    // sticky head, whose 160 px budget (deferred-work E816) holds the month toolbar alone.
+    const menus = code(CALENDAR_SCREEN_PARTS.modeSwitch);
+    expect(menus.split("{t('print.action')}").length - 1, 'Ispiši is drawn twice').toBe(1);
+    expect(page, 'Ispiši is drawn on the page itself').not.toContain("t('print.action')");
+    expect(page).toContain('{printable ? <CalendarExportMenu onPrint={print} /> : null}');
+    expect(page).toMatch(/<StickyHead summary=\{filterSummary\} filtersAbove>\s*<div[^>]*>\{monthNav\}<\/div>\s*<\/StickyHead>/);
     // The loan notice is drawn on paper, though the sentence it follows is not.
     expect(page).toMatch(/<LoanNoticeLine\s+notice=\{month\.ownLoan\}\s+className="(?![^"]*print:hidden)[^"]*print:mt-0/);
   });

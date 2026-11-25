@@ -1,8 +1,7 @@
 import { createRoute, useLocation, useNavigate } from '@tanstack/react-router';
 import { useCallback, useEffect } from 'react';
 
-import { Card } from '@/components/ui/card';
-import { PageDescription, PageHeader, PageTitle } from '@/components/ui/page-header';
+import { PageTitle } from '@/components/ui/page-header';
 import { HistoryBody } from '@/features/history/components/history-body';
 import { useChangeHistory, type HistoryNavigate } from '@/features/history/hooks/use-change-history';
 import {
@@ -56,17 +55,14 @@ export function PovijestPromjenaScreen() {
 
   return (
     <main className="mx-auto flex w-full min-w-0 max-w-5xl flex-1 flex-col gap-6 p-6" aria-busy={screen.loading}>
-      <PageHeader>
-        <div className="min-w-0">
+      <HistoryBody
+        screen={screen}
+        title={
           <PageTitle asChild>
             <h1>{t('nav.povijestPromjena')}</h1>
           </PageTitle>
-          <PageDescription>{t('history.lede')}</PageDescription>
-        </div>
-      </PageHeader>
-      <Card className="min-w-0">
-        <HistoryBody screen={screen} />
-      </Card>
+        }
+      />
     </main>
   );
 }

@@ -23,7 +23,7 @@ Epics 16–19 were added on 2026-11-20 by `sprint-change-proposal-2026-11-20-v2-
 
 Epic 20 was added on 2026-11-20 by `sprint-change-proposal-2026-11-20-self-hosting.md`: Shift is hosted on our own server through Coolify, with no Supabase cloud and no Cloudflare Pages. It changes no product behaviour. Its later stories wait for the founder decisions H-1 to H-15 and the inputs that proposal lists.
 
-Epic 21 was added on 2026-11-25 by `sprint-change-proposal-2026-11-25-pilot-readiness.md`, on the founder's approval of the first production pilot's scope and the founder's additions the same day. It covers personal scheduling (a manual grid, a pattern fill, personal rotations, seasons), job roles and floater cover, organization holidays, a minimum per team, a public product page and a label rename. Its requirements are CAP-29 to CAP-32, CAP-21 as amended, Q31 and UX-DR71 to UX-DR80 below, from PRD FR-102 to FR-116 and NFR-35, and engine rules R13 to R16. Production (20.9) stays after it.
+Epic 21 was added on 2026-11-25 by `sprint-change-proposal-2026-11-25-pilot-readiness.md`, on the founder's approval of the first production pilot's scope and the founder's additions the same day. It covers personal scheduling (a manual grid, a pattern fill, personal rotations, seasons), job roles and floater cover, organization holidays, a minimum per team, a public product page and a label rename. Its requirements are CAP-29 to CAP-32, CAP-21 as amended, Q31 and UX-DR71 to UX-DR82 below, from PRD FR-102 to FR-116 and NFR-35, and engine rules R13 to R16. Production (20.9) stays after it.
 
 **Requirements basis:** the SPEC package is canonical. `prd.md` is a fully-absorbed source and is deliberately not an input — it retains a retired rotation table, a pre-narrowing FR-16, and pre-architecture conflict framing. The PRD **addendum** is an adopted companion and is an input, for the pilot seed configuration and the epic seed.
 
@@ -242,6 +242,7 @@ From `DESIGN.md` (visual) and `EXPERIENCE.md` (behavioural). Both are binding an
 - **UX-DR79** A team's minimum (story 21.20). The team dialog has *Najmanje ljudi*, with the hint `Prazno: vrijedi za organizaciju ({n})`.
 - **UX-DR80** The public page (story 21.21). One page in the app's visual language (direction G): hero with *Smjenko*, what it does, who it is for, *Javi se* and *Prijava* (and *Registriraj se* only once production signup opens), and a footer `Bez kolačića i praćenja.`, all in both themes and at phone width first.
 - **UX-DR81** The product's name and mark (story 21.24; the founder's decisions of 2026-11-25). The name a user sees is *Smjenko* everywhere: the page title, the installed app, the sign-in panel and the setup header, Auth mail and its sender, the calendar feed and the month download, the PDF's metadata and a push without a title. The mark is concept C, *Predaja smjene*: an S of two 290° clock arcs meeting at a seam, accent blue `#3FA0FA` over white, on an ink-navy `#0F172A` tile (rx 112 of 512), its colours fixed in both themes, a white 16 % hairline on dark glass, and kept under forced colours. The wordmark is text in Outfit 600, never an image. Internal identifiers (`@shift/*`, the repository, env var names, databases, URLs, UID domains) stay.
+- **UX-DR82** The compact toolbar (story 21.23). On every filtered or exporting list (*Kalendar*, *Ljudi*, *Godišnji*, *Povijest promjena*): one row of the title, the search (`Traži…`), `Filtri` with its count, `Prikaz ▾`, `Izvoz ▾` and the primary action; under it the result count and the removable chips with `Očisti sve`. On a phone two rows at most, the buttons icon-only (their names unchanged). `Filtri` opens a dropdown panel from 1024 px and a bottom sheet below it, with `Očisti` and `Primijeni`.
 
 ### FR Coverage Map
 
@@ -3597,7 +3598,7 @@ The admin of a fire department with mixed teams opens *Ručni raspored*. The fou
 
 Added 2026-11-25 by `sprint-change-proposal-2026-11-25-pilot-readiness.md`, on the founder's approval of the first production pilot's scope. That approval covers two organizations, a fire department on 24-hour duty and a department that mixes 24-hour crews with day workers, floater students and leave, and it was widened the same day by the founder's additions recorded in the proposal (§1). The source is modelling a real month on staging with the operator script `supabase/operator/demo-mladost.sql` (DEPLOY §7.6), whose workarounds this epic retires. **Production (20.9) stays after this epic.**
 
-**Capabilities:** CAP-29, CAP-30, CAP-31, CAP-32, CAP-21 (amended) · **Governed by:** AD-2, AD-4, AD-5, AD-7, AD-11, AD-13, AD-18, AD-19, AD-20, and AD-26 to AD-28 (added 2026-11-25) · **Engine rules:** R14, R15, R16, R13, R10.2 (amended) · **Proves:** Q2, Q9, Q11, Q12, Q21, Q22, Q25, Q27, Q31 · **UX:** UX-DR71–UX-DR81 · **Decisions:** E-1 to E-8 (proposal §6; each story names its own), all accepted at the recommended defaults by the founder on 2026-11-25
+**Capabilities:** CAP-29, CAP-30, CAP-31, CAP-32, CAP-21 (amended) · **Governed by:** AD-2, AD-4, AD-5, AD-7, AD-11, AD-13, AD-18, AD-19, AD-20, and AD-26 to AD-28 (added 2026-11-25) · **Engine rules:** R14, R15, R16, R13, R10.2 (amended) · **Proves:** Q2, Q9, Q11, Q12, Q21, Q22, Q25, Q27, Q31 · **UX:** UX-DR71–UX-DR82 · **Decisions:** E-1 to E-8 (proposal §6; each story names its own), all accepted at the recommended defaults by the founder on 2026-11-25
 
 **Planning status (2026-11-25):** every story is `ready-for-dev` in `sprint-status.yaml` until it is built (`sprint-status.yaml` holds each story's current status). Each story's spec is written by `bmad-create-story` when it starts. 21.22 is unblocked: the founder chose *Timovi* (E-6, 2026-11-25). 21.24 (the *Smjenko* name and mark) was added the same day by the founder's decisions reversing E-5's default; it is built together with 21.22 on one branch (`feat/smjenko-brand`), since both rewrite `hr.json`'s copy. 21.21 waits for the founder's contact address only to publish (E-4), not to build. The order below is the build order. 21.3, 21.12, 21.20 and 21.21 touch no other story's files and may run in parallel worktrees; 21.22 is built with 21.24 on one branch. There is no 21.23: the number was left unassigned when 21.24 was named by the founder.
 
@@ -4075,3 +4076,29 @@ So that what I install, open, receive by email and subscribe to is recognizably 
 **Given** AD-20's pinned feed lines
 **When** the name changes
 **Then** the spine records the amendment, the golden files and `calendar.test.ts` pin the new lines, and the change is noted as harmless for existing subscribers (PRODID names the writer; no UID changes)
+
+### Story 21.23: Compact toolbar and filters
+
+As anyone reading a filtered list on a phone,
+I want the filters folded into one compact toolbar,
+So that the list starts at once instead of under a screen of filters.
+
+**Depends on:** none. Presentation only: no filter, URL key or semantics changes. **Blocked on:** nothing. Added on the founder's request of 2026-11-25 (a CRM contacts page's pattern). Touches the hot files `hr.json` and `components/ui/dialog.tsx`, after 21.3.
+
+**Acceptance Criteria:**
+
+**Given** *Kalendar*, *Ljudi*, *Godišnji* (the admin overview) and *Povijest promjena*
+**When** the page opens
+**Then** one toolbar row holds the page title, the search where the page searches today (placeholder `Traži…`), `Filtri` with the count of filters on, `Prikaz ▾` where the page has view options, `Izvoz ▾` where it exports (the PDF or print), and the primary action at the right; under it one line gives the result count, followed by one removable chip per active filter (`Ključ: vrijednost ✕`) and `Očisti sve`; the content starts right after (UX-DR82)
+
+**Given** the filters are closed
+**When** the page is drawn at any width
+**Then** they take no more than the toolbar row and that line, and on a phone the toolbar wraps to two compact rows at most: the title with 44 px icon buttons (named as at every width), and the search
+
+**Given** `Filtri`
+**When** it is pressed
+**Then** the *Filtri* panel opens, a dropdown under `Filtri` from 1024 px and a bottom sheet below it, with every existing field and picker, the live result count, `Očisti` and `Primijeni`; it is the native modal (focus trap, Escape, focus back to `Filtri`), `Filtri` says `aria-expanded`, and every pick still writes the URL at once
+
+**Given** every filter and its URL state as before this story
+**When** this ships
+**Then** each filter, chip, default and URL key behaves as before, the glass rules, 44 px targets, focus rings, forced colours and reduced motion hold, and the e2e specs that located the old controls are updated

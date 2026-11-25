@@ -1,15 +1,15 @@
 import { createRoute, useNavigate } from '@tanstack/react-router';
+import type { ReactNode } from 'react';
 
 import { MonthNav } from '@/components/month-nav';
 import { StickyHead } from '@/components/sticky-head';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Printer } from '@/components/ui/icon';
 import { OfflineNote } from '@/components/offline-note';
 import { Notice } from '@/components/ui/notice';
-import { PageActions, PageHeader, PageTitle } from '@/components/ui/page-header';
+import { PageTitle } from '@/components/ui/page-header';
 import { CalendarFilters, calendarFilterSummaryOf } from '@/features/calendar/components/calendar-filters';
-import { CalendarModeSwitch } from '@/features/calendar/components/calendar-mode-switch';
+import { CalendarExportMenu, CalendarModeSwitch } from '@/features/calendar/components/calendar-mode-switch';
 import { CalendarMonthBody } from '@/features/calendar/components/calendar-month-body';
 import { CalendarPrintHeader, calendarPrintHeaderOf } from '@/features/calendar/components/calendar-print-header';
 import { LoanNoticeLine } from '@/features/calendar/components/loan-notice-line';
@@ -64,24 +64,30 @@ import { keepFocusOnAlert } from '@/utils/retry-focus';
  * a mark is on screen. The day list stays a plain list.
  *
  * ONE TEAM (story 3.3a), `?smjena=<team id>`, and ONE PERSON (story 3.3b),
- * `?osoba=<member id>`: *Sve smjene* narrowed by the shared filter bar at the
- * top of the Card (story 7.5) — Smjena and Osoba chips, a summary of what is
- * shown and one `Poništi filtre`. A person chosen replaces the grid with their
+ * `?osoba=<member id>`: *Sve smjene* narrowed by the shared filter bar in the
+ * compact toolbar (stories 7.5, 21.23) — `Filtri` in the toolbar row, the
+ * summary as the result count under it, Smjena and Osoba chips after it with
+ * `Očisti sve`. A person chosen replaces the grid with their
  * day list, headed with their name, and wins over a team. The state lives in
  * the URL alone, and the bar waits for the month, so a loading screen shows
  * the toolbar and the skeleton only. *Moj raspored* shows no filters but one
  * sentence in their place: whose schedule it is, the viewer's team, and that
  * the filters belong to *Sve smjene* (deferred-work E822).
  *
+ * THE COMPACT TOOLBAR (story 21.23, UX-DR82) is one element for the
+ * screen's life (`CalendarFilters`): the `<h1>`, the month control from
+ * 640 px, `Filtri` in *Sve smjene*, `Prikaz ▾` with the two modes and
+ * `Izvoz ▾` with *Ispiši*; under it the result count and the chips.
+ *
  * THE MONTH CONTROL (story 15.7b) is ONE `MonthNav`, its slot chosen by
- * `usePhone()`: from 640 px a compact header control at the right of the
- * `PageHeader` row, beside the `<h1>`, and the Card opens on the mode switch;
- * below 640 px it stays in the Card's sticky head at the top of the viewport
- * while the month scrolls (`StickyHead`, deferred-work E816), the mode switch
- * beside it. Never two at once: their ids, heading and picker state would
- * collide. The filter bar follows the head in flow, and once it has scrolled
- * under the head, the head shows the active filters as one line. With the
- * read refused there is no month control, in either slot.
+ * `usePhone()`: from 640 px the toolbar's `lead`, beside the `<h1>`, and the
+ * Card opens on the month itself; below 640 px it is the Card's sticky head
+ * at the top of the viewport while the month scrolls (`StickyHead`,
+ * deferred-work E816), alone. Never two at once: their ids, heading and
+ * picker state would collide. The filters are above the Card, so once the
+ * Card's top has scrolled away the head shows the active filters as one line
+ * (`filtersAbove`). With the read refused there is no month control, in
+ * either slot.
  *
  * ONE DAY (story 3.4b): a grid cell — clicked, or Enter or Space on it — and a
  * day-list day on a team open a Dialog of that team on that date: facts only
@@ -118,14 +124,14 @@ import { keepFocusOnAlert } from '@/utils/retry-focus';
  * colleague (`useSwapProposed`).
  *
  * THE MONTH PRINTS (story 16.1, UX-DR56, decision D3): *Ispiši*, in both
- * modes once a month is drawn — from 640 px at the end of the Card's head
- * row, below it the page header's action under the title, never in the
- * phone's sticky head (its 160 px budget, deferred-work E816) — opens the
+ * modes once a month is drawn — in the toolbar's `Izvoz ▾` at every width
+ * (story 21.23), never in the phone's sticky head (its 160 px budget,
+ * deferred-work E816) — opens the
  * browser's own print dialog (`usePrintMonth`). What prints is THIS page —
  * the same snapshot, the same marks under the viewer's own visibility, never a
  * second read (AD-13) — under the print stylesheet (`index.css`, scoped by
- * `data-print-month`): A4 landscape, the shell, the page header, the sticky
- * head and the filter bar not drawn, and in their place `CalendarPrintHeader`:
+ * `data-print-month`): A4 landscape, the shell, the toolbar, the sticky
+ * head and the chips not drawn, and in their place `CalendarPrintHeader`:
  * the organization, the month, the filter in words and the time printed. The
  * legend, the loan notice and the as-of note print as the screen shows them.
  *
@@ -144,7 +150,7 @@ export function KalendarScreen() {
     });
   });
   const { snapshot, loading, refusal, month, mode } = screen;
-  // Story 15.7b: the one month control's slot — the page header from 640 px, the sticky head below.
+  // Story 15.7b: the one month control's slot — the compact toolbar's lead from 640 px (story 21.23), the sticky head below.
   const isPhone = usePhone();
   const monthNav =
     refusal !== null ? null : <MonthNav month={month} headingId={MONTH_HEADING_ID} onShow={screen.show} />;
@@ -161,19 +167,11 @@ export function KalendarScreen() {
   // STORY 16.1: the printed header, once a month is drawn.
   const { printedAt, print } = usePrintMonth();
   const printHeader = calendarPrintHeaderOf({ refused: refusal !== null, snapshot, month, mode, printedAt });
-  // *Ispiši* is ONE button, its slot chosen by `usePhone()` as the month
-  // control's is, the other way round: from 640 px at the end of the Card's
-  // head row, below 640 px the page header's action under the title, which
-  // scrolls away. The phone's sticky head holds the month toolbar alone
-  // (deferred-work E816, its 160 px budget): beside the mode switch the
-  // button opened a third row.
-  const printAction =
-    printHeader === null ? null : (
-      <Button className="h-11 gap-2 px-3 sm:ml-auto" type="button" variant="outline" onClick={print}>
-        <Printer aria-hidden className="size-4 shrink-0" />
-        {t('print.action')}
-      </Button>
-    );
+  // STORY 21.23: the toolbar's `Prikaz ▾` (the two modes) once the mode is
+  // known and the month not refused, and `Izvoz ▾` with *Ispiši* once a month
+  // is drawn.
+  const viewMode = refusal === null ? mode : null;
+  const printable = printHeader !== null;
   // STORY 12.2: the polite line a landed swap proposal returns with.
   const { proposed: swapProposed, lineField: swapLine } = useSwapProposed();
   const overrideForm = useOverrideForm(snapshot, screen.detail, screen.leaveKeys, screen.leaveRecords);
@@ -193,13 +191,26 @@ export function KalendarScreen() {
       aria-busy={loading}
     >
       {printHeader === null ? null : <CalendarPrintHeader text={printHeader} />}
-      <PageHeader className="print:hidden">
-        <PageTitle asChild>
-          <h1>{t('nav.kalendar')}</h1>
-        </PageTitle>
-        {isPhone && printAction !== null ? <PageActions>{printAction}</PageActions> : null}
-        {isPhone ? null : monthNav}
-      </PageHeader>
+      {/* STORY 21.23: ONE COMPACT TOOLBAR, one element for the screen's
+          life — the title, the month control from 640 px, `Filtri` in *Sve
+          smjene*, `Prikaz ▾` and `Izvoz ▾` — with the result count and the
+          chips under it. Not printed: the printed header says the same. */}
+      <CalendarFilters
+        shown={mode === MODE_SVE ? month : null}
+        onFilter={screen.filter}
+        toolbar={{
+          title: kalendarTitle(),
+          lead: isPhone ? undefined : monthNav,
+          after:
+            viewMode === null && !printable ? undefined : (
+              <>
+                {viewMode === null ? null : <CalendarModeSwitch chosen={viewMode} onChoose={screen.choose} />}
+                {printable ? <CalendarExportMenu onPrint={print} /> : null}
+              </>
+            ),
+          className: 'print:hidden',
+        }}
+      />
       <OfflineNote offline={screen.offline} />
       <SwapProposedLine proposed={swapProposed} lineField={swapLine} />
       {/* STORY 19.4 (UX-DR70): an admin's way back to setup while no team exists. */}
@@ -222,24 +233,14 @@ export function KalendarScreen() {
       )}
       {refusal !== null ? null : (
         <Card className="min-w-0 print:rounded-none print:border-0">
-          {/* From 640 px the head's row holds the mode switch alone; the month is in the page header.
-              Until the mode is known there it has nothing to hold, so no empty row opens the Card. */}
-          {!isPhone && mode === null ? null : (
-            <StickyHead summary={filterSummary}>
-              <div className="flex min-w-0 flex-wrap items-center gap-2 px-4 py-2 sm:gap-3 sm:py-4">
-                {isPhone ? monthNav : null}
-                {mode === null ? null : <CalendarModeSwitch chosen={mode} onChoose={screen.choose} />}
-                {isPhone ? null : printAction}
-              </div>
+          {/* Below 640 px only: the month control in the sticky head; from 640 px it is the toolbar's. */}
+          {isPhone && monthNav !== null ? (
+            <StickyHead summary={filterSummary} filtersAbove>
+              <div className="flex min-w-0 flex-wrap items-center gap-2 px-4 py-2">{monthNav}</div>
             </StickyHead>
-          )}
-          {month === null || mode !== MODE_SVE ? null : (
-            <div className="min-w-0 print:hidden">
-              <CalendarFilters shown={month} onFilter={screen.filter} />
-            </div>
-          )}
+          ) : null}
           {ownNote === null ? null : (
-            <p className="min-w-0 px-4 pb-4 pt-2 text-sm text-muted-foreground sm:pt-0 print:hidden">{ownNote}</p>
+            <p className="min-w-0 px-4 pb-4 pt-4 text-sm text-muted-foreground print:hidden">{ownNote}</p>
           )}
           {/* STORY 18.5 (UX-DR59): the viewer's own loan, covering today or ahead. */}
           {ownNote === null || month?.ownLoan === undefined ? null : (
@@ -261,6 +262,15 @@ export function KalendarScreen() {
         onClosedByBrowser={screen.closedByBrowser}
       />
     </main>
+  );
+}
+
+/** The screen's `<h1>`, in the compact toolbar (story 21.23). */
+function kalendarTitle(): ReactNode {
+  return (
+    <PageTitle asChild>
+      <h1>{t('nav.kalendar')}</h1>
+    </PageTitle>
   );
 }
 

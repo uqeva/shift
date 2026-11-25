@@ -622,16 +622,22 @@ describe('the screen is read at all, so every sweep below means something', () =
     expect(occurrences(nav, "t('kalendar.current')"), 'Ovaj mjesec is drawn outside the picker footer').toBe(1);
     expect(nav).toMatch(/aria-label=\{month\.isCurrent \? `\$\{triggerName\}, \$\{t\('kalendar\.thisMonthLabel'\)\}` : triggerName\}/);
     // One control per screen, its slot chosen by `usePhone()`: the page header
-    // from 640 px, the sticky head below — never two at once.
+    // from 640 px — on *Kalendar* the compact toolbar's `lead` since story
+    // 21.23 — the sticky head below — never two at once.
     for (const page of [KALENDAR_PAGE, SATI_PAGE]) {
       const screen = source(page);
 
       expect(occurrences(screen, '<MonthNav '), `${page} draws the month control twice`).toBe(1);
       expect(screen, `${page} no longer chooses the month's slot by usePhone`).toMatch(/const isPhone = usePhone\(\);/);
       expect(screen, `${page} no longer puts the month in the page header from 640 px`).toMatch(
-        /\{isPhone \? null : monthNav\}\s*<\/PageHeader>/,
+        page === KALENDAR_PAGE
+          ? /lead: isPhone \? undefined : monthNav,/
+          : /\{isPhone \? null : monthNav\}\s*<\/PageHeader>/,
       );
     }
+    expect(source(KALENDAR_PAGE), 'the phone sticky head lost the month control').toMatch(
+      /\{isPhone && monthNav !== null \? \(\s*<StickyHead summary=\{filterSummary\} filtersAbove>/,
+    );
     // One group named "Mjesec", and the month is a button that opens a dialog.
     expect(nav).toMatch(/role="group"\s+aria-label=\{t\('kalendar\.month'\)\}/);
     expect(ariaHaspopupValues(nav)).toEqual(['dialog']);
@@ -673,16 +679,21 @@ describe('the screen is read at all, so every sweep below means something', () =
     // STORY 7.13: *Ljudi* draws the same chips through the option-chip bar.
     expect(source(MEMBER_LIST)).toMatch(/<OptionFilterBar\b/);
     expect(source(MEMBER_LIST), 'the member list draws a Select again').not.toMatch(/<Select\b|<select\b/);
-    // STORY 15.7: ONE PATTERN AT EVERY WIDTH. Both bars draw the summary card,
-    // the active chips and the side sheet; no chip opens a picker of its own,
-    // and nothing is hidden below 640 px or chosen by the phone store.
+    // STORY 15.7: ONE PATTERN AT EVERY WIDTH. Both bars draw `Filtri`, the
+    // active chips and the panel; no chip opens a picker of its own, and
+    // nothing is hidden below 640 px or chosen by the phone store. STORY
+    // 21.23: in the compact toolbar `Filtri` is `FilterTrigger` (the filter
+    // bar keeps the summary card for *Sati*), and the panel is anchored under
+    // `Filtri` from 1024 px.
+    expect(bar, 'the filter bar draws no summary card for Sati').toMatch(/<FilterSummaryCard\b/);
     for (const [name, text] of [
       ['the filter bar', bar],
       ['the option bar', optionBar],
     ] as const) {
-      expect(text, `${name} draws no summary card`).toMatch(/<FilterSummaryCard\b/);
+      expect(text, `${name} draws no Filtri in the toolbar`).toMatch(/<FilterTrigger\b/);
+      expect(text, `${name} draws no compact toolbar`).toMatch(/<FilterToolbar\b/);
       expect(text, `${name} draws no active chips`).toMatch(/<ActiveChips\b/);
-      expect(text, `${name} has no side sheet`).toMatch(/<SheetDialog\b[^>]*\sside>/);
+      expect(text, `${name} has no anchored panel`).toMatch(/<SheetDialog\b[^>]*\sanchor=\{bar\.filtri\}/);
       expect(text, `${name} picks a value outside the sheet`).toMatch(/<FilterField\b/);
       expect(text, `${name} reads the phone store again`).not.toMatch(/\busePhone\b/);
       expect(text, `${name} hides a control below 640 px`).not.toMatch(/\bsm:hidden\b|\bmax-sm:hidden\b/);
@@ -701,8 +712,10 @@ describe('the screen is read at all, so every sweep below means something', () =
       /aria-haspopup="dialog"\s+aria-expanded=\{expandedBy\(chip\.key\)\}\s+aria-controls=\{expandedBy\(chip\.key\) \? sheetId : undefined\}/,
     );
     expect(bar).toMatch(/aria-expanded=\{expanded\}\s+aria-controls=\{expanded \? sheetId : undefined\}/);
-    // The sheet sits outside the chips' group, in the bar's one root.
-    expect(bar).toMatch(/<\/div>\s*<SheetDialog\b/);
+    // The sheet sits outside the chips' group: after the summary card's group,
+    // or after the compact toolbar (story 21.23).
+    expect(bar).toMatch(/<\/div>\s*\{renderSheet\(\)\}/);
+    expect(bar).toMatch(/\/>\s*\{renderSheet\(\)\}/);
     // A field opens its picker in the opaque Popover, never a glass one in the glass sheet.
     expect(bar).toMatch(/<Popover\b[\s\S]{0,240}?\sopaque\s*>/);
     // The sheet closes where it changes edge, read through the shared hook.

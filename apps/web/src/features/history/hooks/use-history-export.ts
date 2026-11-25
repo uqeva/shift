@@ -15,6 +15,9 @@ import type { HistoryRow } from '@/features/history/services/history-rows';
 import type { HistorySearchFilters } from '@/features/history/services/history-search';
 import { writeHistoryExport } from '@/features/history/services/pdf';
 
+/** What the hook reads with no ready view: no rows, so nothing to export. */
+const NO_ROWS: { readonly rows: readonly HistoryRow[] } = { rows: [] };
+
 /**
  * *Povijest promjena*'s export (story 14.3), wired as the hours export's
  * (`useHoursExport`): whether a file is being built, and whether the last
@@ -34,7 +37,10 @@ import { writeHistoryExport } from '@/features/history/services/pdf';
  * while a file is built is refused by a ref, so two quick presses cannot start
  * two builds.
  */
-export function useHistoryExport(view: HistoryExportView, filters: HistorySearchFilters) {
+export function useHistoryExport(ready: HistoryExportView | null, filters: HistorySearchFilters) {
+  // STORY 21.23: called above the ready state, so the toolbar's *Izvoz* and the
+  // notices share it; with no ready view there are no rows and nothing to press.
+  const view = ready ?? NO_ROWS;
   const [pending, setPending] = useState(false);
   const [failedRows, setFailedRows] = useState<readonly HistoryRow[] | null>(null);
   const [refusedRows, setRefusedRows] = useState<readonly HistoryRow[] | null>(null);
@@ -57,7 +63,7 @@ export function useHistoryExport(view: HistoryExportView, filters: HistorySearch
   function start(): void {
     const press = historyExportPressOf(view, inFlight.current);
 
-    if (press === HISTORY_EXPORT_PRESS.ignore) return;
+    if (press === HISTORY_EXPORT_PRESS.ignore || ready === null) return;
 
     const built = view.rows;
 
@@ -72,7 +78,7 @@ export function useHistoryExport(view: HistoryExportView, filters: HistorySearch
 
     inFlight.current = true;
     setPending(true);
-    void exportHistory({ view, filters, generatedAt: new Date() }, writeHistoryExport).then((done) => {
+    void exportHistory({ view: ready, filters, generatedAt: new Date() }, writeHistoryExport).then((done) => {
       inFlight.current = false;
       if (!live.current) return;
 

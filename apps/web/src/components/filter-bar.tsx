@@ -13,6 +13,7 @@ import {
 } from 'react';
 
 import { LoanMark, lentFromText } from '@/components/loan-mark';
+import { PageToolbar, ToolbarLabel } from '@/components/page-toolbar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -23,6 +24,7 @@ import { Label } from '@/components/ui/label';
 import { Popover } from '@/components/ui/popover';
 import { useCloseWhenCrossing } from '@/hooks/viewport';
 import { t } from '@/lib/i18n';
+import { cn } from '@/lib/utils';
 import {
   ALL_TEAMS_OPTION,
   FILTERS_CLEARED,
@@ -54,6 +56,7 @@ import {
   type FilterChange,
   type FilterKey,
 } from '@/utils/filter-bar';
+import { NO_TEXT } from '@/utils/text';
 
 /**
  * What a screen can ask of the bar: make `change`, and once the model shows
@@ -238,14 +241,134 @@ export function useFilterBarState(stateKey: string) {
 }
 
 /**
+ * What a screen puts in its compact toolbar around the filter bar's own parts
+ * (story 21.23): the `<h1>`, the `lead` after it (a search, or the month
+ * control), and `after`, the controls after `Filtri` — `Prikaz ▾`, `Izvoz ▾`,
+ * then the primary action.
+ */
+export interface ToolbarSlots {
+  readonly title?: ReactNode;
+  readonly lead?: ReactNode;
+  readonly after?: ReactNode;
+  readonly className?: string;
+}
+
+/**
+ * The filter bar's parts in the compact page toolbar (story 21.23): `Filtri`
+ * among the toolbar's controls, and under the row the result count (the
+ * bar's summary, the `role="status"` line) followed by the active chips. With
+ * no `trigger` (nothing to filter on this view), the toolbar alone.
+ */
+export function FilterToolbar({
+  toolbar,
+  root,
+  trigger,
+  summary,
+  chips,
+}: {
+  readonly toolbar: ToolbarSlots;
+  readonly root: RefObject<HTMLDivElement | null>;
+  readonly trigger: ReactNode;
+  /** The result count, or `null` where the bar is not drawn. */
+  readonly summary: string | null;
+  readonly chips: ReactNode;
+}): ReactNode {
+  return (
+    <div ref={root} tabIndex={-1} className={cn('min-w-0 outline-none', toolbar.className)}>
+      <PageToolbar
+        title={toolbar.title}
+        lead={toolbar.lead}
+        controls={
+          trigger === null && toolbar.after === undefined ? undefined : (
+            <>
+              {trigger}
+              {toolbar.after}
+            </>
+          )
+        }
+        below={
+          summary === null ? undefined : (
+            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+              <p role="status" className="min-w-0 text-sm text-muted-foreground tabular-nums empty:hidden">
+                {summary}
+              </p>
+              {chips}
+            </div>
+          )
+        }
+      />
+    </div>
+  );
+}
+
+/**
+ * `Filtri` in the compact toolbar (story 21.23): an outline 44 px button with
+ * its funnel, its word (hidden on a phone) and, while filters are on, a Badge
+ * with their count — then named `Filtri, aktivno: 2`. In its own group named
+ * `Filtri`, as the chips are in theirs.
+ */
+export function FilterTrigger({
+  activeCount,
+  expanded,
+  sheetId,
+  filtriRef,
+  disabled = false,
+  describedBy,
+  onOpen,
+}: {
+  readonly activeCount: number;
+  readonly expanded: boolean;
+  readonly sheetId: string;
+  readonly filtriRef: RefObject<HTMLButtonElement | null>;
+  readonly disabled?: boolean;
+  readonly describedBy?: string | undefined;
+  readonly onOpen: () => void;
+}): ReactNode {
+  const badge = filterBadgeCountOf(activeCount);
+
+  return (
+    <div role="group" aria-label={t('filter.label')} className="shrink-0">
+      <Button
+        ref={filtriRef}
+        type="button"
+        variant="outline"
+        className="h-11 min-w-11 shrink-0 gap-2 px-3"
+        aria-label={badge === null ? undefined : t('filter.openActive', { count: badge })}
+        aria-haspopup="dialog"
+        aria-expanded={expanded}
+        aria-controls={expanded ? sheetId : undefined}
+        aria-describedby={describedBy}
+        disabled={disabled}
+        onClick={onOpen}
+      >
+        <FunnelSimple aria-hidden />
+        <ToolbarLabel>{t('filter.open')}</ToolbarLabel>
+        {badge === null ? null : (
+          <Badge aria-hidden className="tabular-nums">
+            {badge}
+          </Badge>
+        )}
+      </Button>
+    </div>
+  );
+}
+
+/**
  * THE FILTER BAR of *Kalendar*'s *Sve smjene* and of *Sati*'s organization
  * table (stories 7.5, 15.7), under the month toolbar: one summary card — what
  * is shown as the `role="status"` line, and `Filtri` with the count of
  * filters on — then one removable chip per active filter (`Smjena: B ✕`) and
- * `Očisti sve`, and the *Filtri* sheet, where each filter's value is picked
- * in a searchable list. The same at every width: the sheet docks at the
- * bottom below 1024 px and at the side from it. Every change is the screen's
+ * `Očisti sve`, and the *Filtri* panel, where each filter's value is picked
+ * in a searchable list. The panel is a bottom sheet below 1024 px and a
+ * dropdown under `Filtri` from it (story 21.23). Every change is the screen's
  * `onChange`, which writes the URL at once.
+ *
+ * WITH `toolbar` (story 21.23, *Kalendar*) the bar draws the compact page
+ * toolbar instead of the summary card: `Filtri` among the toolbar's
+ * controls, the summary as the result count under it, the chips after it.
+ * There a `null` model — *Moj raspored*, a month not yet read — draws the
+ * toolbar with no filter part, so the toolbar is one element for the
+ * screen's life and focus on its controls survives a change of mode.
  *
  * PRESENTATIONAL: the model (`@/utils/filter-bar`) decides the chips, the
  * summary, what a press changes — a person replacing the team in *Kalendar*,
@@ -255,14 +378,24 @@ export function FilterBar({
   model,
   onChange,
   handle,
+  toolbar,
 }: {
-  readonly model: FilterBarModel;
+  readonly model: FilterBarModel | null;
   readonly onChange: (change: FilterChange) => void;
   readonly handle?: Ref<FilterBarHandle>;
+  readonly toolbar?: ToolbarSlots;
 }): ReactNode {
-  const state = modelStateKeyOf(model);
+  // No model: an empty key, so no focus waits on a bar with nothing to filter.
+  const state = model === null ? NO_TEXT : modelStateKeyOf(model);
   const bar = useFilterBarState(state);
-  const { focusOnceShown } = bar;
+  const { focusOnceShown, closeSheet } = bar;
+
+  // No model, nothing to filter: an open panel closes.
+  const noModel = model === null;
+
+  useEffect(() => {
+    if (noModel) closeSheet();
+  }, [noModel, closeSheet]);
 
   /** Make `change`, and focus `target` once the model shows it. */
   const changeThenFocus = useCallback(
@@ -285,20 +418,16 @@ export function FilterBar({
     [changeThenFocus],
   );
 
-  return (
-    <div ref={bar.root} tabIndex={-1} className="min-w-0 px-4 pb-4 outline-none">
-      <div role="group" aria-label={t('filter.label')} className="grid min-w-0 gap-2">
-      <FilterSummaryCard
-        summary={t(filterSummaryMessageKey(model.summary), filterSummaryValuesOf(model.summary))}
-        activeCount={model.activeCount}
-        expanded={bar.expandedBy(null)}
-        sheetId={bar.sheetId}
-        filtriRef={bar.filtri}
-        onOpen={() => {
-          bar.openSheet(null);
-        }}
-      />
+  const summary =
+    model === null ? null : t(filterSummaryMessageKey(model.summary), filterSummaryValuesOf(model.summary));
+
+  /** One chip per filter on: in the toolbar their own group, `Aktivni filtri`; under the summary card the bar's. */
+  function renderChips(): ReactNode {
+    if (model === null) return null;
+
+    return (
       <ActiveChips
+        label={toolbar === undefined ? undefined : t('filter.activeLabel')}
         chips={activeChipsOf(model).map((chip) => ({
           key: chip.key,
           text: t(filterChipMessageKey(chip), { value: chip.value }),
@@ -316,18 +445,74 @@ export function FilterBar({
           changeThenFocus(FILTERS_CLEARED, null);
         }}
       />
-      </div>
-      <SheetDialog id={bar.sheetId} titleId={bar.titleId} open={bar.sheetOpen} onClose={bar.closeSheet} side>
+    );
+  }
+
+  /** The *Filtri* panel, under `Filtri`. */
+  function renderSheet(): ReactNode {
+    if (model === null) return null;
+
+    return (
+      <SheetDialog id={bar.sheetId} titleId={bar.titleId} open={bar.sheetOpen} onClose={bar.closeSheet} anchor={bar.filtri}>
         {bar.sheetOpen ? (
           <FilterSheetContent
             titleId={bar.titleId}
             model={model}
+            summary={summary ?? NO_TEXT}
             fieldRef={bar.fieldRef}
             onClose={bar.closeSheet}
             onChange={onChange}
           />
         ) : null}
       </SheetDialog>
+    );
+  }
+
+  if (toolbar !== undefined) {
+    return (
+      <>
+        <FilterToolbar
+          toolbar={toolbar}
+          root={bar.root}
+          trigger={
+            model === null ? null : (
+              <FilterTrigger
+                activeCount={model.activeCount}
+                expanded={bar.expandedBy(null)}
+                sheetId={bar.sheetId}
+                filtriRef={bar.filtri}
+                onOpen={() => {
+                  bar.openSheet(null);
+                }}
+              />
+            )
+          }
+          summary={summary}
+          chips={renderChips()}
+        />
+        {renderSheet()}
+      </>
+    );
+  }
+
+  if (model === null) return null;
+
+  return (
+    <div ref={bar.root} tabIndex={-1} className="min-w-0 px-4 pb-4 outline-none">
+      <div role="group" aria-label={t('filter.label')} className="grid min-w-0 gap-2">
+      <FilterSummaryCard
+        summary={summary ?? NO_TEXT}
+        activeCount={model.activeCount}
+        expanded={bar.expandedBy(null)}
+        sheetId={bar.sheetId}
+        filtriRef={bar.filtri}
+        onOpen={() => {
+          bar.openSheet(null);
+        }}
+      />
+      {renderChips()}
+      </div>
+      {renderSheet()}
     </div>
   );
 }
@@ -345,8 +530,8 @@ export function activeFilterSummaryOf(model: FilterBarModel): string | null {
  * THE SUMMARY CARD (story 15.7): an opaque reading Card — never glass — with
  * an icon, the muted tabular summary as the `role="status"` line, and
  * `Filtri`, at least 44 px, with a Badge counting the filters on (none with
- * none on; never `destructive`). `leading` (a search) and `trailing` (a sort)
- * share its row, each on its own row below 640 px where the screen asks.
+ * none on; never `destructive`). Since story 21.23 only *Sati*'s bar draws it;
+ * the compact toolbar draws {@link FilterTrigger} instead.
  */
 export function FilterSummaryCard({
   summary,
@@ -356,8 +541,6 @@ export function FilterSummaryCard({
   filtriRef,
   disabled = false,
   describedBy,
-  leading,
-  trailing,
   onOpen,
 }: {
   readonly summary: string;
@@ -369,15 +552,12 @@ export function FilterSummaryCard({
   readonly disabled?: boolean;
   /** The id of what describes `Filtri` — the screen's refusal while one is shown. */
   readonly describedBy?: string | undefined;
-  readonly leading?: ReactNode;
-  readonly trailing?: ReactNode;
   readonly onOpen: () => void;
 }): ReactNode {
   const badge = filterBadgeCountOf(activeCount);
 
   return (
     <Card className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 p-2">
-      {leading}
       <div className="flex min-w-0 flex-1 basis-0 items-center gap-3 pl-2">
         <Users aria-hidden className="size-5 shrink-0 text-muted-foreground" />
         <p role="status" className="min-w-0 py-1 text-sm text-muted-foreground tabular-nums">
@@ -405,7 +585,6 @@ export function FilterSummaryCard({
           </Badge>
         )}
       </Button>
-      {trailing}
     </Card>
   );
 }
@@ -424,6 +603,7 @@ export interface ActiveChipView<K extends string = string> {
  * follows while `showClear`. Nothing is drawn with no chip and nothing to clear.
  */
 export function ActiveChips<K extends string>({
+  label,
   chips,
   showClear,
   expandedBy,
@@ -435,6 +615,8 @@ export function ActiveChips<K extends string>({
   onRemove,
   onClear,
 }: {
+  /** In the compact toolbar (story 21.23): the chips' own group's name, `Aktivni filtri`. */
+  readonly label?: string | undefined;
   readonly chips: readonly ActiveChipView<K>[];
   readonly showClear: boolean;
   /** Whether the sheet is open and the chip `key` opened it: only that chip says so. */
@@ -449,49 +631,59 @@ export function ActiveChips<K extends string>({
 }): ReactNode {
   if (chips.length === 0 && !showClear) return null;
 
-  return (
-    <div className="flex min-w-0 flex-wrap items-center gap-2">
-      {chips.map((chip) => (
-        <div
-          key={chip.key}
-          className="inline-flex min-w-0 max-w-full items-center rounded-full border-[1.5px] border-primary bg-primary/10"
-        >
-          <Button
-            ref={chipRef(chip.key)}
-            type="button"
-            variant="ghost"
-            className="h-11 min-w-0 rounded-full pl-4 pr-1 font-semibold"
-            aria-haspopup="dialog"
-            aria-expanded={expandedBy(chip.key)}
-            aria-controls={expandedBy(chip.key) ? sheetId : undefined}
-            aria-describedby={describedBy}
-            disabled={disabled}
-            onClick={() => {
-              onOpen(chip.key);
-            }}
+  function renderRow(): ReactNode {
+    return (
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        {chips.map((chip) => (
+          <div
+            key={chip.key}
+            className="inline-flex min-w-0 max-w-full items-center rounded-full border-[1.5px] border-primary bg-primary/10"
           >
-            <span className="truncate">{chip.text}</span>
+            <Button
+              ref={chipRef(chip.key)}
+              type="button"
+              variant="ghost"
+              className="h-11 min-w-0 rounded-full pl-4 pr-1 font-semibold"
+              aria-haspopup="dialog"
+              aria-expanded={expandedBy(chip.key)}
+              aria-controls={expandedBy(chip.key) ? sheetId : undefined}
+              aria-describedby={describedBy}
+              disabled={disabled}
+              onClick={() => {
+                onOpen(chip.key);
+              }}
+            >
+              <span className="truncate">{chip.text}</span>
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-11 w-11 shrink-0 rounded-full p-0"
+              aria-label={chip.removeLabel}
+              aria-describedby={describedBy}
+              disabled={disabled}
+              onClick={() => {
+                onRemove(chip.key);
+              }}
+            >
+              <X aria-hidden />
+            </Button>
+          </div>
+        ))}
+        {showClear ? (
+          <Button type="button" variant="link" className="h-11 px-2" disabled={disabled} onClick={onClear}>
+            {t('filter.clearAll')}
           </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            className="h-11 w-11 shrink-0 rounded-full p-0"
-            aria-label={chip.removeLabel}
-            aria-describedby={describedBy}
-            disabled={disabled}
-            onClick={() => {
-              onRemove(chip.key);
-            }}
-          >
-            <X aria-hidden />
-          </Button>
-        </div>
-      ))}
-      {showClear ? (
-        <Button type="button" variant="link" className="h-11 px-2" disabled={disabled} onClick={onClear}>
-          {t('filter.clearAll')}
-        </Button>
-      ) : null}
+        ) : null}
+      </div>
+    );
+  }
+
+  return label === undefined ? (
+    renderRow()
+  ) : (
+    <div role="group" aria-label={label} className="min-w-0">
+      {renderRow()}
     </div>
   );
 }
@@ -876,21 +1068,24 @@ function PersonOptions({
 }
 
 /**
- * The *Filtri* sheet's content, mounted for each opening: the Smjena and
+ * The *Filtri* panel's content, mounted for each opening: the Smjena and
  * Osoba fields — in *Kalendar* with the note that a person replaces the team
- * — and `Poništi` and a live `Prikaži {n} osoba`. Every pick writes the URL
- * at once, so Back works; the sheet stays open until `Prikaži…`, Escape, its
- * close or a crossing of 1024 px.
+ * — the live result count, `Očisti` and `Primijeni`. Every pick writes the
+ * URL at once, so Back works; the panel stays open until `Primijeni`,
+ * Escape, its close or a crossing of 1024 px.
  */
 function FilterSheetContent({
   titleId,
   model,
+  summary,
   fieldRef,
   onClose,
   onChange,
 }: {
   readonly titleId: string;
   readonly model: FilterBarModel;
+  /** The result count the filters leave, live: the bar's summary. */
+  readonly summary: string;
   readonly fieldRef: (key: string) => (element: HTMLButtonElement | null) => void;
   readonly onClose: () => void;
   readonly onChange: (change: FilterChange) => void;
@@ -941,7 +1136,7 @@ function FilterSheetContent({
         {model.combine ? null : <p className="text-sm text-muted-foreground">{t('filter.replaceNote')}</p>}
       </div>
       <SheetFooter
-        shownCount={model.shownCount}
+        summary={summary}
         onReset={() => {
           onChange(FILTERS_CLEARED);
         }}
@@ -953,21 +1148,22 @@ function FilterSheetContent({
 
 /**
  * A sheet on the native `Dialog`: docked to the bottom edge (the month
- * picker's on a phone), or with `side` the *Filtri* sheet, at the bottom below
- * 1024 px and at the right from it.
+ * picker's on a phone), or with `anchor` the *Filtri* panel — at the bottom
+ * below 1024 px and, from it, a dropdown under `anchor`, its trigger (story
+ * 21.23).
  */
 export function SheetDialog({
   id,
   titleId,
   open,
-  side = false,
+  anchor,
   onClose,
   children,
 }: {
   readonly id: string;
   readonly titleId: string;
   readonly open: boolean;
-  readonly side?: boolean;
+  readonly anchor?: RefObject<HTMLElement | null>;
   readonly onClose: () => void;
   readonly children: ReactNode;
 }): ReactNode {
@@ -980,7 +1176,7 @@ export function SheetDialog({
       }}
       aria-labelledby={titleId}
       docked
-      side={side}
+      anchor={anchor}
     >
       {children}
     </Dialog>
@@ -996,24 +1192,35 @@ export function SheetHeader({ titleId, onClose }: { readonly titleId: string; re
   );
 }
 
-/** The sheet's `Poništi`, and `Prikaži {n} osoba`, which closes it. */
+/**
+ * The panel's foot (story 21.23): the result count the filters leave, live
+ * (the screen's own summary, a `role="status"` line), then `Očisti`, which
+ * clears every filter and keeps the panel open, and `Primijeni`, which closes
+ * it. Every pick has already written the URL, so `Primijeni` confirms what
+ * the count says and Back still steps through each pick.
+ */
 export function SheetFooter({
-  shownCount,
+  summary,
   onReset,
   onClose,
 }: {
-  readonly shownCount: number;
+  readonly summary: string;
   readonly onReset: () => void;
   readonly onClose: () => void;
 }): ReactNode {
   return (
-    <DialogFooter className="flex-row [&>*]:flex-1">
-      <Button type="button" variant="outline" className="h-11" onClick={onReset}>
-        {t('filter.sheetReset')}
-      </Button>
-      <Button type="button" className="h-11" onClick={onClose}>
-        {t('filter.sheetShow', { count: shownCount })}
-      </Button>
-    </DialogFooter>
+    <div className="grid min-w-0 gap-3">
+      <p role="status" className="text-sm text-muted-foreground tabular-nums empty:hidden">
+        {summary}
+      </p>
+      <DialogFooter className="flex-row [&>*]:flex-1">
+        <Button type="button" variant="outline" className="h-11" onClick={onReset}>
+          {t('filter.sheetReset')}
+        </Button>
+        <Button type="button" className="h-11" onClick={onClose}>
+          {t('filter.sheetApply')}
+        </Button>
+      </DialogFooter>
+    </div>
   );
 }

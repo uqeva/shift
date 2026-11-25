@@ -59,7 +59,7 @@ export class HistoryPage extends BasePage {
     // Exact: the chip's remove button is named `Ukloni filtar smjena: …`, which
     // holds the chip's own name case-insensitively.
     return this.page
-      .getByRole('group', { name: hr.filter.label, exact: true })
+      .getByRole('group', { name: hr.filter.activeLabel, exact: true })
       .getByRole('button', { name: text, exact: true });
   }
 
@@ -110,9 +110,24 @@ export class HistoryPage extends BasePage {
 
   // ------------------------------------------------ the export (story 14.3)
 
-  /** `Izvezi u PDF`, above the rows; while building, it wears the pending label. */
+  /** The compact toolbar's `Izvoz ▾` (story 21.23), drawn once the rows are ready. */
+  get exportMenu(): Locator {
+    return this.page.getByRole('button', { name: hr.toolbar.export, exact: true });
+  }
+
+  /**
+   * `Izvezi u PDF`, in `Izvoz ▾`'s menu (story 21.23): drawn only while it is
+   * open (`openExport`); while building, it wears the pending label.
+   */
   get exportButton(): Locator {
     return this.page.getByRole('button', { name: history.export.action, exact: true });
+  }
+
+  /** Opens `Izvoz ▾`, unless its menu is open already. */
+  async openExport(): Promise<void> {
+    if (await this.exportButton.isVisible()) return;
+    await this.exportMenu.click();
+    await this.exportButton.waitFor();
   }
 
   /** The line a failed build shows. */
@@ -137,8 +152,9 @@ export class HistoryPage extends BasePage {
     return new RegExp(`^${escapeRegExp(head ?? '')}.+ ${day} ${day}\\.pdf$`);
   }
 
-  /** Chooses the export and answers the download it starts. */
+  /** Opens `Izvoz ▾`, chooses the export and answers the download it starts. */
   async exportDownload(): Promise<Download> {
+    await this.openExport();
     const [download] = await Promise.all([this.page.waitForEvent('download'), this.exportButton.click()]);
 
     return download;

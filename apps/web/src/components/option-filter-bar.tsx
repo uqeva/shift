@@ -3,12 +3,14 @@ import { useEffect, type ReactNode } from 'react';
 import {
   ActiveChips,
   FilterField,
-  FilterSummaryCard,
+  FilterToolbar,
+  FilterTrigger,
   SearchableOptions,
   SheetDialog,
   SheetFooter,
   SheetHeader,
   useFilterBarState,
+  type ToolbarSlots,
 } from '@/components/filter-bar';
 import { t } from '@/lib/i18n';
 import { focusAfterOptionRemovalOf, optionChipsActiveCount, type OptionChipState } from '@/utils/filter-bar';
@@ -38,54 +40,57 @@ export interface OptionChipView extends OptionChipState {
 }
 
 /**
- * A BAR OF OPTION CHIPS (stories 7.13, 15.7): {@link FilterBar}'s drawing —
- * the summary card with `Filtri` and its count, one removable chip per set
- * filter with `Očisti sve`, and the *Filtri* sheet with one searchable field
- * per chip — over chips that each choose one value from a list. *Ljudi* draws
- * Razina, Smjena and Status with it, *Godišnji*'s overview Smjena and Stanje;
- * *Kalendar* and *Sati* keep {@link FilterBar}.
+ * A BAR OF OPTION CHIPS (stories 7.13, 15.7, 21.23) in the screen's compact
+ * page toolbar: `Filtri` with its count among the toolbar's controls, the
+ * summary as the one-line result count under the row, one removable chip per
+ * set filter with `Očisti sve` after it, and the *Filtri* panel with one
+ * searchable field per chip — a bottom sheet below 1024 px, a dropdown under
+ * `Filtri` from it. *Ljudi* draws Razina, Smjena and Status with it,
+ * *Godišnji*'s overview Smjena and Stanje, *Povijest promjena* Razdoblje,
+ * Osoba, Smjena and Vrsta; *Kalendar* and *Sati* keep {@link FilterBar}.
  *
  * PRESENTATIONAL: the screen decides the chips, the summary, and what each
  * press changes. `onPick` and `onRemove` make the change and return the state
  * it leaves, as one key, and focus waits for `stateKey` to read it before it
  * moves — after a ✕ to the next set chip, else `Filtri`. `onClear` is
  * `Očisti sve` and places focus itself (the screen's search); `onReset` is
- * the sheet's `Poništi`, which leaves focus in the sheet. `showClear` is the
+ * the panel's `Očisti`, which leaves focus in the panel. `showClear` is the
  * screen's: *Ljudi*'s default `Status: aktivni` is a drawn chip that counts in
  * the Badge, with no `Očisti sve`. `describedBy` points `Filtri` and the chips
  * at the screen's refusal while one is shown.
  *
- * `leading` (the search) and `trailing` share the summary card's row.
+ * `toolbar` is the rest of the row: the `<h1>`, the search as its `lead`, and
+ * the controls after `Filtri`. `absent` draws that toolbar with no filter
+ * part — a read refused, with nothing to narrow — so the toolbar is one
+ * element for the screen's life.
  */
 export function OptionFilterBar({
   chips,
   summary,
   showClear,
-  shownCount,
   stateKey,
   disabled = false,
+  absent = false,
   describedBy,
-  leading,
-  trailing,
+  toolbar,
   onPick,
   onRemove,
   onClear,
   onReset,
 }: {
   readonly chips: readonly OptionChipView[];
-  /** The summary line's text. */
+  /** The summary line's text: the result count. */
   readonly summary: string;
   /** `Očisti sve` is shown. */
   readonly showClear: boolean;
-  /** How many rows the filters leave: the sheet's `Prikaži {n} osoba`. */
-  readonly shownCount: number;
   /** The state the bar shows, as the key `onPick` and `onRemove` return. */
   readonly stateKey: string;
   readonly disabled?: boolean;
+  /** Nothing to filter: the toolbar alone. */
+  readonly absent?: boolean;
   /** The id of the screen's refusal while one is shown, for `Filtri` and the chips. */
   readonly describedBy?: string | undefined;
-  readonly leading?: ReactNode;
-  readonly trailing?: ReactNode;
+  readonly toolbar: ToolbarSlots;
   readonly onPick: (key: string, id: string) => string;
   readonly onRemove: (key: string) => string;
   readonly onClear: () => void;
@@ -94,79 +99,94 @@ export function OptionFilterBar({
   const bar = useFilterBarState(stateKey);
   const { closeSheet } = bar;
 
-  // Dead while there is no answer to narrow: an open sheet closes.
+  // Dead while there is no answer to narrow: an open panel closes.
   useEffect(() => {
-    if (disabled) closeSheet();
-  }, [disabled, closeSheet]);
+    if (disabled || absent) closeSheet();
+  }, [disabled, absent, closeSheet]);
 
   return (
-    <div ref={bar.root} tabIndex={-1} className="min-w-0 outline-none">
-      <div role="group" aria-label={t('filter.label')} className="grid min-w-0 gap-2">
-      <FilterSummaryCard
-        summary={summary}
-        activeCount={optionChipsActiveCount(chips)}
-        expanded={bar.expandedBy(null)}
-        sheetId={bar.sheetId}
-        filtriRef={bar.filtri}
-        disabled={disabled}
-        describedBy={describedBy}
-        leading={leading}
-        trailing={trailing}
-        onOpen={() => {
-          bar.openSheet(null);
-        }}
+    <>
+      <FilterToolbar
+        toolbar={toolbar}
+        root={bar.root}
+        trigger={
+          absent ? null : (
+            <FilterTrigger
+              activeCount={optionChipsActiveCount(chips)}
+              expanded={bar.expandedBy(null)}
+              sheetId={bar.sheetId}
+              filtriRef={bar.filtri}
+              disabled={disabled}
+              describedBy={describedBy}
+              onOpen={() => {
+                bar.openSheet(null);
+              }}
+            />
+          )
+        }
+        summary={absent ? null : summary}
+        chips={
+          <ActiveChips
+            label={t('filter.activeLabel')}
+            chips={chips
+              .filter((chip) => chip.active)
+              .map((chip) => ({ key: chip.key, text: chip.text, removeLabel: chip.removeLabel }))}
+            showClear={showClear}
+            expandedBy={bar.expandedBy}
+            sheetId={bar.sheetId}
+            disabled={disabled}
+            describedBy={describedBy}
+            chipRef={bar.chipRef}
+            onOpen={bar.openSheet}
+            onRemove={(key) => {
+              bar.focusOnceShown(onRemove(key), focusAfterOptionRemovalOf(chips, key));
+            }}
+            onClear={onClear}
+          />
+        }
       />
-      <ActiveChips
-        chips={chips
-          .filter((chip) => chip.active)
-          .map((chip) => ({ key: chip.key, text: chip.text, removeLabel: chip.removeLabel }))}
-        showClear={showClear}
-        expandedBy={bar.expandedBy}
-        sheetId={bar.sheetId}
-        disabled={disabled}
-        describedBy={describedBy}
-        chipRef={bar.chipRef}
-        onOpen={bar.openSheet}
-        onRemove={(key) => {
-          bar.focusOnceShown(onRemove(key), focusAfterOptionRemovalOf(chips, key));
-        }}
-        onClear={onClear}
-      />
-      </div>
-      <SheetDialog id={bar.sheetId} titleId={bar.titleId} open={bar.sheetOpen} onClose={bar.closeSheet} side>
-        {bar.sheetOpen ? (
-          <>
-            <SheetHeader titleId={bar.titleId} onClose={bar.closeSheet} />
-            {chips.map((chip) => (
-              <FilterField
-                key={chip.key}
-                label={chip.heading}
-                value={chip.options.find((option) => option.id === chip.chosen)?.label ?? chip.chosen}
-                pickerLabel={chip.pickerLabel}
-                disabled={disabled}
-                fieldRef={bar.fieldRef(chip.key)}
-                picker={(done) => (
-                  <SearchableOptions
-                    searchLabel={t('filter.optionSearch', { label: chip.heading })}
-                    items={chip.options}
-                    nameOf={(option) => option.label}
-                    keep={(option) => option.id === chip.allId}
-                    rowsOf={(matching) =>
-                      matching.map((option) => ({ id: option.id, name: option.label, count: option.count, group: null }))
-                    }
-                    chosen={chip.chosen}
-                    onPick={(id) => {
-                      if (id !== null) onPick(chip.key, id);
-                      done();
-                    }}
-                  />
-                )}
-              />
-            ))}
-            <SheetFooter shownCount={shownCount} onReset={onReset} onClose={bar.closeSheet} />
-          </>
-        ) : null}
-      </SheetDialog>
-    </div>
+      {absent ? null : (
+        <SheetDialog
+          id={bar.sheetId}
+          titleId={bar.titleId}
+          open={bar.sheetOpen}
+          onClose={bar.closeSheet}
+          anchor={bar.filtri}
+        >
+          {bar.sheetOpen ? (
+            <>
+              <SheetHeader titleId={bar.titleId} onClose={bar.closeSheet} />
+              {chips.map((chip) => (
+                <FilterField
+                  key={chip.key}
+                  label={chip.heading}
+                  value={chip.options.find((option) => option.id === chip.chosen)?.label ?? chip.chosen}
+                  pickerLabel={chip.pickerLabel}
+                  disabled={disabled}
+                  fieldRef={bar.fieldRef(chip.key)}
+                  picker={(done) => (
+                    <SearchableOptions
+                      searchLabel={t('filter.optionSearch', { label: chip.heading })}
+                      items={chip.options}
+                      nameOf={(option) => option.label}
+                      keep={(option) => option.id === chip.allId}
+                      rowsOf={(matching) =>
+                        matching.map((option) => ({ id: option.id, name: option.label, count: option.count, group: null }))
+                      }
+                      chosen={chip.chosen}
+                      onPick={(id) => {
+                        if (id !== null) onPick(chip.key, id);
+                        done();
+                      }}
+                    />
+                  )}
+                />
+              ))}
+              <SheetFooter summary={summary} onReset={onReset} onClose={bar.closeSheet} />
+            </>
+          ) : null}
+        </SheetDialog>
+      )}
+    </>
   );
 }

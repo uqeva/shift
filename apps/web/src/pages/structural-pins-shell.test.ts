@@ -766,13 +766,14 @@ describe('the chrome the layout wraps every destination in', () => {
     expect(dialog, 'the docked geometry is not the primitive’s').toContain(
       '"mb-0 mt-auto w-full max-w-none rounded-b-none rounded-t-2xl pb-[env(safe-area-inset-bottom,0px)]"',
     );
-    // STORY 15.7: `side` docks the filter sheet at the right from 1024 px,
-    // over the same bottom sheet below it, classes only and the safe areas kept.
-    expect(dialog, 'the side geometry is not the primitive’s').toContain(
-      '"lg:mr-0 lg:mt-0 lg:ml-auto lg:h-dvh lg:max-h-dvh lg:w-[26rem] lg:rounded-tr-none lg:rounded-bl-2xl lg:pt-[env(safe-area-inset-top,0px)]"',
+    // STORY 21.23 (replacing 15.7's side sheet): `anchor` makes the filter
+    // panel a dropdown under its trigger from 1024 px, over the same bottom
+    // sheet below it, classes only, over a clear backdrop.
+    expect(dialog, 'the anchored geometry is not the primitive’s').toContain(
+      '"lg:mb-auto lg:ml-auto lg:mr-[var(--anchor-right)] lg:mt-[var(--anchor-top)] lg:max-h-[calc(100dvh-var(--anchor-top)-1rem)] lg:w-[24rem] lg:max-w-[calc(100vw-2rem)] lg:rounded-lg lg:pb-0 lg:backdrop:bg-transparent"',
     );
-    expect(dialog).toContain('docked && side && DOCKED_SIDE');
-    expect(sheetDialog, 'the filter sheet does not dock at the side').toMatch(/\sside=\{side\}/);
+    expect(dialog).toContain('docked && anchor !== undefined && DOCKED_ANCHORED');
+    expect(sheetDialog, 'the filter panel is not anchored').toMatch(/\sanchor=\{anchor\}/);
     expect(popover).toContain('glass-panel');
     expect(css, 'the scrim blurs').not.toMatch(/::backdrop[^{]*\{[^}]*backdrop-filter/);
 

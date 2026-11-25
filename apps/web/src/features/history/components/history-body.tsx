@@ -2,14 +2,16 @@ import { useRef, useState, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 import { StackedSkeletonRow } from '@/components/ui/stacked-list';
 import { HistoryBegins } from '@/features/history/components/history-begins';
-import { HistoryExport } from '@/features/history/components/history-export';
+import { HistoryExportMenu, HistoryExportNotices } from '@/features/history/components/history-export';
 import { HistoryFilters } from '@/features/history/components/history-filters';
 import { HistoryStackedRows } from '@/features/history/components/history-rows';
 import { HistoryTable } from '@/features/history/components/history-table';
 import type { ChangeHistoryScreen } from '@/features/history/hooks/use-change-history';
+import { useHistoryExport } from '@/features/history/hooks/use-history-export';
 import { HISTORY_ROWS_STEP, historyRowsShownOf, type HistoryRow } from '@/features/history/services/history-rows';
 import { HISTORY_LOADING, HISTORY_OFFLINE, HISTORY_READY } from '@/features/history/services/history-states';
 import { usePhone } from '@/hooks/viewport';
@@ -19,17 +21,27 @@ import { keepFocusOnAlert } from '@/utils/retry-focus';
 const SKELETON_ROWS = [0, 1, 2, 3];
 
 /**
- * *Povijest promjena* under its heading (story 14.2): the chips, where
- * history begins when the period reaches it, the *Izvezi u PDF* action (story
- * 14.3), and the rows — a table from 640 px, stacked rows below, drawn
- * {@link HISTORY_ROWS_STEP} at a time (epic 14 retro A9). The
- * skeleton while the reads are unanswered; offline, one notice and no rows
- * (the history is never kept on the device); a failed read, one alert with a
- * retry; in place of no rows, one line that says why.
+ * *Povijest promjena* (story 14.2): its compact toolbar (story 21.23) — the
+ * title, `Filtri`, `Izvoz ▾` with *Izvezi u PDF* once the rows are ready
+ * (story 14.3), the result count and the chips — then the card: where history
+ * begins when the period reaches it, the export's outcome, and the rows — a
+ * table from 640 px, stacked rows below, drawn {@link HISTORY_ROWS_STEP} at a
+ * time (epic 14 retro A9). The skeleton while the reads are unanswered;
+ * offline, one notice and no rows (the history is never kept on the device);
+ * a failed read, one alert with a retry; in place of no rows, one line that
+ * says why. The toolbar is one element for the screen's life, so focus on it
+ * survives every refetch.
  */
-export function HistoryBody({ screen }: { readonly screen: ChangeHistoryScreen }): ReactNode {
+export function HistoryBody({
+  screen,
+  title,
+}: {
+  readonly screen: ChangeHistoryScreen;
+  readonly title: ReactNode;
+}): ReactNode {
   const { view, retryable, retry, clearFilters } = screen;
   const isPhone = usePhone();
+  const exporting = useHistoryExport(view.kind === HISTORY_READY ? view : null, screen.filters);
 
   function renderBody(): ReactNode {
     if (view.kind === HISTORY_OFFLINE) {
@@ -87,8 +99,8 @@ export function HistoryBody({ screen }: { readonly screen: ChangeHistoryScreen }
             <HistoryBegins begins={view.begins} />
           </div>
         )}
-        <div className="px-4">
-          <HistoryExport view={view} filters={screen.filters} />
+        <div className="px-4 empty:hidden">
+          <HistoryExportNotices exporting={exporting} />
         </div>
         {/* A new period or chip starts at one step again; a refetch of the same keeps the rows shown. */}
         <HistoryRowsInSteps key={screen.stateKey} rows={view.rows} empty={empty} isPhone={isPhone} />
@@ -97,12 +109,16 @@ export function HistoryBody({ screen }: { readonly screen: ChangeHistoryScreen }
   }
 
   return (
-    <div className="grid min-w-0 gap-4">
-      <div className="grid min-w-0 px-4 pt-4">
-        <HistoryFilters screen={screen} />
-      </div>
-      {renderBody()}
-    </div>
+    <>
+      <HistoryFilters
+        screen={screen}
+        title={title}
+        exports={view.kind === HISTORY_READY ? <HistoryExportMenu exporting={exporting} /> : undefined}
+      />
+      <Card className="min-w-0">
+        <div className="grid min-w-0 gap-4 pt-4">{renderBody()}</div>
+      </Card>
+    </>
   );
 }
 

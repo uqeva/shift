@@ -290,7 +290,8 @@ test.describe("the admin's overview (story 7.15)", () => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await leavePage.goto(`?trazi=${encodeURIComponent(member.name)}`);
     await expect(leavePage.heading(hr.nav.godisnji)).toBeVisible();
-    await expect(leavePage.text(overview.lede)).toBeVisible();
+    // STORY 21.23: the compact toolbar — the title, the search and `Filtri` in one row, no lede.
+    await expect(leavePage.overviewSearch).toBeVisible();
     // AN ADMIN SEES ONLY THE OVERVIEW: no tiles of their own.
     await expect(leavePage.allowanceFigure).toHaveCount(0);
     await expect(leavePage.overviewTable).toBeVisible();

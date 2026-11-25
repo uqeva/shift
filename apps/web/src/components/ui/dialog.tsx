@@ -27,10 +27,14 @@ import { cn } from "@/lib/utils"
 // rounded on top, padded clear of the safe area. Screens pass `docked` and
 // never restyle the panel.
 //
-// `docked side` IS THE FILTER SHEET (story 15.7): the same bottom sheet
-// below 1024 px, and from `lg:` a full-height panel at the right edge, rounded
-// on its inner side and padded clear of the top and bottom safe areas — classes
-// only, so the one sheet primitive is still restyled once, here.
+// `docked anchor` IS THE FILTER PANEL (story 21.23, replacing 15.7's side
+// sheet): the same bottom sheet below 1024 px, and from `lg:` a dropdown
+// panel under its trigger, right-aligned to it, over a clear backdrop. Still
+// the native modal: the focus trap, Escape and the return of focus are the
+// browser's at every width. The trigger's place is read as the panel opens
+// and on every resize while it is open, into two custom properties the
+// classes below read — classes only, so the one sheet primitive is still
+// restyled once, here.
 //
 // ONE BLURRED PANEL AT A TIME. A dialog opened over another (a change from the
 // day detail) marks every open panel beneath it `data-covered`, and
@@ -82,31 +86,75 @@ export interface DialogProps
   /** The phone's bottom sheet: docked to the bottom edge, full width. */
   docked?: boolean
   /**
-   * With `docked`: that bottom sheet below 1024 px, and from it a
-   * full-height panel at the right edge (the filter sheet, story 15.7).
+   * With `docked`: that bottom sheet below 1024 px, and from it a dropdown
+   * panel under this element, right-aligned to it (the filter panel, story
+   * 21.23).
    */
-  side?: boolean
+  anchor?: React.RefObject<HTMLElement | null> | undefined
 }
 
 /** The bottom sheet's geometry. */
 const DOCKED_BOTTOM =
   "mb-0 mt-auto w-full max-w-none rounded-b-none rounded-t-2xl pb-[env(safe-area-inset-bottom,0px)]"
 
-/** From 1024 px, the side sheet's geometry, over the bottom one. */
-const DOCKED_SIDE =
-  "lg:mr-0 lg:mt-0 lg:ml-auto lg:h-dvh lg:max-h-dvh lg:w-[26rem] lg:rounded-tr-none lg:rounded-bl-2xl lg:pt-[env(safe-area-inset-top,0px)]"
+/**
+ * From 1024 px, the anchored panel's geometry, over the bottom one: under the
+ * trigger (`--anchor-top`), its right edge on the trigger's
+ * (`--anchor-right`), never taller than the room below it, over a clear
+ * backdrop — a dropdown, not a sheet.
+ */
+const DOCKED_ANCHORED =
+  "lg:mb-auto lg:ml-auto lg:mr-[var(--anchor-right)] lg:mt-[var(--anchor-top)] lg:max-h-[calc(100dvh-var(--anchor-top)-1rem)] lg:w-[24rem] lg:max-w-[calc(100vw-2rem)] lg:rounded-lg lg:pb-0 lg:backdrop:bg-transparent"
+
+/** The gutter the anchored panel keeps from the viewport's edges, in px. */
+const ANCHOR_GUTTER = 16
+
+/** The gap between the trigger and the anchored panel, in px. */
+const ANCHOR_GAP = 8
+
+/** Where the anchored panel goes for a trigger at `rect` in a viewport `width` wide. */
+function anchorPlaceOf(rect: DOMRect, width: number): React.CSSProperties {
+  return {
+    "--anchor-top": `${String(Math.max(Math.round(rect.bottom + ANCHOR_GAP), ANCHOR_GUTTER))}px`,
+    "--anchor-right": `${String(Math.max(Math.round(width - rect.right), ANCHOR_GUTTER))}px`,
+  } as React.CSSProperties
+}
 
 function Dialog({
   open,
   onOpenChange,
   dismissible = true,
   docked = false,
-  side = false,
+  anchor,
   className,
+  style,
   children,
   ...props
 }: DialogProps) {
   const element = React.useRef<HTMLDialogElement>(null)
+  const [place, setPlace] = React.useState<React.CSSProperties | null>(null)
+
+  // THE TRIGGER'S PLACE, read before the panel shows and on every resize while
+  // it is open, and on every scroll: a native modal does not lock the page's
+  // scroll, and a scrolled trigger would leave the panel behind.
+  React.useLayoutEffect(() => {
+    if (!open || anchor === undefined) return
+
+    const measure = (): void => {
+      const trigger = anchor.current
+
+      // The top layer's box excludes a classic scrollbar; `innerWidth` does not.
+      if (trigger !== null) setPlace(anchorPlaceOf(trigger.getBoundingClientRect(), document.documentElement.clientWidth))
+    }
+
+    measure()
+    window.addEventListener("resize", measure)
+    window.addEventListener("scroll", measure, { passive: true, capture: true })
+    return () => {
+      window.removeEventListener("resize", measure)
+      window.removeEventListener("scroll", measure, { capture: true })
+    }
+  }, [open, anchor])
 
   React.useEffect(() => {
     const dialog = element.current
@@ -173,9 +221,10 @@ function Dialog({
       className={cn(
         "glass-panel p-0 text-foreground backdrop:bg-glass-scrim",
         docked ? DOCKED_BOTTOM : "m-auto w-[calc(100%-2rem)] max-w-lg rounded-lg",
-        docked && side && DOCKED_SIDE,
+        docked && anchor !== undefined && DOCKED_ANCHORED,
         className
       )}
+      style={anchor === undefined || place === null ? style : { ...place, ...style }}
       {...props}
     >
       {/* ONE SHRINKABLE COLUMN: without it the grid grows to its widest
@@ -268,7 +317,7 @@ function ConfirmDialog({
   onCancel,
   children,
   ...props
-}: Omit<DialogProps, "open" | "onOpenChange" | "dismissible" | "docked" | "side"> & {
+}: Omit<DialogProps, "open" | "onOpenChange" | "dismissible" | "docked" | "anchor"> & {
   busy: boolean
   onCancel: () => void
 }) {

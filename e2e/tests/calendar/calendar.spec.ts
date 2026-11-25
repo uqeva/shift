@@ -330,11 +330,12 @@ test.describe('the month toolbar', () => {
     // Off the current month there is still no Ovaj mjesec outside the picker.
     await expect(calendarPage.currentButtons).toHaveCount(0);
     await expect(calendarPage.pageHeader.getByRole('group', { name: kalendar.month, exact: true })).toBeVisible();
-    await expect(calendarPage.stickyHead.getByRole('group', { name: kalendar.month, exact: true })).toHaveCount(0);
-    // The head's row holds the mode switch alone.
-    await expect(calendarPage.stickyHead.getByRole('group', { name: kalendar.mode.label })).toBeVisible();
+    // STORY 21.23: from 640 px the Card has no head at all — the modes are
+    // the toolbar's `Prikaz ▾`, in the same row.
+    await expect(calendarPage.stickyHead).toHaveCount(0);
+    await expect(calendarPage.pageHeader.getByRole('button', { name: hr.toolbar.view, exact: true })).toBeVisible();
 
-    // The same row as the h1, at its right end.
+    // The same row as the h1, right after it (the toolbar's lead, story 21.23).
     const title = await calendarPage.anyHeading.boundingBox();
     const control = await calendarPage.monthToolbar.boundingBox();
     expect(title, 'the title has no box').not.toBeNull();
@@ -642,7 +643,8 @@ test.describe('on a phone, as a member', () => {
 
     await calendarPage.goto();
     await expect(calendarPage.monthHeading(monthHeading(rotation.today))).toBeVisible();
-    const { moj, sve } = calendarPage.modes();
+    // STORY 21.23: the modes are `Prikaz ▾`'s menu.
+    const { moj, sve } = await calendarPage.openModes();
     await expect(moj).toHaveAttribute('aria-pressed', 'true');
     await expect(sve).toHaveAttribute('aria-pressed', 'false');
     await expect(calendarPage.anyGrid).toHaveCount(0);
@@ -668,6 +670,9 @@ test.describe('on a phone, as a member', () => {
     // the team's name over the type, drawn in full, named like a gridcell.
     await sve.click();
     await expect(page).toHaveURL(/prikaz=sve/);
+    // A pick closes the menu and puts focus back on `Prikaz`.
+    await expect(calendarPage.viewMenu).toBeFocused();
+    await calendarPage.openModes();
     await expect(sve).toHaveAttribute('aria-pressed', 'true');
     await expect(calendarPage.anyGrid).toHaveCount(0);
     const cell = calendarPage.dayButtonIn(calendarPage.dayList, fixture.team.name, rotation.today);
@@ -686,6 +691,7 @@ test.describe('on a phone, as a member', () => {
       expect(box!.height).toBeGreaterThanOrEqual(MINIMUM_TARGET - 0.5);
     }
     await expectTouchTargets(page);
+    await calendarPage.closeModes();
 
     // `prikaz` survives next, and the switch back keeps the month.
     const next = firstOfNextMonth(rotation.today);
@@ -695,6 +701,7 @@ test.describe('on a phone, as a member', () => {
     await expect(page).toHaveURL(/prikaz=sve/);
     await expect(calendarPage.teamDaysOf(fixture.team.name).first()).toBeVisible();
     await expect(calendarPage.anyGrid).toHaveCount(0);
+    await calendarPage.openModes();
     await moj.click();
     await expect(page).toHaveURL(/prikaz=moj/);
     await expect(page).toHaveURL(new RegExp(`mjesec=${next.slice(0, 7)}`));
@@ -727,9 +734,10 @@ test.describe('on a phone, as an admin', () => {
 
   test('lands on Sve smjene, the day list of every team (story 21.3)', async ({ page, calendarPage, fixture }) => {
     await calendarPage.goto();
-    const { moj, sve } = calendarPage.modes();
+    const { moj, sve } = await calendarPage.openModes();
     await expect(sve).toHaveAttribute('aria-pressed', 'true');
     await expect(moj).toHaveAttribute('aria-pressed', 'false');
+    await calendarPage.closeModes();
     await expect(calendarPage.teamDaysOf(fixture.team.name).first()).toBeVisible();
     // Exactly one form in the DOM: no grid, and no strip of one.
     await expect(calendarPage.anyGrid).toHaveCount(0);
@@ -759,7 +767,8 @@ test.describe('on a phone, as the member on no team', () => {
     await calendarPage.goto();
 
     await expect(calendarPage.noTeamNotice).toBeVisible();
-    await expect(calendarPage.modes().moj).toHaveAttribute('aria-pressed', 'true');
+    await expect((await calendarPage.openModes()).moj).toHaveAttribute('aria-pressed', 'true');
+    await calendarPage.closeModes();
     await expect(calendarPage.dayList).toHaveCount(0);
     await expect(calendarPage.anyGrid).toHaveCount(0);
     await expectNoHorizontalScroll(page);
@@ -805,8 +814,8 @@ for (const [width, height, name] of [
       await expect(cells).toHaveCount(rows * columns);
 
       // Tab enters the grid on that one cell, and a second Tab leaves it. The
-      // control before the grid is the filter bar's last one drawn (story 7.5).
-      await calendarPage.filters.lastControl.focus();
+      // control before the grid is the toolbar's last one, `Izvoz ▾` (story 21.23).
+      await calendarPage.exportMenu.focus();
       await page.keyboard.press('Tab');
       await expect(calendarPage.todayFirstCell).toBeFocused();
       const start = await calendarPage.focusedCell();
@@ -1351,7 +1360,8 @@ test.describe('a roster override at 390 px, as the member put on', () => {
 
     await loginPage.signIn(fixture.slug, fixture.spare.username, fixture.password);
     await calendarPage.goto();
-    await expect(calendarPage.modes().moj).toHaveAttribute('aria-pressed', 'true');
+    await expect((await calendarPage.openModes()).moj).toHaveAttribute('aria-pressed', 'true');
+    await calendarPage.closeModes();
     await expect(calendarPage.noTeamNotice).toHaveCount(0);
     const today = calendarPage.today;
     await expect(today).toContainText(expectedType(rotation, rotation.today));
@@ -2230,14 +2240,17 @@ test.describe('the team filter at 1280 px', () => {
     await expect(filters.summary).toContainText(summaryAllOf(columns));
     await expect(filters.clearButton).toHaveCount(0);
 
-    // `Filtri` opens the sheet at the right, focus on its first field.
+    // `Filtri` opens the panel as a dropdown under it, its right edge on
+    // `Filtri`'s (story 21.23), focus on its first field.
+    const filtriBox = await filters.filtriButton.boundingBox();
     await filters.filtriButton.click();
     await expect(filters.sheet).toBeVisible();
     await expect(filters.filtriButton).toHaveAttribute('aria-expanded', 'true');
     await expect(filters.teamField).toBeFocused();
     const sheetBox = await filters.sheet.boundingBox();
-    expect(sheetBox!.x + sheetBox!.width).toBeGreaterThanOrEqual(1280 - 1);
-    expect(sheetBox!.height).toBeGreaterThanOrEqual(800 - 1);
+    expect(sheetBox!.y, 'the panel is not under Filtri').toBeGreaterThanOrEqual(filtriBox!.y + filtriBox!.height - 1);
+    expect(Math.abs(sheetBox!.x + sheetBox!.width - (filtriBox!.x + filtriBox!.width)), 'the panel is not right-aligned to Filtri').toBeLessThanOrEqual(2);
+    expect(sheetBox!.height, 'the panel is a full-height sheet').toBeLessThan(800 - 1);
 
     // The Smjena picker: an empty search, `Sve smjene (N)` chosen and
     // focused, every team with its count.
@@ -2344,7 +2357,8 @@ test.describe('the team filter at 1280 px', () => {
 
   test('Moj raspored ignores the team, shows no filter, and keeps it in the URL', async ({ page, calendarPage, fixture }) => {
     await calendarPage.goto(`?prikaz=moj&smjena=${fixture.team.id}`);
-    await expect(calendarPage.modes().moj).toHaveAttribute('aria-pressed', 'true');
+    await expect((await calendarPage.openModes()).moj).toHaveAttribute('aria-pressed', 'true');
+    await calendarPage.closeModes();
     await expect(calendarPage.monthHeading(/\d{4}$/)).toBeVisible();
     await expect(calendarPage.filters.bar).toHaveCount(0);
     await expect(calendarPage.filters.summary).toHaveCount(0);
@@ -2619,7 +2633,8 @@ test.describe('the person filter in Moj raspored', () => {
     expect(osoba).not.toBe('');
 
     await calendarPage.goto(`?prikaz=moj&osoba=${osoba}`);
-    await expect(calendarPage.modes().moj).toHaveAttribute('aria-pressed', 'true');
+    await expect((await calendarPage.openModes()).moj).toHaveAttribute('aria-pressed', 'true');
+    await calendarPage.closeModes();
     await expect(calendarPage.monthHeading(/\d{4}$/)).toBeVisible();
     await expect(calendarPage.filters.bar).toHaveCount(0);
     await expect(calendarPage.personHeading(fixture.member.name, { exact: false })).toHaveCount(0);
@@ -2690,11 +2705,11 @@ test.describe('the filters on a phone', () => {
     );
 
     // Choosing a team writes the URL at once, and `Prikaži` counts its people.
-    const before = await filters.sheetShowAny.innerText();
+    const before = await filters.sheetSummary.innerText();
     await filters.pickIn(filterWords.team, filters.teamOption(fixture.team.name));
     await expect(page).toHaveURL(searchParamPattern('smjena', fixture.team.id));
     await expect(filters.teamField).toHaveAccessibleName(filters.fieldName(filterWords.team, fixture.team.name));
-    await expect(filters.sheetShowAny).not.toHaveText(before);
+    await expect(filters.sheetSummary).not.toHaveText(before);
 
     // Escape closes it, focus on `Filtri`, whose Badge now counts one.
     await page.keyboard.press('Escape');
@@ -2720,7 +2735,7 @@ test.describe('the filters on a phone', () => {
     await filters.openSheet();
     await filters.pickIn(filterWords.person, filters.personOption(fixture.member.name));
     await expect(page).toHaveURL(anySearchParamPattern('osoba'));
-    await filters.sheetShow(1).click();
+    await filters.sheetApply.click();
     await expect(filters.sheet).toBeHidden();
     await expect(filters.filtriButton).toBeFocused();
     await expect(filters.personChip).toHaveAccessibleName(filters.personChipText(fixture.member.name));
@@ -2753,11 +2768,11 @@ test.describe('the filters on a phone, after a change', () => {
     await filters.filtriButton.click();
     await expect(filters.sheet).toBeVisible();
     await expect(filters.filtriButton).toHaveAttribute('aria-expanded', 'true');
-    const narrowed = await filters.sheetShowAny.innerText();
+    const narrowed = await filters.sheetSummary.innerText();
     await filters.sheetReset.click();
     await expect(page).not.toHaveURL(anySearchParamPattern('smjena'));
     await expect(page).not.toHaveURL(anySearchParamPattern('osoba'));
-    await expect(filters.sheetShowAny).not.toHaveText(narrowed);
+    await expect(filters.sheetSummary).not.toHaveText(narrowed);
 
     // Type into the search, close, reopen: the search is empty again.
     await filters.personField.click();

@@ -5,7 +5,6 @@ import { expect, test, type Browser, type CDPSession, type Page } from '@playwri
 
 import { CalendarPage } from '../e2e/pages/calendar.page.ts';
 import { LoginPage } from '../e2e/pages/login.page.ts';
-import { hr } from '../e2e/utils/i18n.ts';
 
 /**
  * Story 15.5: the glass budget, measured. This is the automatable proxy for a
@@ -110,22 +109,26 @@ async function signIn(page: Page): Promise<void> {
  * its mode pressed and its first team day drawn.
  */
 async function expectAllTeams(calendar: CalendarPage, timeout = 5_000): Promise<void> {
-  await expect(calendar.modes().sve, 'Sve smjene is not the mode shown (was it not remembered?)').toHaveAttribute(
+  // STORY 21.23: the modes are `Prikaz ▾`'s menu, closed again before anything is measured.
+  const { sve } = await calendar.openModes();
+  await expect(sve, 'Sve smjene is not the mode shown (was it not remembered?)').toHaveAttribute(
     'aria-pressed',
     'true',
     { timeout },
   );
+  await calendar.closeModes();
   await expect(calendar.dayList.getByRole('button').first()).toBeVisible({ timeout });
 }
 
 /** Opens *Kalendar* and makes sure *Sve smjene* (all teams), not *Moj raspored*, shows. */
-async function openAllTeams(calendar: CalendarPage, page: Page): Promise<void> {
+async function openAllTeams(calendar: CalendarPage): Promise<void> {
   await calendar.goto();
   await expect(calendar.monthHeading()).toBeVisible();
-  const modeSwitch = page.getByRole('button', { name: hr.kalendar.mode.sve, exact: true });
-  // Wait until the screen has settled on one mode before deciding.
-  await expect(modeSwitch).toBeVisible();
+  // Wait until the screen has settled on one mode before deciding (story
+  // 21.23: in `Prikaz ▾`'s menu); a pick closes the menu.
+  const { sve: modeSwitch } = await calendar.openModes();
   if ((await modeSwitch.getAttribute('aria-pressed')) !== 'true') await modeSwitch.click();
+  else await calendar.closeModes();
   await expectAllTeams(calendar);
 }
 
@@ -137,7 +140,7 @@ test('NFR-22: the month renders within two seconds on a mid-range phone', async 
   await signIn(page);
   const calendar = new CalendarPage(page);
   // Once unthrottled, so the mode the screen remembers is Sve smjene.
-  await openAllTeams(calendar, page);
+  await openAllTeams(calendar);
 
   const session = await page.context().newCDPSession(page);
   await session.send('Network.enable');
@@ -318,10 +321,11 @@ async function expectGrid(calendar: CalendarPage): Promise<void> {
 }
 
 /** Opens *Kalendar*'s *Sve smjene* at a grid width: the grid, never the day list. */
-async function openGridAtWidth(calendar: CalendarPage, page: Page): Promise<void> {
+async function openGridAtWidth(calendar: CalendarPage): Promise<void> {
   await calendar.goto('?prikaz=sve');
   await expect(calendar.monthHeading()).toBeVisible();
-  await expect(page.getByRole('button', { name: hr.kalendar.mode.sve, exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect((await calendar.openModes()).sve).toHaveAttribute('aria-pressed', 'true');
+  await calendar.closeModes();
   await expectGrid(calendar);
 }
 

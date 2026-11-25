@@ -2294,3 +2294,12 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-21-24-smjenko-brand-name-logo-and-icons.md`
   summary: OWNER the founder (consider). On a phone the sign-in screen shows no product name or mark: the brand panel is drawn from `lg` up only (story 15.3, "the person holding it came to sign in"). Whether *Smjenko*'s mark should head the phone's sign-in form is a design decision this story did not take.
   evidence: `auth-layout.tsx`'s `hidden … lg:flex` panel; raised by the 21.24 review.
+
+## Deferred from: story 21.23, compact toolbar and filters (2026-11-25)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-23-compact-toolbar-and-filters.md`
+  summary: OWNER the founder (scope). *Sati*'s organization table keeps the 15.7 summary card inside its Card (it shares 21.23's anchored panel and its `Očisti` / `Primijeni` foot, not the toolbar), and *Ljudi*'s member-role directory keeps its page header and lede. Neither was in the founder's list of four pages; moving *Sati*'s filters and its *Izvezi u Excel* into a page toolbar would change a tabbed page's layout and is a story of its own if wanted.
+  evidence: Spec 21.23 § Epic AC Deviations.
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-23-compact-toolbar-and-filters.md`
+  summary: The phone row puts the search under the title and buttons visually while it comes before them in the DOM (CSS `order`), so below 640 px focus goes from the search (row 2) back up to `Filtri` (row 1). Kept because the DOM order is the desktop's reading order; revisit if a screen-reader or keyboard user on a phone reports it.
+  evidence: 21.23 implementation, `components/page-toolbar.tsx`.

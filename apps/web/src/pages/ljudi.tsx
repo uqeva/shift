@@ -2,12 +2,14 @@ import { Link, createRoute, redirect, useNavigate } from '@tanstack/react-router
 import { useCallback } from 'react';
 
 import { OfflineNote } from '@/components/offline-note';
+import { ToolbarLabel } from '@/components/page-toolbar';
 import { Button } from '@/components/ui/button';
 import { Plus, UsersThree } from '@/components/ui/icon';
 import { Notice } from '@/components/ui/notice';
-import { PageActions, PageDescription, PageHeader, PageTitle } from '@/components/ui/page-header';
+import { PageDescription, PageHeader, PageTitle } from '@/components/ui/page-header';
 import { t } from '@/lib/i18n';
 import { MemberAddDialog } from '@/features/members/components/member-add-dialog';
+import { MemberFilters } from '@/features/members/components/member-filters';
 import { MemberTable } from '@/features/members/components/member-table';
 import { useMemberCreate, type MemberAddNavigate } from '@/features/members/hooks/use-member-create';
 import { useMemberList, type MembersNavigate } from '@/features/members/hooks/use-member-list';
@@ -163,34 +165,39 @@ function LjudiList() {
       className="mx-auto flex w-full min-w-0 max-w-5xl flex-1 flex-col gap-6 p-6"
       aria-busy={loading}
     >
-      <PageHeader>
-        <div className="min-w-0">
-          {/* FOCUSABLE BY SCRIPT ONLY: where focus lands when the dialog
-              closes after a deep link, with no button that opened it. */}
+      {/* STORY 21.23: ONE COMPACT TOOLBAR — the title, the search, `Filtri`,
+          then the teams link and *Dodaj osobu* — with the result count and
+          the chips under it, and the table right after. */}
+      <MemberFilters
+        list={list}
+        title={
+          // FOCUSABLE BY SCRIPT ONLY: where focus lands when the dialog
+          // closes after a deep link, with no button that opened it.
           <PageTitle asChild>
             <h1 id={MEMBERS_PAGE_HEADING_ID} tabIndex={-1}>
               {t('nav.ljudi')}
             </h1>
           </PageTitle>
-          <PageDescription>{t('ljudi.lede')}</PageDescription>
-        </div>
-        <PageActions>
-          {/* STORY 1.7a: the teams screen, reached from here rather than from
-              the navigation, so the destinations stay eight. */}
-          <Button asChild variant="outline" className="h-11">
-            <Link to="/ljudi/smjene">
-              <UsersThree aria-hidden />
-              {t('smjene.heading')}
-            </Link>
-          </Button>
-          {/* THE WAY IN, a BUTTON (story 7.13b): adding a person is a dialog
-              on this list, not a screen. It is where focus returns on close. */}
-          <Button ref={create.opener} type="button" className="h-11" onClick={create.open}>
-            <Plus aria-hidden />
-            {t('ljudi.form.add')}
-          </Button>
-        </PageActions>
-      </PageHeader>
+        }
+        actions={
+          <>
+            {/* STORY 1.7a: the teams screen, reached from here rather than from
+                the navigation, so the destinations stay eight. */}
+            <Button asChild variant="outline" className="h-11 min-w-11 shrink-0 gap-2 px-3">
+              <Link to="/ljudi/smjene">
+                <UsersThree aria-hidden />
+                <ToolbarLabel>{t('smjene.heading')}</ToolbarLabel>
+              </Link>
+            </Button>
+            {/* THE WAY IN, a BUTTON (story 7.13b): adding a person is a dialog
+                on this list, not a screen. It is where focus returns on close. */}
+            <Button ref={create.opener} type="button" className="h-11 min-w-11 shrink-0 gap-2 px-3" onClick={create.open}>
+              <Plus aria-hidden />
+              <ToolbarLabel>{t('ljudi.form.add')}</ToolbarLabel>
+            </Button>
+          </>
+        }
+      />
       <OfflineNote offline={list.offline} />
       {/* OUTSIDE the answered branch, and conditional on both sides: a read that
           produced no row never renders a table, so an explanation rendered

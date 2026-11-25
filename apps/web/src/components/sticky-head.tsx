@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
-import { STICKY_HEAD_HEIGHT_VAR, filtersCoveredBy, stickyHeadHeightOf } from '@/utils/sticky-head';
+import { STICKY_HEAD_HEIGHT_VAR, filtersAboveCoveredBy, filtersCoveredBy, stickyHeadHeightOf } from '@/utils/sticky-head';
 
 /**
  * THE PHONE'S STICKY HEAD of *Kalendar* and *Sati* (deferred-work E816): the
  * month toolbar, held at the top of the viewport below 640 px while the month
  * scrolls, and in flow from 640 px up, where the sidebar leaves room for the
- * page to scroll it away. The filter bar is NOT in it: it follows in flow, so
- * the head stays one toolbar high.
+ * page to scroll it away (on *Sati*; *Kalendar* draws no head from 640 px
+ * since story 21.23, its month being the compact toolbar's). The filter bar
+ * is NOT in it: on *Sati* it follows in flow, on *Kalendar* it is the
+ * toolbar's, above the Card (`filtersAbove`), so the head stays one toolbar
+ * high.
  *
  * `summary` is the active filters as one line (`null` with none on). Once the
  * filter bar has scrolled up under the head, that line shows under the
@@ -34,9 +37,16 @@ import { STICKY_HEAD_HEIGHT_VAR, filtersCoveredBy, stickyHeadHeightOf } from '@/
  */
 export function StickyHead({
   summary = null,
+  filtersAbove = false,
   children,
 }: {
   readonly summary?: string | null;
+  /**
+   * STORY 21.23: the filter bar is above the head's Card (*Kalendar*'s
+   * compact toolbar), not after the head: the summary shows once the Card's
+   * top has scrolled away.
+   */
+  readonly filtersAbove?: boolean;
   readonly children: ReactNode;
 }): ReactNode {
   const head = useRef<HTMLDivElement>(null);
@@ -79,6 +89,14 @@ export function StickyHead({
     }
 
     const check = (): void => {
+      if (filtersAbove) {
+        const container = element.parentElement;
+
+        setCovered(container !== null && filtersAboveCoveredBy(container.getBoundingClientRect().top));
+
+        return;
+      }
+
       const next = element.nextElementSibling;
 
       setCovered(
@@ -95,7 +113,7 @@ export function StickyHead({
       window.removeEventListener('scroll', check);
       window.removeEventListener('resize', check);
     };
-  }, [summary]);
+  }, [summary, filtersAbove]);
 
   return (
     <div

@@ -23,12 +23,22 @@ function labelOf(options: readonly HistoryOptionView[], id: string | null, pendi
 }
 
 /**
- * *Povijest promjena*'s four chips (story 14.2) — Razdoblje (a chip once it is not the default)
- * then Osoba, Smjena and Vrsta — on the shared option-chip bar, with the
- * summary line. What each press changes is the hook's; this only puts the
- * words on it. Dead while there is nothing to narrow.
+ * *Povijest promjena*'s compact toolbar (stories 14.2, 21.23): the `<h1>`,
+ * `Filtri` with the four chips — Razdoblje (a chip once it is not the
+ * default) then Osoba, Smjena and Vrsta — on the shared option-chip bar, the
+ * summary as the result count, and `exports` (`Izvoz ▾`) after `Filtri`.
+ * What each press changes is the hook's; this only puts the words on it.
+ * Dead while there is nothing to narrow.
  */
-export function HistoryFilters({ screen }: { readonly screen: ChangeHistoryScreen }): ReactNode {
+export function HistoryFilters({
+  screen,
+  title,
+  exports,
+}: {
+  readonly screen: ChangeHistoryScreen;
+  readonly title: ReactNode;
+  readonly exports?: ReactNode;
+}): ReactNode {
   const { view, filters, periods } = screen;
   const ready = view.kind === HISTORY_READY ? view : null;
   const members = ready?.members ?? [];
@@ -102,9 +112,9 @@ export function HistoryFilters({ screen }: { readonly screen: ChangeHistoryScree
       chips={chips}
       summary={ready === null ? NO_TEXT : t('history.summary', { shown: ready.shown, total: ready.total })}
       showClear={historyNarrowed(filters)}
-      shownCount={ready?.shown ?? 0}
       stateKey={screen.stateKey}
       disabled={ready === null}
+      toolbar={{ title, after: exports }}
       onPick={screen.pickChip}
       onRemove={screen.removeChip}
       onClear={screen.clearFilters}

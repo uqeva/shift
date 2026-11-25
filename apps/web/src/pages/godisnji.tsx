@@ -2,12 +2,14 @@ import { Link, createRoute, redirect, useNavigate } from '@tanstack/react-router
 import { useCallback } from 'react';
 
 import { OfflineNote } from '@/components/offline-note';
+import { PageToolbar } from '@/components/page-toolbar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CalendarPlus } from '@/components/ui/icon';
 import { Notice } from '@/components/ui/notice';
-import { PageActions, PageDescription, PageHeader, PageTitle } from '@/components/ui/page-header';
+import { PageActions, PageHeader, PageTitle } from '@/components/ui/page-header';
 import { LeaveOverviewBody } from '@/features/leave/components/leave-overview-body';
+import { LeaveOverviewFilters } from '@/features/leave/components/leave-overview-filters';
 import { MyLeaveBody } from '@/features/leave/components/my-leave-body';
 import { MyLeaveRequests } from '@/features/leave/components/my-leave-requests';
 import { MyLeaveSkeleton } from '@/features/leave/components/my-leave-skeleton';
@@ -86,14 +88,14 @@ export function GodisnjiScreen() {
       className="mx-auto flex w-full min-w-0 max-w-5xl flex-1 flex-col gap-6 p-6"
       aria-busy={screen.view === GODISNJI_LOADING || screen.loading}
     >
-      <PageHeader>
-        <div className="min-w-0">
-          <PageTitle asChild>
-            <h1>{t('nav.godisnji')}</h1>
-          </PageTitle>
-          {screen.view === GODISNJI_OVERVIEW ? <PageDescription>{t('godisnji.overview.lede')}</PageDescription> : null}
-        </div>
-      </PageHeader>
+      {/* STORY 21.23: the overview's compact toolbar — the title, *Traži
+          osobu*, `Filtri`, the result count and the chips — and the table
+          right after. Before the role is known, the title alone. */}
+      {screen.view === GODISNJI_OVERVIEW ? (
+        <LeaveOverviewFilters screen={screen} title={<GodisnjiTitle />} />
+      ) : (
+        <PageToolbar title={<GodisnjiTitle />} />
+      )}
       <OfflineNote offline={screen.offline} />
       {screen.view === GODISNJI_OVERVIEW ? (
         <Card className="min-w-0">
@@ -122,6 +124,15 @@ export function GodisnjiScreen() {
         </Card>
       )}
     </main>
+  );
+}
+
+/** The admin view's `<h1>`, in the compact toolbar (story 21.23). */
+function GodisnjiTitle() {
+  return (
+    <PageTitle asChild>
+      <h1>{t('nav.godisnji')}</h1>
+    </PageTitle>
   );
 }
 

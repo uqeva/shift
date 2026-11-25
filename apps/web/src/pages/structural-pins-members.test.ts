@@ -1114,8 +1114,8 @@ describe('the member list filters are dead while unanswered, and the reset resto
   });
 
   it.each([
-    { name: 'the search losing its guard', from: 'onChange={changeSearch}\n              disabled={unanswered}', to: 'onChange={changeSearch}' },
-    { name: 'the chips losing their guard', from: '      disabled={unanswered}\n      describedBy', to: '      describedBy' },
+    { name: 'the search losing its guard', from: 'onChange={changeSearch}\n                disabled={unanswered}', to: 'onChange={changeSearch}' },
+    { name: 'the chips losing their guard', from: '      disabled={unanswered}\n      absent', to: '      absent' },
     { name: 'the reset dropping unanswered', from: 'showClear={!unanswered && isNarrowed(filters)}', to: 'showClear={isNarrowed(filters)}' },
     { name: 'the reset ignoring isNarrowed', from: 'showClear={!unanswered && isNarrowed(filters)}', to: 'showClear={!unanswered}' },
     { name: 'the sheet resetting with focus', from: 'onReset={list.clearFilters}', to: 'onReset={list.resetFilters}' },

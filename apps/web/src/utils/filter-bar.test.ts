@@ -176,9 +176,8 @@ describe('the chips and the summary', () => {
     expect(t('filter.personCount', { count: 1 })).toBe('1 osoba');
     expect(t('filter.personCount', { count: 4 })).toBe('4 osobe');
     expect(t('filter.personCount', { count: 21 })).toBe('21 osoba');
-    expect(t('filter.sheetShow', { count: 4 })).toBe('Prikaži 4 osobe');
-    expect(t('filter.sheetShow', { count: 17 })).toBe('Prikaži 17 osoba');
-    expect(t('filter.sheetShow', { count: 1 })).toBe('Prikaži 1 osobu');
+    expect(t('filter.sheetApply')).toBe('Primijeni');
+    expect(t('filter.sheetReset')).toBe('Očisti');
     expect(t('filter.allTeams', { count: 4 })).toBe('Svi timovi (4)');
     expect(t('filter.matches', { shown: 1, total: 17 })).toBe('1 od 17');
     expect(t('filter.clear')).toBe('Poništi filtre');

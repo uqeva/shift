@@ -31,16 +31,28 @@ import {
 import { NO_TEXT } from '@/utils/text';
 
 /**
- * The member list's search, its three chips — Razina, Smjena and Status — and
- * the summary line with `Poništi filtre` (story 7.13), drawn by the shared
- * option-chip bar (`@/components/filter-bar`, the 7.5 drawing).
+ * *Ljudi*'s compact toolbar (stories 7.13, 21.23): the `<h1>`, the search,
+ * `Filtri` with the three chips — Razina, Smjena and Status — the summary as
+ * the result count, and the screen's `actions` at the right, drawn by the
+ * shared option-chip bar (`@/components/option-filter-bar`).
  *
  * WHAT EACH PRESS CHANGES is `@/features/members/services/list`'s, through
  * the hook; this only puts the words on it. The chips are drawn from the URL
- * at once, and are dead while there is no answer to narrow.
+ * at once, and are dead while there is no answer to narrow. A read that
+ * failed leaves the toolbar with the title and the actions alone, as the
+ * table under it is not drawn either.
  */
-export function MemberFilters({ list }: { readonly list: MemberList }): ReactNode {
-  const { search, searchField, changeSearch, unanswered, refusal, filters, narrowed, summary } = list;
+export function MemberFilters({
+  list,
+  title,
+  actions,
+}: {
+  readonly list: MemberList;
+  readonly title: ReactNode;
+  readonly actions: ReactNode;
+}): ReactNode {
+  const { search, searchField, changeSearch, unanswered, loading, refusal, filters, narrowed, summary } = list;
+  const absent = unanswered && !loading;
   // THE TEAM THE ROWS WERE NARROWED BY, once there are rows; before that the
   // URL's, so the chip says what was asked for while the list loads.
   const team = unanswered ? filters.team : narrowed.team;
@@ -102,32 +114,37 @@ export function MemberFilters({ list }: { readonly list: MemberList }): ReactNod
       chips={chips}
       summary={summaryText(summary)}
       showClear={!unanswered && isNarrowed(filters)}
-      shownCount={narrowed.rows.length}
       stateKey={list.stateKey}
       disabled={unanswered}
+      absent={absent}
       describedBy={refusal === null ? undefined : MEMBERS_ERROR_ID}
-      leading={
-        <div className="grid min-w-0 flex-1 basis-full lg:basis-64">
-          <Label htmlFor="ljudi-search" className="sr-only">
-            {t('ljudi.search')}
-          </Label>
-          <InputGroup>
-            <InputGroupIcon>
-              <MagnifyingGlass />
-            </InputGroupIcon>
-            <Input
-              id="ljudi-search"
-              ref={searchField}
-              type="search"
-              className="h-11 w-full"
-              value={search}
-              onChange={changeSearch}
-              disabled={unanswered}
-              aria-describedby={refusal === null ? undefined : MEMBERS_ERROR_ID}
-            />
-          </InputGroup>
-        </div>
-      }
+      toolbar={{
+        title,
+        lead: absent ? undefined : (
+          <div className="grid min-w-0">
+            <Label htmlFor="ljudi-search" className="sr-only">
+              {t('ljudi.search')}
+            </Label>
+            <InputGroup>
+              <InputGroupIcon>
+                <MagnifyingGlass />
+              </InputGroupIcon>
+              <Input
+                id="ljudi-search"
+                ref={searchField}
+                type="search"
+                className="h-11 w-full"
+                placeholder={t('toolbar.searchPlaceholder')}
+                value={search}
+                onChange={changeSearch}
+                disabled={unanswered}
+                aria-describedby={refusal === null ? undefined : MEMBERS_ERROR_ID}
+              />
+            </InputGroup>
+          </div>
+        ),
+        after: actions,
+      }}
       onPick={list.pickChip}
       onRemove={list.removeChip}
       onClear={list.resetFilters}

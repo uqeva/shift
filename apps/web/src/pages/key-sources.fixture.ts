@@ -929,7 +929,10 @@ export const KEY_SOURCES = [
     // *Ispiši*, the header's title and time printed, and *Moj raspored*'s
     // filter in words with and without a team.
     // STORY 19.4: where a schedule comes from, with no team.
-    strings: 189,
+    // ONE HUNDRED AND NINETY-SEVEN SINCE STORY 21.23: the compact toolbar —
+    // `Prikaz` and `Izvoz` with their menus' names, and the shared bar's
+    // `Filtri` group, trigger and count, `Aktivni filtri` and `Primijeni`.
+    strings: 197,
   },
   {
     // STORY 12.2. On the swap proposal: its heading (twice, once while the
@@ -1111,7 +1114,9 @@ export const KEY_SOURCES = [
     keys: translationKeys,
     // ONE HUNDRED AND SEVEN SINCE STORY 18.5: the shared Osoba picker's hidden
     // separator before a lent person's mark.
-    strings: 107,
+    // ONE HUNDRED AND ELEVEN SINCE STORY 21.23: the shared bar's toolbar
+    // `Filtri` (its group, word and count) and the `Aktivni filtri` group.
+    strings: 111,
   },
   {
     // STORY 5.2c. THREE on Godišnji: its own `nav.godisnji` heading, the
@@ -1147,7 +1152,9 @@ export const KEY_SOURCES = [
     name: 'the Godišnji destination',
     file: GODISNJI,
     keys: translationKeys,
-    strings: 67,
+    // SIXTY-SIX SINCE STORY 21.23: the overview's lede gone, and the search's
+    // placeholder the shared `Traži…` rather than its label again.
+    strings: 66,
   },
   {
     // STORY 9.3. On the request form: its heading (twice, once while the role
@@ -1190,7 +1197,8 @@ export const KEY_SOURCES = [
     name: 'the Povijest promjena destination',
     file: POVIJEST_PROMJENA,
     keys: translationKeys,
-    strings: 57,
+    // FIFTY-EIGHT SINCE STORY 21.23: the lede gone, `Izvoz` and its menu's name added.
+    strings: 58,
   },
   {
     // STORY 14.2: the history's words — the record, action, field, value,

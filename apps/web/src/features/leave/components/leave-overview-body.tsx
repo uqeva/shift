@@ -3,7 +3,6 @@ import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import { StackedSkeletonRow } from '@/components/ui/stacked-list';
-import { LeaveOverviewFilters } from '@/features/leave/components/leave-overview-filters';
 import { LeaveOverviewRows } from '@/features/leave/components/leave-overview-rows';
 import { LeaveOverviewTable } from '@/features/leave/components/leave-overview-table';
 import type { LeaveOverviewScreen } from '@/features/leave/hooks/use-leave-overview';
@@ -20,10 +19,10 @@ import { keepFocusOnAlert } from '@/utils/retry-focus';
 const SKELETON_ROWS = [0, 1, 2, 3];
 
 /**
- * The admin's *Godišnji* under its heading (story 7.15): *Traži osobu* and
- * the Smjena and Stanje chips with the summary line (E884,
- * `leave-overview-filters`), and the overview — a table from 640 px, stacked
- * rows below it. The skeleton while the reads are unanswered, one alert with
+ * The admin's *Godišnji* under its compact toolbar (stories 7.15, 21.23;
+ * *Traži osobu*, the Smjena and Stanje chips and the result count are the
+ * page's `leave-overview-filters`): the overview — a table from 640 px,
+ * stacked rows below it. The skeleton while the reads are unanswered, one alert with
  * a retry when any read failed, and in place of the rows one line that states
  * what is true: nobody active today, no name matching the search with
  * *Poništi pretragu*, or nobody the chips leave with *Poništi filtre*.
@@ -110,12 +109,5 @@ export function LeaveOverviewBody({ screen }: { readonly screen: LeaveOverviewSc
     );
   }
 
-  return (
-    <div className="grid min-w-0 gap-4">
-      <div className="grid min-w-0 px-4 pt-4">
-        <LeaveOverviewFilters screen={screen} />
-      </div>
-      {renderBody()}
-    </div>
-  );
+  return <div className="grid min-w-0 gap-4 pt-4">{renderBody()}</div>;
 }
