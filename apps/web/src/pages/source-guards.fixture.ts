@@ -306,12 +306,18 @@ export const RUCNI_RASPORED: readonly string[] = [
   join(srcRoot, 'features', 'planning', 'components', 'manual-picker.tsx'),
   join(srcRoot, 'features', 'planning', 'components', 'manual-preview-dialog.tsx'),
   join(srcRoot, 'features', 'planning', 'components', 'manual-save-bar.tsx'),
+  // Story 21.5: *Popuni uzorkom* and *Kopiraj*.
+  join(srcRoot, 'features', 'planning', 'components', 'manual-plan-buttons.tsx'),
+  join(srcRoot, 'features', 'planning', 'components', 'manual-fill-dialog.tsx'),
+  join(srcRoot, 'features', 'planning', 'components', 'manual-copy-dialog.tsx'),
+  join(srcRoot, 'features', 'planning', 'components', 'manual-people-field.tsx'),
 ];
 
-/** Story 21.4's rules: the preview's line keys and the save's refusals, off their `\w*MessageKey` unions. */
+/** Story 21.4's rules: the preview's line keys and the save's refusals, off their `\w*MessageKey` unions; 21.5's fill and copy refusals. */
 export const RUCNI_RASPORED_KEYS: readonly string[] = [
   join(srcRoot, 'features', 'planning', 'services', 'manual-preview.ts'),
   join(srcRoot, 'features', 'planning', 'services', 'manual-save.ts'),
+  join(srcRoot, 'features', 'planning', 'services', 'manual-fill.ts'),
 ];
 
 /** Story 14.2's rules: the history's words, off `t()` and its `\w*MessageKey` unions. */
@@ -1253,7 +1259,14 @@ export const SCREENS = [
   // *Odbaci*, *Spremi* and the unchecked save's *Provjeri ponovno*; and in
   // *Što se mijenja* *Natrag na uređivanje* and its *Spremi*. The grid's
   // cells are `gridcell`s and the phone's dates plain buttons, never a `<Button>`.
-  { name: 'the Ručni raspored destination', file: RUCNI_RASPORED, expectedFields: 2, expectedButtons: 10 },
+  // ELEVEN FIELDS AND EIGHTEEN BUTTONS SINCE STORY 21.5: *Popuni uzorkom*'s Od,
+  // Do, a step's choice and count (written once inside the map over the
+  // steps) and *Počni od koraka*; *Kopiraj*'s source and target as dates and
+  // as months. Its buttons: *Popuni uzorkom* and *Kopiraj* (written once,
+  // drawn in the toolbar or above the phone's day list), a step's remove,
+  // *Dodaj korak*, and each dialog's *Odustani* and submit. The people's
+  // checkboxes are native `<input>`s, inside 44 px labels.
+  { name: 'the Ručni raspored destination', file: RUCNI_RASPORED, expectedFields: 11, expectedButtons: 18 },
   // STORY 9.3. On the request form: the od and do `<Input>`s, *Pošalji*,
   // *Odustani* (a `<Button asChild>` link back to Godišnji), the figures'
   // unavailable alert's retry, *Natrag na Godišnji* above the title (written

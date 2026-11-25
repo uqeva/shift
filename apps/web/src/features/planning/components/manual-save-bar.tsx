@@ -28,6 +28,13 @@ export function ManualSaveBar({ screen }: { readonly screen: ManualScreen }): Re
             : screen.saved === null
               ? t('rucniRaspored.bar.none')
               : t('rucniRaspored.bar.saved', { count: screen.saved })}
+          {/* WHAT A FILL OR COPY DID (story 21.5): the days drafted, and those left out as archived. */}
+          {screen.planned === null ? null : (
+            <span className="block">{t('rucniRaspored.plan.placed', { count: screen.planned.placed })}</span>
+          )}
+          {screen.planned === null || screen.planned.skipped === 0 ? null : (
+            <span className="block">{t('rucniRaspored.plan.skipped', { count: screen.planned.skipped })}</span>
+          )}
         </p>
         <Button className="h-11" type="button" variant="outline" disabled={count === 0 || screen.pending} onClick={screen.discard}>
           {t('rucniRaspored.bar.discard')}

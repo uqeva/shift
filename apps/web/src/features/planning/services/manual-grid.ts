@@ -349,14 +349,19 @@ export interface ManualMonth {
   readonly legend: readonly ManualLegendEntry[];
 }
 
-/** Saturday or Sunday, by the civil date alone (no zone). */
-export function isWeekend(date: string): boolean {
+/** The weekday of a civil date (no zone): 0 is Sunday, 6 Saturday. */
+export function weekdayOf(date: string): number {
   const [year, month, day] = date.split('-').map(Number) as [number, number, number];
-  // Sakamoto's method: 0 is Sunday.
+  // Sakamoto's method.
   const offsets = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4] as const;
   const y = month < 3 ? year - 1 : year;
-  const weekday =
-    (y + Math.floor(y / 4) - Math.floor(y / 100) + Math.floor(y / 400) + (offsets[month - 1] ?? 0) + day) % 7;
+
+  return (y + Math.floor(y / 4) - Math.floor(y / 100) + Math.floor(y / 400) + (offsets[month - 1] ?? 0) + day) % 7;
+}
+
+/** Saturday or Sunday, by the civil date alone (no zone). */
+export function isWeekend(date: string): boolean {
+  const weekday = weekdayOf(date);
 
   return weekday === 0 || weekday === 6;
 }

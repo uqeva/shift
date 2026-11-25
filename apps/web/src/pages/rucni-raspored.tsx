@@ -10,9 +10,12 @@ import { Notice } from '@/components/ui/notice';
 import { PageTitle } from '@/components/ui/page-header';
 import { calendarMessageKey } from '@/features/calendar/services/snapshot';
 import { requireAdmin } from '@/features/navigation/services/admin-guard';
+import { ManualCopyDialog } from '@/features/planning/components/manual-copy-dialog';
+import { ManualFillDialog } from '@/features/planning/components/manual-fill-dialog';
 import { ManualGrid } from '@/features/planning/components/manual-grid';
 import { ManualMemberDays } from '@/features/planning/components/manual-member-days';
 import { ManualPicker } from '@/features/planning/components/manual-picker';
+import { ManualPlanButtons } from '@/features/planning/components/manual-plan-buttons';
 import { ManualPreviewDialog } from '@/features/planning/components/manual-preview-dialog';
 import { ManualSaveBar } from '@/features/planning/components/manual-save-bar';
 import {
@@ -120,17 +123,20 @@ export function RucniRasporedScreen() {
         lead={isPhone || refusal !== null ? undefined : <MonthNav month={screen.month} headingId={MANUAL_HEADING_ID} onShow={screen.show} />}
         controls={
           isPhone || refusal !== null ? undefined : (
-            <Button
-              className="h-11"
-              type="button"
-              variant="outline"
-              disabled={screen.selected.length === 0 || screen.pending}
-              onClick={() => {
-                screen.openPicker(screen.selected);
-              }}
-            >
-              {t('rucniRaspored.edit', { count: screen.selected.length })}
-            </Button>
+            <>
+              <ManualPlanButtons screen={screen} />
+              <Button
+                className="h-11"
+                type="button"
+                variant="outline"
+                disabled={screen.selected.length === 0 || screen.pending}
+                onClick={() => {
+                  screen.openPicker(screen.selected);
+                }}
+              >
+                {t('rucniRaspored.edit', { count: screen.selected.length })}
+              </Button>
+            </>
           )
         }
       />
@@ -157,12 +163,19 @@ export function RucniRasporedScreen() {
               </div>
             </StickyHead>
           ) : null}
+          {isPhone && screen.shown !== null && screen.shown.rows.length !== 0 ? (
+            <div className="flex flex-wrap gap-2 px-4 pt-4">
+              <ManualPlanButtons screen={screen} />
+            </div>
+          ) : null}
           <ManualLegend screen={screen} isPhone={isPhone} />
           <ManualBody screen={screen} isPhone={isPhone} />
           <ManualSaveBar screen={screen} />
         </Card>
       )}
       <ManualPicker screen={screen} />
+      <ManualFillDialog screen={screen} />
+      <ManualCopyDialog screen={screen} />
       <ManualPreviewDialog screen={screen} />
     </main>
   );
