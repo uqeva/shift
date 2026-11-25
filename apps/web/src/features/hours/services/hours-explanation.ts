@@ -196,15 +196,17 @@ interface LineNames {
   readonly inConflict: ReadonlySet<string>;
 }
 
-/** A team's and a shift type's names as stored. @throws RangeError for one the snapshot lacks. */
+/**
+ * A team's and a shift type's names as stored; a Personal Shift counted with
+ * no team reads `bez tima` (story 21.6), never an unavailable explanation.
+ *
+ * @throws RangeError for one the snapshot lacks.
+ */
 function namesOf(names: LineNames, teamId: string | null, shiftTypeId: string): { readonly team: string; readonly shiftType: string } {
-  // Story 21.1: a Personal Shift counted with no team reads `bez tima` from story 21.6; until then the explanation is unavailable.
-  if (teamId === null) throw new RangeError(`a shift of type ${shiftTypeId} counts with no team`);
-
-  const team = names.teams.get(teamId);
+  const team = teamId === null ? t('sati.organization.noTeamWord') : names.teams.get(teamId);
   const shiftType = names.types.get(shiftTypeId);
 
-  if (team === undefined) throw new RangeError(`team ${teamId} is not in the snapshot`);
+  if (team === undefined) throw new RangeError(`team ${String(teamId)} is not in the snapshot`);
   if (shiftType === undefined) throw new RangeError(`shift type ${shiftTypeId} is not in the snapshot`);
 
   return { team, shiftType };

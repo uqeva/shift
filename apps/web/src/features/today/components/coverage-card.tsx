@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { useId, type ReactNode } from 'react';
 
 import { Card } from '@/components/ui/card';
+import { PencilSimple } from '@/components/ui/icon';
 import { CONFLICT_GLYPH } from '@/features/calendar/utils/modifiers';
 import { MODE_SVE } from '@/features/calendar/utils/month';
 import {
@@ -10,6 +11,7 @@ import {
   STAFFING_SHORT,
   coverageAbsentMessageKey,
   coverageHasNoTeamOf,
+  coverageRowKeyOf,
   coveragePhaseMessageKey,
   coverageShiftMessageKey,
   coverageStaffingMessageKey,
@@ -36,10 +38,18 @@ function renderAbsent(absent: CoverageAbsent): ReactNode {
  */
 function renderRow(row: CoverageRow): ReactNode {
   return (
-    <li key={row.teamId} className="grid min-w-0 gap-1 py-2">
+    <li key={coverageRowKeyOf(row)} className="grid min-w-0 gap-1 py-2">
       <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <span className="min-w-0 break-words font-semibold tabular-nums">
           {t(coverageShiftMessageKey(row), { type: row.shiftTypeName, range: row.range, team: row.teamName })}
+          {/* STORY 21.6 (UX-DR73): a staffing group is marked assigned, the pencil and `ručno`. */}
+          {row.groupTypeId === undefined ? null : (
+            <span className="ml-2 inline-flex items-center gap-1 font-normal text-muted-foreground">
+              <PencilSimple aria-hidden className="size-3 shrink-0" />
+              <span aria-hidden>{t('kalendar.cell.assignedShort')}</span>
+              <span className="sr-only">{t('kalendar.cell.assigned')}</span>
+            </span>
+          )}
         </span>
         {row.staffing === STAFFING_NOBODY ? null : (
           <span className="font-semibold tabular-nums">

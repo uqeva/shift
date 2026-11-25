@@ -1,6 +1,7 @@
 import { useId, type ReactNode } from 'react';
 
 import { Card } from '@/components/ui/card';
+import { PencilSimple } from '@/components/ui/icon';
 import type { MemberTeam } from '@/features/members/services/list';
 import { LoanNoticeLine } from '@/features/calendar/components/loan-notice-line';
 import { dayEmptyMessageKey } from '@/features/calendar/utils/empty-day';
@@ -27,11 +28,19 @@ import { t } from '@/lib/i18n';
  */
 function renderShift(shift: TodayShift, index: number): ReactNode {
   return (
-    <li key={`${String(index)}-${shift.teamId}`} className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+    <li key={`${String(index)}-${String(shift.teamId)}`} className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
       <span className="font-semibold">{shift.name ?? t('kalendar.noRotation')}</span>
       {shift.range === null ? null : <span className="tabular-nums">{shift.range}</span>}
       {shift.fromYesterday ? <span className="text-muted-foreground">{t('danas.today.fromYesterday')}</span> : null}
-      <span className="min-w-0 break-words text-muted-foreground">{shift.teamName}</span>
+      {/* STORY 21.6 (UX-DR73): a Personal Shift is marked assigned, the pencil and `ručno`. */}
+      {shift.assigned === true ? (
+        <span className="flex items-center gap-1 text-muted-foreground">
+          <PencilSimple aria-hidden className="size-3 shrink-0" />
+          <span aria-hidden>{t('kalendar.cell.assignedShort')}</span>
+          <span className="sr-only">{t('kalendar.cell.assigned')}</span>
+        </span>
+      ) : null}
+      <span className="min-w-0 break-words text-muted-foreground">{shift.teamName ?? t('kalendar.cell.noTeam')}</span>
     </li>
   );
 }

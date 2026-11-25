@@ -590,6 +590,9 @@
       "empty": "Taj dan nitko nije raspoređen.",
       "off": "{team} taj dan ne radi.",
       "noRotation": "{team} taj dan nema rotacije.",
+      "offGroups": "{team} taj dan nema smjenu iz rotacije. Ručno dodijeljeni rade:",
+      "noRotationGroups": "{team} taj dan nema rotacije. Ručno dodijeljeni rade:",
+      "group": "{type} · ručno",
       "changes": {
         "heading": "Izmjene",
         "empty": "Za ovaj dan nema izmjena tipa smjene ni sastava."
@@ -740,6 +743,13 @@
       "uncovered": "Nepokriveno",
       "shortStaffed": "Premalo ljudi"
     },
+    "cell": {
+      "assigned": "dodijeljeno ručno",
+      "assignedShort": "ručno",
+      "noTeam": "bez tima",
+      "noTeamShown": "· bez tima"
+    },
+    "legendAssigned": "olovka: dodijeljeno ručno",
     "error": {
       "unavailable": "Kalendar trenutačno nije moguće učitati. Pokušaj ponovno."
     },
@@ -2861,6 +2871,15 @@
     "noTeam": "Bez tima",
     "offMark": "–",
     "countedMark": "+",
+    "addShift": {
+      "title": "Dodaj smjenu",
+      "hint": "Jedna smjena za jedan dan. Otvara Ručni raspored na tom danu, s istim izborom, provjerom i spremanjem.",
+      "date": "Datum",
+      "open": "Odaberi smjenu",
+      "cancel": "Odustani",
+      "close": "Zatvori",
+      "noRow": "Za tu osobu taj dan ovdje nema što urediti, pa joj smjenu ne možeš dodati. Odaberi drugi datum ili osobu."
+    },
     "column": {
       "person": "Osoba"
     },

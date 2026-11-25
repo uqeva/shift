@@ -2,13 +2,14 @@ import { DUTY_DONE, type DutyPhase } from '@shift/domain';
 import { useId, type ReactNode } from 'react';
 
 import { Card } from '@/components/ui/card';
-import { CheckCircleBold, CircleDashedBold, RecordBold, type IconComponent } from '@/components/ui/icon';
+import { CheckCircleBold, CircleDashedBold, PencilSimple, RecordBold, type IconComponent } from '@/components/ui/icon';
 import {
   dutyEndLineMessageKey,
   dutyHeadlineMessageKey,
   dutyLegStateMessageKey,
   dutyNoteMessageKey,
   endLinePointOf,
+  NOTE_OWN,
   NOTE_REPLACING,
   type DutyDuration,
   type DutyLegNote,
@@ -39,7 +40,7 @@ function pointText(point: DutyPoint): string {
 function noteText(note: DutyLegNote): string {
   return note.kind === NOTE_REPLACING
     ? t(dutyNoteMessageKey(note.kind), { name: note.member, team: note.team })
-    : t(dutyNoteMessageKey(note.kind), { team: note.team });
+    : t(dutyNoteMessageKey(note.kind), { team: note.team ?? t('kalendar.cell.noTeam') });
 }
 
 /** One leg: its state in words with its icon, then the type, its range and whose shift it is. */
@@ -55,7 +56,17 @@ function renderLeg(leg: TodayDutyLeg, index: number): ReactNode {
           <span className="font-semibold">{leg.name}</span>
           {leg.range === null ? null : <span className="tabular-nums">{leg.range}</span>}
         </p>
-        <p className="min-w-0 break-words text-sm text-muted-foreground">{noteText(leg.note)}</p>
+        <p className="flex min-w-0 flex-wrap items-center gap-x-2 break-words text-sm text-muted-foreground">
+          <span className="min-w-0 break-words">{noteText(leg.note)}</span>
+          {/* STORY 21.6 (UX-DR73): a Personal Shift's pencil and `ručno`, as the today card draws them. */}
+          {leg.note.kind === NOTE_OWN && leg.note.assigned === true ? (
+            <span className="inline-flex items-center gap-1">
+              <PencilSimple aria-hidden className="size-3 shrink-0" />
+              <span aria-hidden>{t('kalendar.cell.assignedShort')}</span>
+              <span className="sr-only">{t('kalendar.cell.assigned')}</span>
+            </span>
+          ) : null}
+        </p>
       </div>
     </li>
   );

@@ -465,6 +465,8 @@ export const MEMBER_EDIT: readonly string[] = [
   // `MEMBER_LOAN_KEYS`, a key source of its own.
   join(MEMBERS_FEATURE, 'hooks', 'use-member-loan.ts'),
   join(MEMBERS_FEATURE, 'components', 'member-loan-dialog.tsx'),
+  // STORY 21.6: *Dodaj smjenu*, the planning feature's card the page composes.
+  join(srcRoot, 'features', 'planning', 'components', 'member-add-shift-card.tsx'),
 ];
 
 /** The two team pages, which only compose (source structure B6), and their hooks. */
@@ -725,6 +727,9 @@ export const CALENDAR_ROSTER_WRITE_KEYS = join(srcRoot, 'features', 'calendar', 
 
 /** Story 3.2b's modifier vocabulary: the four marks' labels and a cell with no rotation. */
 export const CALENDAR_MODIFIER_KEYS = join(srcRoot, 'features', 'calendar', 'utils', 'modifiers.ts');
+
+/** Story 21.6: the day detail's sentence for a day with no Scheduled Shift, off `dayNotWorkingMessageKey`. */
+export const CALENDAR_DAY_DETAIL_KEYS = join(srcRoot, 'features', 'calendar', 'utils', 'day-detail.ts');
 
 /** B449: what an empty day or month says, inactive or on no team; shared with *Danas*. */
 export const CALENDAR_EMPTY_DAY_KEYS = join(srcRoot, 'features', 'calendar', 'utils', 'empty-day.ts');
@@ -1097,7 +1102,8 @@ export const SCREENS = [
   // *Razlog*; and its card button, retry, cancel and *Spremi*.
   // FORTY-THREE BUTTONS SINCE STORY 18.4: a loan row's *Izmijeni posudbu* and
   // the amend dialog's *Završi danas*. *Ukloni posudbu* is the shared Switch.
-  { name: 'the member edit form', file: MEMBER_EDIT, expectedFields: 17, expectedButtons: 43 },
+  // EIGHTEEN FIELDS AND FORTY-SIX BUTTONS SINCE STORY 21.6: *Dodaj smjenu*'s card opener and its dialog's date, *Odustani* and *Odaberi smjenu*.
+  { name: 'the member edit form', file: MEMBER_EDIT, expectedFields: 18, expectedButtons: 46 },
   // STORY 1.7a. FOUR on the team list: the link back to `Ljudi`, the one name
   // `<Input>`, the add `<Button>`, and ONE row link written once inside the map
   // over the teams — the same count at zero teams as at nine. SIX on one team:

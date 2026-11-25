@@ -277,11 +277,43 @@ export function legendOf(
   return canonicalModifiersOf(present);
 }
 
+/**
+ * STORY 21.6 (Design Note 3): whether the legend adds the assigned pencil —
+ * any cell shown is a Personal Shift or carries a staffing group. It is a
+ * cell field, not a sixth modifier, so it is asked apart from {@link legendOf}.
+ */
+export function legendAssignedOf(
+  cells: Iterable<{ readonly assigned?: true; readonly groups?: readonly unknown[] } | null>,
+): boolean {
+  for (const cell of cells) {
+    if (cell !== null && (cell.assigned === true || (cell.groups ?? []).length > 0)) return true;
+  }
+
+  return false;
+}
+
 /** What separates the parts of a cell's label, and the marks' names in the day list. */
 export const LABEL_SEPARATOR = ', ';
 
+/**
+ * STORY 21.6 (UX-DR73): what an assigned shift — a day list's Personal
+ * Shift, or a grid cell's staffing group — is named by in a label.
+ */
+export function assignedMessageKey(): 'kalendar.cell.assigned' {
+  return 'kalendar.cell.assigned';
+}
+
+/** STORY 21.6: what a Personal Shift counted with no team names in place of a team. */
+export function noTeamMessageKey(): 'kalendar.cell.noTeam' {
+  return 'kalendar.cell.noTeam';
+}
+
 /** Every key a cell's label resolves through. */
-export type CellLabelKey = ReturnType<typeof modifierMessageKey> | ReturnType<typeof noRotationMessageKey>;
+export type CellLabelKey =
+  | ReturnType<typeof modifierMessageKey>
+  | ReturnType<typeof noRotationMessageKey>
+  | ReturnType<typeof assignedMessageKey>
+  | ReturnType<typeof noTeamMessageKey>;
 
 export type CellLabelTranslate = (key: CellLabelKey) => string;
 
@@ -297,20 +329,32 @@ export interface CellLabelSource {
   readonly name: string | null;
   readonly range: string | null;
   readonly modifiers: readonly CalendarModifier[];
+  /** STORY 21.6: a Personal Shift, named `dodijeljeno ručno` after its type and range. */
+  readonly assigned?: boolean;
+  /** STORY 21.6: the cell's staffing groups, each named after the cell's own words. */
+  readonly groups?: readonly { readonly name: string; readonly range: string | null }[];
 }
 
 /**
  * A cell's full label for assistive technology, the same at every width:
- * `subota 26.09., Smjena A, Noć, 19:00–07:00`, then each modifier's label in
- * canonical order. Never a letter.
+ * `subota 26.09., Smjena A, Noć, 19:00–07:00`, then `dodijeljeno ručno` for
+ * a Personal Shift (story 21.6), then each modifier's label in canonical
+ * order, then each staffing group (story 21.6) as `Dan, 08:00–16:00,
+ * dodijeljeno ručno`. A team with no rotation but a group names the group
+ * alone, never "no rotation". Never a letter.
  */
 export function cellLabelOf(source: CellLabelSource, translate: CellLabelTranslate): string {
+  const groups = source.groups ?? [];
+  const assigned = translate(assignedMessageKey());
+
   return [
     `${source.weekday} ${source.dayMonth}`,
     source.teamName,
-    source.name ?? translate(noRotationMessageKey()),
+    ...(source.name === null && groups.length > 0 ? [] : [source.name ?? translate(noRotationMessageKey())]),
     ...(source.range === null ? [] : [source.range]),
+    ...(source.assigned === true ? [assigned] : []),
     ...canonicalModifiersOf(source.modifiers).map((modifier) => translate(modifierMessageKey(modifier))),
+    ...groups.flatMap((group) => [group.name, ...(group.range === null ? [] : [group.range]), assigned]),
   ].join(LABEL_SEPARATOR);
 }
 
@@ -349,6 +393,7 @@ export function gridCellLabelsOf(
           name: cell.name,
           range: cell.range,
           modifiers: cell.modifiers,
+          ...(cell.groups === undefined ? {} : { groups: cell.groups }),
         },
         translate,
       );
@@ -360,7 +405,9 @@ export function gridCellLabelsOf(
  * Every day-list shift's {@link cellLabelOf}, the grid cell's full label, for
  * the button that opens its detail (story 3.4b), day for day and shift for
  * shift (story 3.6a); `null` for a team `teams` lacks — never a label with no
- * team. A day with no shift has none.
+ * team. A day with no shift has none. A Personal Shift counted with no team
+ * (story 21.6) names `bez tima` in the team's place, and is labelled, though
+ * it opens no day.
  */
 export function dayListLabelsOf(
   days: readonly CalendarDay[],
@@ -371,7 +418,7 @@ export function dayListLabelsOf(
 
   return days.map((day) =>
     day.shifts.map((shift) => {
-      const teamName = names.get(shift.teamId);
+      const teamName = shift.teamId === null ? translate(noTeamMessageKey()) : names.get(shift.teamId);
 
       if (teamName === undefined) return null;
 
@@ -383,6 +430,7 @@ export function dayListLabelsOf(
           name: shift.cell.name,
           range: shift.cell.range,
           modifiers: shift.cell.modifiers,
+          assigned: shift.cell.assigned === true,
         },
         translate,
       );

@@ -2,7 +2,7 @@
 title: 'Story 21.12: job roles are organization data'
 type: 'feature'
 created: '2026-11-25'
-status: 'in-review'
+status: 'done'
 baseline_commit: 'dc02fff50d307a52462f712aabd1bb052afb0132'
 review_loop_iteration: 0
 context:
@@ -10,7 +10,7 @@ context:
   - '{project-root}/_bmad/custom/bmad-build.toml'
 ---
 
-Status: built, CI pending (no PR yet). Baseline: `origin/main` at `dc02fff` (#367, story 21.23). Touches the hot file `hr.json`; 21.4 (in progress in parallel) touches it too: whichever merges second rebases and keeps the other's wording. Migration **0078** only (main is at 0077); another story's migration waits for this one.
+Status: merged as PR #371 (squash `e1b6a65`), `CI passed` green. Baseline: `origin/main` at `dc02fff` (#367, story 21.23). Touches the hot file `hr.json`; 21.4 (in progress in parallel) touches it too: whichever merges second rebases and keeps the other's wording. Migration **0078** only (main is at 0077); another story's migration waits for this one.
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 
@@ -115,7 +115,7 @@ Status: built, CI pending (no PR yet). Baseline: `origin/main` at `dc02fff` (#36
 - `pnpm build`, then `pnpm exec vitest run test/resource-hygiene.test.ts test/supabase-scaffold.test.ts test/feature-boundaries.test.ts test/import-cycles.test.ts test/key-hygiene.test.ts test/localization-guard.test.ts` -- 6 files, 2909 tests passed. `index.css` is unchanged, so the theme files were not run.
 - DB-connecting root tests (`test/provisioning.test.ts`, `test/rls-isolation.test.ts`) and e2e (`e2e/tests/organization/job-roles.spec.ts`, `cleanUpJobRolesInSql`) were written unrun: CI is their first run (STRICT DATABASE RULE). A local run of them would fail on the unapplied `0078`, which is expected.
 
-**Residual risk:** the unrun DB cases (the `job_roles` refusals and their constraint names, the 23503 on another tenant's role, the `calendar_members()` key sets, the members column grant, the 24-table audit inventory) and the e2e spec are verified only by reading `0078`; CI is the first run.
+**Residual risk (settled by CI):** the DB cases written unrun (the `job_roles` refusals and their constraint names, the 23503 on another tenant's role, the `calendar_members()` key sets, the members column grant, the 24-table audit inventory) and the e2e spec ran first in CI on PR #371 and passed on the merged head (`CI passed` green; no failed check on the PR's final run).
 
 ## Suggested Review Order
 

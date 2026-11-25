@@ -42,8 +42,21 @@ function renderDayButton(
         openDay(teamId, date, event.currentTarget);
       }}
     >
-      <CalendarCellBox cell={cell} inGrid={false} />
+      <CalendarCellBox cell={cell} inGrid={false} labelled={label !== null} />
     </Button>
+  );
+}
+
+/**
+ * STORY 21.6: a Personal Shift counted with no team — a row of its own, not
+ * a button, since a day detail is a team on a date. Named in full by its
+ * label (`bez tima`, `dodijeljeno ručno`), as a button would be.
+ */
+function renderTeamlessShift(cell: CalendarCell, label: string | null): ReactNode {
+  return (
+    <span role="group" aria-label={label ?? undefined} className="flex min-h-11 min-w-0 flex-1 items-stretch print:min-h-0">
+      <CalendarCellBox cell={cell} inGrid={false} noTeam labelled={label !== null} />
+    </span>
   );
 }
 
@@ -69,8 +82,10 @@ function renderDay(openDay: OpenDay, day: CalendarDay, labels: readonly (string 
         // one a roster override put them on.
         <span className="flex min-w-0 flex-1 flex-col gap-1">
           {day.shifts.map((shift, index) => (
-            <span key={shift.teamId} className="flex min-w-0">
-              {renderDayButton(openDay, shift.teamId, day.date, shift.cell, labels[index] ?? null)}
+            <span key={`${String(index)}-${String(shift.teamId)}`} className="flex min-w-0">
+              {shift.teamId === null
+                ? renderTeamlessShift(shift.cell, labels[index] ?? null)
+                : renderDayButton(openDay, shift.teamId, day.date, shift.cell, labels[index] ?? null)}
             </span>
           ))}
         </span>
@@ -177,7 +192,7 @@ export function CalendarTeamDays({
                     }}
                   >
                     <span className="px-1 text-xs text-muted-foreground">{shown.columns[column]?.name}</span>
-                    <CalendarCellBox cell={cell} inGrid={false} />
+                    <CalendarCellBox cell={cell} inGrid={false} labelled />
                   </Button>
                 ))}
               </span>

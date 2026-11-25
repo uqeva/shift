@@ -87,7 +87,7 @@ export function MemberLoanDialog({ edit }: { readonly edit: MemberEdit }): React
         {preview.shifts.map((line) => (
           <span key={JSON.stringify([line.side, line.date, line.team, line.type])} className="block">
             {t(loanShiftMessageKey(line), {
-              team: line.team,
+              team: line.team ?? t('kalendar.cell.noTeam'),
               type: line.type,
               range: line.range ?? NO_TEXT,
               ...loanDateValuesOf(line.date),
@@ -100,9 +100,9 @@ export function MemberLoanDialog({ edit }: { readonly edit: MemberEdit }): React
         {preview.doubles.map((line) => (
           <span key={line.key} className="block">
             {t('loans.double', {
-              firstTeam: line.first.team,
+              firstTeam: line.first.team ?? t('kalendar.cell.noTeam'),
               firstType: line.first.type,
-              secondTeam: line.second.team,
+              secondTeam: line.second.team ?? t('kalendar.cell.noTeam'),
               secondType: line.second.type,
               ...loanDateValuesOf(line.date),
             })}
@@ -111,7 +111,7 @@ export function MemberLoanDialog({ edit }: { readonly edit: MemberEdit }): React
         {preview.restGaps.map((line) => (
           <span key={line.key} className="block">
             {t('loans.restGap', {
-              teams: formatList(line.teams),
+              teams: formatList(line.teams.map((team) => team ?? t('kalendar.cell.noTeam'))),
               duration: t(shiftTypeDurationMessageKey(line.totalMinutes), durationValuesOf(line.totalMinutes)),
               ...loanDateValuesOf(line.date),
             })}

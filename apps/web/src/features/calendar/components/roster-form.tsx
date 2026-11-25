@@ -227,7 +227,7 @@ export function RosterSetForm({
             ? null
             : t('kalendar.detail.rosterChange.set.overlap', {
                 name: overlap.memberName,
-                team: overlap.teamName,
+                team: overlap.teamName ?? t('kalendar.cell.noTeam'),
                 day: overlap.day,
                 range: overlap.range,
               })}

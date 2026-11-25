@@ -434,7 +434,8 @@ export type LoanShiftSide = typeof LOAN_LOST | typeof LOAN_GAINED;
 
 /** One working shift of the preview, as data: names as stored, the ISO date, the range or none. */
 export interface LoanShift {
-  readonly team: string;
+  /** The team's name; `null` for a Personal Shift counted with no team (story 21.6, `bez tima`). */
+  readonly team: string | null;
   readonly date: string;
   readonly type: string;
   /** `19:00–07:00`, or `null` for a type with no times in effect that date. */
@@ -450,8 +451,8 @@ export interface LoanDoubleLine {
   readonly key: string;
   /** The earlier one's date. */
   readonly date: string;
-  readonly first: { readonly team: string; readonly type: string };
-  readonly second: { readonly team: string; readonly type: string };
+  readonly first: { readonly team: string | null; readonly type: string };
+  readonly second: { readonly team: string | null; readonly type: string };
 }
 
 /** Working shifts of two or more teams joined with no rest: one duty, FR-26's figure. */
@@ -460,7 +461,7 @@ export interface LoanRestGapLine {
   /** The duty's first date. */
   readonly date: string;
   /** The teams in the order worked, each once in a row. */
-  readonly teams: readonly string[];
+  readonly teams: readonly (string | null)[];
   readonly totalMinutes: number;
 }
 
@@ -522,21 +523,29 @@ function scheduleDaysOf(snapshot: CalendarSnapshot, memberId: string, dates: rea
 }
 
 /** The working shifts of a day, as `team\u0000type` keys and their team and type ids. */
-function workingOf(snapshot: CalendarSnapshot, day: MemberScheduleDay | undefined): ReadonlyMap<string, { teamId: string; shiftTypeId: string }> {
-  const working = new Map<string, { teamId: string; shiftTypeId: string }>();
+function workingOf(
+  snapshot: CalendarSnapshot,
+  day: MemberScheduleDay | undefined,
+): ReadonlyMap<string, { teamId: string | null; shiftTypeId: string }> {
+  const working = new Map<string, { teamId: string | null; shiftTypeId: string }>();
 
   for (const shift of day?.shifts ?? []) {
-    // Story 21.1: a Personal Shift counted with no team is read from story 21.6.
-    if (shift.shiftTypeId === null || shift.teamId === null) continue;
+    // Story 21.6: a Personal Shift counted with no team is read too (`bez tima`).
+    if (shift.shiftTypeId === null) continue;
 
     const type = snapshot.types.find((candidate) => candidate.id === shift.shiftTypeId);
 
     if (type?.isWorking !== true) continue;
 
-    working.set(`${shift.teamId}\u0000${shift.shiftTypeId}`, { teamId: shift.teamId, shiftTypeId: shift.shiftTypeId });
+    working.set(`${shift.teamId ?? ''}\u0000${shift.shiftTypeId}`, { teamId: shift.teamId, shiftTypeId: shift.shiftTypeId });
   }
 
   return working;
+}
+
+/** A team's name as stored, or `null` for none (story 21.6). @throws RangeError for a team the snapshot lacks. */
+function teamNameOf(snapshot: CalendarSnapshot, teamId: string | null): string | null {
+  return teamId === null ? null : nameOf(snapshot.teams, teamId, 'team');
 }
 
 function nameOf<Row extends { readonly id: string; readonly name: string }>(rows: readonly Row[], id: string, what: string): string {
@@ -547,17 +556,17 @@ function nameOf<Row extends { readonly id: string; readonly name: string }>(rows
   return row.name;
 }
 
-function shiftOf(snapshot: CalendarSnapshot, teamId: string, shiftTypeId: string, date: string): LoanShift {
+function shiftOf(snapshot: CalendarSnapshot, teamId: string | null, shiftTypeId: string, date: string): LoanShift {
   const type = snapshot.types.find((candidate) => candidate.id === shiftTypeId);
 
   if (type === undefined) throw new RangeError(`shift type ${shiftTypeId} is not in the snapshot`);
 
-  return { team: nameOf(snapshot.teams, teamId, 'team'), date, type: type.name, range: typeRangeOn(type, date) };
+  return { team: teamNameOf(snapshot, teamId), date, type: type.name, range: typeRangeOn(type, date) };
 }
 
 /** A leg of the "after", with what a line names. */
 interface LoanLeg extends DutyLeg {
-  readonly teamId: string;
+  readonly teamId: string | null;
   readonly shiftTypeId: string;
 }
 
@@ -642,7 +651,7 @@ export function loanPreviewOf(before: CalendarSnapshot, after: CalendarSnapshot,
   const pairsBefore = new Set(pairsOf(legsBefore).map(pairKey));
   const dutiesBefore = new Set(dutiesAcrossOf(legsBefore).map(dutyKey));
   const named = (leg: LoanLeg) => ({
-    team: nameOf(after.teams, leg.teamId, 'team'),
+    team: teamNameOf(after, leg.teamId),
     type: nameOf(after.types, leg.shiftTypeId, 'shift type'),
   });
   const doubles = pairsOf(legsAfter)
@@ -656,7 +665,7 @@ export function loanPreviewOf(before: CalendarSnapshot, after: CalendarSnapshot,
     .filter((duty) => inReported(duty.legs) && !dutiesBefore.has(dutyKey(duty)))
     .map((duty): LoanRestGapLine => {
       const teams = duty.legs
-        .map((leg) => nameOf(after.teams, leg.teamId, 'team'))
+        .map((leg) => teamNameOf(after, leg.teamId))
         .filter((team, index, all) => index === 0 || all[index - 1] !== team);
       const first = duty.legs[0] as LoanLeg;
 

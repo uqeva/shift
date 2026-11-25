@@ -47,26 +47,35 @@ import {
   type PlannedRefusal,
 } from '@/features/planning/services/manual-fill';
 import { COPY_OPEN_ID, FILL_OPEN_ID } from '@/features/planning/utils/element-ids';
+import { SINGLE_CELL_OPEN, singleCellOf } from '@/features/planning/services/single-cell';
 import { MEMBERSHIP_WRITE_DEPENDENTS, refreshAfterWrite } from '@/features/teams/services/dependents';
 import { useOrganizationToday } from '@/hooks/organization-today';
+import { isIsoDate } from '@/lib/i18n/format';
 import { writesOnline } from '@/lib/offline/use-write-gate';
 import { supabaseClient } from '@/lib/supabase/client';
 import { focusLater } from '@/utils/focus-later';
 
-/** `?mjesec=2026-12&osoba=<id>`: the month shown, and on a phone the member edited. */
+/**
+ * `?mjesec=2026-12&osoba=<id>`: the month shown, and on a phone the member
+ * edited. STORY 21.6: `&dan=2026-12-06` opens the picker on that member's
+ * cell once (*Dodaj smjenu*), then leaves the URL.
+ */
 export interface ManualSearch {
   readonly mjesec?: string;
   readonly osoba?: string;
+  readonly dan?: string;
 }
 
-/** The search as the route validates it: a month of the wrong shape, or a person that is not text, dropped. */
+/** The search as the route validates it: a month of the wrong shape, a person that is not text, or a day that is no date, dropped. */
 export function manualSearchOf(search: Record<string, unknown>): ManualSearch {
   const mjesec = search['mjesec'];
   const osoba = search['osoba'];
+  const dan = search['dan'];
 
   return {
     ...(isCalendarMonth(mjesec) ? { mjesec } : {}),
     ...(typeof osoba === 'string' && osoba !== '' ? { osoba } : {}),
+    ...(typeof dan === 'string' && isIsoDate(dan) ? { dan } : {}),
   };
 }
 
@@ -143,6 +152,9 @@ export function useManualSchedule(search: ManualSearch, navigate: ManualNavigate
   const [saved, setSaved] = useState<number | null>(null);
   const [planning, setPlanning] = useState<ManualPlanning | null>(null);
   const [planned, setPlanned] = useState<ManualPlanned | null>(null);
+  // STORY 21.6: *Dodaj smjenu* named a member with no row that month.
+  const [noRow, setNoRow] = useState(false);
+  const opened = useRef<string | null>(null);
   const dragging = useRef<{ readonly from: ManualCellRef; moved: boolean; cells: readonly ManualCellRef[] } | null>(null);
   const erasures = useErasureConfirmation<ManualDraft>(pending, () => saveButton.current);
 
@@ -182,8 +194,49 @@ export function useManualSchedule(search: ManualSearch, navigate: ManualNavigate
           ? { memberId: shown.rows[0].memberId, date: shown.dates[0].date }
           : null;
 
+  // STORY 21.6 — *DODAJ SMJENU*: `?dan=` opens the picker on that member's
+  // cell ONCE, then leaves the URL; a member with no row (or an inactive day)
+  // that month is an alert, never a picker. The picker, the check and the save
+  // are the grid's. It waits for a fresh read and for no save in flight, so a
+  // stale month never latches the alert and a save is never interrupted.
+  const settling = answer.isFetching || pending;
+
+  useEffect(() => {
+    const day = search.dan;
+
+    if (day === undefined || shown === null || settling) return;
+
+    const key = `${search.osoba ?? ''}|${day}`;
+
+    if (opened.current === key) return;
+
+    opened.current = key;
+
+    const found = singleCellOf(shown, search.osoba, day);
+
+    if (found.kind === SINGLE_CELL_OPEN) {
+      setNoRow(false);
+      setSelected([found.cell]);
+      setAnchor(found.cell);
+      setFocus(found.cell);
+      setSaved(null);
+      setPicking({ cells: [found.cell] });
+    } else {
+      setNoRow(true);
+    }
+
+    navigate(
+      {
+        ...(search.mjesec === undefined ? {} : { mjesec: search.mjesec }),
+        ...(search.osoba === undefined ? {} : { osoba: search.osoba }),
+      },
+      { replace: true },
+    );
+  }, [search, shown, settling, navigate]);
+
   /** Another month: the selection was about the one shown. */
   function show(next: string | null): void {
+    setNoRow(false);
     setSelected([]);
     setAnchor(null);
     setPlanned(null);
@@ -193,6 +246,7 @@ export function useManualSchedule(search: ManualSearch, navigate: ManualNavigate
   /** The phone's member. */
   function choosePerson(memberId: string): void {
     setPlanned(null);
+    setNoRow(false);
     navigate({ ...search, osoba: memberId }, { replace: true });
   }
 
@@ -205,6 +259,7 @@ export function useManualSchedule(search: ManualSearch, navigate: ManualNavigate
   function openPicker(cells: readonly ManualCellRef[]): void {
     if (cells.length === 0 || pending) return;
 
+    setNoRow(false);
     setSaved(null);
     setPicking({ cells });
   }
@@ -478,6 +533,7 @@ export function useManualSchedule(search: ManualSearch, navigate: ManualNavigate
 
     saving.current = true;
     setPending(true);
+    setNoRow(false);
     setRefusal(null);
     setUnchecked(false);
     setSaved(null);
@@ -599,6 +655,8 @@ export function useManualSchedule(search: ManualSearch, navigate: ManualNavigate
     refusal,
     unchecked,
     saved,
+    /** STORY 21.6: *Dodaj smjenu* named a member with no row that month. */
+    noRow,
     erasures,
     saveButton,
     retryButton,

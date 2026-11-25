@@ -7,7 +7,7 @@ import { CalendarLegend } from '@/features/calendar/components/calendar-legend';
 import type { CalendarScreenState } from '@/features/calendar/hooks/use-calendar-screen';
 import { DAY_DETAIL_POPUP } from '@/features/calendar/utils/day-detail';
 import { MONTH_HEADING_ID, gridTabStopOf, isSameGridPosition, type GridPosition } from '@/features/calendar/utils/grid-keys';
-import type { CalendarCell, CalendarMonth, CalendarRow } from '@/features/calendar/utils/month';
+import type { CalendarMonth, CalendarRow, CalendarTeamCell } from '@/features/calendar/utils/month';
 import { usePhone } from '@/hooks/viewport';
 import { t } from '@/lib/i18n';
 
@@ -20,7 +20,7 @@ function renderCell(
   screen: CalendarScreenState,
   month: string,
   date: string,
-  cell: CalendarCell,
+  cell: CalendarTeamCell,
   label: string | undefined,
   position: GridPosition,
   tabStop: GridPosition,

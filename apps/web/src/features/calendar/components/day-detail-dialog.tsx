@@ -4,13 +4,15 @@ import type { ReactNode, SyntheticEvent } from 'react';
 import { LoanMark, lentFromText } from '@/components/loan-mark';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { UsersThree } from '@/components/ui/icon';
+import { PencilSimple, UsersThree } from '@/components/ui/icon';
 import {
   DAY_DETAIL_DIALOG_ID,
+  dayNotWorkingMessageKey,
   DAY_NO_ROTATION,
   DAY_OFF,
   type DayConflict,
   type DayDetail,
+  type DayDetailMember,
   type DayDetailOverride,
   type DayDetailPendingOverride,
   type DayDetailRosterChange,
@@ -49,7 +51,7 @@ import type { CalendarSnapshot } from '@/features/calendar/services/snapshot';
 import { candidateContinuousMessageKey, candidateContinuousOf } from '@/features/calendar/utils/replacement-candidates';
 import { leaveHalfNamedOf } from '@/features/leave/services/leave-section';
 import { atWorkText } from '@/features/staffing/components/short-staffed-block';
-import type { CoverageAgainstMinimum } from '@/features/staffing/services/short-staffed';
+import { NO_GROUP_STAFFING, type CoverageAgainstMinimum } from '@/features/staffing/services/short-staffed';
 import { positionsShown, rosterLineOf, rosterPositionMessageKey } from '@/features/members/utils/position';
 import { ranksShown, rosterRankMessageKey } from '@/features/members/utils/rank';
 import {
@@ -63,6 +65,7 @@ import {
   DAY_DETAIL_ROSTER_INERT_ID,
   DAY_DETAIL_ROSTER_PENDING_ID,
   conflictLineIdOf,
+  dayDetailGroupIdOf,
   rosterChangeLineIdOf,
 } from '@/features/calendar/utils/element-ids';
 import { t } from '@/lib/i18n';
@@ -73,9 +76,32 @@ const OVERRIDDEN_TREATMENT = modifierTreatmentOf([MODIFIER_OVERRIDDEN]);
 /** The calendar's own `⚠` and ring (story 7.9), beside the heading of the day's unresolved conflicts. */
 const CONFLICT_TREATMENT = modifierTreatmentOf([MODIFIER_CONFLICT]);
 
+/**
+ * STORY 21.6 (UX-DR73): a member on the day through a Personal Assignment —
+ * the pencil and `ručno`, named `dodijeljeno ručno` for a screen reader.
+ */
+function renderAssigned(member: DayDetailMember): ReactNode {
+  if (member.assigned !== true) return null;
+
+  return (
+    <>
+      <span className="sr-only">{t('ljudi.status.separator')}</span>
+      <span className="ml-2 inline-flex items-center gap-1 text-sm text-muted-foreground">
+        <PencilSimple aria-hidden className="size-3 shrink-0" />
+        <span aria-hidden>{t('kalendar.cell.assignedShort')}</span>
+        <span className="sr-only">{t('kalendar.cell.assigned')}</span>
+      </span>
+    </>
+  );
+}
+
 /** The roster, one `Ime · čin · položaj` line per member, rank and position where the organization uses them. */
-function renderRoster(shown: DayDetail, usesFireRanks: boolean): ReactNode {
-  if (shown.roster.length === 0) {
+function renderRoster(
+  roster: readonly DayDetailMember[],
+  usesFireRanks: boolean,
+  labelledBy: string = DAY_DETAIL_ROSTER_ID,
+): ReactNode {
+  if (roster.length === 0) {
     return <p className="text-sm text-muted-foreground">{t('kalendar.detail.empty')}</p>;
   }
 
@@ -83,8 +109,8 @@ function renderRoster(shown: DayDetail, usesFireRanks: boolean): ReactNode {
   const positionShown = positionsShown({ usesFireRanks });
 
   return (
-    <ul aria-labelledby={DAY_DETAIL_ROSTER_ID} className="grid gap-2">
-      {shown.roster.map((member) => {
+    <ul aria-labelledby={labelledBy} className="grid gap-2">
+      {roster.map((member) => {
         const rankKey = rosterRankMessageKey(member.fireRank, rankShown);
         const positionKey = rosterPositionMessageKey(member.position, positionShown);
         // WHICH SENTENCE is `rosterLineOf`'s decision, executed in a test.
@@ -114,6 +140,7 @@ function renderRoster(shown: DayDetail, usesFireRanks: boolean): ReactNode {
                 <LoanMark className="ml-2 text-sm text-muted-foreground">{lent}</LoanMark>
               </>
             )}
+            {renderAssigned(member)}
           </li>
         );
       })}
@@ -142,6 +169,33 @@ function renderStaffing(staffing: CoverageAgainstMinimum | null): ReactNode {
       <span className="min-w-0 break-words">{staffing.short ? t('popunjenost.dayShort', { atWork }) : atWork}</span>
     </p>
   );
+}
+
+/**
+ * STORY 21.6 (R14.6): each staffing group as its own section — `Dan · ručno`
+ * with its range, its people at work against the minimum (`peopleAtWorkOn(…,
+ * type)`, an admin's while the setting is set) and its people, by name.
+ */
+function renderGroups(
+  shown: DayDetail,
+  usesFireRanks: boolean,
+  groupStaffing: Readonly<Record<string, CoverageAgainstMinimum | null>>,
+): ReactNode {
+  return (shown.groups ?? []).map((group) => {
+    const headingId = dayDetailGroupIdOf(group.shiftTypeId);
+
+    return (
+      <section key={group.shiftTypeId} aria-labelledby={headingId} className="grid gap-2">
+        <h3 id={headingId} className="flex flex-wrap items-center gap-x-2 font-heading text-base font-semibold">
+          <span>{t('kalendar.detail.group', { type: group.typeName })}</span>
+          <PencilSimple aria-hidden className="size-3.5 shrink-0" />
+          {group.range === null ? null : <span className="font-normal tabular-nums">{group.range}</span>}
+        </h3>
+        {renderStaffing(groupStaffing[group.shiftTypeId] ?? null)}
+        {renderRoster(group.roster, usesFireRanks, headingId)}
+      </section>
+    );
+  });
 }
 
 /** A mark's glyph and ring beside a heading, as the calendar's cell draws it: `✎` by default. */
@@ -382,6 +436,7 @@ function renderDetail(
   form: OverrideFormState,
   roster: RosterFormState,
   staffing: CoverageAgainstMinimum | null,
+  groupStaffing: Readonly<Record<string, CoverageAgainstMinimum | null>>,
 ): ReactNode {
   const said = (
     <>
@@ -399,11 +454,10 @@ function renderDetail(
     return (
       <div className="grid gap-4">
         <p className="text-sm">
-          {shown.kind === DAY_OFF
-            ? t('kalendar.detail.off', { team: shown.teamName })
-            : t('kalendar.detail.noRotation', { team: shown.teamName })}
+          {t(dayNotWorkingMessageKey(shown), { team: shown.teamName })}
         </p>
         {renderConflicts(conflicts)}
+        {renderGroups(shown, usesFireRanks, groupStaffing)}
         {renderChanges(shown, form, roster)}
         {said}
       </div>
@@ -422,8 +476,9 @@ function renderDetail(
           {t('kalendar.detail.roster')}
         </h3>
         {renderStaffing(staffing)}
-        {renderRoster(shown, usesFireRanks)}
+        {renderRoster(shown.roster, usesFireRanks)}
       </div>
+      {renderGroups(shown, usesFireRanks, groupStaffing)}
       {renderChanges(shown, form, roster)}
       {said}
     </div>
@@ -517,6 +572,7 @@ export function DayDetailDialog({
   snapshot,
   conflicts,
   staffing,
+  groupStaffing = NO_GROUP_STAFFING,
   form,
   roster,
   swapOffered = false,
@@ -530,6 +586,8 @@ export function DayDetailDialog({
   readonly conflicts: readonly DayConflict[];
   /** The working day's people at work against the minimum (story 11.3): an admin's while it is set, else `null`. */
   readonly staffing: CoverageAgainstMinimum | null;
+  /** STORY 21.6: each staffing group's people at work against the minimum, by type id (`peopleAtWorkOn(…, type)`). */
+  readonly groupStaffing?: Readonly<Record<string, CoverageAgainstMinimum | null>>;
   readonly form: OverrideFormState;
   readonly roster: RosterFormState;
   /** Story 12.2: whether the footer offers *Predloži zamjenu* (`swapOfferedOf`): a member's own working shift from today on. */
@@ -594,7 +652,7 @@ export function DayDetailDialog({
             <DialogHeader closeLabel={t('kalendar.detail.close')} onClose={closeUnlessPending}>
               <DialogTitle id={DAY_DETAIL_HEADING_ID} tabIndex={-1}>{t('kalendar.detail.title', { team: detail.teamName, date: detail.date })}</DialogTitle>
             </DialogHeader>
-            {renderDetail(detail, snapshot.usesFireRanks, conflicts, form, roster, staffing)}
+            {renderDetail(detail, snapshot.usesFireRanks, conflicts, form, roster, staffing, groupStaffing)}
             {renderFooter(detail, form, roster, swapOffered, swapProposed)}
           </>
         )}

@@ -15,6 +15,7 @@ import {
   scheduleOfMonth,
   shiftTypeVersionOn,
   shortStaffedShiftsOf,
+  staffingOn,
   type Collision,
   type CollisionLeaveRecord,
   type CollisionResolution,
@@ -514,9 +515,28 @@ export function monthHeaderOf(month: string, today: string): MonthHeader {
   };
 }
 
-/** One team on one date, as the grid draws it. */
+/**
+ * STORY 21.6 (R14.6): one staffing group a grid cell adds beside its team's
+ * Scheduled Shift — another working type among the Personal Shifts counted
+ * with the team that date (`staffingOn`) — drawn with its letter or name and
+ * the assigned pencil. It names the type, never counts people.
+ */
+export interface CalendarCellGroup {
+  readonly shiftTypeId: string;
+  readonly name: string;
+  /** The type's letter in the compressed grid ({@link typeLettersOf}). */
+  readonly letter: string | null;
+  /** `08:00–16:00`, or `null` for a type with no times that date. */
+  readonly range: string | null;
+}
+
+/**
+ * One team on one date, as the grid draws it — or, in a day list, one of the
+ * member's shifts (story 3.6a), whose team is `null` for a Personal Shift
+ * counted with no team (story 21.6, `bez tima`).
+ */
 export interface CalendarCell {
-  readonly teamId: string;
+  readonly teamId: string | null;
   readonly shiftTypeId: string | null;
   /** The type's name, always visible; `null` where no rotation is in effect yet. */
   readonly name: string | null;
@@ -539,7 +559,22 @@ export interface CalendarCell {
    * minimum (story 11.3). A cell with no rotation in effect carries none.
    */
   readonly modifiers: readonly CalendarModifier[];
+  /**
+   * STORY 21.6 (UX-DR73): a day list's Personal Shift, marked as assigned —
+   * the pencil, `ručno` and `dodijeljeno ručno`. A cell field, not a
+   * modifier. ABSENT for every other cell, so a month with no Personal
+   * Assignment is the month it was.
+   */
+  readonly assigned?: true;
+  /**
+   * STORY 21.6 (R14.6): a grid cell's staffing groups, in `staffingOn`'s
+   * order. ABSENT when the team has none that date.
+   */
+  readonly groups?: readonly CalendarCellGroup[];
 }
+
+/** A grid cell: always a team's. */
+export type CalendarTeamCell = CalendarCell & { readonly teamId: string };
 
 /**
  * What the conflict and leave marks are set from (story 5.3c), DERIVED on
@@ -583,9 +618,9 @@ function teamDateKeyOf(teamId: string, date: string): string {
   return `${teamId}|${date}`;
 }
 
-/** The key a member's cell's collision is found under: member, team and date. */
-function memberTeamDateKeyOf(memberId: string, teamId: string, date: string): string {
-  return `${memberId}|${teamId}|${date}`;
+/** The key a member's cell's collision is found under: member, team (none: story 21.6) and date. */
+function memberTeamDateKeyOf(memberId: string, teamId: string | null, date: string): string {
+  return `${memberId}|${teamId ?? ''}|${date}`;
 }
 
 /** {@link CalendarMarks} indexed once per month, for the cells to look up. */
@@ -675,7 +710,7 @@ function gridCellMarksOf(lookup: MarksLookup, teamId: string, date: string, over
 function memberCellMarksOf(
   lookup: MarksLookup,
   memberId: string,
-  teamId: string,
+  teamId: string | null,
   date: string,
   overridden: boolean,
 ): CellMarks {
@@ -732,7 +767,7 @@ export interface CalendarRow {
   readonly weekday: string;
   /** Today in the organization's zone. */
   readonly isToday: boolean;
-  readonly cells: readonly CalendarCell[];
+  readonly cells: readonly CalendarTeamCell[];
 }
 
 /** An active team as a grid column: its row, and its letter in the compressed grid. */
@@ -808,10 +843,14 @@ export interface CalendarPersonMonth {
   readonly days: CalendarDayListOutcome;
 }
 
-/** One shift of a day in the day list (story 3.6a): a team the member works with that day. */
+/**
+ * One shift of a day in the day list (story 3.6a): a team the member works
+ * with that day — or, for a Personal Shift counted with no team (story 21.6),
+ * none: a row of its own that opens no day, since a day is a team on a date.
+ */
 export interface CalendarDayShift {
-  /** The team, archived or not. */
-  readonly teamId: string;
+  /** The team, archived or not; `null` for a Personal Shift counted with no team. */
+  readonly teamId: string | null;
   /** That team's cell, as the grid draws it. */
   readonly cell: CalendarCell;
   /** Held only through a roster override: another team's shift the member was put on. */
@@ -955,15 +994,60 @@ function cellLookupOf(snapshot: CalendarSnapshot, shown: Iterable<string | null>
   };
 }
 
-function cellOf(
-  { types, fills, letters }: CellLookup,
-  teamId: string,
+/** What story 21.6 adds to a cell: the assigned mark, or the staffing groups' type ids. */
+interface CellSource {
+  readonly assigned?: boolean;
+  readonly groups?: readonly string[];
+}
+
+/**
+ * A type the snapshot holds. Never a raw id as a label: a type the snapshot
+ * lacks is a defect, and `calendarMonthOutcomeOf` turns it into the read failure.
+ */
+function typeOfLookup(types: ReadonlyMap<string, ShiftTypeRow>, shiftTypeId: string, date: string): ShiftTypeRow {
+  const type = types.get(shiftTypeId);
+
+  if (type === undefined) {
+    throw new RangeError(`shift type ${shiftTypeId} is projected on ${date} but is not in the snapshot`);
+  }
+
+  return type;
+}
+
+/** The fields story 21.6 adds to a cell, each ABSENT when it has nothing to say. */
+function cellExtrasOf(
+  { types, letters }: CellLookup,
+  date: string,
+  source: CellSource,
+): { readonly assigned?: true; readonly groups?: readonly CalendarCellGroup[] } {
+  const groups = (source.groups ?? []).map((shiftTypeId): CalendarCellGroup => {
+    const type = typeOfLookup(types, shiftTypeId, date);
+
+    return { shiftTypeId, name: type.name, letter: letters.get(shiftTypeId) ?? null, range: typeRangeOn(type, date) };
+  });
+
+  return {
+    ...(source.assigned === true ? { assigned: true as const } : {}),
+    ...(groups.length > 0 ? { groups } : {}),
+  };
+}
+
+function cellOf<Team extends string | null>(
+  lookup: CellLookup,
+  teamId: Team,
   shiftTypeId: string | null,
   date: string,
   marks: CellMarks,
-): CalendarCell {
+  source: CellSource = {},
+): CalendarCell & { readonly teamId: Team } {
+  const { types, fills, letters } = lookup;
+  const extras = cellExtrasOf(lookup, date, source);
+  const modifiers = cellModifiersOf(marks);
+
   // NO ROTATION, NO MARK: there is no schedule to mark, so the cell carries
   // none — no overridden, no conflict and no leave — whatever the marks say.
+  // STORY 21.6: a cell with a staffing group has people at work, so it carries
+  // its marks after all — a short group is short-staffed — and draws its groups.
   if (shiftTypeId === null) {
     return {
       teamId,
@@ -973,18 +1057,12 @@ function cellOf(
       className: `${CALENDAR_CELL_CLASS} ${NO_ROTATION_CELL_CLASS}`,
       range: null,
       modifiers: NO_MODIFIERS,
+      ...extras,
+      ...(extras.groups === undefined ? {} : { modifiers }),
     };
   }
 
-  const modifiers = cellModifiersOf(marks);
-
-  const type = types.get(shiftTypeId);
-
-  // Never a raw id as a label: a type the snapshot lacks is a defect, and
-  // `calendarMonthOutcomeOf` turns it into the read failure.
-  if (type === undefined) {
-    throw new RangeError(`shift type ${shiftTypeId} is projected on ${date} but is not in the snapshot`);
-  }
+  const type = typeOfLookup(types, shiftTypeId, date);
 
   return {
     teamId,
@@ -994,6 +1072,7 @@ function cellOf(
     className: `${CALENDAR_CELL_CLASS} ${fills.get(shiftTypeId) ?? NONWORKING_CHIP_CLASS}`,
     range: typeRangeOn(type, date),
     modifiers,
+    ...extras,
   };
 }
 
@@ -1143,8 +1222,9 @@ export function calendarDayListOf(
     weekday: weekdayOf(day.date),
     isToday: day.date === today,
     inactive: !day.active,
-    // Story 21.1: a Personal Shift counted with no team is not drawn yet; story 21.6 draws it.
-    shifts: day.shifts.filter(hasTeam).map((shift) => ({
+    // Story 21.6: a Personal Shift is drawn as assigned, and one counted
+    // with no team is a row of its own (`bez tima`).
+    shifts: day.shifts.map((shift) => ({
       teamId: shift.teamId,
       cell: cellOf(
         lookup,
@@ -1152,6 +1232,7 @@ export function calendarDayListOf(
         shift.shiftTypeId,
         day.date,
         memberCellMarksOf(marked, memberId, shift.teamId, day.date, shift.overridden || shift.rosterChanged),
+        { assigned: shift.personalAssignmentId !== undefined },
       ),
       viaOverride: shift.viaOverride,
     })),
@@ -1314,10 +1395,19 @@ export function calendarMonthOf(
     },
     month,
   );
-  const lookup = cellLookupOf(
-    snapshot,
-    schedule.flatMap((row) => row.cells.map((cell) => cell.shiftTypeId)),
+  // STORY 21.6 (R14.6): each cell's staffing groups, the type ids alone.
+  const groupsOf = staffingGroupsOf(snapshot);
+  const groups = new Map(
+    schedule.flatMap((row) =>
+      row.cells.map(
+        (cell) => [teamDateKeyOf(cell.teamId, row.date), groupsOf(cell.teamId, row.date, cell.shiftTypeId)] as const,
+      ),
+    ),
   );
+  const lookup = cellLookupOf(snapshot, [
+    ...schedule.flatMap((row) => row.cells.map((cell) => cell.shiftTypeId)),
+    ...[...groups.values()].flat(),
+  ]);
   // ACTIVE IN THE MONTH SHOWN: a member active on at least one of its dates,
   // by the domain's rule over their status versions (story 3.4a) — the same
   // membership rule as a Sati row, so a Sati name always opens that member.
@@ -1376,6 +1466,7 @@ export function calendarMonthOf(
             cell.shiftTypeId,
             row.date,
             gridCellMarksOf(marked, cell.teamId, row.date, cell.overridden || cell.rosterChanged),
+            { groups: groups.get(teamDateKeyOf(cell.teamId, row.date)) ?? [] },
           ),
         ),
     })),
@@ -1389,6 +1480,37 @@ export function calendarMonthOf(
             ...chosenOne.filtered,
             days: dayListOutcomeOf(snapshot, { ...chosenOne.member, memberId: chosenOne.member.id }, month, today, marks),
           },
+  };
+}
+
+/**
+ * STORY 21.6 (R14.6, Design Note 4): the staffing groups of a team's cell —
+ * every working type among the Personal Shifts counted with it that date
+ * other than its working Scheduled Shift, in `staffingOn`'s order — as type
+ * ids. Read with no leave (`staffingInputOf(snapshot, [])`): the cell names
+ * the types and never counts people. Only a date some member holds an
+ * assignment on is asked, so a month with none asks nothing.
+ *
+ * @throws RangeError on any precondition of `staffingOn`.
+ */
+function staffingGroupsOf(
+  snapshot: CalendarSnapshot,
+): (teamId: string, date: string, scheduled: string | null) => readonly string[] {
+  const assignedDates = new Set(snapshot.members.flatMap((member) => member.personalAssignments.map((one) => one.date)));
+
+  if (assignedDates.size === 0) return () => [];
+
+  const input = staffingInputOf(snapshot, []);
+  const working = new Set(input.workingShiftTypeIds);
+
+  return (teamId, date, scheduled) => {
+    if (!assignedDates.has(date)) return [];
+
+    const scheduledWorking = scheduled !== null && working.has(scheduled) ? scheduled : null;
+
+    return staffingOn(input, teamId, date)
+      .filter((one) => one.shiftTypeId !== scheduledWorking)
+      .map((one) => one.shiftTypeId);
   };
 }
 

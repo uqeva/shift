@@ -154,6 +154,8 @@ export function RucniRasporedScreen() {
           </Button>
         </div>
       )}
+      {/* STORY 21.6: *Dodaj smjenu* named a member with no row that month. */}
+      {screen.noRow ? <Notice role="alert">{t('rucniRaspored.addShift.noRow')}</Notice> : null}
       {refusal !== null ? null : (
         <Card className="min-w-0">
           {isPhone ? (
