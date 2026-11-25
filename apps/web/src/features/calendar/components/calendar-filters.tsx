@@ -1,30 +1,34 @@
 import type { ReactNode } from 'react';
 
-import { FilterBar, activeFilterSummaryOf } from '@/components/filter-bar';
+import { FilterBar, activeFilterSummaryOf, type ToolbarSlots } from '@/components/filter-bar';
 import { calendarFilterBarOf } from '@/features/calendar/utils/filters';
 import type { CalendarFilterChange, CalendarMonth } from '@/features/calendar/utils/month';
 import { t } from '@/lib/i18n';
 import { filterSummaryMessageKey, filterSummaryValuesOf } from '@/utils/filter-bar';
 
 /**
- * THE FILTERS of *Sve smjene* (story 7.5): the shared filter bar under the
- * month toolbar, Smjena and Osoba as chips, the summary line and one
- * `Poništi filtre`. Which team or person is chosen — an unknown or archived
- * id being none — is `calendarMonthOf`'s decision, and the bar's model is
+ * *Kalendar*'s compact toolbar (stories 7.5, 21.23) with the filters of *Sve
+ * smjene*: the shared filter bar's `Filtri` among the toolbar's controls,
+ * Smjena and Osoba as chips under it with the summary as the result count.
+ * Which team or person is chosen — an unknown or archived id being none — is
+ * `calendarMonthOf`'s decision, and the bar's model is
  * `calendarFilterBarOf`'s: a person replaces the team (story 3.3b). The state
- * lives in the URL alone. Nothing is drawn while the month offers no team
- * and nobody.
+ * lives in the URL alone. `shown` is `null` where nothing is filtered —
+ * *Moj raspored*, a month not yet read — and the toolbar is then drawn with
+ * no filter part, as it is while the month offers no team and nobody.
  */
 export function CalendarFilters({
   shown,
+  toolbar,
   onFilter,
 }: {
-  readonly shown: CalendarMonth;
+  readonly shown: CalendarMonth | null;
+  readonly toolbar: ToolbarSlots;
   readonly onFilter: (change: CalendarFilterChange) => void;
 }): ReactNode {
-  if (shown.filter.teams.length === 0 && shown.filter.people.length === 0) return null;
+  const filtered = shown !== null && (shown.filter.teams.length !== 0 || shown.filter.people.length !== 0);
 
-  return <FilterBar model={calendarFilterBarOf(shown)} onChange={onFilter} />;
+  return <FilterBar model={filtered ? calendarFilterBarOf(shown) : null} onChange={onFilter} toolbar={toolbar} />;
 }
 
 /** The active filters of *Sve smjene* as one line, or `null` with none on: the phone's sticky head repeats it (deferred-work E816). */

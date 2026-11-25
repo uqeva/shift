@@ -36,26 +36,21 @@ export function filterText(
   return plural_ === undefined ? filled : plural(filled.replace(`{${plural_.name}, plural,`, '{count, plural,'), plural_.count);
 }
 
-/**
- * A pattern for an ICU message whatever its number(s): every form the app can
- * render (Croatian one, few and other), each number read as any number.
- */
-function anyCountOf(message: string, values: Readonly<Record<string, string>> = {}): RegExp {
-  const forms = [1, 2, 5].map((count) =>
-    escapeRegExp(filterText(message, values, { name: 'count', count })).replace(/\d+/g, '\\d+'),
-  );
-
-  return new RegExp(`^(?:${forms.join('|')})$`);
-}
+/** `Filtri` or `Aktivni filtri`: the two groups the bar draws in the compact toolbar (story 21.23). */
+const BAR_GROUP = new RegExp(`^(?:${escapeRegExp(filter.label)}|${escapeRegExp(filter.activeLabel)})$`);
 
 /**
- * THE SHARED FILTER BAR'S LOCATORS (stories 7.5, 15.7): the one pattern
- * *Kalendar*'s *Sve smjene*, *Sati*'s organization table, *Ljudi* and
- * *Godišnji*'s overview render at every width — the summary card with its
- * `role="status"` line and `Filtri`, one removable chip per active filter,
- * `Očisti sve`, and the *Filtri* sheet, where each filter is a field whose
- * value is picked in a searchable picker. Locators and actions only, never
- * an assertion (`e2e/README.md`).
+ * THE SHARED FILTER BAR'S LOCATORS (stories 7.5, 15.7, 21.23): the one
+ * pattern *Kalendar*'s *Sve smjene*, *Sati*'s organization table, *Ljudi*,
+ * *Godišnji*'s overview and *Povijest promjena* render at every width —
+ * `Filtri` (in the compact page toolbar since story 21.23, in its own group;
+ * on *Sati* still in the summary card), the `role="status"` result line, one
+ * removable chip per active filter with `Očisti sve` (in the toolbar their own
+ * group, `Aktivni filtri`), and the *Filtri* panel — a bottom sheet below
+ * 1024 px, a dropdown under `Filtri` from it — where each filter is a field
+ * whose value is picked in a searchable picker, with the live result line,
+ * `Očisti` and `Primijeni`. Locators and actions only, never an assertion
+ * (`e2e/README.md`).
  */
 export class FilterBarParts {
   private readonly page: Page;
@@ -64,17 +59,13 @@ export class FilterBarParts {
     this.page = page;
   }
 
-  /** The bar's group, named `Filtri`: the summary card, the chips and the sheet. */
-  get bar(): Locator {
-    return this.page.getByRole('group', { name: filter.label, exact: true });
-  }
-
   /**
-   * The bar's last control drawn — `Očisti sve` while a filter is on, else
-   * `Filtri`: the one before the content in tab order.
+   * The bar's groups: `Filtri` (the toolbar's trigger, or *Sati*'s summary
+   * card with its chips) and, while a chip is drawn in the toolbar,
+   * `Aktivni filtri`. Chain from it; assert on `filtriButton` or a chip.
    */
-  get lastControl(): Locator {
-    return this.bar.getByRole('button').filter({ visible: true }).last();
+  get bar(): Locator {
+    return this.page.getByRole('group', { name: BAR_GROUP });
   }
 
   /** The active Smjena chip's body (drawn only while a team is chosen). */
@@ -107,9 +98,9 @@ export class FilterBarParts {
     return this.page.getByRole('button', { name: fill(filter.remove.person, { value: person }), exact: true });
   }
 
-  /** The summary line: `Prikazano: …`. */
+  /** The summary line under the toolbar: `Prikazano: …` — not the panel's copy of it. */
   get summary(): Locator {
-    return this.page.getByRole('status').filter({ hasText: SUMMARY });
+    return this.page.getByRole('status').filter({ hasText: SUMMARY }).and(this.page.locator(':not(dialog *)'));
   }
 
   /** `Očisti sve`, after the chips. */
@@ -232,17 +223,17 @@ export class FilterBarParts {
     return this.personPicker.getByText(name, { exact: true });
   }
 
-  /** `Prikaži {n} osoba`, whatever it counts. */
-  get sheetShowAny(): Locator {
-    return this.sheet.getByRole('button', { name: anyCountOf(filter.sheetShow) });
+  /** The panel's live result line, above its buttons (story 21.23): the screen's own summary. */
+  get sheetSummary(): Locator {
+    return this.sheet.getByRole('status');
   }
 
-  /** `Prikaži {n} osoba`, live. */
-  sheetShow(count: number): Locator {
-    return this.sheet.getByRole('button', { name: plural(filter.sheetShow, count), exact: true });
+  /** The panel's `Primijeni`, which closes it (story 21.23). */
+  get sheetApply(): Locator {
+    return this.sheet.getByRole('button', { name: filter.sheetApply, exact: true });
   }
 
-  /** The sheet's `Poništi`. */
+  /** The panel's `Očisti`. */
   get sheetReset(): Locator {
     return this.sheet.getByRole('button', { name: filter.sheetReset, exact: true });
   }
@@ -266,9 +257,9 @@ export class FilterBarParts {
     await this.sheet.waitFor();
   }
 
-  /** Closes the sheet through `Prikaži …`, and waits for it to go. */
+  /** Closes the panel through `Primijeni`, and waits for it to go. */
   async showResults(): Promise<void> {
-    await this.sheetShowAny.click();
+    await this.sheetApply.click();
     await this.sheet.waitFor({ state: 'hidden' });
   }
 

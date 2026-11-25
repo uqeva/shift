@@ -362,7 +362,7 @@ test.describe('a wide grid at 800 px (story 21.3)', () => {
     // Tab into the grid on its one tab stop, while that cell is partly under
     // the sticky date column.
     await coverFirstColumn(scroller);
-    await calendarPage.filters.lastControl.focus();
+    await calendarPage.exportMenu.focus();
     await page.keyboard.press('Tab');
     await expect(calendarPage.tabStops).toBeFocused();
     await expectClear(page, 'Tab');
@@ -609,11 +609,11 @@ test.describe("the phone's sticky head (deferred-work E816)", () => {
     await expect(calendarPage.stickySummary).toHaveCount(0);
   });
 
-  test('is in flow from 640 px up', async ({ page, calendarPage }) => {
+  test('is not drawn from 640 px up, where the month is the toolbar’s (story 21.23)', async ({ page, calendarPage }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await calendarPage.goto('?prikaz=sve');
     await expect(calendarPage.monthTrigger).toBeVisible();
-    expect((await stickyHead(page)).sticky).toBe(false);
+    await expect(calendarPage.stickyHead).toHaveCount(0);
   });
 
   test('on Sati holds the month toolbar too', async ({ page, hoursPage }) => {
@@ -698,14 +698,16 @@ test.describe('the calendar while its read is pending, on a phone, as a member',
     const { moj, sve } = calendarPage.modes();
 
     // No role yet: the grid's thirty rows of five (a date and four team
-    // columns), and no switch, since the mode is unknown.
+    // columns), and no switch — no `Prikaz ▾` (story 21.23) — since the mode
+    // is unknown.
     await expect(pulses).toHaveCount(30 * 5);
-    await expect(moj).toHaveCount(0);
+    await expect(calendarPage.viewMenu).toHaveCount(0);
 
     // The role lands in the cache: the day list's thirty rows of two, and the
     // switch on *Moj raspored* — before the calendar's read has answered.
     role.release();
     await expect(pulses).toHaveCount(30 * 2);
+    await calendarPage.openModes();
     await expect(moj).toHaveAttribute('aria-pressed', 'true');
     await expect(sve).toHaveAttribute('aria-pressed', 'false');
     await expect(calendarPage.anyGrid).toHaveCount(0);
@@ -941,7 +943,7 @@ test.describe('the calendar under forced colours', () => {
     await calendarPage.goto('?prikaz=sve');
     await expect(calendarPage.grid).toBeVisible();
 
-    await calendarPage.filters.lastControl.focus();
+    await calendarPage.exportMenu.focus();
     await page.keyboard.press('Tab');
     await expect(calendarPage.tabStops).toBeFocused();
     const outline = await calendarPage.tabStops.evaluate((cell) => {

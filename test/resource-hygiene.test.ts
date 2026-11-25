@@ -176,7 +176,6 @@ const SANCTIONED_PLURAL_KEYS = [
   'filter.summary.all',
   'filter.summary.team',
   'filter.summary.both',
-  'filter.sheetShow',
   // STORY 5.1c: the leave card's three day counts that are a sentence of their
   // own — the preview's over-balance note and the two lines a landed save
   // shows — each carrying a number that may be negative (`−2 dana`) — and the
@@ -824,7 +823,6 @@ const SANCTIONED_SCREEN_KEYS = [
   // and a screen the database no longer matches are three sentences, not one.
   // DESIGN REFRESH C: the member list's lede; the new member screen's lede and
   // aside; the two sections both member forms are split into.
-  'ljudi.lede',
   'ljudi.form.newLede',
   // The member edit screen's card for the status.
   'ljudi.status.heading',
@@ -1294,6 +1292,16 @@ const SANCTIONED_SCREEN_KEYS = [
   'filter.person',
   'filter.replaceNote',
   'filter.sheetReset',
+  // STORY 21.23: the compact toolbar — the panel's `Primijeni`, the chips'
+  // own group, the search's placeholder, and `Prikaz` and `Izvoz` with their
+  // menus' names.
+  'filter.sheetApply',
+  'filter.activeLabel',
+  'toolbar.searchPlaceholder',
+  'toolbar.view',
+  'toolbar.viewMenu',
+  'toolbar.export',
+  'toolbar.exportMenu',
   'filter.empty.filtered',
   'filter.empty.notInTeam',
   'filter.empty.inTeam',
@@ -1793,7 +1801,6 @@ const SANCTIONED_SCREEN_KEYS = [
   // caption and five column names, the words for no team, the search box,
   // and the two empty sentences with the search's way out. The summary line
   // is a plural, listed above.
-  'godisnji.overview.lede',
   'godisnji.overview.caption',
   'godisnji.overview.search',
   'godisnji.overview.person',
@@ -2682,7 +2689,6 @@ const SANCTIONED_SCREEN_KEYS = [
   // choices, the record, action, field and value words its rows are built
   // from, the authors, the reconstructed badge, where history begins, and
   // the offline, unavailable, empty and filtered lines.
-  'history.lede',
   'history.caption',
   'history.column.time',
   'history.column.author',

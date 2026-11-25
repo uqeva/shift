@@ -68,9 +68,13 @@ export class CalendarPage extends BasePage {
     return this.monthToolbar.getByRole('button', { name: THIS_MONTH_TRIGGER_NAME });
   }
 
-  /** The page header's row: the `<h1>` and, from 640 px, the month control (story 15.7b). */
+  /**
+   * The compact toolbar's row (story 21.23): the `<h1>` (in its own slot)
+   * and, from 640 px, the month control (story 15.7b), then `Filtri`,
+   * `Prikaz ▾` and `Izvoz ▾`.
+   */
   get pageHeader(): Locator {
-    return this.anyHeading.locator('xpath=..');
+    return this.anyHeading.locator('xpath=../..');
   }
 
   /** The month picker, open. */
@@ -123,7 +127,21 @@ export class CalendarPage extends BasePage {
     return this.monthPicker.locator('[aria-live="polite"]');
   }
 
-  /** The mode switch's two buttons. */
+  /** The compact toolbar's `Prikaz ▾` (story 21.23), which opens the two modes. */
+  get viewMenu(): Locator {
+    return this.page.getByRole('button', { name: hr.toolbar.view, exact: true });
+  }
+
+  /**
+   * The compact toolbar's `Izvoz ▾` (story 21.23), which holds *Ispiši*: the
+   * toolbar's last control, the one before the month in tab order while no
+   * filter chip is drawn.
+   */
+  get exportMenu(): Locator {
+    return this.page.getByRole('button', { name: hr.toolbar.export, exact: true });
+  }
+
+  /** The mode switch's two buttons, in `Prikaz ▾`'s menu: drawn only while it is open (`openModes`). */
   modes(): { readonly moj: Locator; readonly sve: Locator } {
     const group = this.page.getByRole('group', { name: kalendar.mode.label });
 
@@ -131,6 +149,25 @@ export class CalendarPage extends BasePage {
       moj: group.getByRole('button', { name: kalendar.mode.moj, exact: true }),
       sve: group.getByRole('button', { name: kalendar.mode.sve, exact: true }),
     };
+  }
+
+  /** Opens `Prikaz ▾`, unless its menu is open already, and returns the two modes. */
+  async openModes(): Promise<{ readonly moj: Locator; readonly sve: Locator }> {
+    const modes = this.modes();
+
+    if (!(await modes.moj.isVisible())) {
+      await this.viewMenu.click();
+      await modes.moj.waitFor();
+    }
+
+    return modes;
+  }
+
+  /** Closes `Prikaz ▾`'s menu with Escape, if it is open: focus goes back to `Prikaz`. */
+  async closeModes(): Promise<void> {
+    if (!(await this.modes().moj.isVisible())) return;
+    await this.page.keyboard.press('Escape');
+    await this.modes().moj.waitFor({ state: 'detached' });
   }
 
   /** The alert a failed read shows. */

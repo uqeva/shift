@@ -231,6 +231,7 @@
   },
   "filter": {
     "label": "Filtri",
+    "activeLabel": "Aktivni filtri",
     "open": "Filtri",
     "openActive": "Filtri, aktivno: {count}",
     "chip": {
@@ -268,8 +269,8 @@
     "person": "Osoba",
     "replaceNote": "U Kalendaru osoba zamjenjuje tim.",
     "teamReplaced": "Zamijenjeno osobom",
-    "sheetReset": "Poništi",
-    "sheetShow": "{count, plural, one {Prikaži # osobu} few {Prikaži # osobe} other {Prikaži # osoba}}",
+    "sheetReset": "Očisti",
+    "sheetApply": "Primijeni",
     "empty": {
       "filtered": "Odabrani filtri ne prikazuju nijednu osobu.",
       "notInTeam": "{person} nije u timu {team} {monthIn} {year}.",
@@ -292,8 +293,14 @@
       "12": "u prosincu"
     }
   },
+  "toolbar": {
+    "searchPlaceholder": "Traži…",
+    "view": "Prikaz",
+    "viewMenu": "Mogućnosti prikaza",
+    "export": "Izvoz",
+    "exportMenu": "Mogućnosti izvoza"
+  },
   "history": {
-    "lede": "Tko je što promijenio i kada: svaka promjena pravila, iznimke, odluke, zahtjeva, osobe ili postavke, s onim što je bilo i što je sada.",
     "caption": "Povijest promjena",
     "column": {
       "time": "Vrijeme",
@@ -783,7 +790,6 @@
     "unscheduled": "Za tebe još ne postoji raspored, pa se godišnji odmor ne može izračunati.",
     "retry": "Pokušaj ponovno",
     "overview": {
-      "lede": "Godišnji odmori svih osoba aktivnih danas. Odsutnosti se upisuju na stranici osobe.",
       "caption": "Godišnji odmor osoba aktivnih danas u tekućoj godini",
       "search": "Traži osobu",
       "person": "Osoba",
@@ -1112,7 +1118,6 @@
     }
   },
   "ljudi": {
-    "lede": "Osobe u organizaciji, njihove razine ovlasti i dani godišnjeg odmora.",
     "directory": {
       "lede": "Tko je u kojem timu.",
       "search": "Traži osobu",

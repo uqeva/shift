@@ -33,3 +33,14 @@ export function stickyHeadHeightOf(height: number, withSummary = false): string 
 export function filtersCoveredBy(headBottom: number, filtersBottom: number): boolean {
   return filtersBottom <= headBottom;
 }
+
+/**
+ * STORY 21.23: whether the filters ABOVE the head's container (*Kalendar*'s
+ * compact toolbar, its result count and chips) are out of sight, by the
+ * container's top edge in the viewport: once it has scrolled above the
+ * viewport's top, everything above the container has too, and the head —
+ * stuck at the top — shows the summary.
+ */
+export function filtersAboveCoveredBy(containerTop: number): boolean {
+  return containerTop < 0;
+}

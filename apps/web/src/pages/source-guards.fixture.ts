@@ -1164,7 +1164,8 @@ export const SCREENS = [
   // THIRTY-SEVEN SINCE STORY 21.3: *Sve smjene* on a phone is a day list of
   // every shown team, each team's day a button (`CalendarTeamDays`), written
   // once inside the map over a date's cells.
-  { name: 'the Kalendar destination', file: KALENDAR, expectedFields: 6, expectedButtons: 37 },
+  // THIRTY-EIGHT SINCE STORY 21.23: the compact toolbar's `Filtri` (`FilterTrigger`).
+  { name: 'the Kalendar destination', file: KALENDAR, expectedFields: 6, expectedButtons: 38 },
   // STORY 12.2. On the swap proposal: the colleague and return `<Select>`s,
   // *Pošalji*, *Odustani* (a `<Button asChild>` link back to Kalendar), the
   // snapshot's unavailable alert's retry, *Natrag na Kalendar* above the title
@@ -1199,7 +1200,8 @@ export const SCREENS = [
   // in the Kalendar set too.
   // TWENTY-THREE SINCE STORY 15.7b: the month control's `Ovaj mjesec` off the
   // current month is gone, counted in the Kalendar set too.
-  { name: 'the Sati destination', file: SATI, expectedFields: 1, expectedButtons: 23 },
+  // TWENTY-FOUR SINCE STORY 21.23: the shared bar's toolbar `Filtri` (`FilterTrigger`).
+  { name: 'the Sati destination', file: SATI, expectedFields: 1, expectedButtons: 24 },
   // STORY 5.2c. ONE on Godišnji: the retry its unavailable alert offers. The
   // three figures are read, never pressed, and nothing here writes: a member
   // requests no leave (story 5.3 is conflicts, not requests).

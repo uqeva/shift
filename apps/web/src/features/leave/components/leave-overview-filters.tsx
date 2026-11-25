@@ -22,14 +22,20 @@ import { t } from '@/lib/i18n';
 import { NO_TEXT } from '@/utils/text';
 
 /**
- * The overview's *Traži osobu*, its two chips — Smjena and Stanje — and the
- * summary line with `Poništi filtre` (E884), drawn by the shared option-chip
- * bar as *Ljudi*'s. What each press changes is
- * `@/features/leave/services/leave-overview`'s, through the hook; this only
- * puts the words on it. The chips are drawn from the URL at once and are dead
- * while there are no rows to narrow.
+ * The overview's compact toolbar (E884, story 21.23): the `<h1>`, *Traži
+ * osobu*, `Filtri` with its two chips — Smjena and Stanje — and the summary
+ * as the result count, drawn by the shared option-chip bar as *Ljudi*'s.
+ * What each press changes is `@/features/leave/services/leave-overview`'s,
+ * through the hook; this only puts the words on it. The chips are drawn from
+ * the URL at once and are dead while there are no rows to narrow.
  */
-export function LeaveOverviewFilters({ screen }: { readonly screen: LeaveOverviewScreen }): ReactNode {
+export function LeaveOverviewFilters({
+  screen,
+  title,
+}: {
+  readonly screen: LeaveOverviewScreen;
+  readonly title: ReactNode;
+}): ReactNode {
   const { overview, filters, team, search, searchField, changeSearch } = screen;
   const ready = overview.kind === OVERVIEW_READY ? overview : null;
   const teams = ready?.teams ?? [];
@@ -89,30 +95,32 @@ export function LeaveOverviewFilters({ screen }: { readonly screen: LeaveOvervie
               })
       }
       showClear={ready !== null && leaveOverviewNarrowed({ team, state: filters.state })}
-      shownCount={ready?.rows.length ?? 0}
       stateKey={screen.stateKey}
       disabled={ready === null}
-      leading={
-        <div className="grid min-w-0 flex-1 basis-full lg:basis-64">
-          <Label htmlFor="godisnji-overview-search" className="sr-only">
-            {t('godisnji.overview.search')}
-          </Label>
-          <InputGroup>
-            <InputGroupIcon>
-              <MagnifyingGlass />
-            </InputGroupIcon>
-            <Input
-              id="godisnji-overview-search"
-              ref={searchField}
-              type="search"
-              className="h-11 w-full"
-              placeholder={t('godisnji.overview.search')}
-              value={search}
-              onChange={changeSearch}
-            />
-          </InputGroup>
-        </div>
-      }
+      toolbar={{
+        title,
+        lead: (
+          <div className="grid min-w-0">
+            <Label htmlFor="godisnji-overview-search" className="sr-only">
+              {t('godisnji.overview.search')}
+            </Label>
+            <InputGroup>
+              <InputGroupIcon>
+                <MagnifyingGlass />
+              </InputGroupIcon>
+              <Input
+                id="godisnji-overview-search"
+                ref={searchField}
+                type="search"
+                className="h-11 w-full"
+                placeholder={t('toolbar.searchPlaceholder')}
+                value={search}
+                onChange={changeSearch}
+              />
+            </InputGroup>
+          </div>
+        ),
+      }}
       onPick={screen.pickChip}
       onRemove={screen.removeChip}
       onClear={screen.resetFilters}

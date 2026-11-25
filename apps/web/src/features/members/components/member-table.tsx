@@ -19,7 +19,6 @@ import {
 import { usePhone } from '@/hooks/viewport';
 import { t } from '@/lib/i18n';
 import { CellView } from '@/features/members/components/cell-view';
-import { MemberFilters } from '@/features/members/components/member-filters';
 import { MemberRows } from '@/features/members/components/member-rows';
 import type { MemberList } from '@/features/members/hooks/use-member-list';
 import {
@@ -39,7 +38,7 @@ import {
 const SKELETON_ROWS = [0, 1, 2, 3, 4];
 
 /**
- * The member list's card: the filters at its head, then the table — or, below
+ * The member list's card (its filters are the page toolbar's): the table — or, below
  * 640 px, the shared sort control and the same rows stacked (story 7.6). Only
  * one of the two forms is in the DOM; the sort lives in `useMemberList`, so
  * crossing 640 px keeps it, and the control's pick is the heading's press.
@@ -67,10 +66,7 @@ export function MemberTable({ list }: { readonly list: MemberList }): ReactNode 
 
   return unanswered && !loading ? null : (
     <Card className="min-w-0">
-      {/* THE FILTERS, at the head of the table they narrow. */}
-      <CardContent className="border-b p-4">
-        <MemberFilters list={list} />
-      </CardContent>
+      {/* THE FILTERS are the page toolbar's (story 21.23), above this card. */}
       {/* TWO CONTAINERS rather than one ternary between the forms, for the
           bare-JSX sweep's reason given below. */}
       {isPhone ? (

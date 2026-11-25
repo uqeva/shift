@@ -963,8 +963,8 @@ test.describe('the filters on a phone, as an admin', () => {
     // Combined: the team is kept beside the person.
     await expect(page).toHaveURL(/[?&]smjena=/);
     await expect(page).toHaveURL(/[?&]osoba=/);
-    await expect(filters.sheetShow(1)).toBeVisible();
-    await filters.sheetShow(1).click();
+    await expect(filters.sheetSummary).toBeVisible();
+    await filters.sheetApply.click();
     await expect(filters.sheet).toBeHidden();
     // Both chips stay visible above the table, each with its ✕.
     await expect(filters.filtriButton).toHaveAccessibleName(filters.filtriName(2));

@@ -44,7 +44,7 @@ export function useCloseWhenWide(open: boolean, close: () => void): void {
 
 /**
  * Closes a surface that changes shape at `query` (the filter sheet, docked at
- * the bottom below 1024 px and at the side from it, story 15.7) the moment the
+ * the bottom below 1024 px and anchored under `Filtri` from it, stories 15.7 and 21.23) the moment the
  * viewport crosses it, either way. Listens only while `open`.
  */
 export function useCloseWhenCrossing(open: boolean, close: () => void, query: string = SIDE_SHEET_QUERY): void {

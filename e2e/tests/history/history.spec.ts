@@ -111,6 +111,7 @@ test.describe('an admin', () => {
       await historyPage.goto(`?smjena=${team.id}&razdoblje=90-dana`);
       await expect(historyPage.chip(fill(history.chip.team, { value: renamed }))).toBeVisible();
       await expect(historyPage.table.locator('tbody tr')).toHaveCount(2);
+      await historyPage.openExport();
       await expect(historyPage.exportButton).toBeEnabled();
 
       const download = await historyPage.exportDownload();
@@ -125,6 +126,7 @@ test.describe('an admin', () => {
       // no reload that would reset the hook anyway, removes it.
       await historyPage.removeTeamChip(renamed).click();
       await expect(page).not.toHaveURL(/[?&]smjena=/);
+      await historyPage.openExport();
       await expect(historyPage.exportButton).toBeEnabled();
       await expect(historyPage.exportDone(fileName, 2)).toHaveCount(0);
     } finally {
@@ -148,6 +150,7 @@ test.describe('an admin', () => {
     await historyPage.goto('?razdoblje=365-dana');
     await expect(historyPage.table).toBeVisible();
     await expect(historyPage.exportFailed).toHaveCount(0);
+    await historyPage.openExport();
     await historyPage.exportButton.click();
     await expect(historyPage.exportFailed).toBeVisible();
     expect(aborted, 'the writer was requested, and refused').toBeGreaterThan(0);

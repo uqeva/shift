@@ -493,7 +493,7 @@ test.describe('the member list filters by status and states it in a column', () 
     await expect(peoplePage.memberRow(fixture.admin.name)).toHaveCount(0);
   });
 
-  test('docks the Filtri sheet at the right at 1280 px, and Escape in a picker closes the picker only', async ({
+  test('opens the Filtri panel as a dropdown under Filtri at 1280 px, and Escape in a picker closes the picker only', async ({
     page,
     peoplePage,
   }) => {
@@ -501,6 +501,7 @@ test.describe('the member list filters by status and states it in a column', () 
     await peoplePage.goto();
     await expect(peoplePage.statusChip).toBeVisible();
     const filters = peoplePage.filters;
+    const filtriBox = await filters.filtriButton.boundingBox();
 
     // Only the opener says it is expanded.
     await peoplePage.statusChip.click();
@@ -508,9 +509,11 @@ test.describe('the member list filters by status and states it in a column', () 
     await expect(peoplePage.statusChip).toHaveAttribute('aria-expanded', 'true');
     await expect(filters.filtriButton).toHaveAttribute('aria-expanded', 'false');
     await expect(peoplePage.statusField).toBeFocused();
+    // STORY 21.23: under `Filtri`, right-aligned to it, whichever control opened it.
     const box = await filters.sheet.boundingBox();
-    expect(box!.x + box!.width).toBeGreaterThanOrEqual(1280 - 1);
-    expect(box!.height).toBeGreaterThanOrEqual(800 - 1);
+    expect(box!.y, 'the panel is not under Filtri').toBeGreaterThanOrEqual(filtriBox!.y + filtriBox!.height - 1);
+    expect(Math.abs(box!.x + box!.width - (filtriBox!.x + filtriBox!.width)), 'the panel is not right-aligned to Filtri').toBeLessThanOrEqual(2);
+    expect(box!.height, 'the panel is a full-height sheet').toBeLessThan(800 - 1);
 
     await peoplePage.statusField.click();
     const picker = filters.picker(hr.ljudi.chip.statusPicker);
@@ -565,7 +568,7 @@ test.describe('the member list filters by status and states it in a column', () 
     await expect(peoplePage.filters.sheet).toBeVisible();
     await peoplePage.filters.pickIn(hr.ljudi.status.heading, peoplePage.statusOption('all'));
     await expect(page).toHaveURL(/[?&]status=svi\b/);
-    await peoplePage.filters.sheetShowAny.click();
+    await peoplePage.filters.sheetApply.click();
     await expect(peoplePage.filters.sheet).toBeHidden();
     await expect(peoplePage.filters.filtriButton).toBeFocused();
     await expect(peoplePage.filters.filtriButton).toHaveAccessibleName(peoplePage.filters.filtriName(0));
