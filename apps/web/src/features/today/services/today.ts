@@ -135,8 +135,12 @@ export const CASE_FREE = 'free';
 
 /** One shift of today: its type's name (`null` where no rotation is in effect), its range, and its team. */
 export interface TodayShift {
-  readonly teamId: string;
-  readonly teamName: string;
+  /** `null` for a Personal Shift counted with no team (story 21.6): the card names `bez tima`. */
+  readonly teamId: string | null;
+  /** The team's name; `null` with no team. */
+  readonly teamName: string | null;
+  /** STORY 21.6 (UX-DR73): a Personal Shift, marked `ručno`. ABSENT otherwise. */
+  readonly assigned?: true;
   readonly name: string | null;
   /** `19:00–07:00`; `null` for a non-working type or one with no times. */
   readonly range: string | null;
@@ -594,11 +598,18 @@ function todayShiftOf(
   shift: CalendarDay['shifts'][number],
   fromYesterday = false,
 ): TodayShift {
+  const assigned = shift.cell.assigned === true ? { assigned: true as const } : {};
+
+  // STORY 21.6: a Personal Shift counted with no team names no team.
+  if (shift.teamId === null) {
+    return { teamId: null, teamName: null, name: shift.cell.name, range: shift.cell.range, fromYesterday, ...assigned };
+  }
+
   const team = snapshot.teams.find((candidate) => candidate.id === shift.teamId);
 
   if (team === undefined) throw new RangeError(`the team ${shift.teamId} is not in the snapshot`);
 
-  return { teamId: shift.teamId, teamName: team.name, name: shift.cell.name, range: shift.cell.range, fromYesterday };
+  return { teamId: shift.teamId, teamName: team.name, name: shift.cell.name, range: shift.cell.range, fromYesterday, ...assigned };
 }
 
 /** Whether a shift of a day is a working one. */

@@ -489,6 +489,8 @@ const SOURCES = [
   join(webRoot, 'src', 'features', 'planning', 'components', 'manual-copy-dialog.tsx'),
   join(webRoot, 'src', 'features', 'planning', 'components', 'manual-people-field.tsx'),
   join(webRoot, 'src', 'features', 'planning', 'services', 'manual-fill.ts'),
+  // Story 21.6: *Dodaj smjenu*, the member page's card that opens the grid on one cell.
+  join(webRoot, 'src', 'features', 'planning', 'components', 'member-add-shift-card.tsx'),
   join(webRoot, 'src', 'features', 'history', 'hooks', 'use-change-history.ts'),
   join(webRoot, 'src', 'features', 'history', 'components', 'history-body.tsx'),
   join(webRoot, 'src', 'features', 'history', 'components', 'history-filters.tsx'),

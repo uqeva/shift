@@ -42,3 +42,10 @@ export function fillStepCountIdOf(position: number): string {
 export function planPersonIdOf(memberId: string): string {
   return `rucni-raspored-plan-${memberId}`;
 }
+/** STORY 21.6: the member page's *Dodaj smjenu* heading and its date field. */
+export const ADD_SHIFT_HEADING_ID = 'member-add-shift-heading';
+export const ADD_SHIFT_DATE_ID = 'member-add-shift-date';
+export const ADD_SHIFT_HINT_ID = 'member-add-shift-hint';
+export const ADD_SHIFT_DIALOG_HEADING_ID = 'member-add-shift-dialog-heading';
+/** STORY 21.6: *Dodaj smjenu*'s date before one is chosen. */
+export const NO_DATE = '';

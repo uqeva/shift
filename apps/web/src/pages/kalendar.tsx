@@ -254,6 +254,7 @@ export function KalendarScreen() {
         snapshot={snapshot}
         conflicts={screen.dayConflicts}
         staffing={screen.dayStaffing}
+        groupStaffing={screen.dayGroupStaffing}
         form={overrideForm}
         roster={rosterForm}
         swapOffered={screen.swapOffered}

@@ -120,6 +120,11 @@ export function conflictLineIdOf(memberId: string): string {
   return `kalendar-conflict-${memberId}`;
 }
 
+/** STORY 21.6: a staffing group's heading in the day detail, which names its section and list. */
+export function dayDetailGroupIdOf(shiftTypeId: string): string {
+  return `kalendar-detail-group-${shiftTypeId}`;
+}
+
 /** The type dialog's *Što se mijenja* (story 7.9), which its save is described by. */
 export const OVERRIDE_PREVIEW_ID = 'kalendar-override-preview';
 

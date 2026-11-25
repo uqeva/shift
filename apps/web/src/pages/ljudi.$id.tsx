@@ -16,6 +16,7 @@ import { MemberStatusCard } from '@/features/members/components/member-status-ca
 import { MemberTeamCard } from '@/features/members/components/member-team-card';
 import { useMemberEdit } from '@/features/members/hooks/use-member-edit';
 import { requireAdmin } from '@/features/navigation/services/admin-guard';
+import { MemberAddShiftCard } from '@/features/planning/components/member-add-shift-card';
 import { appLayoutRoute } from '@/pages/_app';
 
 /**
@@ -96,6 +97,8 @@ export function LjudiMemberScreen() {
         handoff={handoff}
         allowanceAction={<MemberAllowanceAction edit={edit} />}
       />
+      {/* STORY 21.6: one person, one date — *Ručni raspored*'s single-cell case. */}
+      <MemberAddShiftCard memberId={id} />
       {/* STORY 1.6. */}
       <MemberStatusCard edit={edit} />
       {/* STORY 16.5 (UX-DR55): whether the member's calendar link is on, and

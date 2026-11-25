@@ -418,7 +418,7 @@ function replacedCoverageOf(
       memberInId,
     });
 
-    return replaced.ok ? coverageAgainstMinimumOf(replaced.after, records, collision.teamId, collision.date) : null;
+    return replaced.ok ? coverageAgainstMinimumOf(replaced.after, records, collision.teamId, collision.date, collision.shiftTypeId) : null;
   } catch (cause) {
     if (!(cause instanceof RangeError)) throw cause;
 
@@ -448,14 +448,14 @@ export function resolutionStaffingOf(
 ): ResolutionStaffing | null {
   if (minimumOfCalendar(snapshot) === null) return null;
 
-  const accept = coverageAgainstMinimumOf(snapshot, records, collision.teamId, collision.date);
+  const accept = coverageAgainstMinimumOf(snapshot, records, collision.teamId, collision.date, collision.shiftTypeId);
   const replace = replacedCoverageOf(snapshot, records, collision, STAFFING_REPLACEMENT_ID);
   const others = records.filter((one) => one.id !== record.id);
   const amended =
     target.kind === AMEND_REMOVES
       ? others
       : [...others, { id: record.id, memberId: collision.memberId, from: target.range.from, to: target.range.to }];
-  const amend = coverageAgainstMinimumOf(snapshot, amended, collision.teamId, collision.date);
+  const amend = coverageAgainstMinimumOf(snapshot, amended, collision.teamId, collision.date, collision.shiftTypeId);
 
   if (accept === null || replace === null || amend === null) return null;
 

@@ -580,7 +580,7 @@ describe('Amend / change team / end early / remove: the edit\'s one "after"', ()
   it('Change team: C to D is C lost and D gained over the same dates', () => {
     const preview = shownLoanPreviewOf(lent, amendOf({ teamId: D }));
     const lines = (side: string) =>
-      preview?.shifts.filter((line) => line.side === side).map((line) => [line.date, line.team]) ?? [];
+      preview?.shifts.filter((line) => line.side === side).map((line) => [line.date, line.team] as const) ?? [];
 
     // C works Dan 10. and Noć 11.; D (the pilot's fourth team) works on the 10.–12. too, all inside the range.
     expect(lines(LOAN_LOST).length).toBeGreaterThan(0);

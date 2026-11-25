@@ -1532,12 +1532,15 @@ const SNAPSHOT_CARRIES = [
  * and position into `rosterPositionMessageKey` once, gated by the flags the
  * screen hands in. The screen shows them: the setting handed to `ranksShown`
  * and `positionsShown` once more in the working branch, and passed down.
+ * STORY 21.6: a member on the day through a Personal Assignment carries their
+ * rank and their position in the team (`assignedMemberOf`, two each); the
+ * groups pass the setting on to their rosters (four reads more in the dialog).
  */
 const DETAIL_CARRIES = [
   { token: "'@/features/members/utils/rank'", count: 1 },
   { token: "'@/features/members/utils/position'", count: 1 },
-  { token: 'fireRank', count: 11 },
-  { token: 'position', count: 11 },
+  { token: 'fireRank', count: 13 },
+  { token: 'position', count: 13 },
 ] as const;
 /**
  * STORY 5.4c: the replacement candidates CARRY each candidate's rank and
@@ -1556,7 +1559,7 @@ const CANDIDATES_CARRY = [
  */
 const SCREEN_SHOWS = [
   { token: "'@/features/members/utils/rank'", count: 1 },
-  { token: 'usesFireRanks', count: 10 },
+  { token: 'usesFireRanks', count: 14 },
   { token: 'member.fireRank', count: 1 },
   { token: "'@/features/members/utils/position'", count: 1 },
   { token: 'positionsShown', count: 3 },

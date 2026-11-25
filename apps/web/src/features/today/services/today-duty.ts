@@ -60,7 +60,11 @@ export const NOTE_ADDED = 'added';
 
 /** What a leg says beside its type: whose shift it is. */
 export type DutyLegNote =
-  | { readonly kind: typeof NOTE_OWN; readonly team: string }
+  /**
+   * `team` is `null` for a Personal Shift counted with no team (story 21.6,
+   * `bez tima`); `assigned` marks a Personal Shift (UX-DR73), ABSENT otherwise.
+   */
+  | { readonly kind: typeof NOTE_OWN; readonly team: string | null; readonly assigned?: true }
   | {
       readonly kind: typeof NOTE_REPLACING;
       readonly team: string;
@@ -128,9 +132,9 @@ interface ShiftLeg extends DutyLeg {
   readonly shift: CalendarDayShift;
 }
 
-/** The key a scheduled shift is known by: its date and its team. */
-export function legKeyOf(date: string, teamId: string): string {
-  return `${date}\u0000${teamId}`;
+/** The key a scheduled shift is known by: its date and its team (none for a teamless Personal Shift, story 21.6). */
+export function legKeyOf(date: string, teamId: string | null): string {
+  return `${date}\u0000${teamId ?? ''}`;
 }
 
 /** The day before `date`. @throws RangeError at the start of the calendar. */
@@ -205,11 +209,17 @@ export function legNoteOf(
   leg: { readonly date: string; readonly shift: CalendarDayShift },
 ): DutyLegNote {
   const { teamId, viaOverride } = leg.shift;
+  // STORY 21.6 (UX-DR73): a Personal Shift is the viewer's own, marked assigned.
+  const assigned = leg.shift.cell.assigned === true ? { assigned: true as const } : {};
+
+  // STORY 21.6: one counted with no team names none, `bez tima`.
+  if (teamId === null) return { kind: NOTE_OWN, team: null, ...assigned };
+
   const team = snapshot.teams.find((candidate) => candidate.id === teamId);
 
   if (team === undefined) throw new RangeError(`the team ${teamId} is not in the snapshot`);
 
-  if (!viaOverride) return { kind: NOTE_OWN, team: team.name };
+  if (!viaOverride) return { kind: NOTE_OWN, team: team.name, ...assigned };
 
   const replaced = rosterStandingOfCalendar(snapshot).inForce.find(
     (override) =>

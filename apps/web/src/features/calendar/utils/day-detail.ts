@@ -7,6 +7,7 @@ import {
   MINUTES_PER_DAY,
   memberScheduleOfMonth,
   monthOf,
+  personalShiftOn,
   rosterOn,
   scheduledShiftTypeOn,
   shiftRoster,
@@ -23,6 +24,7 @@ import {
   rosterStandingOfCalendar,
   typeRangeOn,
   weekdayOf,
+  workingShiftTypeIdsOf,
 } from '@/features/calendar/utils/month';
 import type {
   CalendarOverride,
@@ -110,6 +112,27 @@ export const DAY_NO_ROTATION = 'noRotation';
 /** What the team does that day: works a type, has a non-working type, or has no rotation yet. */
 export type DayDetailKind = typeof DAY_WORKING | typeof DAY_OFF | typeof DAY_NO_ROTATION;
 
+/**
+ * The sentence of a day the team works no Scheduled Shift on: off, or with no
+ * rotation. STORY 21.6: with a staffing group the team still has people at
+ * work, so the sentence says only that its rotation gives no shift, and the
+ * groups follow — never "taj dan ne radi" over a working group. Asked of a
+ * day that is not a working one; any other kind reads as no rotation.
+ */
+export function dayNotWorkingMessageKey(
+  detail: { readonly kind: DayDetailKind; readonly groups?: readonly unknown[] | undefined },
+):
+  | 'kalendar.detail.off'
+  | 'kalendar.detail.noRotation'
+  | 'kalendar.detail.offGroups'
+  | 'kalendar.detail.noRotationGroups' {
+  const grouped = (detail.groups ?? []).length !== 0;
+
+  if (detail.kind === DAY_OFF) return grouped ? 'kalendar.detail.offGroups' : 'kalendar.detail.off';
+
+  return grouped ? 'kalendar.detail.noRotationGroups' : 'kalendar.detail.noRotation';
+}
+
 /** One member rostered on the day: shown as `Ime · čin · položaj`. */
 export interface DayDetailMember {
   readonly id: string;
@@ -134,6 +157,25 @@ export interface DayDetailMember {
    * is the detail it was (R11.4).
    */
   readonly lentFrom?: LentFrom;
+  /**
+   * STORY 21.6 (UX-DR73): on this shift through a Personal Assignment counted
+   * with the team — marked `ručno`. ABSENT for everyone else.
+   */
+  readonly assigned?: true;
+}
+
+/**
+ * STORY 21.6 (R14.6): one staffing group of the day — the members whose
+ * Personal Shift counts with the team in another working type than the
+ * day's — as its own section: the type, its range and its people, by name.
+ */
+export interface DayDetailGroup {
+  readonly shiftTypeId: string;
+  readonly typeName: string;
+  /** `08:00–16:00`, or `null` for a type with no times that date. */
+  readonly range: string | null;
+  /** Each one `assigned`, by name then id, as the roster is. */
+  readonly roster: readonly DayDetailMember[];
 }
 
 /** The day detail's `<dialog>` element's id. */
@@ -235,6 +277,13 @@ export interface DayDetail {
    * one, every one in force is. In the snapshot's order.
    */
   readonly rosterInert: readonly DayDetailRosterChange[];
+  /**
+   * STORY 21.6 (R14.6): the day's staffing groups, whatever the kind — a
+   * no-rotation or off day still shows its groups — in `staffingOn`'s order
+   * (by the first member's place in the snapshot's members). ABSENT with
+   * none, so a day with no Personal Assignment is the detail it was.
+   */
+  readonly groups?: readonly DayDetailGroup[];
 }
 
 function compareMembers(left: DayDetailMember, right: DayDetailMember): number {
@@ -248,6 +297,101 @@ function compareMembers(left: DayDetailMember, right: DayDetailMember): number {
   }
 
   return left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
+}
+
+/** A member of the snapshot with the working type of their Personal Shift (story 21.6). */
+interface PersonalShiftWith {
+  readonly member: CalendarSnapshot['members'][number];
+  readonly shiftTypeId: string;
+}
+
+/**
+ * STORY 21.6 (R14.3): every Personal Shift counted with `teamId` on `date` —
+ * `personalShiftOn` over the snapshot's members, in their order, so an
+ * inactive member, a non-working type and a day off count nothing. Only the
+ * members holding an assignment are asked.
+ *
+ * @throws RangeError on any precondition of `personalShiftOn`.
+ */
+function personalShiftsWithOf(snapshot: CalendarSnapshot, teamId: string, date: string): readonly PersonalShiftWith[] {
+  const assigned = snapshot.members.filter((member) => member.personalAssignments.length > 0);
+
+  if (assigned.length === 0) return [];
+
+  const working = new Set(workingShiftTypeIdsOf(snapshot));
+
+  return assigned.flatMap((member) => {
+    const shift = personalShiftOn(member, date, working);
+
+    return shift === null || shift.teamId !== teamId ? [] : [{ member, shiftTypeId: shift.shiftTypeId }];
+  });
+}
+
+/**
+ * A member on the day through their Personal Shift, marked assigned, as a
+ * rotation member of that team would show: their position where the team is
+ * their own (`effectiveTeamOn`; a loan holds no position), and a lent
+ * member's `posudba iz tima {tim}` (story 18.5) when the team is their loan team.
+ */
+function assignedMemberOf(
+  snapshot: CalendarSnapshot,
+  member: CalendarSnapshot['members'][number],
+  teamId: string,
+  date: string,
+): DayDetailMember {
+  const effective = effectiveTeamOn(member, date);
+  const lentFrom = lentFromShownOf(snapshot, member, teamId, date);
+  const listed: DayDetailMember = {
+    id: member.id,
+    name: member.name,
+    fireRank: member.fireRank,
+    position: effective?.teamId === teamId ? effective.position : null,
+    assigned: true,
+  };
+
+  return lentFrom === null ? listed : { ...listed, lentFrom };
+}
+
+/**
+ * STORY 21.6 (R14.6, Design Note 4): the `groups` field — one group per
+ * working type among `personal` other than the day's working type
+ * (`scheduledWorking`), in the order of its first member, each roster by
+ * name — or nothing with none.
+ *
+ * @throws RangeError on any precondition of `typeRangeOn`, or a type the snapshot lacks.
+ */
+function groupsFieldOf(
+  snapshot: CalendarSnapshot,
+  teamId: string,
+  personal: readonly PersonalShiftWith[],
+  scheduledWorking: string | null,
+  date: string,
+): { readonly groups?: readonly DayDetailGroup[] } {
+  const byType = new Map<string, PersonalShiftWith[]>();
+
+  for (const one of personal) {
+    if (one.shiftTypeId === scheduledWorking) continue;
+
+    const known = byType.get(one.shiftTypeId);
+
+    if (known === undefined) byType.set(one.shiftTypeId, [one]);
+    else known.push(one);
+  }
+
+  if (byType.size === 0) return {};
+
+  const groups = [...byType].map(([shiftTypeId, members]): DayDetailGroup => {
+    const type = typeOf(snapshot, shiftTypeId, date);
+
+    return {
+      shiftTypeId,
+      typeName: type.name,
+      range: typeRangeOn(type, date),
+      roster: members.map((one) => assignedMemberOf(snapshot, one.member, teamId, date)).sort(compareMembers),
+    };
+  });
+
+  return { groups };
 }
 
 /**
@@ -289,9 +433,15 @@ export function dayDetailOf(snapshot: CalendarSnapshot, teamId: string, date: st
   if (full === null) throw new RangeError(`the date ${date} could not be formatted`);
 
   const base = { teamId, teamName: team.name, date: `${weekdayOf(date)} ${full}`, isoDate: date, rosterPending };
+  // STORY 21.6: the Personal Shifts counted with the team that date.
+  const personal = personalShiftsWithOf(snapshot, teamId, date);
+  const scheduledWorking =
+    scheduled !== null && workingShiftTypeIdsOf(snapshot).includes(scheduled.shiftTypeId) ? scheduled.shiftTypeId : null;
+  const groups = groupsFieldOf(snapshot, teamId, personal, scheduledWorking, date);
 
   if (scheduled === null) {
     return {
+      ...groups,
       ...base,
       projectedShiftTypeId: null,
       shiftTypeId: null,
@@ -319,6 +469,7 @@ export function dayDetailOf(snapshot: CalendarSnapshot, teamId: string, date: st
 
   if (!type.isWorking) {
     return {
+      ...groups,
       ...projected,
       kind: DAY_OFF,
       typeName: null,
@@ -349,13 +500,20 @@ export function dayDetailOf(snapshot: CalendarSnapshot, teamId: string, date: st
 
     return lentFrom === null ? listed : { ...listed, lentFrom };
   });
+  // STORY 21.6: a member whose Personal Shift counts with the team in the
+  // day's working type is on *Sastav*, marked `ručno`.
+  // Each member once: one a roster override also put on is listed as that.
+  const assigned = personal
+    .filter((one) => one.shiftTypeId === scheduled.shiftTypeId && !roster.some((listed) => listed.id === one.member.id))
+    .map((one) => assignedMemberOf(snapshot, one.member, teamId, date));
 
   return {
+    ...groups,
     ...projected,
     kind: DAY_WORKING,
     typeName: type.name,
     range: typeRangeOn(type, date),
-    roster: roster.sort(compareMembers),
+    roster: [...roster, ...assigned].sort(compareMembers),
     override,
     rosterChanges: shown.applied.map((one) => rosterChangeOf(snapshot, one)),
     rosterInert: inertOf(shown.applied),
@@ -761,6 +919,10 @@ export function rosterOffersOf(
     if (one.memberInId !== null) named.add(one.memberInId);
   }
 
+  // STORY 21.6: a member on *Sastav* through a Personal Assignment (`ručno`) is
+  // the assignment's, never a roster override's: neither taken off nor put on.
+  for (const member of detail.roster) if (member.assigned === true) named.add(member.id);
+
   const onDefault = shiftRoster(snapshot.members, teamId, isoDate);
   const onDefaultIds = new Set(onDefault.map((entry) => entry.memberId));
   const byId = new Map(snapshot.members.map((member) => [member.id, member]));
@@ -902,7 +1064,8 @@ export function isoDateShiftedBy(date: string, days: number): string {
  */
 export interface RosterOverlap {
   readonly memberName: string;
-  readonly teamName: string;
+  /** `null` for a Personal Shift counted with no team (story 21.6): the hint names `bez tima`. */
+  readonly teamName: string | null;
   /** The day the shift they already work starts, `YYYY-MM-DD`: the open day, or the one before or after. */
   readonly date: string;
   /** That day as the calendar reads it: `četvrtak 01.01.`. */
@@ -947,7 +1110,7 @@ function windowOf(
 /** One shift the member already works near the open day, in the order the hint names them. */
 interface NearbyShift {
   readonly date: string;
-  readonly teamId: string;
+  readonly teamId: string | null;
   readonly shiftTypeId: string;
   /** Their own team's shift, rather than one a roster override puts them on. */
   readonly own: boolean;
@@ -1012,8 +1175,8 @@ export function rosterOverlapOf(snapshot: CalendarSnapshot, detail: DayDetail, m
     if (!dates.includes(date)) continue;
 
     for (const shift of shifts) {
-      // Story 21.1: a Personal Shift counted with no team is read from story 21.6.
-      if (shift.shiftTypeId === null || shift.teamId === null) continue;
+      // Story 21.6: a Personal Shift counted with no team is a leg too.
+      if (shift.shiftTypeId === null) continue;
       if (shift.teamId === detail.teamId && date === day) continue;
       nearby.push({ date, teamId: shift.teamId, shiftTypeId: shift.shiftTypeId, own: !shift.viaOverride });
     }
@@ -1021,14 +1184,14 @@ export function rosterOverlapOf(snapshot: CalendarSnapshot, detail: DayDetail, m
 
   // `Array.prototype.sort` is stable: equal ones keep the domain's order.
   for (const shift of nearby.sort(compareNearby)) {
-    const team = snapshot.teams.find((one) => one.id === shift.teamId);
+    const team = shift.teamId === null ? null : snapshot.teams.find((one) => one.id === shift.teamId);
     const theirs = windowOf(snapshot, shift.shiftTypeId, shift.date, daysBetween(day, shift.date));
 
     if (team === undefined || theirs === null) continue;
     if (theirs.window.start < open.window.end && open.window.start < theirs.window.end) {
       return {
         memberName: member.name,
-        teamName: team.name,
+        teamName: team === null ? null : team.name,
         date: shift.date,
         day: `${weekdayOf(shift.date)} ${dayMonthOf(shift.date)}`,
         range: theirs.range,
@@ -1353,5 +1516,6 @@ export function swapOfferedOf(
   if (detail.kind !== DAY_WORKING || detail.isoDate < today) return false;
   if (swapProposalMarkOf(snapshot, detail, today, proposals) !== null) return false;
 
-  return detail.roster.some((member) => member.id === snapshot.viewer.memberId);
+  // Story 21.6: a Personal Shift is never swapped here (story 21.8 swaps it).
+  return detail.roster.some((member) => member.id === snapshot.viewer.memberId && member.assigned !== true);
 }

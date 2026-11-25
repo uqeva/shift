@@ -71,7 +71,7 @@ import {
 import { useReplacementLinkRefresh } from '@/features/conflicts/hooks/use-replacement-link-refresh';
 import { NO_LEAVE_RECORDS, hoursLeaveKeysOf, hoursLeaveRecordsOf } from '@/features/hours/services/hours-conflicts';
 import { MEMBER_ROLE_KEY } from '@/features/navigation/services/role';
-import { dayStaffingOf } from '@/features/staffing/services/short-staffed';
+import { NO_GROUP_STAFFING, dayStaffingOf } from '@/features/staffing/services/short-staffed';
 import { useMySwapRequestsRead } from '@/features/swaps/hooks/use-my-swaps';
 import { MY_SWAP_REQUESTS_KEY, openSwapProposalsOf } from '@/features/swaps/services/my-swaps';
 import { FRESHNESS_OFFLINE, ZONE_FROM_CALENDAR } from '@/lib/offline/freshness';
@@ -371,6 +371,21 @@ export function useCalendarScreen(
         : dayStaffingOf(snapshot, marks.staffingLeave, detail.teamId, detail.isoDate),
     [snapshot, marks, detail],
   );
+  // STORY 21.6 (R14.6): each staffing group's own line, by type id, through
+  // `peopleAtWorkOn(…, type)` — on any kind of day, since an off or
+  // no-rotation day still shows its groups.
+  const dayGroupStaffing = useMemo(
+    () =>
+      snapshot === null || marks === null || detail === null
+        ? NO_GROUP_STAFFING
+        : Object.fromEntries(
+            (detail.groups ?? []).map((group) => [
+              group.shiftTypeId,
+              dayStaffingOf(snapshot, marks.staffingLeave, detail.teamId, detail.isoDate, group.shiftTypeId),
+            ]),
+          ),
+    [snapshot, marks, detail],
+  );
   // STORY 12.3: the viewer's open proposals (the proposer's side), `null`
   // while the read is unknown — not yet answered, or failed even over cached
   // rows — and the link is then offered as before, with 0049's 23505 the
@@ -526,6 +541,7 @@ export function useCalendarScreen(
     detail,
     dayConflicts,
     dayStaffing,
+    dayGroupStaffing,
     swapOffered,
     swapProposed,
     candidateLeave,

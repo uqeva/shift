@@ -331,7 +331,10 @@ function lastReturnMonthOf(given: DayDetail): string | null {
 
 /** Whether `memberId` is on the working roster of `day`. */
 function works(day: DayDetail | null, memberId: string): boolean {
-  return day !== null && day.kind === DAY_WORKING && day.roster.some((member) => member.id === memberId);
+  // Story 21.6: a Personal Shift is not a rostered shift a swap gives or takes (story 21.8).
+  return (
+    day !== null && day.kind === DAY_WORKING && day.roster.some((member) => member.id === memberId && member.assigned !== true)
+  );
 }
 
 /**

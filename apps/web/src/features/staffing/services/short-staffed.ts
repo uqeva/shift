@@ -346,19 +346,24 @@ export interface CoverageAgainstMinimum {
  * the roster), against the minimum — the domain's `peopleAtWorkOn`. `null`
  * while the minimum is empty (the strip stays as shipped), on a shift that is
  * not working, or on a `RangeError` (logged).
+ *
+ * STORY 21.6 (R14.6): with `shiftTypeId`, the team's shift of that type —
+ * its Scheduled Shift, or the staffing group of that type — as the domain's
+ * `peopleAtWorkOn(…, type)` reads it; without, the Scheduled Shift as before.
  */
 export function coverageAgainstMinimumOf(
   calendar: CalendarSnapshot,
   records: readonly CollisionLeaveRecord[],
   teamId: string,
   date: string,
+  shiftTypeId?: string,
 ): CoverageAgainstMinimum | null {
   const minimum = minimumOfCalendar(calendar);
 
   if (minimum === null) return null;
 
   try {
-    const staffing = peopleAtWorkOn(staffingInputOf(calendar, records), teamId, date);
+    const staffing = peopleAtWorkOn(staffingInputOf(calendar, records), teamId, date, shiftTypeId);
 
     if (staffing === null) return null;
 
@@ -374,6 +379,9 @@ export function coverageAgainstMinimumOf(
 
 // ------------------------------------------------- the calendar's day detail
 
+/** STORY 21.6: a day's staffing groups' lines, by type id — none. Frozen, so a memo's answer stays one object. */
+export const NO_GROUP_STAFFING: Readonly<Record<string, CoverageAgainstMinimum | null>> = Object.freeze({});
+
 /**
  * STORY 11.3: the day detail's line under *Sastav*, `rade 2 od najmanje 3`,
  * for `teamId`'s working shift on `date`, from the calendar's own snapshot and
@@ -388,15 +396,18 @@ export function coverageAgainstMinimumOf(
  * that is not working, and on a `RangeError` (logged), through
  * {@link coverageAgainstMinimumOf}: the domain's `peopleAtWorkOn` and
  * `isShortStaffed`, no arithmetic here (AD-7).
+ *
+ * STORY 21.6: with `shiftTypeId`, a staffing group's own line.
  */
 export function dayStaffingOf(
   calendar: CalendarSnapshot,
   staffingLeave: readonly CollisionLeaveRecord[] | null,
   teamId: string,
   date: string,
+  shiftTypeId?: string,
 ): CoverageAgainstMinimum | null {
   if (staffingLeave === null) return null;
   if (!splitTeams(calendar.teams).active.some((team) => team.id === teamId)) return null;
 
-  return coverageAgainstMinimumOf(calendar, staffingLeave, teamId, date);
+  return coverageAgainstMinimumOf(calendar, staffingLeave, teamId, date, shiftTypeId);
 }

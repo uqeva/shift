@@ -6,6 +6,7 @@ import {
   JOB_ROLE_WRITE_KEYS,
   AUTH_LAYOUT,
   CALENDAR_EMPTY_DAY_KEYS,
+  CALENDAR_DAY_DETAIL_KEYS,
   CALENDAR_MODIFIER_KEYS,
   CALENDAR_OVERRIDE_WRITE_KEYS,
   CALENDAR_ROSTER_WRITE_KEYS,
@@ -506,7 +507,9 @@ export const KEY_SOURCES = [
     file: DANAS,
     keys: translationKeys,
     // STORY 19.4: coverage with no team, its fact and its consequence.
-    strings: 101,
+    // 107 SINCE STORY 21.6: a Personal Shift's `ručno` and `dodijeljeno ručno` on a row and on a coverage group, `bez tima` on a row and in a duty note.
+    // 109 SINCE ITS REVIEW: a duty leg's `ručno` and `dodijeljeno ručno`.
+    strings: 109,
   },
   {
     // STORY 6.1a: today's three cases, the next shift's two headings, and
@@ -936,7 +939,9 @@ export const KEY_SOURCES = [
     // ONE HUNDRED AND NINETY-SEVEN SINCE STORY 21.23: the compact toolbar —
     // `Prikaz` and `Izvoz` with their menus' names, and the shared bar's
     // `Filtri` group, trigger and count, `Aktivni filtri` and `Primijeni`.
-    strings: 198,
+    // 207 SINCE STORY 21.6: the cell's `ručno`, `bez tima` and a group's `dodijeljeno ručno`, the legend's pencil, a staffing group's heading, an assigned member's `ručno` and `dodijeljeno ručno`, and the overlap hint's `bez tima`.
+    // 206 SINCE ITS REVIEW: the off and no-rotation sentences moved to `dayNotWorkingMessageKey` (the day detail's rules).
+    strings: 206,
   },
   {
     // STORY 12.2. On the swap proposal: its heading (twice, once while the
@@ -1019,7 +1024,16 @@ export const KEY_SOURCES = [
     name: 'the calendar modifier vocabulary',
     file: CALENDAR_MODIFIER_KEYS,
     keys: memberListKeys,
-    strings: 6,
+    // 8 SINCE STORY 21.6: `dodijeljeno ručno` and `bez tima` in a label.
+    strings: 8,
+  },
+  {
+    // STORY 21.6: the day detail's sentence for an off or no-rotation day,
+    // with or without a staffing group (`dayNotWorkingMessageKey`).
+    name: 'the day detail rules',
+    file: CALENDAR_DAY_DETAIL_KEYS,
+    keys: messageKeyUnions,
+    strings: 4,
   },
   {
     // STORY 4.1b. TWELVE on Sati: its own `nav.sati` heading; the shared month
@@ -1241,7 +1255,8 @@ export const KEY_SOURCES = [
     name: 'the Ručni raspored destination',
     file: RUCNI_RASPORED,
     keys: translationKeys,
-    strings: 119,
+    // 120 SINCE STORY 21.6: *Dodaj smjenu*'s alert for a member with no row.
+    strings: 120,
   },
   {
     // STORY 21.4: the preview's shift and inert-override lines, and the save's refusals.
@@ -1659,7 +1674,8 @@ export const KEY_SOURCES = [
     name: 'the hours explanation rules',
     file: HOURS_EXPLANATION_KEYS,
     keys: (text: string) => [...translationKeys(text), ...messageKeyUnions(text)],
-    strings: 13,
+    // 14 SINCE STORY 21.6: a teamless line's `bez tima`.
+    strings: 14,
   },
   {
     // STORY 18.5: a member's own loan, covering today or ahead, off
@@ -1902,7 +1918,8 @@ export const KEY_SOURCES = [
     name: 'the member edit form',
     file: MEMBER_EDIT,
     keys: translationKeys,
-    strings: 205,
+    // 218 SINCE STORY 21.6: the loan preview's `bez tima` (four) and *Dodaj smjenu*'s card (its title and opener, the hint) and dialog (title, *Zatvori*, *Datum*, the hint, *Odustani*, *Odaberi smjenu*).
+    strings: 218,
   },
   {
     // THIRTEEN on the member write path's rules: eleven `ljudi.form.error.*`

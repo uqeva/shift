@@ -48,8 +48,8 @@ function renderDay({ day, onLeave }: TodayWeekDay): ReactNode {
           <span className="text-sm text-muted-foreground">{t(dayEmptyMessageKey(day))}</span>
         ) : null}
         {day.shifts.map((shift, index) => (
-          <span key={`${String(index)}-${shift.teamId}`} className="flex min-w-0">
-            <CalendarCellBox cell={shift.cell} inGrid={false} />
+          <span key={`${String(index)}-${String(shift.teamId)}`} className="flex min-w-0">
+            <CalendarCellBox cell={shift.cell} inGrid={false} noTeam={shift.teamId === null} />
           </span>
         ))}
         {onLeave ? renderLeave(day) : null}

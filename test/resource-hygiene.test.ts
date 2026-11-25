@@ -1257,6 +1257,13 @@ const SANCTIONED_SCREEN_KEYS = [
   'kalendar.modifier.uncovered',
   // STORY 11.3: the fifth mark, short-staffed.
   'kalendar.modifier.shortStaffed',
+  // STORY 21.6 (UX-DR73): a Personal Shift's assigned mark — a cell field, not a
+  // modifier — and the legend's pencil; `bez tima` for one counted with no team.
+  'kalendar.cell.assigned',
+  'kalendar.cell.assignedShort',
+  'kalendar.cell.noTeam',
+  'kalendar.cell.noTeamShown',
+  'kalendar.legendAssigned',
   // STORY 5.3c: the unavailable alert's retry, which reads the schedule and
   // the leave the marks stand on again.
   'kalendar.retry',
@@ -1354,6 +1361,11 @@ const SANCTIONED_SCREEN_KEYS = [
   'kalendar.detail.empty',
   'kalendar.detail.off',
   'kalendar.detail.noRotation',
+  // STORY 21.6: a staffing group's own section, `Dan · ručno`.
+  'kalendar.detail.group',
+  // STORY 21.6 (review): an off or no-rotation day that has a group, never "ne radi".
+  'kalendar.detail.offGroups',
+  'kalendar.detail.noRotationGroups',
   // STORY 7.9: day detail is facts, and each change its own dialog — the
   // *Izmjene* heading and the sentence for a day with none; the day's
   // unresolved conflict (heading, line, "Riješi konflikt"); a type with its
@@ -3371,6 +3383,14 @@ const SANCTIONED_SCREEN_KEYS = [
   'rucniRaspored.noTeam',
   'rucniRaspored.offMark',
   'rucniRaspored.countedMark',
+  // STORY 21.6: *Dodaj smjenu* on the member page, and the grid's alert for a member with no row.
+  'rucniRaspored.addShift.title',
+  'rucniRaspored.addShift.hint',
+  'rucniRaspored.addShift.date',
+  'rucniRaspored.addShift.open',
+  'rucniRaspored.addShift.cancel',
+  'rucniRaspored.addShift.close',
+  'rucniRaspored.addShift.noRow',
   'rucniRaspored.column.person',
   'rucniRaspored.source.team',
   'rucniRaspored.source.manual',

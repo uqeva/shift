@@ -748,14 +748,14 @@ development_status:
   21-2-a-personal-assignment-is-a-recorded-exception: done  # PR #365, squash d23aef6, CI green
   21-3-the-calendar-scrolls-with-the-page-kalendar-bez-unutarnjeg-s: done  # PR #364, squash 9ea215f, CI green
   21-4-an-admin-plans-the-month-in-ručni-raspored: done  # PR #369, squash a5cf067, CI green
-  21-5-popuni-uzorkom-and-kopiraj-fill-a-range: review  # built, CI pending; PR #372; the role beside each name built, the grid's Posao filter deferred to 21.25
-  21-6-personal-shifts-are-read-wherever-shifts-are-read: ready-for-dev  # after 21.2
+  21-5-popuni-uzorkom-and-kopiraj-fill-a-range: done  # PR #372, squash fdedebc, CI green; the role beside each name built, the grid's Posao filter deferred to 21.25
+  21-6-personal-shifts-are-read-wherever-shifts-are-read: review  # built, CI pending
   21-7-a-leave-over-a-personal-shift-is-a-conflict-and-a-replacemen: ready-for-dev  # after 21.6
   21-8-swaps-give-and-take-personal-shifts: ready-for-dev  # after 21.6
   21-9-the-schedule-source-rule-in-the-domain: review  # built, CI pending; PR #373; domain only, no migration
   21-10-an-admin-gives-a-member-their-own-rotation-or-makes-them-man: ready-for-dev  # after 21.9, 21.4
   21-11-a-seasonal-member-s-season-is-set-in-one-step: ready-for-dev  # independent
-  21-12-job-roles-are-organization-data: review  # built, CI pending (0078)
+  21-12-job-roles-are-organization-data: done  # PR #371, squash e1b6a65, CI green (0078)
   21-13-floaters-are-suggested-for-an-uncovered-shift-by-role: ready-for-dev  # after 21.7, 21.12
   21-14-a-floater-covers-a-whole-leave-in-one-action: ready-for-dev  # after 21.13
   21-15-the-holiday-rule-in-the-domain: ready-for-dev  # after 21.9

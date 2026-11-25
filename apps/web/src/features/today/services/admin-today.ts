@@ -14,7 +14,7 @@ import {
 import type { CalendarSnapshot } from '@/features/calendar/services/snapshot';
 import { calendarMarksOf } from '@/features/calendar/services/marks';
 import type { LoanNotice } from '@/features/calendar/utils/loan-marks';
-import { DAY_NO_ROTATION, DAY_OFF, dayDetailOf } from '@/features/calendar/utils/day-detail';
+import { DAY_NO_ROTATION, DAY_OFF, dayDetailOf, type DayDetailMember } from '@/features/calendar/utils/day-detail';
 import { MODIFIER_CONFLICT, MODIFIER_SHORT_STAFFED } from '@/features/calendar/utils/modifiers';
 import {
   CALENDAR_CELL_CLASS,
@@ -274,6 +274,17 @@ export interface CoverageRow {
   readonly absent: readonly CoverageAbsent[];
   /** Full, nobody rostered, or short with `absent` named. */
   readonly staffing: CoverageStaffing;
+  /**
+   * STORY 21.6 (R14.6): a staffing group's row — its type, the people whose
+   * Personal Shift of that type counts with the team. ABSENT on the team's
+   * own working shift.
+   */
+  readonly groupTypeId?: string;
+}
+
+/** A coverage row's stable identity: its team, and its type when it is a group (story 21.6). */
+export function coverageRowKeyOf(row: Pick<CoverageRow, 'teamId' | 'groupTypeId'>): string {
+  return row.groupTypeId === undefined ? row.teamId : `${row.teamId}|${row.groupTypeId}`;
 }
 
 /** *Pokrivenost danas*. */
@@ -731,19 +742,42 @@ function coverageOf(
 
     if (detail === null) throw new RangeError(`team ${team.id} is not in the snapshot`);
 
-    if (detail.kind === DAY_NO_ROTATION) {
-      noRotation.push(team.name);
+    // STORY 21.6 (R14.6): each staffing group is a row of its own, after the
+    // team's working shift, on any kind of day.
+    const groupRows = (detail.groups ?? []).map((group) =>
+      rowOf(team, group.shiftTypeId, group.typeName, group.range, group.roster, true),
+    );
+
+    // A team whose only work today is a group is listed in its group rows
+    // alone, never also as off or with no rotation, as if nobody worked.
+    if (detail.kind === DAY_NO_ROTATION || detail.kind === DAY_OFF) {
+      if (groupRows.length !== 0) rows.push(...groupRows);
+      else if (detail.kind === DAY_OFF) off.push(team.name);
+      else noRotation.push(team.name);
       continue;
     }
 
-    if (detail.kind === DAY_OFF) {
-      off.push(team.name);
-      continue;
+    if (detail.shiftTypeId === null || detail.typeName === null) {
+      throw new RangeError(`the working type of team ${team.id} on ${today} is not in the snapshot`);
     }
 
-    const type = detail.shiftTypeId === null ? undefined : types.get(detail.shiftTypeId);
+    rows.push(rowOf(team, detail.shiftTypeId, detail.typeName, detail.range, detail.roster, false), ...groupRows);
+  }
 
-    if (type === undefined || detail.typeName === null) {
+  return { rows, off, noRotation };
+
+  /** One working shift of `team` today, a staffing group's with `group`. */
+  function rowOf(
+    team: { readonly id: string; readonly name: string },
+    shiftTypeId: string,
+    typeName: string,
+    range: string | null,
+    roster: readonly DayDetailMember[],
+    group: boolean,
+  ): CoverageRow {
+    const type = types.get(shiftTypeId);
+
+    if (type === undefined) {
       throw new RangeError(`the working type of team ${team.id} on ${today} is not in the snapshot`);
     }
 
@@ -751,7 +785,7 @@ function coverageOf(
     const absent: CoverageAbsent[] = [];
     let replaced = 0;
 
-    for (const entry of detail.roster) {
+    for (const entry of roster) {
       if (!onLeave(records, entry.id, today)) continue;
 
       const key = collisionKeyOf({ memberId: entry.id, date: today, teamId: team.id });
@@ -771,22 +805,21 @@ function coverageOf(
       });
     }
 
-    const total = detail.roster.length - replaced;
+    const total = roster.length - replaced;
 
-    rows.push({
+    return {
       teamId: team.id,
       teamName: team.name,
-      shiftTypeName: detail.typeName,
-      range: detail.range,
+      shiftTypeName: typeName,
+      range,
       phase: version === null ? null : coveragePhaseOf(version.startMinute, version.endMinute, minute),
       present: total - absent.length,
       total,
       absent,
       staffing: total === 0 ? STAFFING_NOBODY : absent.length === 0 ? STAFFING_FULL : STAFFING_SHORT,
-    });
+      ...(group ? { groupTypeId: shiftTypeId } : {}),
+    };
   }
-
-  return { rows, off, noRotation };
 }
 
 /**
