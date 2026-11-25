@@ -1,12 +1,14 @@
-import type { ReactNode } from 'react';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
 
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CalendarCellBox } from '@/features/calendar/components/calendar-cell';
+import { CalendarTeamDays } from '@/features/calendar/components/calendar-day-list';
 import { CalendarLegend } from '@/features/calendar/components/calendar-legend';
 import type { CalendarScreenState } from '@/features/calendar/hooks/use-calendar-screen';
 import { DAY_DETAIL_POPUP } from '@/features/calendar/utils/day-detail';
 import { MONTH_HEADING_ID, gridTabStopOf, isSameGridPosition, type GridPosition } from '@/features/calendar/utils/grid-keys';
-import type { CalendarCell, CalendarMonth } from '@/features/calendar/utils/month';
+import type { CalendarCell, CalendarMonth, CalendarRow } from '@/features/calendar/utils/month';
+import { usePhone } from '@/hooks/viewport';
 import { t } from '@/lib/i18n';
 
 /**
@@ -46,26 +48,114 @@ function renderCell(
   );
 }
 
+/** A date's row header, in the grid and in the strip's copy alike. */
+function renderRowHeader(row: CalendarRow): ReactNode {
+  return (
+    <TableHead
+      scope="row"
+      className={
+        row.isToday
+          ? 'sticky left-0 z-10 h-auto whitespace-nowrap border-l-4 border-foreground bg-card py-1 text-sm font-bold normal-case tracking-normal text-foreground print:whitespace-normal print:px-1 print:py-px print:text-xs'
+          : 'sticky left-0 z-10 h-auto whitespace-nowrap bg-card py-1 text-sm font-medium normal-case tracking-normal text-foreground print:whitespace-normal print:px-1 print:py-px print:text-xs'
+      }
+    >
+      <span className="block tabular-nums print:inline">{row.dayMonth}</span>
+      <span className="block text-xs font-normal text-muted-foreground print:ml-1 print:inline">{row.weekday}</span>
+    </TableHead>
+  );
+}
+
+/**
+ * The header row, in the grid and in the strip's copy alike: the corner
+ * (sticky on the left, which only the strip's ever shows) and a team per
+ * column, each `h-11` — the strip's height and the grid's pull-up.
+ */
+function renderHeaderRow(shown: CalendarMonth): ReactNode {
+  return (
+    <TableRow>
+      <TableHead
+        scope="col"
+        className="sticky left-0 z-30 h-11 w-28 min-w-28 bg-muted shadow-[inset_0_-1px_0_var(--border)] forced-colors:border-b forced-colors:border-[CanvasText] print:h-auto print:border-b print:px-1 print:py-1"
+      >
+        {t('kalendar.columnDate')}
+      </TableHead>
+      {shown.columns.map((team) => (
+        <TableHead
+          key={team.id}
+          scope="col"
+          className="h-11 whitespace-nowrap bg-muted normal-case shadow-[inset_0_-1px_0_var(--border)] forced-colors:border-b forced-colors:border-[CanvasText] print:h-auto print:whitespace-normal print:[overflow-wrap:anywhere] print:border-b print:px-1 print:py-1"
+        >
+          {team.name}
+        </TableHead>
+      ))}
+    </TableRow>
+  );
+}
+
+/**
+ * THE STRIP's table (story 21.3): a VISUAL COPY of the grid — its header row
+ * AND its body rows, the same content through the same primitives and
+ * classes, in a table as wide as the grid — so auto table layout gives it the
+ * grid's column widths by construction, never by measuring. The strip clips
+ * everything below the header row. The copy has no roles, ids, handlers or
+ * `aria-current`, is `inert`, and the strip around it is `aria-hidden`, so
+ * the grid's own `thead` is what assistive technology and print read.
+ */
+function renderStripTable(shown: CalendarMonth): ReactNode {
+  return (
+    <table className="w-full caption-bottom text-sm">
+      <TableHeader>{renderHeaderRow(shown)}</TableHeader>
+      <TableBody>
+        {shown.rows.map((row) => (
+          <TableRow key={row.date}>
+            {renderRowHeader(row)}
+            {row.cells.map((cell) => (
+              <TableCell key={cell.teamId} className="px-1 py-1">
+                <CalendarCellBox cell={cell} inGrid />
+              </TableCell>
+            ))}
+          </TableRow>
+        ))}
+      </TableBody>
+    </table>
+  );
+}
+
 /**
  * *Sve smjene*'s grid (stories 3.1, 3.2b): a row per date and a column per
  * active team, an ARIA grid with one tab stop that the arrows, Home and End
  * move by `@/features/calendar/utils/grid-keys`, and the legend above it
- * while a mark is on screen. Below 640 px it is COMPRESSED by CSS alone — one
- * letter per team header and per cell, the full names `sr-only` — and is the
- * same table; from 640 px up it is story 3.1's.
+ * while a mark is on screen. Below 640 px (`usePhone()`) it is not drawn: the
+ * phone reads the same month as a day list of every shown team
+ * (`CalendarTeamDays`, story 21.3), so a phone never scrolls sideways.
+ * Exactly one form is in the DOM.
  *
- * STICKY ON BOTH AXES (package 3c): the table's own scroller is held to 70 svh
- * (the small viewport, so it never resizes while a phone's toolbar slides), so
- * a 28–31-row month scrolls inside it and the team header stays at its top
- * while the date column stays at its left. Stacked corner over header over
- * date column over cells, and ISOLATED, so those layers never paint over the
- * phone's sticky bottom bar. In print the bound is lifted, so a printed month
- * is whole. On a phone's screen the bound is also the room between the
- * sticky head and the bottom bar (`data-grid-bound`, `index.css`), so the
- * team header is never under the head (deferred-work E816).
+ * THE PAGE SCROLLS, NEVER THE GRID (story 21.3). The grid has no height bound
+ * and no vertical scroll container: a 28–31-row month is as tall as it is, and
+ * the page scrolls it. Its one scroller is HORIZONTAL only
+ * (`overflow-x-auto overflow-y-hidden`), so a wide month scrolls sideways
+ * inside it and the page never does; the date column is sticky on that axis.
+ *
+ * THE HEADER IS A SEPARATE STRIP. An `overflow-x: auto` box is a sticky
+ * element's scroll container on BOTH axes, so a header inside the scroller
+ * could never stick to the page. The strip sits outside it, in the same
+ * ISOLATED frame: sticky at the viewport's top, `h-11`, clipping its copy table to the
+ * header row, and kept in step with the scroller's `scrollLeft` (its corner
+ * is sticky on the left, as the date column is). The grid's real `thead`
+ * stays in the table for assistive technology and print, pulled up `-mt-11`
+ * behind the strip, where the scroller clips it; in its natural place it
+ * coincides with the strip. In print the strip is not drawn and the pull-up is
+ * lifted: the one table prints whole, its header row repeated on every page.
+ *
+ * A phone never draws the grid (it draws the day list), so the strip never
+ * meets the phone's sticky head. Its `max-sm:top-[var(--sticky-head,0px)]`
+ * is only a GUARD for the fractional gap between `usePhone()`'s
+ * `(max-width: 639px)` and the `max-sm` breakpoint (below 640 px): at a
+ * width such as 639.5 px the grid is drawn under `max-sm` CSS, and there the
+ * strip sits under the head rather than behind it.
  *
  * THE MARGINS ARE THE SIZES: the date column is `w-28` and each cell's
- * `scroll-margin-left` is `28`; the header is `h-11` and each cell's
+ * `scroll-margin-left` is `28`; the strip is `h-11` and each cell's
  * `scroll-margin-top` is `11`. `useCalendarScreen`'s `reveal` scrolls a focused
  * cell inside them, so it lands clear of both.
  */
@@ -76,6 +166,16 @@ export function CalendarGrid({
   readonly shown: CalendarMonth;
   readonly screen: CalendarScreenState;
 }): ReactNode {
+  const isPhone = usePhone();
+  const strip = useRef<HTMLDivElement>(null);
+  const scroller = useRef<HTMLDivElement>(null);
+
+  // The strip follows the scroller after every render too: a month or a
+  // filter that changes the width can move `scrollLeft` with no scroll event.
+  useLayoutEffect(() => {
+    if (strip.current !== null && scroller.current !== null) strip.current.scrollLeft = scroller.current.scrollLeft;
+  });
+
   if (shown.columns.length === 0) {
     // STORY 19.4 (UX-DR70): the fact, and where a schedule comes from.
     return (
@@ -86,82 +186,72 @@ export function CalendarGrid({
     );
   }
 
+  if (isPhone) {
+    return <CalendarTeamDays shown={shown} labels={screen.labels} openDay={screen.openDay} />;
+  }
+
   const tabStop = gridTabStopOf(screen.gridFocus, shown.month, shown.rows, shown.columns.length);
 
   return (
     <>
       <CalendarLegend cells={shown.rows.flatMap((row) => row.cells)} />
-      {/* The primitive's wrapper IS the one scroller (`table.tsx`); this only
-          bounds its height, so the sticky header has something to stick in,
-          and isolates the sticky layers' stacking from the page's. */}
-      <div
-        data-grid-bound
-        className="isolate [&>div]:max-h-[70svh] print:[&>div]:max-h-none print:[&>div]:overflow-visible"
-      >
-        <Table
-          ref={screen.gridRef}
-          className="print:table-fixed"
-          role="grid"
-          aria-readonly
-          aria-labelledby={MONTH_HEADING_ID}
-          onKeyDown={(event) => {
-            screen.moveGridFocus(event, shown);
-          }}
-          onKeyUp={(event) => {
-            screen.openOnKeyUp(event, shown);
+      {/* The frame ISOLATES the sticky layers' stacking from the page's. */}
+      <div data-grid-frame className="isolate">
+        {/* The strip is `aria-hidden`; its copy is `inert`. An inert box is
+            no target for a pointer either, so a press on the copy would land
+            on the cell scrolled under it: the strip itself, outside the
+            inert copy, takes the press and does nothing. */}
+        <div
+          aria-hidden
+          data-grid-strip
+          className="sticky top-0 z-20 h-11 bg-muted forced-colors:border-b forced-colors:border-[CanvasText] max-sm:top-[var(--sticky-head,0px)] print:hidden"
+        >
+          <div ref={strip} inert data-grid-strip-copy className="h-full overflow-hidden">
+            {renderStripTable(shown)}
+          </div>
+        </div>
+        <div
+          ref={scroller}
+          data-grid-scroller
+          className="overflow-x-auto overflow-y-hidden print:overflow-visible"
+          onScroll={(event) => {
+            if (strip.current !== null) strip.current.scrollLeft = event.currentTarget.scrollLeft;
           }}
         >
-          <TableHeader>
-            <TableRow>
-              <TableHead
-                scope="col"
-                className="sticky left-0 top-0 z-30 h-11 w-28 min-w-28 bg-muted shadow-[inset_0_-1px_0_var(--border)] forced-colors:border-b forced-colors:border-[CanvasText] print:h-auto print:border-b print:px-1 print:py-1"
-              >
-                {t('kalendar.columnDate')}
-              </TableHead>
-              {shown.columns.map((team) => (
-                <TableHead
-                  key={team.id}
-                  scope="col"
-                  className="sticky top-0 z-20 h-11 whitespace-nowrap bg-muted normal-case shadow-[inset_0_-1px_0_var(--border)] forced-colors:border-b forced-colors:border-[CanvasText] max-sm:text-center print:h-auto print:whitespace-normal print:[overflow-wrap:anywhere] print:border-b print:px-1 print:py-1"
-                >
-                  <span aria-hidden className="sm:hidden">
-                    {team.letter}
-                  </span>
-                  <span className="sr-only sm:not-sr-only">{team.name}</span>
-                </TableHead>
+          <table
+            ref={screen.gridRef}
+            className="-mt-11 w-full caption-bottom text-sm print:mt-0 print:table-fixed"
+            role="grid"
+            aria-readonly
+            aria-labelledby={MONTH_HEADING_ID}
+            onKeyDown={(event) => {
+              screen.moveGridFocus(event, shown);
+            }}
+            onKeyUp={(event) => {
+              screen.openOnKeyUp(event, shown);
+            }}
+          >
+            <TableHeader>{renderHeaderRow(shown)}</TableHeader>
+            <TableBody>
+              {shown.rows.map((row, rowIndex) => (
+                <TableRow key={row.date} aria-current={row.isToday ? 'date' : undefined} className="print:break-inside-avoid">
+                  {renderRowHeader(row)}
+                  {row.cells.map((cell, column) =>
+                    renderCell(
+                      screen,
+                      shown.month,
+                      row.date,
+                      cell,
+                      screen.labels?.[rowIndex]?.[column],
+                      { row: rowIndex, column },
+                      tabStop,
+                    ),
+                  )}
+                </TableRow>
               ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {shown.rows.map((row, rowIndex) => (
-              <TableRow key={row.date} aria-current={row.isToday ? 'date' : undefined} className="print:break-inside-avoid">
-                <TableHead
-                  scope="row"
-                  className={
-                    row.isToday
-                      ? 'sticky left-0 z-10 h-auto whitespace-nowrap border-l-4 border-foreground bg-card py-1 text-sm font-bold normal-case tracking-normal text-foreground print:whitespace-normal print:px-1 print:py-px print:text-xs'
-                      : 'sticky left-0 z-10 h-auto whitespace-nowrap bg-card py-1 text-sm font-medium normal-case tracking-normal text-foreground print:whitespace-normal print:px-1 print:py-px print:text-xs'
-                  }
-                >
-                  <span className="block tabular-nums print:inline">{row.dayMonth}</span>
-                  <span className="block text-xs font-normal text-muted-foreground print:ml-1 print:inline">{row.weekday}</span>
-                </TableHead>
-                {row.cells.map((cell, column) =>
-                  renderCell(
-                    screen,
-                    shown.month,
-                    row.date,
-                    cell,
-                    screen.labels?.[rowIndex]?.[column],
-                    { row: rowIndex, column },
-                    tabStop,
-                  ),
-                )}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableBody>
+          </table>
+        </div>
       </div>
     </>
   );

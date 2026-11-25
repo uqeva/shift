@@ -561,7 +561,12 @@
    * The top clears the phone's sticky head of *Kalendar* and *Sati*
    * (`StickyHead`, deferred-work E816) the same way, by what it covers in
    * `--sticky-head` (the toolbar, and room for its one-line filter summary),
-   * which is unset (0) on every other screen.
+   * which is unset (0) on every other screen. A phone's *Sve smjene* is a
+   * day list (story 21.3), so the calendar grid's sticky team strip is never
+   * under the head; its `max-sm` top at `--sticky-head` only guards the
+   * fractional width between `usePhone()`'s query and the `sm` breakpoint.
+   * From 640 px the strip sticks at the top and each cell's own
+   * `scroll-margin-top` clears it.
    *
    * EVERY DIGIT IS TABULAR (story 15.1, D1, UX-DR40), set once here: Outfit's
    * `tnum` gives all ten digits one advance at every weight in use. */
@@ -985,25 +990,6 @@
   }
 }
 
-/* DEFERRED-WORK E816: on a phone's screen the calendar grid's scroller fits
- * in what is left below the sticky head (`--sticky-head`) with the page
- * scrolled to its end, so its own sticky team header is never under the head:
- * the viewport less the head, the bottom bar (4.75 rem + 2 px since story
- * 15.1's floating pill, in flow at the page's end) and the content's own
- * clearance of it (the same again, `chrome.tsx`), the page's 1.5 rem below the
- * Card and the Card's two 1 px borders. Never taller than the 70 svh it has everywhere; small viewport
- * units, as that bound. UNLAYERED, so it wins over the wrapper's
- * `[&>div]:max-h-[70svh]` utility, and SCREEN only, so print's lifted bound
- * still wins on paper. */
-@media screen and (max-width: 639.98px) {
-  [data-grid-bound] > div {
-    max-height: min(
-      70svh,
-      calc(100svh - var(--sticky-head, 0px) - 2 * (4.75rem + 2px + env(safe-area-inset-bottom, 0px)) - 1.5rem - 2px)
-    );
-  }
-}
-
 /* STORY 16.1 (UX-DR56, FR-84, decision D3): THE MONTH PRINTS. The browser's
  * own print of *Kalendar*, never a PDF library. Everything here is scoped to
  * a page that holds `[data-print-month]` (`pages/kalendar.tsx`), so no other
@@ -1084,7 +1070,9 @@
   }
 
   /* Sticky heads and date column flow on paper, so each page lays out the
-   * table as a table, the header row repeated. */
+   * table as a table, the header row repeated. The grid's sticky team strip
+   * (story 21.3) is a screen copy and is not printed (`print:hidden`); the
+   * table's own header row is. */
   [data-print-month] .sticky {
     position: static !important;
   }

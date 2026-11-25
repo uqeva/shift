@@ -746,7 +746,7 @@ development_status:
   epic-21: in-progress  # pilot readiness; gates 20.9 (founder 2026-11-25)
   21-1-the-personal-assignment-rule-in-the-domain: review  # built, CI pending
   21-2-a-personal-assignment-is-a-recorded-exception: ready-for-dev  # after 21.1
-  21-3-the-calendar-scrolls-with-the-page-kalendar-bez-unutarnjeg-s: ready-for-dev  # independent; before 21.4
+  21-3-the-calendar-scrolls-with-the-page-kalendar-bez-unutarnjeg-s: review  # built, CI pending; independent; before 21.4
   21-4-an-admin-plans-the-month-in-ručni-raspored: ready-for-dev  # after 21.2, 21.3
   21-5-popuni-uzorkom-and-kopiraj-fill-a-range: ready-for-dev  # after 21.4
   21-6-personal-shifts-are-read-wherever-shifts-are-read: ready-for-dev  # after 21.2

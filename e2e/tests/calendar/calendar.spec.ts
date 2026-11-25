@@ -22,7 +22,12 @@ import {
 import { addDays, dayMonth, weekdayOf } from '../../utils/dates.ts';
 import { ADMIN_STATE, MEMBER_STATE } from '../../utils/run-fixture.ts';
 import { escapeRegExp, fill, hr } from '../../utils/i18n.ts';
-import { MINIMUM_TARGET, expectNoHorizontalScroll, expectTouchTargets } from '../../utils/layout.ts';
+import {
+  MINIMUM_TARGET,
+  expectNoHorizontalScroll,
+  expectNoInnerHorizontalScroll,
+  expectTouchTargets,
+} from '../../utils/layout.ts';
 import { expect, test } from '../../utils/custom-fixtures.ts';
 
 /**
@@ -609,22 +614,18 @@ test.describe('at 320 px', () => {
     await expectNoHorizontalScroll(page);
     await expectTouchTargets(page);
 
+    // STORY 21.3: *Sve smjene* on a phone is the day list of every shown
+    // team, never a grid, so nothing scrolls sideways at any team count.
     await calendarPage.goto('?prikaz=sve');
-    const cell = await calendarPage.cellOf(fixture.team.name, rotation.today);
-    await expect(cell).toContainText(expectedType(rotation, rotation.today));
-    // Below 1024 px the range is not shown — dropped, never abbreviated.
-    await expect(calendarPage.drawnText(cell, '07:00–19:00', { exact: false })).toBeHidden();
+    const day = calendarPage.dayButtonIn(calendarPage.dayList, fixture.team.name, rotation.today);
+    await expect(day).toContainText(expectedType(rotation, rotation.today));
+    await expect(calendarPage.anyGrid).toHaveCount(0);
 
     await expectNoHorizontalScroll(page);
+    await expectNoInnerHorizontalScroll(page);
     await expectTouchTargets(page);
   });
 });
-
-/** Whether `letter` is the start of `word`, uppercased, and shorter than it: a compressed label. */
-function expectLetterOf(letter: string, word: string): void {
-  expect(letter.length, `${letter} is not a short label of ${word}`).toBeGreaterThan(0);
-  expect(word.toLocaleUpperCase('hr').startsWith(letter), `${letter} does not start ${word}`).toBe(true);
-}
 
 test.describe('on a phone, as a member', () => {
   test.use({ storageState: MEMBER_STATE, viewport: { width: 390, height: 844 } });
@@ -662,23 +663,23 @@ test.describe('on a phone, as a member', () => {
       await expect(calendarPage.drawnText(row, '19:00–07:00')).toBeVisible();
     }
 
-    // One tap to the compressed grid: one letter per team and per cell.
+    // One tap to *Sve smjene*, which on a phone is the day list of every
+    // shown team (story 21.3), never a grid: each team's day a button with
+    // the team's name over the type, drawn in full, named like a gridcell.
     await sve.click();
     await expect(page).toHaveURL(/prikaz=sve/);
     await expect(sve).toHaveAttribute('aria-pressed', 'true');
-    const header = calendarPage.columnHeader(fixture.team.name);
-    await expect(calendarPage.letterOf(header)).toBeVisible();
-    expectLetterOf(await calendarPage.letterOf(header).innerText(), fixture.team.name.split(' ').at(-1) ?? '');
-    const cell = await calendarPage.cellOf(fixture.team.name, rotation.today);
-    const letter = calendarPage.letterOf(cell);
-    await expect(letter).toBeVisible();
-    expectLetterOf(await letter.innerText(), expectedType(rotation, rotation.today));
-    // The full name is not drawn below 640 px: the gridcell's label names it.
-    await expect(calendarPage.drawnText(cell, expectedType(rotation, rotation.today))).toBeHidden();
+    await expect(calendarPage.anyGrid).toHaveCount(0);
+    const cell = calendarPage.dayButtonIn(calendarPage.dayList, fixture.team.name, rotation.today);
+    await expect(calendarPage.drawnText(cell, fixture.team.name)).toBeVisible();
+    await expect(calendarPage.drawnText(cell, expectedType(rotation, rotation.today))).toBeVisible();
     await expect(cell).toHaveAccessibleName(new RegExp(`, ${fixture.team.name}, ${expectedType(rotation, rotation.today)}(,|$)`));
+    await expect(cell).toHaveAttribute('aria-haspopup', 'dialog');
+    await expect(calendarPage.todayIn(calendarPage.dayList)).toHaveCount(1);
+    await expectNoHorizontalScroll(page);
 
-    // The compressed cells and the switch are touch targets.
-    for (const target of [calendarPage.targetOf(cell), moj, sve]) {
+    // The team days and the switch are touch targets.
+    for (const target of [cell, moj, sve]) {
       const box = await target.boundingBox();
       expect(box, 'a target has no box').not.toBeNull();
       expect(box!.width).toBeGreaterThanOrEqual(MINIMUM_TARGET - 0.5);
@@ -692,7 +693,8 @@ test.describe('on a phone, as a member', () => {
     await expect(calendarPage.monthHeading(monthHeading(next))).toBeVisible();
     await expect(page).toHaveURL(new RegExp(`mjesec=${next.slice(0, 7)}`));
     await expect(page).toHaveURL(/prikaz=sve/);
-    await expect(calendarPage.anyGrid).toBeVisible();
+    await expect(calendarPage.teamDaysOf(fixture.team.name).first()).toBeVisible();
+    await expect(calendarPage.anyGrid).toHaveCount(0);
     await moj.click();
     await expect(page).toHaveURL(/prikaz=moj/);
     await expect(page).toHaveURL(new RegExp(`mjesec=${next.slice(0, 7)}`));
@@ -723,13 +725,26 @@ test.describe('on a phone, as a member', () => {
 test.describe('on a phone, as an admin', () => {
   test.use({ storageState: ADMIN_STATE, viewport: { width: 390, height: 844 } });
 
-  test('lands on the compressed grid', async ({ calendarPage, fixture }) => {
+  test('lands on Sve smjene, the day list of every team (story 21.3)', async ({ page, calendarPage, fixture }) => {
     await calendarPage.goto();
     const { moj, sve } = calendarPage.modes();
     await expect(sve).toHaveAttribute('aria-pressed', 'true');
     await expect(moj).toHaveAttribute('aria-pressed', 'false');
-    const header = calendarPage.columnHeader(fixture.team.name);
-    await expect(calendarPage.letterOf(header)).toBeVisible();
+    await expect(calendarPage.teamDaysOf(fixture.team.name).first()).toBeVisible();
+    // Exactly one form in the DOM: no grid, and no strip of one.
+    await expect(calendarPage.anyGrid).toHaveCount(0);
+    await expect(calendarPage.strip).toHaveCount(0);
+    await expectNoHorizontalScroll(page);
+    await expectNoInnerHorizontalScroll(page);
+
+    // One team filter narrows it to that team.
+    await calendarPage.goto(`?prikaz=sve&smjena=${fixture.team.id}`);
+    await expect(calendarPage.teamDaysOf(fixture.team.name).first()).toBeVisible();
+    expect(await calendarPage.teamDayCount()).toBe(1);
+
+    // Crossing 640 px swaps the form: the grid from 640 px, the list below.
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await expect(calendarPage.columnHeader(fixture.team.name)).toBeAttached();
     await expect(calendarPage.dayList).toHaveCount(0);
   });
 });
@@ -753,7 +768,9 @@ test.describe('on a phone, as the member on no team', () => {
 
 for (const [width, height, name] of [
   [1280, 800, 'the full grid at 1280 px'],
-  [390, 844, 'the compressed grid at 390 px'],
+  // STORY 21.3: below 640 px there is no grid (the day list of every team),
+  // so the narrowest grid is the one at 640 px.
+  [640, 844, 'the grid at 640 px'],
 ] as const) {
   test.describe(`the keyboard grid: ${name}`, () => {
     test.use({ storageState: ADMIN_STATE, viewport: { width, height } });
@@ -1835,7 +1852,8 @@ test.describe('the roster form at 390 px, as an admin', () => {
     const rotation = await seeded(fixture.slug, fixture.team.id);
 
     await calendarPage.goto(gridMonthOf(rotation.today));
-    await (await calendarPage.cellOf(fixture.team.name, rotation.today)).tap();
+    // On a phone *Sve smjene* is the day list of every team (story 21.3).
+    await calendarPage.dayButtonIn(calendarPage.dayList, fixture.team.name, rotation.today).tap();
     const detail = calendarPage.detailOf(fixture.team.name, rotation.today);
     await expect(detail).toBeVisible();
     await expect(calendarPage.rosterOpenerIn(detail)).toBeVisible();
@@ -2146,8 +2164,9 @@ test.describe('the override form at 390 px, as a member', () => {
     await expect(detail).toHaveCount(0);
 
     // An overridden day too: the block, and still no removal.
+    // On a phone *Sve smjene* is the day list of every team (story 21.3).
     await calendarPage.goto(`?prikaz=sve&mjesec=${tomorrow.slice(0, 7)}`);
-    await (await calendarPage.cellOf(fixture.team.name, tomorrow)).click();
+    await calendarPage.dayButtonIn(calendarPage.dayList, fixture.team.name, tomorrow).click();
     const overridden = calendarPage.detailOf(fixture.team.name, tomorrow);
     await expect(calendarPage.overrideIn(overridden)).toBeVisible();
     await expect(calendarPage.overrideRemoveIn(overridden)).toHaveCount(0);
@@ -2649,9 +2668,10 @@ test.describe('the filters on a phone', () => {
     fixture,
   }) => {
     await calendarPage.goto('?prikaz=sve');
-    await expect(calendarPage.columnHeader(fixture.team.name)).toBeAttached();
+    // On a phone *Sve smjene* is the day list of every team (story 21.3).
+    await expect(calendarPage.teamDaysOf(fixture.team.name).first()).toBeVisible();
     const filters = calendarPage.filters;
-    const columns = await calendarPage.columnCount();
+    const columns = await calendarPage.teamDayCount();
 
     // The same pattern as at 1280 px: no chip yet, and `Filtri` carries no Badge.
     await expect(filters.filtriButton).toHaveAccessibleName(filters.filtriName(0));
@@ -2681,14 +2701,14 @@ test.describe('the filters on a phone', () => {
     await expect(filters.sheet).toBeHidden();
     await expect(filters.filtriButton).toBeFocused();
     await expect(filters.filtriButton).toHaveAccessibleName(filters.filtriName(1));
-    // The active chip stays visible, with its ✕, above the grid.
+    // The active chip stays visible, with its ✕, above the month.
     await expect(filters.teamChip).toBeVisible();
     await expect(filters.teamChip).toHaveAccessibleName(filters.teamChipText(fixture.team.name));
     await expect(filters.removeTeam(fixture.team.name)).toBeVisible();
     await expect(filters.personChip).toHaveCount(0);
     const chipBox = await filters.teamChip.boundingBox();
-    const gridBox = await calendarPage.grid.boundingBox();
-    expect(chipBox!.y).toBeLessThan(gridBox!.y);
+    const listBox = await calendarPage.dayList.boundingBox();
+    expect(chipBox!.y).toBeLessThan(listBox!.y);
     await expectNoHorizontalScroll(page);
 
     // Back works: each choice was its own entry.
@@ -2712,7 +2732,7 @@ test.describe('the filters on a phone, after a change', () => {
 
   test('✕ on the only active chip moves focus to Filtri, never to the page', async ({ page, calendarPage, fixture }) => {
     await calendarPage.goto(`?prikaz=sve&smjena=${fixture.team.id}`);
-    await expect(calendarPage.columnHeader(fixture.team.name)).toBeAttached();
+    await expect(calendarPage.teamDaysOf(fixture.team.name).first()).toBeVisible();
     const filters = calendarPage.filters;
 
     await filters.removeTeam(fixture.team.name).click();
@@ -2727,7 +2747,7 @@ test.describe('the filters on a phone, after a change', () => {
     fixture,
   }) => {
     await calendarPage.goto(`?prikaz=sve&smjena=${fixture.team.id}`);
-    await expect(calendarPage.columnHeader(fixture.team.name)).toBeAttached();
+    await expect(calendarPage.teamDaysOf(fixture.team.name).first()).toBeVisible();
     const filters = calendarPage.filters;
 
     await filters.filtriButton.click();
@@ -2755,7 +2775,7 @@ test.describe('the filters on a phone, after a change', () => {
 
   test('an active chip opens the sheet at its field and says so', async ({ calendarPage, fixture }) => {
     await calendarPage.goto(`?prikaz=sve&smjena=${fixture.team.id}`);
-    await expect(calendarPage.columnHeader(fixture.team.name)).toBeAttached();
+    await expect(calendarPage.teamDaysOf(fixture.team.name).first()).toBeVisible();
     const filters = calendarPage.filters;
 
     await expect(filters.teamChip).toHaveAttribute('aria-haspopup', 'dialog');
@@ -2771,7 +2791,7 @@ test.describe('the filters on a phone, after a change', () => {
 
   test('the sheet closes when the viewport crosses 1024 px, focus on Filtri', async ({ page, calendarPage, fixture }) => {
     await calendarPage.goto('?prikaz=sve');
-    await expect(calendarPage.columnHeader(fixture.team.name)).toBeAttached();
+    await expect(calendarPage.teamDaysOf(fixture.team.name).first()).toBeVisible();
     const filters = calendarPage.filters;
 
     await filters.filtriButton.click();
@@ -2809,7 +2829,7 @@ test.describe('the team filter at 320 px', () => {
     fixture,
   }) => {
     await calendarPage.goto(`?prikaz=sve&smjena=${fixture.team.id}`);
-    await expect(calendarPage.columnHeader(fixture.team.name)).toBeAttached();
+    await expect(calendarPage.teamDaysOf(fixture.team.name).first()).toBeVisible();
     const filters = calendarPage.filters;
     await expect(filters.teamChip).toHaveAccessibleName(filters.teamChipText(fixture.team.name));
     const remove = filters.removeTeam(fixture.team.name);
