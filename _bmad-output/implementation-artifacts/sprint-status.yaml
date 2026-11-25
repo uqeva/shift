@@ -727,7 +727,7 @@ development_status:
   20-2-edge-functions-run-behind-a-keyless-router: done  # #327; security-review of the router before production (20.9); live probe in 20.5's rehearsal (DEPLOY.md §9.5 step 7b)
   20-3-the-spa-ships-as-a-static-image-with-its-headers: done  # #329; CSP Report-Only, enforced only after 20.5 verifies it
   20-4-the-host-is-closed-to-everything-but-the-web: done  # applied and confirmed 2026-11-23 (founder); verify-exposure.sh re-run with Studio/Postgres waits for staging on the tailnet (20.5); its deferred pg_net revoke cannot be a migration (postgres is not the grantor; deferred-work, 2026-11-24): an operator step as supabase_admin
-  20-5-staging-stands-up-on-coolify: review  # staging up, CI pending
+  20-5-staging-stands-up-on-coolify: review  # staging up, CI pending; 2026-11-25: on its own domain (staging.<domain>, api.staging.<domain>, Let's Encrypt), email through Resend, signup door OPEN on staging only (DEPLOY.md 9.11)
   20-6-the-pipeline-deploys-through-coolify: review  # built (inert until configured), reviewed twice (2nd: CI/CD security), CI pending; enabling waits: Coolify API token (it must carry `deploy`, 20.5), Tailscale OAuth client, GHCR read token on the host, 20.5
   20-7-backups-leave-the-host-and-a-restore-is-rehearsed: review  # built, CI pending; installed on the staging host, backup + drill PASS 2026-11-23; interim (local sets + tailnet pull + drill); off-host waits: H-11 + target credential
   20-8-someone-hears-when-shift-is-down: review  # built, CI pending; the founder set its three staging secrets and UPTIME_ENABLED (2026-11-24), so it runs once merged; interim (GitHub Actions every 30 min + host jobs-check); UptimeRobot and Coolify notifications wait: H-13, an alert channel
@@ -1442,6 +1442,9 @@ action_items:
       one housekeeping night in cron.job_run_details"
     owner: "Perolipotic (founder) for domain and credentials; then operator or dev"
     status: open
+    # 2026-11-25: (a), (b), (d), (e), (f) done on staging; (c) done in part (Resend test
+    # inboxes: acceptance and link shape; the founder's real inbox still owed); (g) open.
+    # New findings in deferred-work.md (2026-11-25 block). Retro, "A2 progress".
     ref: "_bmad-output/implementation-artifacts/epic-19-retro-2026-11-23.md"
   - id: "epic-19-retro-item-93-a3-run-the-d-s5-security-review-of-19-1"
     epic: 19

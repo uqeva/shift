@@ -3054,8 +3054,8 @@ with or without a key. The admin API takes GET, POST, PUT and DELETE with the se
 and refuses a doubled `/`, `;`, `%` or a dot segment. Kong
 adds no `Server`, `Via` or latency header (`KONG_HEADERS=off`).
 
-**Opening staging,** once story 20.5 stands it up and 19.2 has shipped the
-screens: set the inputs above in Coolify (`SHIFT_DISABLE_SIGNUP=false`,
+**Opening staging** (done 2026-11-25, §9.11 *Email and the open door*), once
+story 20.5 stands it up and 19.2 has shipped the screens: set the inputs above in Coolify (`SHIFT_DISABLE_SIGNUP=false`,
 `SHIFT_MAILER_AUTOCONFIRM=false`, `GOTRUE_SMTP_PASS`, `SHIFT_AUTH_EMAIL_FROM`,
 `SHIFT_PROXY_CIDR`), push migrations (`0066` before GoTrue restarts, §9.4),
 redeploy, check `supabase-auth`'s log shows no `auth-entrypoint:` refusal,
@@ -3081,6 +3081,23 @@ tailnet, `delete from auth.users where email like 'probe-%@' || '<SHIFT_PROBE_NE
 and email_confirmed_at is null and not exists (select 1 from public.members m where
 m.auth_user_id = auth.users.id);`, with the run's own domain written in, removes
 them and no stranger's pending signup.
+
+What staging's first run (2026-11-25) taught. Against Resend's test inboxes the
+new addresses must be `delivered+probe-<uuid>@resend.dev` (a bare
+`probe-<uuid>@resend.dev` is a real address at Resend, not a test inbox), so
+the run used a copy whose only change is that prefix. GoTrue's own
+`GOTRUE_RATE_LIMIT_EMAIL_SENT` (10 an hour for the stack) runs out within the
+first round, after which a `new` signup is rolled back (GoTrue's 429): the
+probe still measures Kong's answers, which is its point, but creates no
+account and sends little mail. Raising Kong's mail limit for the window lets
+about a hundred relays reach GoTrue within a few seconds, and at 0.1 CPU it fell
+behind: for about 35 s it answered the relays 504 and 500 (database and DNS
+dial timeouts in its log) and recovered by itself, with no restart. Run the
+probe when nobody else is using staging. Those failures show in GoTrue's log
+only: Kong runs at `KONG_LOG_LEVEL=crit`, so its `AUTH_MAIL_RELAY` lines
+(`ngx.ERR`) are not written at all, and a masked mail outage does NOT show in
+Kong's log as this section says above (`deferred-work.md`). Kong's limit is per client address, so one address
+cannot do this at staging's real values (5 an hour).
 
 **A dump carries the switch.** A staging dump holds
 `signup_settings.open = true`. Production restores only from production's own
@@ -3262,6 +3279,12 @@ Coolify token's `deploy` ability (a read/write token is refused with 403).
 migrations `0075` and `0076` pushed after a `pre-migration` backup (§9.12), a
 new `shift-web` image, both invoke secrets rotated (below) and Kong's upstream
 keep-alive shortened (below).
+**Moved to its own domain and opened 2026-11-25** (founder decisions of that
+day): the app and the API answer on `staging.<domain>` and
+`api.staging.<domain>` with Let's Encrypt certificates, Auth email goes through
+Resend, `notify` holds a real key, and the signup door is OPEN on staging only
+(§9.9; production stays shut). See *Moving staging to another domain* and
+*Email and the open door* below.
 
 **What exists in Coolify.** A project `shift` with an environment `staging`
 (the founder's choice; the epic had named a project `shift-staging`), holding:
@@ -3279,19 +3302,23 @@ keep-alive shortened (below).
   `https://staging.<domain>`, HTTPS forced, `--read-only --tmpfs /tmp`,
   64 MiB, 0.1 CPU).
 
-Until there is a domain, `<domain>` is an `sslip.io` name of the server's public
-IPv4 (`staging.<ip-dashed>.sslip.io`, `api.staging.<ip-dashed>.sslip.io`), and
-Traefik's Let's Encrypt certificates are issued for those names.
+`<domain>` is the founder's domain since 2026-11-25 (DNS-only A records to the
+server's public IPv4; no AAAA, so the public names are IPv4 only). Until then
+staging ran on `sslip.io` names of the server's IPv4; those routes are retired
+(an old name now gets Coolify's generic 503 page, like any unknown host).
+Production's names (`app.<domain>`, `api.<domain>`) are reserved for 20.9 and
+configured nowhere yet.
 
-**The operator's inputs** are `staging.env.example`'s, with these differences,
-all decided for staging on 2026-11-23:
+**The operator's inputs** are `staging.env.example`'s, with these differences
+(decided 2026-11-23, updated 2026-11-25):
 
 | Input | Staging today | Why |
 | --- | --- | --- |
-| `SHIFT_DISABLE_SIGNUP`, `SHIFT_MAILER_AUTOCONFIRM` | `true`, `true` (the door SHUT) | there is no email provider; GoTrue's wrapper refuses an open door without SMTP (§9.9) |
-| `GOTRUE_SMTP_PASS`, `SHIFT_AUTH_EMAIL_FROM` | unset | no Resend account (it needs a domain) |
-| `RESEND_API_KEY` | an inert `re_…` placeholder | the compose requires it and `notify` refuses to start without the `re_` shape; Resend refuses every send with it, so email is never delivered and push is |
-| `NOTIFY_EMAIL_FROM` | an address under `shift.invalid` | nothing is sent |
+| `SHIFT_DISABLE_SIGNUP`, `SHIFT_MAILER_AUTOCONFIRM` | `false`, `false` (the door OPEN, since 2026-11-25) | `staging.env.example`'s values; GoTrue's wrapper started with every guard met (§9.9) |
+| `GOTRUE_SMTP_PASS` | a sending-only Resend key restricted to the sending domain | Auth email (§9.9) |
+| `SHIFT_AUTH_EMAIL_FROM` | `noreply@mail.<domain>` (Resend's verified sending subdomain, EU region) | GoTrue's display name stays the compose's `Shift` (`GOTRUE_SMTP_SENDER_NAME`) |
+| `RESEND_API_KEY` | **the same** sending-only key as `GOTRUE_SMTP_PASS` | the founder issued one staging key; §9.9's "never notify's key" (revoking one leaves the other path working) is not met on staging, and production needs two (`deferred-work.md`) |
+| `NOTIFY_EMAIL_FROM` | `<the founder's product name> <noreply@mail.<domain>>` | on the verified sending domain |
 | `VAPID_*` | a pair generated for staging; the subject is the app's `https` origin | push works |
 | `SHIFT_FUNCTIONS_IMAGE` | `127.0.0.1:<registry-port>/shift-functions:staging` | see the registry below |
 | `SHIFT_PROXY_CIDR` | the stack's own network's subnet (`docker network inspect <service uuid>`; IPv4 only, as Coolify creates it) | §9.9: Traefik reaches Kong there. Kong logs each client's own IPv4 and IPv6 address, and a client's own `X-Forwarded-For` is not believed |
@@ -3423,8 +3450,48 @@ address inside a minute were answered 120 × 404 and 10 × 429, while 130
 `notify` and 30 `admin-auth` requests in the same minute all got their 401s;
 Kong logged the client's own address for each.
 
-**Not set on staging, by decision.** The email provider and the open signup
-door (no domain yet). Backups and monitoring arrived with 20.7 and 20.8
+**Moving staging to another domain** (done once, 2026-11-25, from the
+`sslip.io` names). The order matters because GoTrue fetches its templates from
+the app origin at start (§9.9):
+
+1. Build `shift-web` for the new API origin (`VITE_SUPABASE_URL=https://api.staging.<domain>`,
+   which also writes the CSP's `connect-src` and `img-src`), check it with
+   `scripts/ci/check-bundle.mjs` and `scripts/ci/probe-web-image.sh`, delete
+   its maps, push it to the loopback registry.
+2. `PATCH /applications/<web uuid>` with `{"domains": "https://staging.<domain>"}`
+   and deploy it (`POST /deploy?uuid=…`). Coolify's Traefik issues the Let's
+   Encrypt certificate for the new name; the old name's route goes with the
+   old domain.
+3. `PATCH /services/<uuid>` with `{"urls": [{"name": "supabase-kong", "url":
+   "https://api.staging.<domain>:8000"}]}`: Coolify regenerates
+   `SERVICE_URL_SUPABASEKONG*` (so `API_EXTERNAL_URL`, `SUPABASE_PUBLIC_URL`,
+   `STORAGE_PUBLIC_URL`) and Kong's Traefik labels. Then
+   `PATCH /services/<uuid>/envs/bulk` with `SHIFT_APP_URL` (GoTrue's site URL,
+   redirect allow-list and template URLs, Kong's CORS origin, the functions'
+   allowed origin) and `VAPID_SUBJECT`, and restart the service.
+4. No `content:` file names an origin (Kong renders `kong.yml` from
+   `SHIFT_APP_URL` at start), so the storages need no update; check with
+   `grep -rl <old name> /data/coolify/services/<uuid>/`, which should find
+   only `.env` and the rendered compose before the restart, and nothing after.
+5. Check every container's environment for the old name (none), both
+   certificates (Let's Encrypt), `http://` → `https://` (302), the old names
+   (Coolify's 503 page), then the checks below and the CSP sweep.
+
+**Email and the open door (2026-11-25).** Set as §9.9's *Opening staging* says:
+`GOTRUE_SMTP_PASS`, `SHIFT_AUTH_EMAIL_FROM`, `RESEND_API_KEY`,
+`NOTIFY_EMAIL_FROM`, `SHIFT_DISABLE_SIGNUP=false`,
+`SHIFT_MAILER_AUTOCONFIRM=false` through `envs/bulk`, the service restarted,
+`supabase-auth` up with no `auth-entrypoint:` line and no restart (so every
+guard held, the three template fetches from the new origin included), then
+`update private.signup_settings set open = true where id;`. `shift-web` is built
+with `VITE_SIGNUP_ENABLED=true` (the third switch). No staging member has an
+email address, so `notify` mails nobody until someone adds one. Epic 19's
+retro A2 checks ran the same day, against Resend's test inboxes only
+(`delivered@resend.dev` with `+` labels, `bounced@resend.dev`); their results
+are in that retro's *A2 progress*. Closing is §9.9's reverse: the SQL first.
+
+**Not set on staging, by decision.** Nothing of the email path now; the second
+Resend key (above) is open. Backups and monitoring arrived with 20.7 and 20.8
 (§9.12, §9.13).
 
 ### 9.12 Backups and the restore drill (story 20.7)

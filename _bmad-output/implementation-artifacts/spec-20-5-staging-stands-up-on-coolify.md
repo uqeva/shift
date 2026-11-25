@@ -269,6 +269,22 @@ staging operations; DEPLOY.md §9.11 records the lessons.
 - `eslint` on the changed test files -- clean. Full `pnpm typecheck` / `pnpm lint`: left to CI.
 - No DB-connecting root test was run (the STRICT DATABASE RULE); no migration changed.
 
+**Follow-up 2026-11-25: the real domain, email and the open door** (founder decisions of that day; operator work, no code change). These close two Epic AC Deviations above in practice. The frozen block is left as approved.
+- *"`api.staging.<domain>` and `staging.<domain>` serve over Let's Encrypt TLS"*: **met.** Both names have certificates from Let's Encrypt (YR2). `http://` redirects 302 to `https://`. The `sslip.io` routes are retired (Coolify's generic 503 page, as for any unknown host). The public names have no AAAA record, so IPv6 is reached only by address.
+- *"the edge-runtime's environment holds the function secrets"*: **met.** The real `RESEND_API_KEY` is set, and Resend's API accepted `notify`'s sender and key. GoTrue shares that key, which is the open entry in `deferred-work.md`.
+- *"a signup is refused"*: the door is now OPEN on staging, as `staging.env.example` intends. A synthesized address is still never relayed: `checks.sh`'s signup answers `{} 200` and creates 0 accounts.
+- `shift-web` was rebuilt for the new API origin with the signup switch on. `check-bundle.mjs` passed (24 files, no secret-shaped value), and so did `probe-web-image.sh`.
+- `checks.sh` was re-run over the new HTTPS names and passed everything:
+  - the key probe and 7b (CORS names the new app origin);
+  - `notify` 200 with the outbox drained, and `remind` 200 `REMIND_RAN`;
+  - PGRST303: 20 × 200;
+  - feed 404 medians 262/264 ms with one signature;
+  - no marker or `calendar-feed/` in the logs;
+  - Kong logged the client's own address;
+  - the CSP sweep: 0 violations, 0 failures, 14 routes, PDF, xlsx and the logo.
+- The uptime workflow (run 45610562576) passed all three staging checks with the new secrets.
+- Epic 19's retro A2 checks: see that retro's *A2 progress*.
+
 ## Suggested Review Order
 
 **The stand-up record**
