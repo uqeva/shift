@@ -2216,3 +2216,21 @@
 - source_spec: `_bmad-output/implementation-artifacts/epic-19-retro-2026-11-23.md`
   summary: OWNER the founder (epic 19 retro A2 (c), with a real inbox). Sign up on `https://staging.<domain>/registracija` with an address the founder reads; check the Croatian confirmation mail (sender, subject, body, the link opening `/potvrda`), press *Potvrdi*, set the password, found an organization; then *Zaboravljena lozinka* for the same address and *Spremi novu lozinku*; and a resend from the neutral screen after 60 s. Optionally the template-outage fallback (`:1886`). Resend's test inboxes proved acceptance and the link's shape, not the rendered mail.
   evidence: Epic 19 retro, *A2 progress* (c).
+
+## Deferred from: correct-course for pilot readiness, Epic 21 planning (2026-11-25)
+
+- source_spec: `_bmad-output/planning-artifacts/sprint-change-proposal-2026-11-25-pilot-readiness.md`
+  summary: OWNER the operator, after 21.10 and 21.17. `supabase/operator/demo-mladost.sql` (branch `feat/demo-mladost`, DEPLOY §7.6) models the pilot's month with workarounds Epic 21 retires: two member-less "carrier" teams with an all-off rotation and per-date shift-type overrides for students, and a shift-type override per day team for the holiday. Rewrite it over personal assignments, personal rotations, floaters and organization holidays, and compare the month with the paper again.
+  evidence: The script's header (THE MODEL), 2026-11-25.
+- source_spec: `_bmad-output/planning-artifacts/sprint-change-proposal-2026-11-25-pilot-readiness.md`
+  summary: OWNER the founder (E-5). The public page names the product *Smjenko*, while the app, its manifest, `hr.json` and Auth mail say *Shift*. Decide whether the app is renamed. If it is, it is one story touching the manifest, `hr.json`, the compose's `GOTRUE_SMTP_SENDER_NAME` and `test/auth-email.test.ts` together (see the 2026-11-25 staging entry above).
+  evidence: Proposal §6, E-5.
+- source_spec: `_bmad-output/planning-artifacts/sprint-change-proposal-2026-11-25-pilot-readiness.md`
+  summary: OWNER product, later. Not in Epic 21. The following stay open; each has a Deferred entry in the spine, except the last two:
+    - holiday lists for countries other than Croatia;
+    - notifications when a holiday is added;
+    - two personal shifts for one member on one date;
+    - a fourth fixed team position (*Vod*), now expressible as a job role;
+    - a setting to hide *Sati na blagdan*: the column shows whenever the period has a worked holiday;
+    - floaters proposing themselves for an open shift (only the admin picks).
+  evidence: Proposal §3 and §6.
