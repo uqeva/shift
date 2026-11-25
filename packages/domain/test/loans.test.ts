@@ -522,7 +522,7 @@ describe("a lent member's own month (memberScheduleOfMonth, through the one rule
   const base = { assignments: fixture.assignments, steps: fixture.steps, overrides: [], rosterOverrides: [], workingShiftTypeIds: working };
   const typeOf = (teamId: string, date: string): string | null =>
     scheduleOfMonth({ teamIds: [teamId], ...base, members: [] }, monthOfDate(date)).find((row) => row.date === date)!.cells[0]!.shiftTypeId;
-  const teamsOf = (input: Parameters<typeof memberScheduleOfMonth>[0], month: string): Record<string, readonly string[]> =>
+  const teamsOf = (input: Parameters<typeof memberScheduleOfMonth>[0], month: string): Record<string, readonly (string | null)[]> =>
     Object.fromEntries(memberScheduleOfMonth(input, month).map((day) => [day.date, day.shifts.map((shift) => shift.teamId)]));
   function monthOfDate(date: string): string {
     return date.slice(0, 7);

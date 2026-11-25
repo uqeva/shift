@@ -28,7 +28,7 @@ const MINUTE = 60 * 1000;
 function line(reminder: ShiftReminder): string {
   return [
     reminder.date,
-    reminder.teamId.replace(/^pilot-smjena-/, ''),
+    (reminder.teamId ?? 'no-team').replace(/^pilot-smjena-/, ''),
     reminder.lead,
     reminder.start,
     reminder.end,

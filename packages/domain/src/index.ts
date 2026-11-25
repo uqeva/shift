@@ -64,6 +64,7 @@ export {
   HOURS_FIGURE_TOTAL,
   HOURS_SOURCE_CHANGE,
   HOURS_SOURCE_LOAN,
+  HOURS_SOURCE_PERSONAL,
   HOURS_SOURCE_REPLACEMENT,
   HOURS_SOURCE_ROTATION,
   explainMemberHours,
@@ -163,6 +164,7 @@ export {
   newlyShortStaffedOf,
   peopleAtWorkOn,
   shortStaffedShiftsOf,
+  staffingOn,
   type ShortStaffedShift,
   type Staffing,
   type StaffingInput,
@@ -191,6 +193,7 @@ export {
   loanAheadOf,
   loanOn,
   membershipOn,
+  personalShiftOn,
   rosterOn,
   shiftRoster,
   type EffectiveTeamOn,
@@ -204,6 +207,18 @@ export {
   type RosterOverride,
   type StatusVersion,
 } from './roster.js';
+
+export {
+  PERSONAL_ASSIGNMENT_OFF,
+  PERSONAL_ASSIGNMENT_SHIFT,
+  checkPersonalAssignments,
+  hasTeam,
+  personalAssignmentOn,
+  personalShiftOf,
+  type PersonalAssignment,
+  type PersonalAssignmentKind,
+  type PersonalShift,
+} from './personal.js';
 
 export {
   MAX_AT_WORK_RANGE_DAYS,

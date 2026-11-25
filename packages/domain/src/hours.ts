@@ -119,10 +119,14 @@ export function shiftHalvesOf(startMinute: number, endMinute: number): ShiftHalv
   };
 }
 
-/** One shift of a member, by its date and team, that counts as leave (story 5.4b). */
+/**
+ * One shift of a member, by its date and team, that counts as leave (story
+ * 5.4b). `teamId` is `null` for a Personal Shift counted with no team (story
+ * 21.1, R14.3).
+ */
 export interface LeaveShift {
   readonly date: string;
-  readonly teamId: string;
+  readonly teamId: string | null;
 }
 
 /** The minutes one band holds in the month, and how many shifts overlap it. */
@@ -219,19 +223,24 @@ export const HOURS_SOURCE_CHANGE = 'CHANGE';
 export const HOURS_SOURCE_REPLACEMENT = 'REPLACEMENT';
 /** Story 18.5: a shift of the loan team a Loan put the member on (`posudba`). */
 export const HOURS_SOURCE_LOAN = 'LOAN';
+/** Story 21.1 (R14.5): a Personal Shift, a shift a Personal Assignment gave the member by hand. */
+export const HOURS_SOURCE_PERSONAL = 'PERSONAL';
 
 /**
  * The rotation's projection (`ROTATION`), a shift-type override that replaced
  * it (`CHANGE`), a roster override that put the member on another team's
  * shift (`REPLACEMENT`, which wins when both apply), or a Loan that put them
  * on the loan team (`LOAN`, story 18.5: below `REPLACEMENT`, above `CHANGE`,
- * as the loan is why the shift is theirs at all).
+ * as the loan is why the shift is theirs at all), or a Personal Assignment
+ * (`PERSONAL`, story 21.1: a Personal Shift is never via an override, a loan
+ * or a change, so it never competes with them).
  */
 export type HoursSource =
   | typeof HOURS_SOURCE_ROTATION
   | typeof HOURS_SOURCE_CHANGE
   | typeof HOURS_SOURCE_REPLACEMENT
-  | typeof HOURS_SOURCE_LOAN;
+  | typeof HOURS_SOURCE_LOAN
+  | typeof HOURS_SOURCE_PERSONAL;
 
 /** What a shift is in the month's hours: worked, leave, or worked with no times. */
 const HOURS_KIND_WORKED = 'WORKED';
@@ -255,7 +264,7 @@ interface HoursShare {
  */
 interface HoursTerm {
   readonly date: string;
-  readonly teamId: string;
+  readonly teamId: string | null;
   readonly shiftTypeId: string;
   readonly source: HoursSource;
   readonly kind: HoursKind;
@@ -276,7 +285,8 @@ export type HoursFigureCode =
 /** One operand of an equation: a shift and the minutes it adds to the figure. */
 export interface HoursOperand {
   readonly date: string;
-  readonly teamId: string;
+  /** `null` for a Personal Shift counted with no team (story 21.1). */
+  readonly teamId: string | null;
   readonly shiftTypeId: string;
   readonly source: HoursSource;
   readonly minutes: number;
@@ -299,6 +309,7 @@ interface MonthWalk {
 }
 
 function sourceOf(shift: MemberShift): HoursSource {
+  if (shift.personalAssignmentId !== undefined) return HOURS_SOURCE_PERSONAL;
   if (shift.viaOverride) return HOURS_SOURCE_REPLACEMENT;
   if (shift.loanId !== undefined) return HOURS_SOURCE_LOAN;
   return shift.overridden ? HOURS_SOURCE_CHANGE : HOURS_SOURCE_ROTATION;

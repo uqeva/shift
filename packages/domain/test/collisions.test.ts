@@ -148,7 +148,7 @@ function expectOrdered(collisions: readonly Collision[]): void {
     const a = collisions[i - 1]!;
     const b = collisions[i]!;
     expect(
-      a.date < b.date || (a.date === b.date && (a.teamId < b.teamId || (a.teamId === b.teamId && a.memberId < b.memberId))),
+      a.date < b.date || (a.date === b.date && ((a.teamId ?? '') < (b.teamId ?? '') || (a.teamId === b.teamId && a.memberId < b.memberId))),
       `${JSON.stringify(a)} before ${JSON.stringify(b)}`,
     ).toBe(true);
   }
@@ -581,7 +581,11 @@ describe.each(FIXTURES)('unresolvedCollisionsOf under $fixture (story 5.4a)', (f
   const memberId = memberOf(fx, team);
   const records = [{ id: 'leave-1', memberId, from: '2026-09-10', to: '2026-09-14' }];
   const collisions = collisionsOf(inputOf(fx, records));
-  const keyOf = (collision: Collision): CollisionResolution => ({ memberId: collision.memberId, date: collision.date, teamId: collision.teamId });
+  const keyOf = (collision: Collision): CollisionResolution => {
+    // A collision with no team (story 21.1) has no stored key until story 21.7; these fixtures raise none.
+    if (collision.teamId === null) throw new Error(`collision of ${collision.memberId} on ${collision.date} has no team`);
+    return { memberId: collision.memberId, date: collision.date, teamId: collision.teamId };
+  };
 
   it('derives 3 collisions to filter', () => {
     expect(collisions).toHaveLength(3);
@@ -687,7 +691,11 @@ describe.each(FIXTURES)('erasedCollisionsOf under $fixture (story 5.5a; AD-5)', 
       { teamId, date: second.date, shiftTypeId: off },
     ],
   });
-  const keyOf = (collision: Collision): CollisionResolution => ({ memberId: collision.memberId, date: collision.date, teamId: collision.teamId });
+  const keyOf = (collision: Collision): CollisionResolution => {
+    // A collision with no team (story 21.1) has no stored key until story 21.7; these fixtures raise none.
+    if (collision.teamId === null) throw new Error(`collision of ${collision.memberId} on ${collision.date} has no team`);
+    return { memberId: collision.memberId, date: collision.date, teamId: collision.teamId };
+  };
 
   it('lists each unresolved collision the change takes away, as "before" raised it, in order', () => {
     expect(erasedCollisionsOf(before, after, [], '2026-09-01')).toEqual([first, second]);

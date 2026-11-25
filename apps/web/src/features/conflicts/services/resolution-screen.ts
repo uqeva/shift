@@ -1,4 +1,4 @@
-import { collisionKeyOf, daysBetween, deriveShiftTimes, isHalfDay, leaveBalanceOf, leaveRangeCostOf, leaveSpanOf, shiftTypeVersionOn, type Collision, type LeaveHalf } from '@shift/domain';
+import { collisionKeyOf, daysBetween, deriveShiftTimes, isHalfDay, leaveBalanceOf, leaveRangeCostOf, leaveSpanOf, shiftTypeVersionOn, type LeaveHalf } from '@shift/domain';
 
 import type { CalendarSnapshot, CalendarSurfaceState } from '@/features/calendar/services/snapshot';
 import { dayDetailOf } from '@/features/calendar/utils/day-detail';
@@ -16,6 +16,7 @@ import {
   queueReadFailed,
   unresolvedOf,
   type LeaveRowsAnswer,
+  type TeamCollision,
 } from '@/features/conflicts/services/conflicts-queue';
 import { heldByReplacement } from '@/features/conflicts/services/replacement-effect';
 import { ACCEPT_UNCOVERED, REPLACE_MEMBER } from '@/features/conflicts/services/resolutions';
@@ -405,7 +406,7 @@ export const STAFFING_REPLACEMENT_ID = 'staffing-replacement';
 function replacedCoverageOf(
   snapshot: CalendarSnapshot,
   records: readonly OrganizationLeaveRecord[],
-  collision: Collision,
+  collision: TeamCollision,
   memberInId: string,
 ): CoverageAgainstMinimum | null {
   try {
@@ -440,7 +441,7 @@ function replacedCoverageOf(
 export function resolutionStaffingOf(
   snapshot: CalendarSnapshot,
   records: readonly OrganizationLeaveRecord[],
-  collision: Collision,
+  collision: TeamCollision,
   record: LeaveRecord,
   target: ResolutionAmendTarget,
   candidateIds: readonly string[] = [],
@@ -635,7 +636,7 @@ export function refetchingAfterFailure(reads: readonly ResolutionReadState[]): b
 }
 
 /** An adjacent conflict's link. */
-function linkOf(collision: Collision | undefined): ResolutionLink | null {
+function linkOf(collision: TeamCollision | undefined): ResolutionLink | null {
   if (collision === undefined) return null;
 
   return {
@@ -661,7 +662,7 @@ function onLeave(records: readonly OrganizationLeaveRecord[], memberId: string, 
  *
  * @throws RangeError for a type the snapshot lacks.
  */
-function shiftMinutesOf(snapshot: CalendarSnapshot, collision: Collision): number | null {
+function shiftMinutesOf(snapshot: CalendarSnapshot, collision: TeamCollision): number | null {
   const type = snapshot.types.find((one) => one.id === collision.shiftTypeId);
 
   if (type === undefined) throw new RangeError(`shift type ${collision.shiftTypeId} is not in the snapshot`);
@@ -685,7 +686,7 @@ export function resolutionPlaceOf(
   params: ResolutionParams,
   today: string,
 ): {
-  readonly ordered: readonly Collision[];
+  readonly ordered: readonly TeamCollision[];
   readonly index: number;
 } {
   const ordered = queueOrderOf(unresolvedOf(snapshot, records, resolutionRows), today);

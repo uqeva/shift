@@ -456,7 +456,7 @@ An admin plans day workers, cleaners, students and seasonal workers per person i
 
 **Capabilities covered:** CAP-29, CAP-30, CAP-31, CAP-32, CAP-21 (amended)
 **Standalone:** with no assignment, schedule version, holiday, team minimum or floater recorded, every derivation is byte-identical to before. Each story ships alone in the order given.
-**Implementation notes:** the source is `sprint-change-proposal-2026-11-25-pilot-readiness.md`; the spine's AD-26 to AD-28 and the amendments of AD-2, AD-4, AD-5, AD-11, AD-18, AD-19 and AD-20 are applied with it, as are engine rules R13 to R16. Founder decisions E-1 to E-7 have recommended defaults; only 21.22 waits on one. Production (20.9) stays after this epic.
+**Implementation notes:** the source is `sprint-change-proposal-2026-11-25-pilot-readiness.md`; the spine's AD-26 to AD-28 and the amendments of AD-2, AD-4, AD-5, AD-11, AD-18, AD-19 and AD-20 are applied with it, as are engine rules R13 to R16. Founder decisions E-1 to E-8 were accepted at their recommended defaults on 2026-11-25 (E-6: *Timovi*), so no story waits on one. Production (20.9) stays after this epic.
 
 ---
 
@@ -3596,9 +3596,9 @@ The admin of a fire department with mixed teams opens *Ručni raspored*. The fou
 
 Added 2026-11-25 by `sprint-change-proposal-2026-11-25-pilot-readiness.md`, on the founder's approval of the first production pilot's scope. That approval covers two organizations, a fire department on 24-hour duty and a department that mixes 24-hour crews with day workers, floater students and leave, and it was widened the same day by the founder's additions recorded in the proposal (§1). The source is modelling a real month on staging with the operator script `supabase/operator/demo-mladost.sql` (DEPLOY §7.6), whose workarounds this epic retires. **Production (20.9) stays after this epic.**
 
-**Capabilities:** CAP-29, CAP-30, CAP-31, CAP-32, CAP-21 (amended) · **Governed by:** AD-2, AD-4, AD-5, AD-7, AD-11, AD-13, AD-18, AD-19, AD-20, and AD-26 to AD-28 (added 2026-11-25) · **Engine rules:** R14, R15, R16, R13, R10.2 (amended) · **Proves:** Q2, Q9, Q11, Q12, Q21, Q22, Q25, Q27, Q31 · **UX:** UX-DR71–UX-DR80 · **Decisions:** E-1 to E-7 (proposal §6; each story names its own, recommended defaults stand for planning)
+**Capabilities:** CAP-29, CAP-30, CAP-31, CAP-32, CAP-21 (amended) · **Governed by:** AD-2, AD-4, AD-5, AD-7, AD-11, AD-13, AD-18, AD-19, AD-20, and AD-26 to AD-28 (added 2026-11-25) · **Engine rules:** R14, R15, R16, R13, R10.2 (amended) · **Proves:** Q2, Q9, Q11, Q12, Q21, Q22, Q25, Q27, Q31 · **UX:** UX-DR71–UX-DR80 · **Decisions:** E-1 to E-8 (proposal §6; each story names its own), all accepted at the recommended defaults by the founder on 2026-11-25
 
-**Planning status (2026-11-25):** every story is `ready-for-dev` in `sprint-status.yaml`. Each story's spec is written by `bmad-create-story` when it starts. 21.22 waits on the founder's choice of word (E-6). 21.21 waits for the founder's contact address only to publish (E-4), not to build. The order below is the build order. 21.3, 21.12, 21.20, 21.21 and 21.22 touch no other story's files and may run in parallel worktrees.
+**Planning status (2026-11-25):** every story is `ready-for-dev` in `sprint-status.yaml`. Each story's spec is written by `bmad-create-story` when it starts. 21.22 is unblocked: the founder chose *Timovi* (E-6, 2026-11-25). 21.21 waits for the founder's contact address only to publish (E-4), not to build. The order below is the build order. 21.3, 21.12, 21.20, 21.21 and 21.22 touch no other story's files and may run in parallel worktrees.
 
 **Rules for every story:**
 - Migrations are forward-only, numbered from the next free number at build time.
@@ -4042,7 +4042,7 @@ As a user,
 I want teams not to be called *Smjene*,
 So that they are never confused with *Tipovi smjena*.
 
-**Depends on:** none. **Blocked on:** the founder's choice (E-6: *Timovi*, recommended, or *Ekipe*). It reverses the 2026-11-23 terminology decision (epic 18 retro A2).
+**Depends on:** none. **Blocked on:** nothing. The founder chose *Timovi* on 2026-11-25 (E-6, accepted at its default). It reverses the 2026-11-23 terminology decision (epic 18 retro A2).
 
 **Acceptance Criteria:**
 

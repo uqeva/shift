@@ -5,6 +5,7 @@
 - **Mode:** batch, unattended. The founder approved the scope and asked for no questions, so each product choice below is recorded as a decision with its rationale. The ones the founder may want to change are listed in §6 (E-1 to E-8), each with a recommended default that stands for planning.
 - **Scope classification:** Moderate to major. It adds one epic (21, 22 stories), FR-102 to FR-116 and NFR-35 to the PRD, engine rules R13 to R16 (R4.2, R10.1 and R10.2 amended), AD-26 to AD-28 to the spine, and amends AD-2, AD-4, AD-5, AD-11, AD-18, AD-19 and AD-20. No shipped behaviour changes until its story ships. With none of the new data recorded, every derivation stays byte-identical.
 - **Status:** scope approved by the founder on 2026-11-25. The planning changes are applied on branch `docs/correct-course-pilot-readiness`. **Production (20.9) stays after this epic.**
+- **Decisions:** E-1 to E-8 (§6) were ACCEPTED by the founder on 2026-11-25 at the recommended defaults, E-6 included: teams are labelled *Timovi*, so story 21.22 is unblocked. Source: the founder's instruction to the orchestrated build of story 21.1, which handed down the decisions and asked that they be recorded here, in the spine and in `sprint-status.yaml`. Recorded on branch `feat/21-1-personal-assignment-rule`.
 
 ---
 
@@ -34,7 +35,7 @@ Modelling the real November schedule of the second one on staging (operator scri
 - **The calendar scrolls with the page,** with no inner scroll box and with sticky headers. The grid follows the same principle.
 - **Organization job roles** (for example a cleaner, a dispatcher, a seasonal worker). They are shown and filtered on. How a person alternates is chosen per person, through the personal rotation. Floater eligibility is by role.
 - **Seasonal workers.** A member is active for a date range only.
-- **Rename the UI label *Smjene*** (meaning teams) to *Timovi* or *Ekipe*. This is founder-decidable.
+- **Rename the UI label *Smjene*** (meaning teams) to *Timovi* or *Ekipe*. This is founder-decidable (decided 2026-11-25: *Timovi*, E-6).
 
 **Category.** A new requirement from the stakeholder, found by a real-data rehearsal. Nothing shipped is wrong. The PRD put public-holiday calendars, and any staffing rule beyond one minimum, out of scope (§7.2). Team-only rotations were a deliberate v1 model (CAP-8) that the pilot outgrew.
 
@@ -58,7 +59,7 @@ Modelling the real November schedule of the second one on staging (operator scri
 | 4.3 MVP review | [x] | Pilot scope grows, and production waits for it (founder) |
 | 4.4 Path | [x] | Direct adjustment through a new epic |
 | 5.x Proposal | [x] | This document |
-| 6.x Approval and handoff | [x] | Scope approved by the founder 2026-11-25; E-1 to E-8 have defaults |
+| 6.x Approval and handoff | [x] | Scope approved by the founder 2026-11-25; E-1 to E-8 accepted at their defaults the same day |
 
 ## 3. Impact analysis and recommended approach
 
@@ -164,7 +165,9 @@ New sections: §13 Holidays (R13.1–R13.8), §14 Personal assignments (R14.1–
   - every Epic 21 story is merged with CI green, and with its data absent the fixtures are byte-identical;
   - then 20.9.
 
-## 6. Founder-decidable items (recommended defaults stand for planning)
+## 6. Founder-decidable items (ACCEPTED 2026-11-25 at the recommended defaults)
+
+**Decision status:** the founder accepted all eight on 2026-11-25, each at its recommended default below. E-6 is *Timovi*. E-4's contact address is still the founder's build input, supplied before 21.21 publishes.
 
 | # | Decision | Recommended default | Why |
 |---|---|---|---|

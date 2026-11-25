@@ -92,6 +92,9 @@ export function calendarOf(request: CalendarRequest): string {
     if (daysBetween(window.from, shift.date) < 0 || daysBetween(shift.date, window.to) < 0) {
       throw new RangeError(`the shift on ${shift.date} starts outside the window ${window.from}–${window.to}`);
     }
+    // Story 21.1: a Personal Shift counted with no team has its own UID and SUMMARY (AD-20 as amended), story
+    // 21.2's. Until then it is left out, so one such shift never fails the member's whole feed or download.
+    if (shift.teamId === null) continue;
     const team = teamNames.get(shift.teamId);
     if (team === undefined) throw new RangeError(`the shift on ${shift.date} names team ${shift.teamId}, which is not given`);
     const type = typeNames.get(shift.shiftTypeId);

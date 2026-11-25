@@ -1,4 +1,12 @@
-import { collisionKeyOf, collisionsOf, unresolvedCollisionsOf, type Collision, type CollisionInput, type LeaveHalf } from '@shift/domain';
+import {
+  collisionKeyOf,
+  collisionsOf,
+  hasTeam,
+  unresolvedCollisionsOf,
+  type Collision,
+  type CollisionInput,
+  type LeaveHalf,
+} from '@shift/domain';
 
 import type { CalendarSnapshot, CalendarSurfaceState } from '@/features/calendar/services/snapshot';
 import { unknownSnapshotIdsOf } from '@/features/calendar/services/snapshot-skew';
@@ -201,7 +209,7 @@ function byDate(first: Collision, second: Collision): number {
  * order they came in is kept — `Array.prototype.sort` is stable — which is
  * `collisionsOf`'s (team, then member).
  */
-export function queueOrderOf(collisions: readonly Collision[], today: string): readonly Collision[] {
+export function queueOrderOf<Item extends Collision>(collisions: readonly Item[], today: string): readonly Item[] {
   const upcoming = collisions.filter((collision) => collision.date >= today).sort(byDate);
   const past = collisions
     .filter((collision) => collision.date < today)
@@ -391,6 +399,11 @@ export function resolutionsOf(snapshot: CalendarSnapshot, rows: readonly unknown
  * THE ONE DERIVATION every unresolved surface stands on (story 5.4a): the
  * collisions of `records`, without those the resolution rows resolve.
  *
+ * Story 21.1: only collisions WITH a team. One over a Personal Shift counted
+ * with no team cannot be resolved until story 21.7 stores its key, and *Za
+ * odluku* shows it from then; nothing produces one before story 21.2 feeds
+ * Personal Assignments.
+ *
  * @throws RangeError when a resolution row cannot be trusted, or on any
  *   precondition of `collisionsOf`.
  */
@@ -398,9 +411,12 @@ export function unresolvedOf(
   snapshot: CalendarSnapshot,
   records: readonly OrganizationLeaveRecord[],
   resolutionRows: readonly unknown[],
-): readonly Collision[] {
-  return unresolvedCollisionsOf(collisionsOf(collisionInputOf(snapshot, records)), resolutionsOf(snapshot, resolutionRows));
+): readonly TeamCollision[] {
+  return unresolvedCollisionsOf(collisionsOf(collisionInputOf(snapshot, records)), resolutionsOf(snapshot, resolutionRows)).filter(hasTeam);
 }
+
+/** A collision on a team's shift: every one before Personal Shifts counted with no team (story 21.1). */
+export type TeamCollision = Collision & { readonly teamId: string };
 
 /**
  * The queue from the snapshot, the organization's record, resolution,

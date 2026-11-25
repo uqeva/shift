@@ -41,6 +41,11 @@
  * {@link collisionKeyOf}; none is read by {@link collisionsOf}, and
  * {@link unresolvedCollisionsOf} is the one filter that drops the resolved.
  *
+ * PERSONAL SHIFTS (story 21.1, R14.5): a member's schedule holds their
+ * Personal Shift on a date they hold a working Personal Assignment, so a leave
+ * record over it collides like any working shift, keyed by the team it counts
+ * with — which may be none (`teamId: null`, AD-4 as amended 2026-11-25).
+ *
  * Ranges are inclusive `from`–`to` calendar dates as in `leave.ts`. Dates are
  * `YYYY-MM-DD` strings: no `Date`, no time zone. Every breached precondition
  * throws a `RangeError` naming the offending value.
@@ -76,7 +81,8 @@ export interface CollisionInput
 export interface Collision {
   readonly memberId: string;
   readonly date: string;
-  readonly teamId: string;
+  /** `null` for a Personal Shift counted with no team (story 21.1, R14.5). */
+  readonly teamId: string | null;
   readonly shiftTypeId: string;
   readonly leaveRecordId: string;
 }
@@ -139,11 +145,18 @@ function recordsByMember(input: CollisionInput): ReadonlyMap<RosterMember, reado
   return byMember;
 }
 
-/** Orders collisions soonest first, then by team, then by member (R6.8). */
+/**
+ * Orders collisions soonest first, then by team, then by member (R6.8). A
+ * collision with no team (story 21.1) comes before every team's on its date.
+ */
 function compareCollisions(left: Collision, right: Collision): number {
   for (const field of ['date', 'teamId', 'memberId'] as const) {
-    if (left[field] < right[field]) return -1;
-    if (left[field] > right[field]) return 1;
+    const leftValue = left[field];
+    const rightValue = right[field];
+    if (leftValue === rightValue) continue;
+    if (leftValue === null) return -1;
+    if (rightValue === null) return 1;
+    return leftValue < rightValue ? -1 : 1;
   }
   return 0;
 }
@@ -170,6 +183,7 @@ export function collisionsOf(input: CollisionInput): readonly Collision[] {
       memberships: member.memberships,
       statuses: member.statuses,
       loans: member.loans,
+      personalAssignments: member.personalAssignments,
       assignments: input.assignments,
       steps: input.steps,
       overrides: input.overrides,
@@ -198,8 +212,8 @@ export function collisionsOf(input: CollisionInput): readonly Collision[] {
           // guards the same way) never rests on that coupling.
           if (day.date < record.from || day.date > record.to || !activeOn(member.statuses, day.date)) continue;
           // Defensive only: one team cannot appear twice on a date, because `rosterOverrideApplies` refuses
-          // to put on a member already on that roster.
-          const teams = new Set<string>();
+          // to put on a member already on that roster, or holding a Personal Shift counted with that team (R14.9).
+          const teams = new Set<string | null>();
           for (const shift of day.shifts) {
             // The per-date rule of the cost, applied to this one shift: the two can never disagree.
             if (shift.shiftTypeId === null || teams.has(shift.teamId) || !isLeaveDay({ date: day.date, shifts: [shift] }, input.workingShiftTypeIds)) continue;
@@ -222,6 +236,10 @@ export function collisionsOf(input: CollisionInput): readonly Collision[] {
 export interface CollisionResolution {
   readonly memberId: string;
   readonly date: string;
+  /**
+   * Always a team today: a resolution of a collision with no team (story
+   * 21.1) is stored from story 21.7, which widens this key (AD-4 as amended).
+   */
   readonly teamId: string;
 }
 

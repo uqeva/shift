@@ -3,6 +3,7 @@ import {
   daysBetween,
   deriveShiftTimes,
   effectiveTeamOn,
+  hasTeam,
   MINUTES_PER_DAY,
   memberScheduleOfMonth,
   monthOf,
@@ -1003,7 +1004,8 @@ export function rosterOverlapOf(snapshot: CalendarSnapshot, detail: DayDetail, m
     if (!dates.includes(date)) continue;
 
     for (const shift of shifts) {
-      if (shift.shiftTypeId === null) continue;
+      // Story 21.1: a Personal Shift counted with no team is read from story 21.6.
+      if (shift.shiftTypeId === null || shift.teamId === null) continue;
       if (shift.teamId === detail.teamId && date === day) continue;
       nearby.push({ date, teamId: shift.teamId, shiftTypeId: shift.shiftTypeId, own: !shift.viaOverride });
     }
@@ -1219,6 +1221,7 @@ export function dayConflictsOf(
   detail: DayDetail,
 ): readonly DayConflict[] {
   const conflicts = collisions
+    .filter(hasTeam)
     .filter((collision) => collision.teamId === detail.teamId && collision.date === detail.isoDate)
     .map((collision): DayConflict => {
       const range = leave.get(collision.memberId)?.find((one) => one.from <= collision.date && collision.date <= one.to);
