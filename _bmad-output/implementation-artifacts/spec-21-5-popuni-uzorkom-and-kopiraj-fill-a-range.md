@@ -138,6 +138,7 @@ context:
 
 **Residual risks:**
 - The new e2e (`e2e/tests/planning/rucni-raspored.spec.ts`, three tests), its page object and its SQL read helper were written unrun (STRICT DATABASE RULE, no local e2e); CI is their first run. The 22023 case stubs the write with `page.route`, as `conflict-resolution.spec.ts` does.
+- CI run 45685417876 on #372 failed in e2e shard 4/4. The fill test (`rucni-raspored.spec.ts:103`) timed out finding the step count by its name `Broj dana u koraku 1`: the field's `<Label>` was an aria-hidden `×` plus a screen-reader-only phrase, and Chromium did not give the field that name. Holding the rotation lock through the 90 s timeout and its retry, it starved the next test (`:200`) and `team-position.spec.ts:177`, which both failed on the lock wait. Fixed by naming the count on the field (`aria-label`), pinned by `manual-fill-dialog.names.test.ts` against the page object. The lock is the same `holdRotation` the rotation and calendar specs take, released in the `afterEach`. CI has not yet run the fix.
 - The dialogs' wiring is checked by typecheck, the sweeps and the e2e only (deferred-work).
 - Gitleaks is the orchestrator's; not run here.
 - Process note: as in 21.1, 21.2 and 21.4, the implementation ran in the orchestrating session (its investigation was in context), not in a fresh step-03 subagent. Review ran with four context-free subagents.

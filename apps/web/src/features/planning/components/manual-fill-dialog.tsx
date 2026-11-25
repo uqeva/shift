@@ -199,12 +199,16 @@ function FillBody({
                   </Select>
                 </div>
                 <div className="grid w-20 shrink-0 gap-1">
-                  <Label htmlFor={fillStepCountIdOf(position)} className="text-xs">
-                    <span aria-hidden>{t('rucniRaspored.fill.times')}</span>
-                    <span className="sr-only">{t('rucniRaspored.fill.count', { position })}</span>
-                  </Label>
+                  {/* THE COUNT IS NAMED ON THE FIELD ITSELF (CI, 21.5): a label of an
+                      aria-hidden `×` and a screen-reader-only phrase left the field
+                      without the name `Broj dana u koraku {n}` in Chromium. The `×`
+                      is drawn beside it, hidden from assistive technology. */}
+                  <span aria-hidden className="text-xs font-medium leading-none">
+                    {t('rucniRaspored.fill.times')}
+                  </span>
                   <Input
                     id={fillStepCountIdOf(position)}
+                    aria-label={t('rucniRaspored.fill.count', { position })}
                     className="h-11 min-w-0 tabular-nums"
                     inputMode="numeric"
                     value={row.count}
