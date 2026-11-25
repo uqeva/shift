@@ -10,6 +10,8 @@ context:
   - '{project-root}/_bmad-output/implementation-artifacts/spec-21-1-the-personal-assignment-rule-in-the-domain.md'
 ---
 
+Status: done. Merged as #365, squash `d23aef6` (2026-11-25), after `CI passed` went green on `9e8f826` (run 45638082207: every job SUCCESS, Test (Vitest, local Supabase), Runtime parity and the four E2E shards included). Rewritten by story 21.4, which set the sprint status `done`.
+
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 
 ## Intent
@@ -154,5 +156,5 @@ context:
 **Results (2026-11-25, after review pass 1):** typecheck and lint clean. Domain: 23 files, 1024 tests. ICS: 4 files, 33 tests. Web: 186 files, 6926 tests (6933 after the rebase onto #364, story 21.3). The six DB-free root files (resource-hygiene, supabase-scaffold, notify-reminder, remind, calendar-feed, runtime-parity): 2558 tests. All pass. No DB suite was run (STRICT DATABASE RULE). If one failed locally because `0077` is not applied, that would be expected.
 
 **Residual risks:**
-- CI run 1 on PR #365 failed in `Test (Vitest, local Supabase)` on two pins this story had missed, both fixed for CI. First, `provisioning.test.ts`'s audited-table inventory (22 → 23, `personal_assignments`), together with its RLS list and rls-isolation's `AUDITED_TABLES`. Second, `notify-boundary.test.ts`'s every-code footer case, which lacked `SCHEDULE_ASSIGNED`'s `from`, `to` and `days`. The other DB cases ran in that job. Sprint status stays `review` until the green run. Every DB case (rls-isolation's 0077 block, provisioning's three inventories, read parity with assignments, the reminder `ASSIGNMENT` form, notify-boundary's inventory) runs first in CI.
+- CI settled (rewritten by story 21.4): run 1 on PR #365 (45635044800) failed in `Test (Vitest, local Supabase)` on two pins this story had missed. The first was `provisioning.test.ts`'s audited-table inventory (22 → 23, `personal_assignments`), with its RLS list and rls-isolation's `AUDITED_TABLES`. The second was `notify-boundary.test.ts`'s every-code footer case, which lacked `SCHEDULE_ASSIGNED`'s `from`, `to` and `days`. Both were fixed by `9e8f826`, a commit pushed only for CI. Run 2 (45638082207) was green: every DB case passed (rls-isolation's 0077 block, provisioning's three inventories, read parity with assignments, the reminder `ASSIGNMENT` form, notify-boundary's inventory), and so did runtime parity and the four E2E shards.
 - Process note: as in 21.1, the implementation ran in the orchestrating session (the investigation was already in its context), not in a fresh step-03 subagent. Review ran with context-free subagents.

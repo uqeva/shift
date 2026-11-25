@@ -69,6 +69,7 @@ import { registracijaRoute } from '@/pages/registracija';
 import { zaboravljenaLozinkaRoute } from '@/pages/zaboravljena-lozinka';
 import { PostavkeRotacijeScreen, postavkeRotacijeRoute } from '@/pages/postavke-rotacije';
 import { PovijestPromjenaScreen, povijestPromjenaRoute } from '@/pages/povijest-promjena';
+import { RucniRasporedScreen, rucniRasporedRoute } from '@/pages/rucni-raspored';
 import {
   PostavkeRotacijeTipSmjeneScreen,
   postavkeRotacijeTipSmjeneRoute,
@@ -238,6 +239,8 @@ const DESTINATION_ROUTES = [
   { id: '/_app/godisnji', path: '/godisnji', route: godisnjiRoute, component: GodisnjiScreen },
   { id: '/_app/za-odluku', path: '/za-odluku', route: zaOdlukuRoute, component: ZaOdlukuScreen },
   { id: '/_app/ljudi', path: '/ljudi', route: ljudiRoute, component: LjudiScreen },
+  // STORY 21.4: the month planned by hand, admin-only.
+  { id: '/_app/rucni-raspored', path: '/rucni-raspored', route: rucniRasporedRoute, component: RucniRasporedScreen },
   // STORY 14.2: the change history, admin-only.
   {
     id: '/_app/povijest-promjena',
@@ -416,6 +419,9 @@ const LEVEL_GUARDED_ROUTES = [
     route: povijestPromjenaRoute,
     component: PovijestPromjenaScreen,
   },
+  // STORY 21.4: the month planned by hand, a destination admin-only, a copy of
+  // the same guard.
+  { id: '/_app/rucni-raspored', path: '/rucni-raspored', route: rucniRasporedRoute, component: RucniRasporedScreen },
   // STORY 2.1b: the hour band list and one band, both admin-only, both copies
   // of the same guard, and neither a destination.
   {
@@ -507,6 +513,8 @@ describe('the shell route tree', () => {
       // STORY 9.1. The queue's old URLs, now redirects to `/za-odluku`.
       '/_app/raspored',
       '/_app/raspored/$memberId/$date/$teamId',
+      // STORY 21.4. The month planned by hand, an admin-only destination.
+      '/_app/rucni-raspored',
       '/_app/sati',
       // STORY 1.8. One team's roster, for every role, reached from Danas only.
       '/_app/smjene/$id',
@@ -2683,7 +2691,8 @@ describe('/ljudi decides its content by permission level, and the admin screens 
       // STORY 9.1: the queue's two old URLs, now redirects. FOURTEEN SINCE
       // STORY 9.4: one leave request's decision screen. FIFTEEN SINCE STORY
       // 12.4: one swap's decision screen. SIXTEEN SINCE STORY 14.2: the change history.
-      expect(LEVEL_GUARDED_ROUTES).toHaveLength(16);
+      // SEVENTEEN SINCE STORY 21.4: *Ručni raspored*.
+      expect(LEVEL_GUARDED_ROUTES).toHaveLength(17);
       for (const { path, route } of LEVEL_GUARDED_ROUTES) {
         expect(
           (route.options as { beforeLoad?: unknown }).beforeLoad,

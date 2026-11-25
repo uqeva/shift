@@ -283,6 +283,18 @@ const SANCTIONED_PLURAL_KEYS = [
   'onboarding.done.shiftTypesCount',
   'onboarding.done.membersCount',
   'onboarding.card.title',
+  // STORY 21.4: a grid save in the history (`Ručni raspored: 3 dana`) and its
+  // disclosure (`Prikaži 3 dana`); *Ručni raspored*'s selection action, the
+  // picker's title, the save bar's count and saved line, *Što se mijenja*'s
+  // lede and its erasure count.
+  'history.planned',
+  'history.plannedDays',
+  'rucniRaspored.edit',
+  'rucniRaspored.picker.title',
+  'rucniRaspored.bar.count',
+  'rucniRaspored.bar.saved',
+  'rucniRaspored.preview.lede',
+  'rucniRaspored.preview.erasures',
 ];
 
 /** The flat screen strings the application is permitted to ship, by the story
@@ -3291,6 +3303,98 @@ const SANCTIONED_SCREEN_KEYS = [
   'onboarding.card.confirm',
   'onboarding.card.refused',
   'onboarding.card.calendarResume',
+  // STORY 21.4: *Ručni raspored* (UX-DR72, UX-DR73) — the page, the grid, its
+  // legend and its cells' names, the picker, the save bar, *Što se mijenja*
+  // and the save's refusals; its destination and description; and the
+  // history's words for a Personal Assignment.
+  'nav.rucniRaspored',
+  'shell.description.rucniRaspored',
+  'history.record.personalAssignment',
+  'history.action.planned',
+  'history.field.assignmentKind',
+  'history.enum.kindShift',
+  'history.enum.kindOff',
+  'history.value.assignmentShiftTeam',
+  'history.value.assignmentOff',
+  'history.value.assignmentNote',
+  'rucniRaspored.loading',
+  'rucniRaspored.failedMonth',
+  'rucniRaspored.empty',
+  'rucniRaspored.retry',
+  'rucniRaspored.noTeam',
+  'rucniRaspored.offMark',
+  'rucniRaspored.countedMark',
+  'rucniRaspored.column.person',
+  'rucniRaspored.source.team',
+  'rucniRaspored.source.manual',
+  'rucniRaspored.cell.label',
+  'rucniRaspored.cell.today',
+  'rucniRaspored.cell.empty',
+  'rucniRaspored.cell.off',
+  'rucniRaspored.cell.unknownType',
+  'rucniRaspored.cell.assigned',
+  'rucniRaspored.cell.rotation',
+  'rucniRaspored.cell.counted',
+  'rucniRaspored.cell.more',
+  'rucniRaspored.cell.changed',
+  'rucniRaspored.cell.separator',
+  'rucniRaspored.cell.inactive',
+  'rucniRaspored.selectionHint',
+  'rucniRaspored.legend.heading',
+  'rucniRaspored.legend.entry',
+  'rucniRaspored.legend.off',
+  'rucniRaspored.legend.assigned',
+  'rucniRaspored.legend.rotation',
+  'rucniRaspored.legend.counted',
+  'rucniRaspored.legend.more',
+  'rucniRaspored.legend.inactive',
+  'rucniRaspored.legend.changed',
+  'rucniRaspored.picker.titleOne',
+  'rucniRaspored.picker.lede',
+  'rucniRaspored.picker.types',
+  'rucniRaspored.picker.off',
+  'rucniRaspored.picker.clear',
+  'rucniRaspored.picker.clearHint',
+  'rucniRaspored.picker.team',
+  'rucniRaspored.picker.ownTeam',
+  'rucniRaspored.picker.close',
+  'rucniRaspored.bar.none',
+  'rucniRaspored.bar.save',
+  'rucniRaspored.bar.discard',
+  'rucniRaspored.unchecked',
+  'rucniRaspored.retryCheck',
+  'rucniRaspored.confirm',
+  'rucniRaspored.error.stale',
+  'rucniRaspored.error.archived',
+  'rucniRaspored.error.tooMany',
+  'rucniRaspored.error.denied',
+  'rucniRaspored.error.failed',
+  'rucniRaspored.phone.person',
+  'rucniRaspored.preview.title',
+  'rucniRaspored.preview.close',
+  'rucniRaspored.preview.back',
+  'rucniRaspored.preview.save',
+  'rucniRaspored.preview.nothing',
+  'rucniRaspored.preview.lost',
+  'rucniRaspored.preview.lostNoRange',
+  'rucniRaspored.preview.lostNoTeam',
+  'rucniRaspored.preview.lostNoTeamNoRange',
+  'rucniRaspored.preview.gained',
+  'rucniRaspored.preview.gainedNoRange',
+  'rucniRaspored.preview.gainedNoTeam',
+  'rucniRaspored.preview.gainedNoTeamNoRange',
+  'rucniRaspored.preview.more',
+  'rucniRaspored.preview.shift',
+  'rucniRaspored.preview.shiftNoTeam',
+  'rucniRaspored.preview.double',
+  'rucniRaspored.preview.restGap',
+  'rucniRaspored.preview.unlistedLeave',
+  'rucniRaspored.preview.inertHeading',
+  'rucniRaspored.preview.inertSwap',
+  'rucniRaspored.preview.inertOut',
+  'rucniRaspored.preview.inertIn',
+  'rucniRaspored.preview.inertNote',
+  'rucniRaspored.preview.unknownMember',
 ];
 
 /** Everything the resource file is permitted to hold, together. */
@@ -3394,6 +3498,14 @@ const DANAS_NAMESPACE = 'danas.';
  * is refused: the shift type is shown by its name.
  */
 const RESOLUTION_NAMESPACE = 'zaOdluku.resolution.';
+
+/**
+ * STORY 21.4: *Ručni raspored* (`rucniRaspored.*`) plans worked shifts per
+ * person, so `smjen` is that shift there (`odaberi smjenu`, `dvije smjene u
+ * isto vrijeme`), as on *Sati*; a team is *tim* (story 21.22), and the Shift
+ * Type's term is refused: a cell shows its type by name or letter.
+ */
+const MANUAL_SCHEDULE_NAMESPACE = 'rucniRaspored.';
 
 /**
  * The leave card's replacement guard (story 5.4e), ONE KEY and no namespace:
@@ -3703,6 +3815,7 @@ function teamTermOutOfTurn(key: string, message: string): boolean {
     key.startsWith(HOURS_NAMESPACE) ||
     key.startsWith(DANAS_NAMESPACE) ||
     key.startsWith(RESOLUTION_NAMESPACE) ||
+    key.startsWith(MANUAL_SCHEDULE_NAMESPACE) ||
     key === LEAVE_REPLACEMENT_KEY ||
     key === DEACTIVATION_CONSEQUENCE_KEY ||
     key === QUEUE_COLLISION_KIND_KEY ||

@@ -122,6 +122,10 @@ export const DESTINATIONS: readonly [Destination, ...Destination[]] = [
   // ADMIN-ONLY BUT NOT A SETTING: the conflicts an admin decides are daily
   // work, so Za odluku sits under *Pregled* with the places a person works in.
   { key: 'nav.zaOdluku', path: '/za-odluku', roles: ADMIN_ONLY, group: 'overview' },
+  // STORY 21.4 (UX-DR72): *Ručni raspored*, the month planned by hand.
+  // ADMIN-ONLY daily work, so under *Pregled* beside *Za odluku*; on a phone
+  // it is in *Više*.
+  { key: 'nav.rucniRaspored', path: '/rucni-raspored', roles: ADMIN_ONLY, group: 'overview' },
   // ROLE-SCOPED TOO (story 7.17): the member list for an admin, the read-only
   // directory of who is on which team for a member.
   { key: 'nav.ljudi', path: '/ljudi', roles: EVERYONE, group: 'overview' },

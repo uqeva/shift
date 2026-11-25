@@ -327,6 +327,9 @@ export const FEATURE_PUBLIC = {
     'services/list', // conflicts, history, leave, onboarding, teams, today, pages
     'services/surface-keys', // leave (public: the member page's key set)
     'utils/position', // calendar, conflicts, history, swaps, teams
+    // STORY 21.4: *Ručni raspored*'s erasure confirmation words its rows as
+    // the member page's do (a member off a team's shift that date).
+    'utils/erasure-copy', // planning
     'utils/rank', // calendar, conflicts, organization, swaps, teams
   ],
   // SINCE STORY 6.3: *Danas* reads the chrome's cached role under its key, never

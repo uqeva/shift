@@ -315,6 +315,8 @@
     "noChanges": "Bez promijenjenih polja",
     "time": "{date} {time}",
     "kindLine": "{record} · {action}",
+    "planned": "Ručni raspored: {count, plural, one {# dan} few {# dana} other {# dana}}",
+    "plannedDays": "{count, plural, one {Prikaži # dan} few {Prikaži # dana} other {Prikaži # dana}}",
     "reconstructed": "Rekonstruirano",
     "markerBadge": "Početak povijesti",
     "markerSubject": "Početak bilježenja povijesti",
@@ -413,6 +415,7 @@
       "leaveAllowance": "Pravo na godišnji",
       "loan": "Posudba",
       "calendarFeed": "Kalendar na mobitelu",
+      "personalAssignment": "Ručni raspored",
       "other": "Zapis"
     },
     "action": {
@@ -427,6 +430,7 @@
       "restored": "vraćeno",
       "amended": "izmijenjeno",
       "decided": "odlučeno",
+      "planned": "planirano",
       "historyBegins": "početak povijesti"
     },
     "field": {
@@ -467,6 +471,7 @@
       "active": "Aktivna",
       "position": "Položaj",
       "stepPosition": "Redni broj koraka",
+      "assignmentKind": "Vrsta",
       "archived": "Arhivirano",
       "isWorking": "Radni",
       "shiftType": "Tip smjene",
@@ -503,6 +508,8 @@
       "kindAcceptUncovered": "prihvaćeno bez zamjene",
       "kindReplaceMember": "zamjena osobe",
       "kindAmendLeave": "izmjena odsutnosti",
+      "kindShift": "tip smjene",
+      "kindOff": "slobodan dan",
       "halfFirst": "prva polovica",
       "halfSecond": "druga polovica",
       "statusCurrent": "važeće",
@@ -525,6 +532,9 @@
       "rosterOverride": "{date}: ulazi {memberIn}, izlazi {memberOut}",
       "rosterOverrideIn": "{date}: ulazi {memberIn}",
       "rosterOverrideOut": "{date}: izlazi {memberOut}",
+      "assignmentShiftTeam": "{type} · tim {team}",
+      "assignmentOff": "slobodno",
+      "assignmentNote": "{value} ({note})",
       "earlierStep": "Korak spremljen ranije",
       "earlierPattern": "Uzorak spremljen ranije",
       "earlierRosterOverride": "Zamjena spremljena ranije",
@@ -1413,6 +1423,7 @@
     "sati": "Sati",
     "godisnji": "Godišnji",
     "zaOdluku": "Za odluku",
+    "rucniRaspored": "Ručni raspored",
     "ljudi": "Ljudi",
     "povijestPromjena": "Povijest promjena",
     "postavkeRotacije": "Postavke rotacije",
@@ -1946,6 +1957,7 @@
       "sati": "Sati svih osoba po mjesecu, izvoz u Excel",
       "godisnji": "Godišnji odmori i stanja dana",
       "zaOdluku": "Stavke koje čekaju odluku",
+      "rucniRaspored": "Mjesec po osobama, kao na papiru",
       "ljudi": "Osobe i njihovi timovi",
       "povijestPromjena": "Tko je što promijenio i kada",
       "postavkeRotacije": "Tipovi smjena, uzorak, pomaci",
@@ -2792,6 +2804,110 @@
       "confirm": "Sakrij postavljanje",
       "refused": "Postavljanje nije sakriveno. Pokušaj ponovno.",
       "calendarResume": "Nastavi postavljanje"
+    }
+  },
+  "rucniRaspored": {
+    "loading": "Učitavanje rasporeda…",
+    "failedMonth": "Ovaj mjesec trenutačno nije moguće prikazati. Osvježi stranicu.",
+    "empty": "Ovaj mjesec nema aktivnih osoba.",
+    "retry": "Pokušaj ponovno",
+    "noTeam": "Bez tima",
+    "offMark": "–",
+    "countedMark": "+",
+    "column": {
+      "person": "Osoba"
+    },
+    "source": {
+      "team": "rotacija tima",
+      "manual": "ručno"
+    },
+    "cell": {
+      "label": "{name}, {weekday} {date}: {value}",
+      "today": "danas",
+      "empty": "nema smjene",
+      "off": "slobodno",
+      "unknownType": "nepoznata smjena",
+      "assigned": "dodijeljeno ručno",
+      "rotation": "iz rasporeda tima",
+      "counted": "računa se u tim {team}",
+      "more": "uz još jednu smjenu",
+      "changed": "izmijenjeno, nije spremljeno",
+      "separator": ", ",
+      "inactive": "osoba tada nije aktivna"
+    },
+    "edit": "{count, plural, =0 {Uredi odabrano} one {Uredi odabrano (#)} few {Uredi odabrano (#)} other {Uredi odabrano (#)}}",
+    "selectionHint": "Klik na dan otvara izbor. Povlačenje ili Shift označava više dana, Ctrl ili Cmd dodaje pojedini dan.",
+    "legend": {
+      "heading": "Oznake",
+      "entry": "{letter} {name}",
+      "off": "{mark} slobodno",
+      "assigned": "olovka: dodijeljeno ručno",
+      "rotation": "strelice: iz rasporeda tima",
+      "counted": "{mark}: računa se u drugi tim",
+      "more": "podcrtano: dvije smjene taj dan",
+      "inactive": "šrafirano: osoba tada nije aktivna",
+      "changed": "isprekidani rub: nije spremljeno"
+    },
+    "picker": {
+      "title": "{count, plural, one {# dan} few {# dana} other {# dana}}",
+      "titleOne": "{name} · {date}",
+      "lede": "Što vrijedi za odabrane dane? Ništa se ne sprema dok ne pritisneš Spremi.",
+      "types": "Smjene",
+      "off": "Slobodno",
+      "clear": "Očisti",
+      "clearHint": "Očisti briše ručno dodijeljeno, pa dan opet slijedi raspored tima, ako ga osoba ima.",
+      "team": "Računaj u tim…",
+      "ownTeam": "Vlastiti tim osobe",
+      "close": "Zatvori"
+    },
+    "bar": {
+      "count": "{count, plural, one {# nespremljena promjena} few {# nespremljene promjene} other {# nespremljenih promjena}}",
+      "none": "Nema nespremljenih promjena.",
+      "saved": "{count, plural, one {Spremljen je # dan.} few {Spremljena su # dana.} other {Spremljeno je # dana.}}",
+      "save": "Spremi",
+      "discard": "Odbaci"
+    },
+    "unchecked": "Promjene trenutačno nije moguće provjeriti, pa ništa nije spremljeno.",
+    "retryCheck": "Provjeri ponovno",
+    "confirm": "Spremi ručni raspored",
+    "error": {
+      "stale": "Raspored se u međuvremenu promijenio (osoba, smjena ili tim). Učitan je ponovno, a tvoje izmjene su sačuvane. Provjeri ih i spremi ponovno.",
+      "archived": "Odabrana smjena ili tim je arhiviran. Promijeni te dane pa spremi ponovno.",
+      "tooMany": "Jedno spremanje prima najviše 5000 dana. Spremi u dijelovima.",
+      "denied": "Nemaš ovlasti za spremanje rasporeda.",
+      "failed": "Spremanje nije uspjelo. Pokušaj ponovno."
+    },
+    "phone": {
+      "person": "Osoba"
+    },
+    "preview": {
+      "title": "Što se mijenja",
+      "lede": "{count, plural, one {Sprema se # dan.} few {Spremaju se # dana.} other {Sprema se # dana.}} Upozorenja ne sprječavaju spremanje.",
+      "close": "Zatvori",
+      "back": "Natrag na uređivanje",
+      "save": "Spremi",
+      "nothing": "Ni za koga se ne mijenja nijedna radna smjena.",
+      "lost": "{weekday} {date}: gubi {type} {range} · {team}",
+      "lostNoRange": "{weekday} {date}: gubi {type} · {team}",
+      "lostNoTeam": "{weekday} {date}: gubi {type} {range} · bez tima",
+      "lostNoTeamNoRange": "{weekday} {date}: gubi {type} · bez tima",
+      "gained": "{weekday} {date}: dobiva {type} {range} · {team}",
+      "gainedNoRange": "{weekday} {date}: dobiva {type} · {team}",
+      "gainedNoTeam": "{weekday} {date}: dobiva {type} {range} · bez tima",
+      "gainedNoTeamNoRange": "{weekday} {date}: dobiva {type} · bez tima",
+      "more": "i još {count}",
+      "shift": "{type} · {team}",
+      "shiftNoTeam": "{type} · bez tima",
+      "double": "{weekday} {date}: dvije smjene u isto vrijeme ({first} i {second})",
+      "restGap": "{weekday} {date}: rad bez odmora, ukupno {duration}",
+      "unlistedLeave": "{weekday} {date}: odsutnost preko smjene bez tima. Taj sukob se još ne prikazuje u Za odluku.",
+      "inertHeading": "Izmjene sastava koje više ne vrijede",
+      "inertSwap": "{weekday} {date}, {team}: ulazi {in}, izlazi {out}",
+      "inertOut": "{weekday} {date}, {team}: izlazi {out}",
+      "inertIn": "{weekday} {date}, {team}: ulazi {in}",
+      "inertNote": "Ostaju zapisane. Ukloni ih u Kalendaru ako više ne trebaju.",
+      "unknownMember": "Nepoznata osoba",
+      "erasures": "{count, plural, one {Spremanje briše # sukob s odsutnošću. Potvrdit ćeš ga u sljedećem koraku.} few {Spremanje briše # sukoba s odsutnošću. Potvrdit ćeš ih u sljedećem koraku.} other {Spremanje briše # sukoba s odsutnošću. Potvrdit ćeš ih u sljedećem koraku.}}"
     }
   }
 }

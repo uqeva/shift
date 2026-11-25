@@ -19,6 +19,7 @@ import { organizacijaSatniPojasRoute } from '@/pages/organizacija.satni-pojasi.$
 import { organizacijaSatniPojasiRoute } from '@/pages/organizacija.satni-pojasi';
 import { postaviLozinkuRoute } from '@/pages/postavi-lozinku';
 import { povijestPromjenaRoute } from '@/pages/povijest-promjena';
+import { rucniRasporedRoute } from '@/pages/rucni-raspored';
 import { postavkeRotacijeRoute } from '@/pages/postavke-rotacije';
 import { postavkeRotacijeTipSmjeneRoute } from '@/pages/postavke-rotacije.tipovi-smjena.$id';
 import { postavljanjeRoute } from '@/pages/postavljanje';
@@ -84,6 +85,8 @@ const appDestinations = appLayoutRoute.addChildren([
   // the layout, absent from the destinations (the `Za odluku` tab lights for
   // it), with the admin guard `/za-odluku` carries.
   zaOdlukuSwapRoute,
+  // STORY 21.4: *Ručni raspored*, the month planned by hand; admin only.
+  rucniRasporedRoute,
   // STORY 9.1: the queue's old URLs, `/raspored` and one conflict under it.
   // They render nothing: past the admin guard each redirects to its
   // `/za-odluku` twin with the same params, replacing the entry.

@@ -43,7 +43,7 @@ export function HistoryStackedRows({
             <StackedField label={t('history.column.author')}>{row.author}</StackedField>
             <StackedField label={t('history.column.subject')}>{row.subject}</StackedField>
             <StackedField label={t('history.column.changes')}>
-              <HistoryChanges changes={row.changes} />
+              <HistoryChanges changes={row.changes} days={row.days} />
             </StackedField>
           </StackedFields>
         </StackedRow>

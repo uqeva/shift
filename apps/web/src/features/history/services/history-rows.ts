@@ -12,6 +12,7 @@ import type {
 } from '@shift/domain';
 import {
   HISTORY_PERIOD_CHOICES,
+  HISTORY_PLANNED_DATE_PREFIX,
   MINUTES_PER_DAY,
   historyKindOfCode,
   historyReachesBeginning,
@@ -74,6 +75,11 @@ export interface HistoryRow {
   /** The `HISTORY_BEGINS` marker: a row of its own. */
   readonly marker: boolean;
   readonly changes: readonly HistoryRowChange[];
+  /**
+   * STORY 21.4: a grid save's day count — its changes are one line per date,
+   * drawn collapsed behind `Prikaži {n} dana`. ABSENT on every other row.
+   */
+  readonly days?: number;
 }
 
 /** A rotation step as an event read holds it: its pattern, its 0-based position and its shift type. */
@@ -289,6 +295,7 @@ const RECORD_KEYS: Readonly<Record<HistoryRecord, ReturnType<typeof historyRecor
   'leave-allowance': 'history.record.leaveAllowance',
   loan: 'history.record.loan',
   'calendar-feed': 'history.record.calendarFeed',
+  'personal-assignment': 'history.record.personalAssignment',
   other: 'history.record.other',
 };
 
@@ -319,6 +326,7 @@ export function historyRecordMessageKey(
   | 'history.record.leaveAllowance'
   | 'history.record.loan'
   | 'history.record.calendarFeed'
+  | 'history.record.personalAssignment'
   | 'history.record.other' {
   return RECORD_KEYS[record];
 }
@@ -335,6 +343,7 @@ const ACTION_KEYS: Readonly<Record<HistoryAction, ReturnType<typeof historyActio
   restored: 'history.action.restored',
   amended: 'history.action.amended',
   decided: 'history.action.decided',
+  planned: 'history.action.planned',
   'history-begins': 'history.action.historyBegins',
 };
 
@@ -353,6 +362,7 @@ export function historyActionMessageKey(
   | 'history.action.restored'
   | 'history.action.amended'
   | 'history.action.decided'
+  | 'history.action.planned'
   | 'history.action.historyBegins' {
   return ACTION_KEYS[action];
 }
@@ -499,6 +509,8 @@ const ENUM_KEYS: Readonly<Record<HistoryEnumField, Readonly<Record<string, Retur
     accept_uncovered: 'history.enum.kindAcceptUncovered',
     replace_member: 'history.enum.kindReplaceMember',
     amend_leave: 'history.enum.kindAmendLeave',
+    SHIFT: 'history.enum.kindShift',
+    OFF: 'history.enum.kindOff',
   },
   half: { FIRST: 'history.enum.halfFirst', SECOND: 'history.enum.halfSecond' },
   status: {
@@ -526,6 +538,8 @@ export function historyEnumMessageKey(
   | 'history.enum.kindAcceptUncovered'
   | 'history.enum.kindReplaceMember'
   | 'history.enum.kindAmendLeave'
+  | 'history.enum.kindShift'
+  | 'history.enum.kindOff'
   | 'history.enum.halfFirst'
   | 'history.enum.halfSecond'
   | 'history.enum.statusCurrent'
@@ -689,9 +703,41 @@ export function historyOperandText(operand: HistoryOperand, names: HistoryNames)
 
       return key === null ? operand.value : t(key);
     }
+    case 'personal-assignment':
+      return assignmentText(operand, names);
     case 'raw':
       return operand.json;
   }
+}
+
+/**
+ * STORY 21.4: one Personal Assignment as a grouped save's date line says it:
+ * `slobodno`, the shift type, or the type and the team it counts with; a kind
+ * this build does not know, as stored.
+ */
+function assignmentText(
+  operand: Extract<HistoryOperand, { readonly type: 'personal-assignment' }>,
+  names: HistoryNames,
+): string {
+  const value = assignmentValueText(operand, names);
+
+  return operand.note === null ? value : t('history.value.assignmentNote', { value, note: operand.note });
+}
+
+/** The assignment without its note: `slobodno`, the type, or the type and its team. */
+function assignmentValueText(
+  operand: Extract<HistoryOperand, { readonly type: 'personal-assignment' }>,
+  names: HistoryNames,
+): string {
+  if (operand.kind === 'OFF') return t('history.value.assignmentOff');
+  if (operand.kind !== 'SHIFT') return operand.kind;
+
+  const type =
+    operand.shiftTypeId === null ? t('history.value.unknownShiftType') : named(names.shiftTypes, operand.shiftTypeId, t('history.value.unknownShiftType'));
+
+  return operand.teamId === null
+    ? type
+    : t('history.value.assignmentShiftTeam', { type, team: named(names.teams, operand.teamId, t('history.value.unknownTeam')) });
 }
 
 // ---------------------------------------------------------------- rows
@@ -759,6 +805,14 @@ export function historyKindText(code: string): string {
 function changeFieldText(record: HistoryRecord, change: HistoryChange): string {
   if (change.field === null) return change.column;
   if (record === 'rotation-step' && change.field === 'position') return t('history.field.stepPosition');
+  // STORY 21.4: a grouped save's line is labelled by its own date; an
+  // assignment's `kind` is what it gives, not a conflict's decision.
+  if (record === 'personal-assignment' && change.column.startsWith(HISTORY_PLANNED_DATE_PREFIX)) {
+    const date = change.column.slice(HISTORY_PLANNED_DATE_PREFIX.length);
+
+    return formatIsoDate(date) ?? date;
+  }
+  if (record === 'personal-assignment' && change.field === 'kind') return t('history.field.assignmentKind');
 
   return t(historyFieldMessageKey(change.field));
 }
@@ -793,14 +847,19 @@ export function historyRowsOf(entries: readonly HistoryEntry[], names: HistoryNa
       id: entry.id,
       time: t('history.time', { date: formatDate(instant, zone), time: formatTime(instant, zone) }),
       author: authorText(entry.author, names),
-      kind: t('history.kindLine', {
-        record: t(historyRecordMessageKey(entry.kind.record)),
-        action: t(historyActionMessageKey(entry.kind.action)),
-      }),
+      // STORY 21.4: a grid save reads `Ručni raspored: 3 dana`.
+      kind:
+        entry.days === undefined
+          ? t('history.kindLine', {
+              record: t(historyRecordMessageKey(entry.kind.record)),
+              action: t(historyActionMessageKey(entry.kind.action)),
+            })
+          : t('history.planned', { count: entry.days }),
       subject: entry.kind.action === 'history-begins' ? t('history.markerSubject') : subjectText(entry, names),
       reconstructed: entry.reconstructed,
       marker: entry.kind.action === 'history-begins',
       changes: entry.changes.map((change) => changeRowOf(entry.kind.record, change, names)),
+      ...(entry.days === undefined ? {} : { days: entry.days }),
     };
   });
 }
