@@ -3725,8 +3725,12 @@ function reservedStemIn(message: string, stems: readonly string[] = RESERVED_STE
   return stems.find((stem) => lowered.includes(stem)) ?? null;
 }
 
+/** The file's text, read once per run; parsed afresh on each call so no test can mutate another's copy. */
+let resourceText: string | null = null;
+
 function resource(): Record<string, unknown> {
-  return JSON.parse(readFileSync(RESOURCE, 'utf8')) as Record<string, unknown>;
+  resourceText ??= readFileSync(RESOURCE, 'utf8');
+  return JSON.parse(resourceText) as Record<string, unknown>;
 }
 
 
