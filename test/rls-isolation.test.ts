@@ -27583,13 +27583,13 @@ describe('a loan is amended, ended early or removed (story 18.4, 0064)', () => {
  * backfill block is run again here, DML only, in a rolled-back transaction.
  */
 
-/** The 22 audited tables (AD-11; `team_loans` since story 18.2). */
+/** The 23 audited tables (AD-11; `team_loans` since story 18.2, `personal_assignments` since 21.2). */
 const AUDITED_TABLES = [
   'organizations', 'members', 'member_status_versions', 'team_membership_versions', 'teams', 'hour_bands',
   'shift_types', 'shift_type_versions', 'rotation_patterns', 'rotation_steps', 'rotation_assignments',
   'shift_type_overrides', 'roster_overrides', 'leave_records', 'conflict_resolutions', 'leave_requests',
   'leave_request_decisions', 'swap_requests', 'swap_request_decisions', 'absence_types', 'leave_allowances',
-  'team_loans',
+  'team_loans', 'personal_assignments',
 ] as const;
 
 interface AuditEvent {

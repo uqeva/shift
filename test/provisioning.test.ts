@@ -701,7 +701,7 @@ describe('every organization table carries row level security, and only its revi
               'leave_request_decisions', 'notification_outbox', 'notification_settings',
               'push_subscriptions', 'swap_requests', 'swap_request_decisions',
               'absence_types', 'leave_allowances', 'audit_events', 'team_loans',
-              'calendar_feed_tokens', 'reminder_settings'
+              'calendar_feed_tokens', 'reminder_settings', 'personal_assignments'
             )
           order by relname`,
       );
@@ -735,6 +735,8 @@ describe('every organization table carries row level security, and only its revi
         'notification_outbox',
         'notification_settings',
         'organizations',
+        // STORY 21.2 (0077): the Personal Assignments, an active admin's read alone.
+        'personal_assignments',
         // STORY 10.4 (0045): a member's devices, own rows only.
         'push_subscriptions',
         // STORY 17.1 (0069): a member's own reminder choice, own row only.
@@ -2445,9 +2447,11 @@ describe('every organization table carries row level security, and only its revi
     absence_types: ['organization_id', 'id'],
     leave_allowances: ['organization_id', 'id'],
     team_loans: ['organization_id', 'id'],
+    // STORY 21.2 (0077), attached in the migration that creates it.
+    personal_assignments: ['organization_id', 'id'],
   };
 
-  it.skipIf(noDatabase)('keeps the change history append-only, read by authenticated alone, and records each of the 22 audited tables through exactly its two triggers (story 14.1)', async () => {
+  it.skipIf(noDatabase)('keeps the change history append-only, read by authenticated alone, and records each of the 23 audited tables through exactly its two triggers (story 14.1; personal_assignments since 21.2)', async () => {
     const client = await connect();
     try {
       // APPEND-ONLY BY PRIVILEGE: `authenticated` SELECT, and nothing else for
