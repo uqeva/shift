@@ -3319,6 +3319,16 @@ day): the app and the API answer on `staging.<domain>` and
 Resend, `notify` holds a real key, and the signup door is OPEN on staging only
 (§9.9; production stays shut). See *Moving staging to another domain* and
 *Email and the open door* below.
+**Refreshed again 2026-11-25** to `main` (stories 21.1-21.3 and the *Smjenko*
+brand, 21.24): a `pre-migration` backup (§9.12), then `main`'s compose by
+`PATCH` (only GoTrue's sender name and subjects changed; every `content:` file
+already matched, so no storage update), migration `0077` pushed and
+`check-migrations` clean, a new functions image (probed with
+`probe-functions-image.sh`) and a new `shift-web` (same inputs, signup on),
+the service restarted, then GoTrue alone restarted once the new `shift-web`
+was live, so it fetched the new templates (order rule: the templates come from
+the app origin at start). The checks below, the CSP sweep and
+`shift-ops jobs-check staging` passed.
 
 **What exists in Coolify.** A project `shift` with an environment `staging`
 (the founder's choice; the epic had named a project `shift-staging`), holding:
