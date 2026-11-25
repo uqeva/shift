@@ -171,18 +171,20 @@ function policyDeclarations(sql: string): string[] {
  * default in a migration would. `seed.sql` is deliberately absent — it is
  * where the pilot's values are *supposed* to live.
  *
- * So is the demo organization script, by name and alone: it IS demo data (the
- * pilot's name, type, zone, locale and shift types, fixed on purpose), and it
- * refuses to run unless `shift.demo_target` is `local` or `staging`, so it
- * never reaches production. `test/demo-organization.test.ts` asserts that
- * refusal. Every other file in `supabase/operator/` stays in scope.
+ * So are the two demo organization scripts, by name and alone: they ARE demo
+ * data (a name, type, zone, locale and shift types, fixed on purpose), and
+ * each refuses to run unless `shift.demo_target` is `local` or `staging`, so
+ * neither reaches production. `test/demo-organization.test.ts` asserts that
+ * refusal for `demo-organization.sql`; `demo-mladost.sql` raises the same
+ * DEMO_TARGET_REFUSED first, before it writes anything. Every other file in
+ * `supabase/operator/` stays in scope.
  */
-const DEMO_SCRIPT = 'demo-organization.sql';
+const DEMO_SCRIPTS: ReadonlySet<string> = new Set(['demo-organization.sql', 'demo-mladost.sql']);
 
 function coreSql(): string {
   const operator = existsSync(operatorRoot)
     ? readdirSync(operatorRoot)
-        .filter((name) => name.endsWith('.sql') && name !== DEMO_SCRIPT)
+        .filter((name) => name.endsWith('.sql') && !DEMO_SCRIPTS.has(name))
         .sort()
         .map((name) => readFileSync(join(operatorRoot, name), 'utf8'))
     : [];

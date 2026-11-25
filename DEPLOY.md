@@ -1626,6 +1626,39 @@ pnpm exec supabase db query --local "delete from organizations where slug = 'dvd
 pnpm exec supabase db query --local "delete from auth.users where email like '%@dvd-demo.shift.invalid'"
 ```
 
+### 7.6 Paper-schedule demo, `dvd-mladost` (local and staging)
+
+`supabase/operator/demo-mladost.sql` creates `dvd-mladost`, "DVD Mladost
+(demo)": one department's paper schedule for November 2026, rebuilt in the
+app so it can be compared with the paper day by day. Four 24-hour crews
+(`Smjena 1` to `Smjena 4`), two weekday day teams (`Dnevni A`, `Dnevni B`), a
+one-person morning team (`Jutarnji`), students who float between single days,
+the 18 November holiday, per-person exceptions and four annual leaves. The
+script's header explains how each part of the paper maps onto the model.
+
+It holds the schedule's **structure only**, keyed by abstract person keys
+(`S1-ZAP`, `A1`, `ST3`, …). The people are a parameter: `shift.demo_people`
+is a JSON array with one `{key, name, username, password}` object per key.
+The names are **fictional**. The paper's real names, and every password, stay
+out of the repository, the database and the logs. The script refuses with
+`DEMO_PEOPLE_INVALID` on a missing, unknown or repeated key, or on a blank
+field, and it refuses with `DEMO_TARGET_REFUSED` as §7.5 does. Re-running it
+replaces `dvd-mladost` and every `@dvd-mladost.shift.invalid` auth user, and
+nothing else. The person with key `S1-ZAP` is the admin.
+
+Pass the JSON on `psql`'s stdin. Base64 keeps it one quoted token, and it
+never appears on a command line:
+
+```bash
+{ printf '\\set people %s\n' "$(base64 -w0 people.json)"
+  echo "select set_config('shift.demo_target', 'staging', false), set_config('shift.demo_people', convert_from(decode(:'people', 'base64'), 'UTF8'), false) \\g /dev/null"
+  cat supabase/operator/demo-mladost.sql; } \
+  | psql "<the staging connection string>" -v ON_ERROR_STOP=1 -q
+```
+
+To remove it, run §7.5's two deletes with `dvd-mladost` in place of
+`dvd-demo`.
+
 ---
 
 ## 8. CI/CD
