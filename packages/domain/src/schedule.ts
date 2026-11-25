@@ -24,7 +24,18 @@
 
 import { checkDate, civilDayNumber, dateOfCivilDay } from './calendar.js';
 import { applyOverride, overridesByTeamAndDate, type ScheduledShiftType, type ShiftTypeOverride } from './overrides.js';
-import { checkPersonalAssignments, personalShiftOf, type PersonalAssignment } from './personal.js';
+import {
+  SCHEDULE_SOURCE_PERSONAL,
+  SCHEDULE_SOURCE_TEAM,
+  checkPersonalAssignments,
+  checkScheduleVersions,
+  personalRotationShiftOf,
+  personalShiftOf,
+  scheduleSourceOn,
+  type PersonalAssignment,
+  type PersonalShift,
+  type ScheduleVersion,
+} from './personal.js';
 import { projectedShiftTypeOn, type RotationAssignment, type RotationStep } from './projection.js';
 import {
   checkLoans,
@@ -50,7 +61,7 @@ export interface ScheduleInput {
   readonly teamIds: readonly string[];
   /** Every rotation version, of any team; versions of teams not asked for are ignored. */
   readonly assignments: readonly RotationAssignment[];
-  /** The steps of every pattern a version names. */
+  /** The steps of every pattern a rotation version or a schedule version (story 21.9) names. */
   readonly steps: readonly RotationStep[];
   /** Every live shift-type override, of any team and date; at most one per team and date. */
   readonly overrides: readonly ShiftTypeOverride[];
@@ -280,9 +291,17 @@ export interface MemberScheduleInput {
    * their schedule as before.
    */
   readonly personalAssignments?: readonly PersonalAssignment[] | undefined;
+  /**
+   * Every version of the same member's schedule source, in any order (story
+   * 21.9, R15). Absent, those of this member's entry in `members` are read;
+   * given, they must be the same as that entry's (an entry without
+   * `scheduleVersions` holding none). None anywhere, they follow their team's
+   * rotation on every date.
+   */
+  readonly scheduleVersions?: readonly ScheduleVersion[] | undefined;
   /** Every rotation version, of any team; only the teams the member belongs to or is lent to are read. */
   readonly assignments: readonly RotationAssignment[];
-  /** The steps of every pattern a version names. */
+  /** The steps of every pattern a rotation version or a schedule version (story 21.9) names. */
   readonly steps: readonly RotationStep[];
   /** Every live shift-type override, of any team and date; at most one per team and date. */
   readonly overrides: readonly ShiftTypeOverride[];
@@ -361,6 +380,37 @@ function personalAssignmentsOf(input: MemberScheduleInput): readonly PersonalAss
   return assignments;
 }
 
+/** A schedule-version list's identity, order-free, as {@link loansKeyOf} is a loan list's. */
+function scheduleVersionsKeyOf(versions: readonly ScheduleVersion[]): string {
+  return JSON.stringify(
+    versions.map((version) => JSON.stringify([version.effectiveFrom, version.source, version.patternId, version.offsetStepId])).sort(),
+  );
+}
+
+/**
+ * The member's schedule versions (story 21.9), by the rule of
+ * {@link loansOf}: `input.scheduleVersions`, else those of their entry in
+ * `input.members`, else none — checked by `checkScheduleVersions`. The rosters
+ * read the entry, so the month must judge each date by the same list.
+ *
+ * @throws RangeError when `input.scheduleVersions` is given, the member has an
+ *   entry in `input.members`, and the two differ; and on any precondition of
+ *   `checkScheduleVersions`.
+ */
+function scheduleVersionsOf(input: MemberScheduleInput): readonly ScheduleVersion[] {
+  const entry = input.members.find((member) => member.id === input.memberId);
+  const versions = input.scheduleVersions ?? entry?.scheduleVersions ?? [];
+  if (
+    input.scheduleVersions !== undefined &&
+    entry !== undefined &&
+    scheduleVersionsKeyOf(input.scheduleVersions) !== scheduleVersionsKeyOf(entry.scheduleVersions ?? [])
+  ) {
+    throw new RangeError(`the schedule versions of member ${input.memberId} differ from those of their entry in the members`);
+  }
+  checkScheduleVersions(versions);
+  return versions;
+}
+
 /**
  * One shift of a member's day (story 3.6a): the team, the shift type it works
  * and the one its rotation projects (both `null` when no rotation version is
@@ -394,6 +444,14 @@ export interface MemberShift {
    * type (`null`), and is neither overridden nor changed by a roster override.
    */
   readonly personalAssignmentId?: string;
+  /**
+   * Set only on the Personal Shift of a personal rotation (story 21.9, R15.3):
+   * the member's own projection, counted with their effective team or none.
+   * ABSENT otherwise, so a month with no schedule version is unchanged
+   * (R15.6). Like an assignment's shift, it has no projected type (`null`)
+   * and is never overridden (R15.4); a roster override onto its team is inert (R15.8).
+   */
+  readonly personalRotation?: true;
 }
 
 /**
@@ -442,6 +500,15 @@ export interface MemberScheduleDay {
  * leaves no shift of their own. Roster overrides putting them on a shift still
  * apply after it. Their assignments are read as their loans are.
  *
+ * SCHEDULE SOURCES (story 21.9, R15.3): on a date with no assignment, their
+ * schedule source decides. Their team's rotation is the rule above. A personal
+ * rotation projects their own type over `input.steps` from the version's
+ * `effectiveFrom`, and a working one of an active member is a Personal Shift
+ * (`personalRotation`), counted with their effective team or none, first in
+ * the day. Manual only leaves no shift of their own. Roster overrides putting
+ * them on a shift still apply after it. Their versions are read as their
+ * loans are; with none, every date is their team's rotation (R15.6).
+ *
  * @throws RangeError when `month` is not a `YYYY-MM` in years 0001–9999, when
  *   a membership or status version's `effectiveFrom` is not a calendar
  *   `YYYY-MM-DD`, when two membership versions or two status versions share
@@ -451,7 +518,10 @@ export interface MemberScheduleDay {
  *   put on, on any of `checkRosterOverrides`, `checkLoans` or `shiftRoster`,
  *   and when `input.loans` and this member's entry in `input.members` hold
  *   different loans; on any precondition of `checkPersonalAssignments`, and
- *   when `input.personalAssignments` and that entry hold different ones.
+ *   when `input.personalAssignments` and that entry hold different ones; on
+ *   any precondition of `checkScheduleVersions` or, for a personal rotation
+ *   in effect on an active date of the month, `personalRotationShiftTypeOf`, and when
+ *   `input.scheduleVersions` and that entry hold different ones.
  */
 export function memberScheduleOfMonth(input: MemberScheduleInput, month: string): readonly MemberScheduleDay[] {
   const dates = datesOfMonth(month);
@@ -460,6 +530,7 @@ export function memberScheduleOfMonth(input: MemberScheduleInput, month: string)
   const statuses = orderedVersions('member status', input.statuses);
   const loans = loansOf(input);
   const assignments = new Map(personalAssignmentsOf(input).map((assignment) => [assignment.date, assignment]));
+  const scheduleVersions = scheduleVersionsOf(input);
 
   const versionsOf = new Map<string, RotationAssignment[]>();
   for (const assignment of input.assignments) {
@@ -489,19 +560,18 @@ export function memberScheduleOfMonth(input: MemberScheduleInput, month: string)
     const teamId = effective?.teamId ?? null;
     const assignment = assignments.get(date);
 
+    // R15.3: below an assignment, the member's schedule source that date; `TEAM` with no version (R15.6).
+    const source = scheduleVersions.length === 0 ? null : scheduleSourceOn(scheduleVersions, date);
+
     if (assignment !== undefined) {
       // R14.2: the assignment is their day; their team's shift is not theirs.
       const personal = personalShiftOf(assignment, active, teamId, working);
-      if (personal !== null) {
-        shifts.push({
-          teamId: personal.teamId,
-          shiftTypeId: personal.shiftTypeId,
-          projectedShiftTypeId: null,
-          overridden: false,
-          rosterChanged: false,
-          viaOverride: false,
-          personalAssignmentId: personal.personalAssignmentId,
-        });
+      if (personal !== null) shifts.push(personalShiftOfDay(personal));
+    } else if (source !== null && source.source !== SCHEDULE_SOURCE_TEAM) {
+      // R15.3: a personal rotation is their own projection, counted with the effective team; manual only is nothing.
+      if (source.source === SCHEDULE_SOURCE_PERSONAL) {
+        const personal = personalRotationShiftOf(source, input.steps, date, active, teamId, working);
+        if (personal !== null) shifts.push(personalShiftOfDay(personal));
       }
     } else if (teamId !== null) {
       const scheduled = scheduledOf(teamId, date);
@@ -525,6 +595,24 @@ export function memberScheduleOfMonth(input: MemberScheduleInput, month: string)
 
     return assignment === undefined ? { date, active, shifts } : { date, active, shifts, personalAssignment: assignment };
   });
+}
+
+/**
+ * A Personal Shift as a shift of the member's day (R14.3, R15.3): no projected
+ * type, never overridden or changed by a roster override, and the mark of
+ * where it came from, an assignment's id or a personal rotation.
+ */
+function personalShiftOfDay(personal: PersonalShift): MemberShift {
+  const shift = {
+    teamId: personal.teamId,
+    shiftTypeId: personal.shiftTypeId,
+    projectedShiftTypeId: null,
+    overridden: false,
+    rosterChanged: false,
+    viaOverride: false,
+  };
+  if (personal.personalAssignmentId !== undefined) return { ...shift, personalAssignmentId: personal.personalAssignmentId };
+  return { ...shift, personalRotation: true };
 }
 
 /** A cell's type fields from a scheduled type, or the empty cell when there is none. */

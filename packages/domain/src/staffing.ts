@@ -30,7 +30,9 @@
  * overrides plus the Personal Shifts counted with T of the same type; those in
  * a group are its Personal Shifts; both less everyone absent, each member
  * counted once. Each is short-staffed by R10.2. With no Personal Assignment,
- * every team has its Scheduled Shift alone, exactly as before (R14.7).
+ * every team has its Scheduled Shift alone, exactly as before (R14.7). A
+ * personal rotation's shifts (story 21.9, R15.3) are Personal Shifts too, and
+ * join the same groups; a member on one is on no base roster.
  *
  * Results are ids, codes and numbers only (AD-8): no name and no text, and
  * nothing here reads a fire rank or a team position (FR-18a) — a roster entry's
@@ -144,20 +146,22 @@ function checkWindow(from: string, to: string): void {
 }
 
 /** One member's Personal Shift, by the member. */
-interface MemberPersonalShift extends PersonalShift {
-  readonly memberId: string;
-}
+type MemberPersonalShift = PersonalShift & { readonly memberId: string };
 
 /**
- * The Personal Shifts counted with a team on a date (R14.3, R14.6), in the
- * order of `members`, computed once per date and only over the members who
- * hold any assignment: with none, every lookup is empty and nothing is read.
+ * The Personal Shifts counted with a team on a date (R14.3, R14.6, R15.3), in
+ * the order of `members`, computed once per date and only over the members who
+ * hold any assignment or schedule version: with none, every lookup is empty
+ * and nothing is read. A personal rotation projects over `steps`.
  */
 function personalShiftsIndexOf(
   members: readonly RosterMember[],
   working: ReadonlySet<string>,
+  steps: ScheduleInput['steps'],
 ): (date: string, teamId: string) => readonly MemberPersonalShift[] {
-  const assigned = members.filter((member) => (member.personalAssignments ?? []).length > 0);
+  const assigned = members.filter(
+    (member) => (member.personalAssignments ?? []).length > 0 || (member.scheduleVersions ?? []).length > 0,
+  );
   const byDate = new Map<string, ReadonlyMap<string, readonly MemberPersonalShift[]>>();
   return (date, teamId) => {
     if (assigned.length === 0) return [];
@@ -165,7 +169,7 @@ function personalShiftsIndexOf(
     if (byTeam === undefined) {
       const indexed = new Map<string, MemberPersonalShift[]>();
       for (const member of assigned) {
-        const shift = personalShiftOn(member, date, working);
+        const shift = personalShiftOn(member, date, working, steps);
         if (shift === null || shift.teamId === null) continue;
         const entry = { ...shift, memberId: member.id };
         const known = indexed.get(shift.teamId);
@@ -199,7 +203,7 @@ interface StaffedShift extends Staffing {
 function staffedShiftsOf(input: StaffingInput, from: string, to: string): readonly StaffedShift[] {
   const onLeave = leaveIndexOf(input.leaveRecords);
   const working = new Set(input.workingShiftTypeIds);
-  const personalOf = personalShiftsIndexOf(input.members, working);
+  const personalOf = personalShiftsIndexOf(input.members, working, input.steps);
   const shifts: StaffedShift[] = [];
   // Each member once: a member put on by an override who also holds a Personal Shift of the type is one person.
   const atWorkOf = (memberIds: readonly string[], date: string): number =>

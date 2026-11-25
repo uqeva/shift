@@ -184,6 +184,7 @@ export function collisionsOf(input: CollisionInput): readonly Collision[] {
       statuses: member.statuses,
       loans: member.loans,
       personalAssignments: member.personalAssignments,
+      scheduleVersions: member.scheduleVersions,
       assignments: input.assignments,
       steps: input.steps,
       overrides: input.overrides,

@@ -1,5 +1,6 @@
 /**
- * Personal Assignments (story 21.1; engine rules R14; AD-26, AD-7, AD-8).
+ * Personal Assignments (story 21.1; engine rules R14) and a member's schedule
+ * source (story 21.9; engine rules R15); AD-26, AD-7, AD-8.
  *
  * A Personal Assignment gives ONE member, on ONE date, one of three things: a
  * working shift type, a non-working shift type, or a plain day off (R14.1). It
@@ -23,6 +24,21 @@
  *
  * With no assignment anywhere, every derivation is what it was before (R14.7).
  *
+ * THE SCHEDULE SOURCE (story 21.9, R15): below an assignment, a member's day
+ * follows their schedule source on the date, a versioned rule riding on the
+ * member (`RosterMember.scheduleVersions`) as their assignments do:
+ *
+ * - `TEAM`, the default and what a member with no version has: they are on
+ *   their effective team's base roster (R11.2), as before;
+ * - `PERSONAL`: a rotation pattern and an offset step of their own, projected
+ *   from the version's `effectiveFrom` exactly as a team's rotation is (R1,
+ *   {@link personalRotationShiftTypeOf}). A working step of an active member is
+ *   a Personal Shift counted with their effective team, else with none;
+ * - `MANUAL`: nothing. They have only what is assigned to them.
+ *
+ * A member whose source is not `TEAM` is on no team's base roster. With no
+ * version anywhere, every derivation is what it was before (R15.6).
+ *
  * This module holds the assignment, its checks and the pure shift rule. The
  * composition with a member's versions (`personalShiftOn`) is in `roster.ts`,
  * which this module never imports.
@@ -31,6 +47,7 @@
  */
 
 import { checkDate, civilDayNumber, dateOfCivilDay } from './calendar.js';
+import { orderedSteps, stepOnDate, type RotationStep } from './projection.js';
 
 /** A Personal Assignment of a shift type, working or not. */
 export const PERSONAL_ASSIGNMENT_SHIFT = 'SHIFT';
@@ -55,15 +72,19 @@ export interface PersonalAssignment {
 }
 
 /**
- * One Personal Shift (R14.3): a working assignment of an active member, its
- * type and the team it counts with (`null`: none).
+ * One Personal Shift (R14.3, R15.3): a working assignment of an active member,
+ * or a working step of their personal rotation; its type and the team it
+ * counts with (`null`: none). An assignment's carries `personalAssignmentId`;
+ * a personal rotation's carries `personalRotation: true` instead (story 21.9).
  */
-export interface PersonalShift {
-  readonly personalAssignmentId: string;
+export type PersonalShift = {
   readonly date: string;
   readonly shiftTypeId: string;
   readonly teamId: string | null;
-}
+} & (
+  | { readonly personalAssignmentId: string; readonly personalRotation?: undefined }
+  | { readonly personalRotation: true; readonly personalAssignmentId?: undefined }
+);
 
 /**
  * Every precondition of one member's live assignments (R14.1): ids non-empty
@@ -344,4 +365,160 @@ export function copiedAssignmentsOf(
       };
     }),
   );
+}
+
+/** Schedule source (R15.1): the member is on their effective team's base roster. The default. */
+export const SCHEDULE_SOURCE_TEAM = 'TEAM';
+/** Schedule source (R15.1): a rotation pattern and an offset step of the member's own. */
+export const SCHEDULE_SOURCE_PERSONAL = 'PERSONAL';
+/** Schedule source (R15.1): no rotation at all; only what is assigned. */
+export const SCHEDULE_SOURCE_MANUAL = 'MANUAL';
+
+export type ScheduleSource = typeof SCHEDULE_SOURCE_TEAM | typeof SCHEDULE_SOURCE_PERSONAL | typeof SCHEDULE_SOURCE_MANUAL;
+
+/**
+ * One stored version of a member's schedule source (`member_schedule_versions`,
+ * story 21.10; R15.2): from `effectiveFrom` on, until the member's next
+ * version, their source is `source`. A `PERSONAL` version names its rotation
+ * pattern and the step the member stands on AT `effectiveFrom`, the version's
+ * anchor (R15.1: "projected from its effective date"); both are `null` on
+ * `TEAM` and `MANUAL`. The member is the one whose `scheduleVersions` hold it.
+ */
+export interface ScheduleVersion {
+  readonly effectiveFrom: string;
+  readonly source: ScheduleSource;
+  readonly patternId: string | null;
+  readonly offsetStepId: string | null;
+}
+
+/** The source before a member's first version, or with none: `TEAM` (R15.2). */
+const TEAM_DEFAULT: ScheduleVersion = { effectiveFrom: '0001-01-01', source: SCHEDULE_SOURCE_TEAM, patternId: null, offsetStepId: null };
+
+/** Each checked list, ordered by `effectiveFrom`. The inputs are read-only, so a list is checked once. */
+const orderedSchedules = new WeakMap<readonly ScheduleVersion[], readonly ScheduleVersion[]>();
+
+/** @throws RangeError on any precondition of {@link checkScheduleVersions}. */
+function orderedScheduleVersions(versions: readonly ScheduleVersion[]): readonly ScheduleVersion[] {
+  const known = orderedSchedules.get(versions);
+  if (known !== undefined) return known;
+  const seen = new Set<string>();
+  for (const version of versions) {
+    checkDate('a schedule version is effective from', version.effectiveFrom);
+    const what = `the schedule version from ${version.effectiveFrom}`;
+    if (seen.has(version.effectiveFrom)) throw new RangeError(`two schedule versions are effective from ${version.effectiveFrom}`);
+    seen.add(version.effectiveFrom);
+    if (version.source === SCHEDULE_SOURCE_PERSONAL) {
+      if (typeof version.patternId !== 'string' || version.patternId === '') {
+        throw new RangeError(`${what} is a personal rotation and names no rotation pattern`);
+      }
+      if (typeof version.offsetStepId !== 'string' || version.offsetStepId === '') {
+        throw new RangeError(`${what} is a personal rotation and names no offset step`);
+      }
+    } else if (version.source === SCHEDULE_SOURCE_TEAM || version.source === SCHEDULE_SOURCE_MANUAL) {
+      if (version.patternId !== null || version.offsetStepId !== null) {
+        throw new RangeError(`${what} is ${version.source} and names a rotation pattern or an offset step`);
+      }
+    } else {
+      throw new RangeError(`${what} is of source ${JSON.stringify(version.source)}, neither TEAM, PERSONAL nor MANUAL`);
+    }
+  }
+  const ordered = [...versions].sort((left, right) => (left.effectiveFrom < right.effectiveFrom ? -1 : 1));
+  orderedSchedules.set(versions, ordered);
+  return ordered;
+}
+
+/**
+ * Every precondition of one member's schedule versions (R15.2): each
+ * `effectiveFrom` a calendar date and no two equal, each `source` one of the
+ * three, and a pattern and an offset step on `PERSONAL` only. Whether the step
+ * belongs to the pattern is checked where it is projected, as a team's is.
+ *
+ * @throws RangeError on the first breach, naming it.
+ */
+export function checkScheduleVersions(versions: readonly ScheduleVersion[]): void {
+  orderedScheduleVersions(versions);
+}
+
+/**
+ * THE SCHEDULE SOURCE of a member on `date` (R15.2): the version with the
+ * greatest `effectiveFrom` on or before it; before their first version, or
+ * with none, `TEAM` (`effectiveFrom` `0001-01-01`, no pattern).
+ *
+ * @throws RangeError when `date` is not a calendar `YYYY-MM-DD`, and on any
+ *   precondition of {@link checkScheduleVersions}.
+ */
+export function scheduleSourceOn(versions: readonly ScheduleVersion[], date: string): ScheduleVersion {
+  checkDate('the date', date);
+  if (versions.length === 0) return TEAM_DEFAULT;
+  let found = TEAM_DEFAULT;
+  for (const version of orderedScheduleVersions(versions)) {
+    if (version.effectiveFrom > date) break;
+    found = version;
+  }
+  return found;
+}
+
+/**
+ * Each pattern's steps ordered by position, per `steps` list. The inputs are
+ * read-only, so a pattern's steps are filtered, checked and ordered once per
+ * list, not once per member and date.
+ */
+const orderedPatterns = new WeakMap<readonly RotationStep[], Map<string, readonly RotationStep[]>>();
+
+/** @throws RangeError on any precondition of `orderedSteps`. */
+function patternStepsOf(steps: readonly RotationStep[], patternId: string): readonly RotationStep[] {
+  let byPattern = orderedPatterns.get(steps);
+  if (byPattern === undefined) {
+    byPattern = new Map();
+    orderedPatterns.set(steps, byPattern);
+  }
+  let ordered = byPattern.get(patternId);
+  if (ordered === undefined) {
+    ordered = orderedSteps(steps.filter((step) => step.patternId === patternId), patternId);
+    byPattern.set(patternId, ordered);
+  }
+  return ordered;
+}
+
+/**
+ * THE PERSONAL ROTATION (R15.1, R1): the shift type a `PERSONAL` version
+ * projects on `date`, `steps[(offsetIndex + daysBetween(effectiveFrom, date))
+ * mod cycleLength]`, its pattern's steps ordered by position. Whether the
+ * version is in effect on `date` is {@link scheduleSourceOn}'s question.
+ * `steps` may hold the steps of several patterns; only the version's are read.
+ *
+ * @throws RangeError when the version is not `PERSONAL`, when `date` is not a
+ *   calendar `YYYY-MM-DD`, when its pattern has no steps among `steps` or they
+ *   are malformed (`orderedSteps`), or when the offset step is not one of them.
+ */
+export function personalRotationShiftTypeOf(version: ScheduleVersion, steps: readonly RotationStep[], date: string): string {
+  const { patternId, offsetStepId } = version;
+  if (version.source !== SCHEDULE_SOURCE_PERSONAL || patternId === null || offsetStepId === null) {
+    throw new RangeError(`the schedule version from ${version.effectiveFrom} is not a personal rotation`);
+  }
+  checkDate('the date', date);
+  return stepOnDate(patternStepsOf(steps, patternId), patternId, offsetStepId, version.effectiveFrom, date).shiftTypeId;
+}
+
+/**
+ * THE SHIFT RULE of a personal rotation (R15.3, R14.3) on `date`, for a
+ * `PERSONAL` version in effect that date: a Personal Shift of the projected
+ * type when it is a WORKING one and the member is `active`, counted with
+ * `effectiveTeamId` (their effective team, R11.1, or `null`); otherwise
+ * `null`, a day off.
+ *
+ * @throws RangeError on any precondition of {@link personalRotationShiftTypeOf}.
+ */
+export function personalRotationShiftOf(
+  version: ScheduleVersion,
+  steps: readonly RotationStep[],
+  date: string,
+  active: boolean,
+  effectiveTeamId: string | null,
+  workingShiftTypeIds: ReadonlySet<string>,
+): PersonalShift | null {
+  // Projected first, on an inactive date too, so a malformed pattern is refused whatever the member's status.
+  const shiftTypeId = personalRotationShiftTypeOf(version, steps, date);
+  if (!active || !workingShiftTypeIds.has(shiftTypeId)) return null;
+  return { personalRotation: true, date, shiftTypeId, teamId: effectiveTeamId };
 }

@@ -50,8 +50,8 @@ Make Smjenko plan the first production pilot's real month without workarounds. T
 ## Technical Decisions
 
 - **Domain owns every rule (AD-7, AD-8).**
-  - `domain/personal` holds R14 and R15. As built, assignments ride on each member (`personalAssignments: { id, date, kind, shiftTypeId, teamId }`, as loans do). `shiftRoster` leaves an assigned member off every base roster. `personalShiftOn` sits in `roster.ts`, over `personal.ts`'s `personalShiftOf`. 21.9 adds `scheduleSourceOn` in the same place.
-  - Output `teamId` is `string | null`. A personal shift carries `personalAssignmentId`. `AtWorkShift` has no `source` field. Reminder items carry `source`.
+  - `domain/personal` holds R14 and R15. As built, assignments ride on each member (`personalAssignments: { id, date, kind, shiftTypeId, teamId }`, as loans do). `shiftRoster` leaves an assigned member off every base roster. `personalShiftOn` sits in `roster.ts`, over `personal.ts`'s `personalShiftOf`. As built by 21.9, schedule versions ride on each member too (`scheduleVersions`): `scheduleSourceOn` and the personal-rotation projection are in `personal.ts`, `shiftRoster` keeps only team-rotation members, and `personalShiftOn` gives an assignment's shift, else the personal rotation's.
+  - Output `teamId` is `string | null`. A personal shift carries `personalAssignmentId`, or `personalRotation: true` for a personal rotation's (21.9). `AtWorkShift` has no `source` field. Reminder items carry `source`.
   - `staffingOn(input, team, date)` gives R14.6's groups: the team's shift plus one group per other working type among the personal shifts counted with the team.
   - The fill is `filledAssignmentsOf(steps, offset, members, from, to)`. The copy is `copiedAssignmentsOf(range, targetStart, members)`. Both produce draft items only, never a stored rule. Copy copies assignments only, so a source date with none clears its target.
   - `domain/floaters` returns suggestions as ids and counts. `domain/holidays` returns `nationalHolidaysOf('HR', year)` as `{ date, code }`. `minimumOf(input, teamId)` gives a team's effective minimum.
@@ -82,7 +82,7 @@ Make Smjenko plan the first production pilot's real month without workarounds. T
 - **Assembly, feed and reminders (AD-19, AD-20, AD-18).**
   - `member_schedule_inputs` and the device snapshot carry every member's live assignments (done in 21.2, snapshot shape 4), schedule versions (21.10), and holiday dates with `offOnHolidays` (21.16). Both parity fixtures gain each one in that story.
   - Roles, floaters, holiday names and minimums are never carried.
-  - Feed UIDs: an assignment's is `<date>-a-<assignmentId>-<memberId>@shift`. A personal rotation's is `<date>-p-<memberId>@shift`, which is 21.9's to build, together with the `PERSONAL_ROTATION` reminder form and its `:p:` subject, in the same change.
+  - Feed UIDs: an assignment's is `<date>-a-<assignmentId>-<memberId>@shift`. A personal rotation's is `<date>-p-<memberId>@shift`. It ships with 21.10's assembly, together with the `PERSONAL_ROTATION` reminder form and its `:p:` subject, in the same change. 21.9 built the domain marker (`AtWorkShift.personalRotation`), and `remind` skips such a shift until then.
   - A team reminder item keeps its eight keys and has no `source`.
   - A holiday-removed shift has no event and no reminder.
   - The feed's fixed lines say *Smjenko*. UIDs are unchanged.
