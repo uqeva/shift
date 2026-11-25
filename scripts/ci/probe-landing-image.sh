@@ -22,6 +22,7 @@ image="${1:?usage: probe-landing-image.sh <image> [<dist>]}"
 dist="${2:-apps/landing/dist}"
 name="shift-landing-probe-$$"
 
+# shellcheck disable=SC2317 # invoked indirectly, by the EXIT trap below
 cleanup() { docker rm -f "$name" > /dev/null 2>&1 || true; }
 trap cleanup EXIT
 
@@ -85,7 +86,10 @@ expect() {
   for header in "${expected[@]}"; do
     exact="$(grep -cFx -- "$header" <<< "$head" || true)"
     named="$(grep -ci -- "^${header%%:*}:" <<< "$head" || true)"
-    [ "$exact" = 1 ] && [ "$named" = 1 ] || { fail "$method $path: '${header%%:*}' is not exactly once with its value"; ok=0; }
+    if [ "$exact" != 1 ] || [ "$named" != 1 ]; then
+      fail "$method $path: '${header%%:*}' is not exactly once with its value"
+      ok=0
+    fi
   done
   if [ "$type" != - ] && ! grep -qi "^Content-Type: $type" <<< "$head"; then
     fail "$method $path: Content-Type is not $type"; ok=0
@@ -162,18 +166,18 @@ fi
 
 # The process runs as uid 101.
 uid="$(docker exec "$name" awk '/^Uid:/ { print $2 }' /proc/1/status)"
-[ "$uid" = 101 ] && echo "ok    nginx runs as uid 101" || fail "nginx runs as uid '$uid'"
+if [ "$uid" = 101 ]; then echo "ok    nginx runs as uid 101"; else fail "nginx runs as uid '$uid'"; fi
 
 # Nothing outside /tmp is owned by, or writable by, uid 101 (the read-only
 # root hides that from a write test, so it is read off the modes). Read as
 # root, so a directory uid 101 cannot list is still checked.
 writable="$(docker exec --user 0 "$name" find / -xdev -path /tmp -prune -o \
   \( -user 101 -o -group 101 -perm -0020 -o -perm -0002 \) ! -type l -print 2>&1 || echo 'find failed')"
-[ -z "$writable" ] && echo "ok    no file outside /tmp is writable by uid 101" || fail "writable by uid 101: $writable"
+if [ -z "$writable" ]; then echo "ok    no file outside /tmp is writable by uid 101"; else fail "writable by uid 101: $writable"; fi
 
 # The image holds the built page only: no script anywhere in it.
 scripts="$(docker exec "$name" find /usr/share/nginx/html -name '*.js' -o -name '*.map' 2>&1 || echo 'find failed')"
-[ -z "$scripts" ] && echo "ok    no script or source map in the image" || fail "scripts in the image: $scripts"
+if [ -z "$scripts" ]; then echo "ok    no script or source map in the image"; else fail "scripts in the image: $scripts"; fi
 
 echo '--- container log'
 docker logs "$name" 2>&1 | tail -n 20
