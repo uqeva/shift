@@ -285,12 +285,14 @@ export interface CalendarRosterOverride extends RosterOverride {
   readonly authorMemberId: string | null;
 }
 
-/** A member of the organization, active or not: id, name and rank only (0018). */
+/** A member of the organization, active or not: id, name, rank and job role only (0018, 0078). */
 export interface CalendarMember {
   readonly id: string;
   readonly name: string;
   /** Shown, never used; `null` is no rank. */
   readonly fireRank: string | null;
+  /** STORY 21.12: the member's job role, archived too; shown in the day detail, never used. `null` is none. */
+  readonly jobRole: CalendarJobRole | null;
   /** Every version of their team membership, in `effectiveFrom` order. */
   readonly memberships: readonly MembershipVersion[];
   /** Every version of their active status, in `effectiveFrom` order; none is always active. */
@@ -1162,19 +1164,29 @@ function compareMembers(first: CalendarMember, second: CalendarMember): number {
   return compareText(first.name, second.name) || compareText(first.id, second.id);
 }
 
+/** A member's job role as `calendar_members()` answers it (0078): its id and name. */
+export interface CalendarJobRole {
+  readonly id: string;
+  readonly name: string;
+}
+
 /** A member as `calendar_members()` answers it, before their histories are attached. */
 interface CalendarMemberIdentity {
   readonly id: string;
   readonly name: string;
   readonly fireRank: string | null;
+  readonly jobRole: CalendarJobRole | null;
 }
 
 /**
  * The members `calendar_members()` answered, or `null`: a malformed answer,
  * an error, data that is not an array, a row without a text id and a
- * non-blank name or with a rank neither text nor `null`, or one id twice.
- * Only `id`, `name` and `fire_rank` are carried off a row, whatever else
- * might arrive.
+ * non-blank name or with a rank neither text nor `null`, a job role that is
+ * not both an id and a name or both `null` (0078), or one id twice. A row
+ * WITHOUT the two role keys (a database before 0078, under an SPA deployed
+ * first) reads as no role, never as a failed calendar. Only
+ * `id`, `name`, `fire_rank`, `job_role_id` and `job_role` are carried off a
+ * row, whatever else might arrive.
  */
 function identitiesOf(answered: unknown): CalendarMemberIdentity[] | null {
   if (!isRecord(answered) || answered['error'] !== null) return null;
@@ -1196,7 +1208,18 @@ function identitiesOf(answered: unknown): CalendarMemberIdentity[] | null {
     if (id === null || typeof name !== 'string' || name.trim() === '') return null;
     if (fireRank !== null && typeof fireRank !== 'string') return null;
 
-    identities.push({ id, name, fireRank });
+    // Absent keys are no role (see above); a present key must hold a value of its type.
+    const roleId = row['job_role_id'] ?? null;
+    const roleName = row['job_role'] ?? null;
+    let jobRole: CalendarJobRole | null = null;
+
+    if (typeof roleId === 'string' && roleId !== '' && typeof roleName === 'string') {
+      jobRole = { id: roleId, name: roleName };
+    } else if (roleId !== null || roleName !== null) {
+      return null;
+    }
+
+    identities.push({ id, name, fireRank, jobRole });
   }
 
   if (new Set(identities.map((identity) => identity.id)).size !== identities.length) return null;

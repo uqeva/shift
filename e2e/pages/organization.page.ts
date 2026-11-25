@@ -198,6 +198,47 @@ export class OrganizationPage extends BasePage {
     return dialog.getByRole('button', { name: organization.absenceTypes.save, exact: true });
   }
 
+  /** *Poslovi* (story 21.12): the job roles card. */
+  get jobRolesRegion(): Locator {
+    return this.page.getByRole('region', { name: organization.jobRoles.heading, exact: true });
+  }
+
+  /** The card's `Dodaj`, which opens the add dialog. */
+  get jobRoleAdd(): Locator {
+    return this.jobRolesRegion.getByRole('button', { name: organization.jobRoles.addLabel, exact: true });
+  }
+
+  /** The add dialog. */
+  get jobRoleAddDialog(): Locator {
+    return this.dialog(organization.jobRoles.addHeading);
+  }
+
+  /** The name field inside a job role dialog. */
+  jobRoleName(dialog: Locator): Locator {
+    return dialog.getByLabel(organization.jobRoles.name, { exact: true });
+  }
+
+  /** The Spremi of a job role dialog. */
+  jobRoleSave(dialog: Locator): Locator {
+    return dialog.getByRole('button', { name: organization.jobRoles.save, exact: true });
+  }
+
+  /** A live role's `Arhiviraj`, named by its role. */
+  jobRoleArchive(name: string): Locator {
+    return this.jobRolesRegion.getByRole('button', {
+      name: fill(organization.jobRoles.archiveLabel, { name }),
+      exact: true,
+    });
+  }
+
+  /** An archived role's `Vrati`, named by its role. */
+  jobRoleRestore(name: string): Locator {
+    return this.jobRolesRegion.getByRole('button', {
+      name: fill(organization.jobRoles.restoreLabel, { name }),
+      exact: true,
+    });
+  }
+
   /** Every field mounted on the page outside a dialog's portal. */
   get mainFields(): Locator {
     return this.page.locator('main input, main select');

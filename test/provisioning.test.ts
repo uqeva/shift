@@ -701,7 +701,8 @@ describe('every organization table carries row level security, and only its revi
               'leave_request_decisions', 'notification_outbox', 'notification_settings',
               'push_subscriptions', 'swap_requests', 'swap_request_decisions',
               'absence_types', 'leave_allowances', 'audit_events', 'team_loans',
-              'calendar_feed_tokens', 'reminder_settings', 'personal_assignments'
+              'calendar_feed_tokens', 'reminder_settings', 'personal_assignments',
+              'job_roles'
             )
           order by relname`,
       );
@@ -725,6 +726,8 @@ describe('every organization table carries row level security, and only its revi
         'calendar_feed_tokens',
         'conflict_resolutions',
         'hour_bands',
+        // STORY 21.12 (0078): an organization's job roles.
+        'job_roles',
         // STORY 13.3 (0055): the versions of a member's allowance.
         'leave_allowances',
         'leave_records',
@@ -928,7 +931,7 @@ describe('every organization table carries row level security, and only its revi
     }
   });
 
-  it.skipIf(noDatabase)('lets a session update five member columns and never the starting allowance (0056)', async () => {
+  it.skipIf(noDatabase)('lets a session update six member columns and never the starting allowance (0056, 0078)', async () => {
     // STORY 13.3b. `members.leave_allowance_days` is the STARTING allowance;
     // an update would rewrite every leave year with no version of its own.
     // `0056` revokes UPDATE on the table from both session roles and grants
@@ -977,6 +980,8 @@ describe('every organization table carries row level security, and only its revi
       ).toEqual([
         'authenticated:email',
         'authenticated:fire_rank',
+        // STORY 21.12 (0078): the member's job role, by 0056's rule.
+        'authenticated:job_role_id',
         'authenticated:name',
         'authenticated:role',
         'authenticated:username',
@@ -1923,6 +1928,54 @@ describe('every organization table carries row level security, and only its revi
     }
   });
 
+  it.skipIf(noDatabase)('holds no privilege on job_roles but read, a two-column insert and a two-column update, and never delete (story 21.12)', async () => {
+    // As 0052's absence types: `authenticated` reads (narrowed by the policy
+    // to an active member), inserts the tenant and the name, and updates the
+    // name and the archived flag alone. No session deletes a role, names its
+    // id, `created_by` or `created_at`, or holds anything as `anon`.
+    const client = await connect();
+    try {
+      const held = await heldPrivileges(client, 'job_roles', [
+        'organization_id',
+        'id',
+        'name',
+        'archived',
+        'created_by',
+        'created_at',
+      ]);
+      expect(held.tables).toEqual(['authenticated:SELECT']);
+      expect(held.columns, 'the writable job role columns changed, or anon holds one').toEqual([
+        'authenticated:INSERT:name',
+        'authenticated:INSERT:organization_id',
+        'authenticated:UPDATE:archived',
+        'authenticated:UPDATE:name',
+      ]);
+
+      const { rows: keys } = await client.query<{ definition: string }>(
+        `select pg_get_constraintdef(oid) as definition
+           from pg_constraint
+          where contype in ('p', 'f', 'u') and conrelid = 'public.job_roles'::regclass`,
+      );
+      expect(keys.map((row) => row.definition).sort()).toEqual([
+        'FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE',
+        'PRIMARY KEY (id)',
+        'UNIQUE (organization_id, id)',
+      ]);
+
+      const { rows: memberKey } = await client.query<{ definition: string }>(
+        `select pg_get_constraintdef(oid) as definition
+           from pg_constraint
+          where conname = 'members_job_role_fkey' and conrelid = 'public.members'::regclass`,
+      );
+      expect(memberKey.map((row) => row.definition)).toEqual([
+        'FOREIGN KEY (organization_id, job_role_id) REFERENCES job_roles(organization_id, id)',
+      ]);
+
+    } finally {
+      await client.end();
+    }
+  });
+
   it.skipIf(noDatabase)('keys absence types per organization, seeds annual leave in every one, and defaults every leave record to it (story 13.1)', async () => {
     const client = await connect();
     try {
@@ -2423,7 +2476,8 @@ describe('every organization table carries row level security, and only its revi
 
   // STORY 14.1 (0061, AD-3 and AD-11 as amended 2026-11-16): the audited
   // tables and the two `tg_argv` each one's triggers pass the recorder — 21
-  // in 0061, 22 since story 18.2's `team_loans` (0062).
+  // in 0061, 22 since story 18.2's `team_loans` (0062), 23 since story 21.2's
+  // `personal_assignments` (0077), 24 since story 21.12's `job_roles` (0078).
   const AUDITED: Readonly<Record<string, readonly [string, string]>> = {
     organizations: ['id', 'id'],
     members: ['organization_id', 'id'],
@@ -2449,9 +2503,11 @@ describe('every organization table carries row level security, and only its revi
     team_loans: ['organization_id', 'id'],
     // STORY 21.2 (0077), attached in the migration that creates it.
     personal_assignments: ['organization_id', 'id'],
+    // STORY 21.12 (0078), attached in the migration that creates it.
+    job_roles: ['organization_id', 'id'],
   };
 
-  it.skipIf(noDatabase)('keeps the change history append-only, read by authenticated alone, and records each of the 23 audited tables through exactly its two triggers (story 14.1; personal_assignments since 21.2)', async () => {
+  it.skipIf(noDatabase)('keeps the change history append-only, read by authenticated alone, and records each of the 24 audited tables through exactly its two triggers (story 14.1; personal_assignments since 21.2, job_roles since 21.12)', async () => {
     const client = await connect();
     try {
       // APPEND-ONLY BY PRIVILEGE: `authenticated` SELECT, and nothing else for

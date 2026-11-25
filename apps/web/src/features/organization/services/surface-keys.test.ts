@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { ABSENCE_TYPES_LIST_KEY } from '@/features/absence-types/services/list';
 import { HOUR_BANDS_LIST_KEY } from '@/features/hour-bands/services/list';
+import { JOB_ROLES_LIST_KEY } from '@/features/job-roles/services/list';
 import {
   ORGANIZATION_REFUSED,
   ORGANIZATION_SNAPSHOT_KEY,
@@ -23,8 +24,13 @@ const text = (key: readonly unknown[]): string => JSON.stringify(key);
 const organization = { ok: true, snapshot: { timezone: 'Europe/Zagreb' } } as unknown as OrganizationOutcome;
 
 describe("Organizacija's keys", () => {
-  it('are the organization, the hour bands and the absence types (story 13.1b)', () => {
-    expect(ORGANIZATION_SURFACE_KEYS).toEqual([ORGANIZATION_SNAPSHOT_KEY, HOUR_BANDS_LIST_KEY, ABSENCE_TYPES_LIST_KEY]);
+  it('are the organization, the hour bands, the absence types (story 13.1b) and the job roles (story 21.12)', () => {
+    expect(ORGANIZATION_SURFACE_KEYS).toEqual([
+      ORGANIZATION_SNAPSHOT_KEY,
+      HOUR_BANDS_LIST_KEY,
+      ABSENCE_TYPES_LIST_KEY,
+      JOB_ROLES_LIST_KEY,
+    ]);
   });
 
   it('are all kept on the device', () => {

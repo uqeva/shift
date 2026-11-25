@@ -416,6 +416,7 @@
       "loan": "Posudba",
       "calendarFeed": "Kalendar na mobitelu",
       "personalAssignment": "Ručni raspored",
+      "jobRole": "Posao",
       "other": "Zapis"
     },
     "action": {
@@ -460,6 +461,7 @@
       "email": "E-pošta",
       "role": "Razina",
       "fireRank": "Zvanje",
+      "jobRole": "Posao",
       "leaveAllowanceDays": "Početno pravo (dani)",
       "member": "Osoba",
       "memberOut": "Izlazi",
@@ -527,6 +529,7 @@
       "unknownTeam": "Nepoznat tim",
       "unknownShiftType": "Nepoznat tip smjene",
       "unknownAbsenceType": "Nepoznata vrsta odsutnosti",
+      "unknownJobRole": "Nepoznat posao",
       "rotationStep": "Korak {position}: {name}",
       "rotationPattern": "{count, plural, one {# korak} few {# koraka} other {# koraka}}: {steps}",
       "rosterOverride": "{date}: ulazi {memberIn}, izlazi {memberOut}",
@@ -1162,7 +1165,13 @@
       "statusPicker": "Odaberi status",
       "levelHeading": "Razina",
       "allLevels": "Sve razine",
-      "pending": "…"
+      "pending": "…",
+      "role": "Posao: {value}",
+      "roleAll": "Posao: svi",
+      "removeRole": "Ukloni filtar posao: {value}",
+      "rolePicker": "Odaberi posao",
+      "roleHeading": "Posao",
+      "allRoles": "Svi poslovi"
     },
     "statusFilter": {
       "active": "Aktivni",
@@ -1275,6 +1284,10 @@
       "officer1": "vatrogasni časnik I. klase",
       "seniorOfficer": "viši vatrogasni časnik",
       "seniorOfficer1": "viši vatrogasni časnik I. klase"
+    },
+    "jobRole": {
+      "label": "Posao",
+      "none": "Bez posla"
     },
     "status": {
       "heading": "Status",
@@ -1619,6 +1632,40 @@
         "drawsRequired": "Odaberi troši li ova vrsta dane godišnjeg.",
         "annualDraws": "Godišnji odmor uvijek troši dane godišnjeg.",
         "stale": "Vrsta odsutnosti se u međuvremenu promijenila. Provjeri popis i pokušaj ponovno.",
+        "refused": "Promjena nije spremljena. Odjavi se i prijavi ponovno.",
+        "saveUnavailable": "Spremanje trenutačno nije moguće. Pokušaj ponovno."
+      }
+    },
+    "jobRoles": {
+      "heading": "Poslovi",
+      "add": "Dodaj",
+      "addLabel": "Dodaj posao",
+      "edit": "Uredi",
+      "editLabel": "Uredi posao {name}",
+      "archive": "Arhiviraj",
+      "archiveLabel": "Arhiviraj posao {name}",
+      "restore": "Vrati",
+      "restoreLabel": "Vrati posao {name}",
+      "archived": "arhiviran",
+      "none": "Još nema poslova. Posao se dodjeljuje osobi na njezinoj stranici.",
+      "addHeading": "Novi posao",
+      "editHeading": "Uređivanje posla",
+      "name": "Naziv",
+      "close": "Zatvori",
+      "cancel": "Odustani",
+      "save": "Spremi",
+      "added": "Posao je dodan.",
+      "saved": "Promjene su spremljene.",
+      "archivedDone": "Posao je arhiviran.",
+      "restoredDone": "Posao je vraćen.",
+      "rowError": "Posao {name}: {message}",
+      "error": {
+        "unavailable": "Poslove trenutačno nije moguće učitati. Pokušaj ponovno.",
+        "nameEmpty": "Naziv posla ne može biti prazan.",
+        "nameTooLong": "Naziv posla može imati najviše 100 znakova.",
+        "nameControl": "Naziv posla ne može sadržavati prijelom retka ni druge kontrolne znakove.",
+        "nameTaken": "Posao s tim nazivom već postoji u organizaciji.",
+        "stale": "Posao se u međuvremenu promijenio. Provjeri popis i pokušaj ponovno.",
         "refused": "Promjena nije spremljena. Odjavi se i prijavi ponovno.",
         "saveUnavailable": "Spremanje trenutačno nije moguće. Pokušaj ponovno."
       }

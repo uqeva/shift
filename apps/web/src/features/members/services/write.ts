@@ -259,7 +259,7 @@ export async function replyCodeOf(answer: FunctionsAnswer): Promise<string | nul
 // ------------------------------------------------------------------ the writes
 
 /** The columns a plain edit writes, and the ones read back to prove it landed. */
-export const MEMBER_EDIT_COLUMNS = 'id,name,email,role,leave_allowance_days,username,fire_rank';
+export const MEMBER_EDIT_COLUMNS = 'id,name,email,role,leave_allowance_days,username,fire_rank,job_role_id';
 const ID_COLUMN = 'id';
 
 /**
@@ -341,6 +341,22 @@ export interface MemberFields {
    * the setting off hides ranks and never deletes them.
    */
   readonly fireRank?: string | null;
+  /**
+   * The job role's id (`0078`, story 21.12), `null` for *Bez posla*, or
+   * ABSENT for "untouched": the basics dialog offers no *Posao* control
+   * until the roles read has answered, and an absent field leaves the stored
+   * role alone. Never part of a create: `admin-auth` writes no role.
+   */
+  readonly jobRoleId?: string | null;
+}
+
+/**
+ * Whether a member save CHANGES the job role (story 21.12): the edit carries
+ * one and it is not the role the member holds. Such a save re-reads the
+ * calendar snapshot too, whose day detail names the role.
+ */
+export function jobRoleChangedBy(edits: MemberEdits, heldId: string | null): boolean {
+  return edits.jobRoleId !== undefined && edits.jobRoleId !== heldId;
 }
 
 /**
@@ -607,6 +623,7 @@ export function memberPatchOf(edits: MemberEdits): Record<string, unknown> {
     ...(edits.email === undefined ? {} : { email: edits.email }),
     ...(edits.role === undefined ? {} : { role: edits.role }),
     ...(edits.fireRank === undefined ? {} : { fire_rank: edits.fireRank }),
+    ...(edits.jobRoleId === undefined ? {} : { job_role_id: edits.jobRoleId }),
   };
 }
 

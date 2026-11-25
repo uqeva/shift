@@ -9,8 +9,10 @@ import { t } from '@/lib/i18n';
 import type { MemberList } from '@/features/members/hooks/use-member-list';
 import {
   ALL_LEVELS,
+  ALL_ROLES,
   ALL_TEAMS,
   CHIP_LEVEL,
+  CHIP_ROLE,
   CHIP_STATUS,
   CHIP_TEAM,
   LEVEL_FILTERS,
@@ -22,17 +24,21 @@ import {
   memberChipActive,
   memberLevelMessageKey,
   membersSummaryMessageKey,
+  roleChipShown,
+  roleFilterMessageKey,
   statusFilterMessageKey,
   statusValueMessageKey,
   teamFilterMessageKey,
   type MembersSummary,
+  type RoleFilterOption,
   type TeamFilterOption,
 } from '@/features/members/services/list';
 import { NO_TEXT } from '@/utils/text';
 
 /**
  * *Ljudi*'s compact toolbar (stories 7.13, 21.23): the `<h1>`, the search,
- * `Filtri` with the three chips — Razina, Smjena and Status — the summary as
+ * `Filtri` with the chips — Razina, Tim, Posao (story 21.12, only while
+ * somebody holds a role or one is chosen) and Status — the summary as
  * the result count, and the screen's `actions` at the right, drawn by the
  * shared option-chip bar (`@/components/option-filter-bar`).
  *
@@ -56,10 +62,26 @@ export function MemberFilters({
   // THE TEAM THE ROWS WERE NARROWED BY, once there are rows; before that the
   // URL's, so the chip says what was asked for while the list loads.
   const team = unanswered ? filters.team : narrowed.team;
+  const role = unanswered ? filters.jobRoleFilter : narrowed.appliedRole;
+  const roleChip: OptionChipView = {
+    key: CHIP_ROLE,
+    active: memberChipActive(filters, team, CHIP_ROLE, role),
+    text: role === ALL_ROLES ? t('ljudi.chip.roleAll') : t('ljudi.chip.role', { value: roleName(role, narrowed.roles) }),
+    removeLabel: t('ljudi.chip.removeRole', { value: roleName(role, narrowed.roles) }),
+    pickerLabel: t('ljudi.chip.rolePicker'),
+    heading: t('ljudi.chip.roleHeading'),
+    options: narrowed.roles.map((option) => ({
+      id: option.value,
+      label: roleName(option.value, narrowed.roles),
+      count: t('filter.personCount', { count: option.count }),
+    })),
+    chosen: role,
+    allId: ALL_ROLES,
+  };
   const chips: OptionChipView[] = [
     {
       key: CHIP_LEVEL,
-      active: memberChipActive(filters, team, CHIP_LEVEL),
+      active: memberChipActive(filters, team, CHIP_LEVEL, role),
       text:
         filters.level === ALL_LEVELS
           ? t('ljudi.chip.levelAll')
@@ -79,7 +101,7 @@ export function MemberFilters({
     },
     {
       key: CHIP_TEAM,
-      active: memberChipActive(filters, team, CHIP_TEAM),
+      active: memberChipActive(filters, team, CHIP_TEAM, role),
       text: team === ALL_TEAMS ? t('filter.chip.teamAll') : t('filter.chip.team', { value: teamName(team, narrowed.teams) }),
       removeLabel: t('filter.remove.team', { value: teamName(team, narrowed.teams) }),
       pickerLabel: t('filter.teamPicker'),
@@ -92,9 +114,11 @@ export function MemberFilters({
       chosen: team,
       allId: ALL_TEAMS,
     },
+    // STORY 21.12: drawn only while its options name a role, or one is chosen.
+    ...(roleChipShown(narrowed.roles, role) ? [roleChip] : []),
     {
       key: CHIP_STATUS,
-      active: memberChipActive(filters, team, CHIP_STATUS),
+      active: memberChipActive(filters, team, CHIP_STATUS, role),
       text: t('ljudi.chip.status', { value: t(statusValueMessageKey(filters.status)) }),
       removeLabel: t('ljudi.chip.removeStatus', { value: t(statusValueMessageKey(filters.status)) }),
       pickerLabel: t('ljudi.chip.statusPicker'),
@@ -163,6 +187,18 @@ function teamName(value: string, teams: readonly TeamFilterOption[]): string {
   if (key !== null) return t(key);
 
   return teams.find((option) => option.value === value)?.team ?? t('ljudi.chip.pending');
+}
+
+/**
+ * A role option's name: the role's own (data), `Svi poslovi`, `Bez posla`,
+ * or — a role the answer has not named yet — a pending mark.
+ */
+function roleName(value: string, roles: readonly RoleFilterOption[]): string {
+  const key = roleFilterMessageKey(value);
+
+  if (key !== null) return t(key);
+
+  return roles.find((option) => option.value === value)?.roleName ?? t('ljudi.chip.pending');
 }
 
 /** The summary line, or nothing before there is an answer to state. */

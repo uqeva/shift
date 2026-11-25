@@ -100,9 +100,11 @@ describe('the kind of an event', () => {
     ['calendar_feed_tokens', 'calendar-feed'],
     // Story 21.4: a Personal Assignment (0077), named rather than `other`.
     ['personal_assignments', 'personal-assignment'],
+    // Story 21.12: a job role (0078).
+    ['job_roles', 'job-role'],
   ];
 
-  it('names one record per audited table, all 24, and nothing else', () => {
+  it('names one record per audited table, all 25, and nothing else', () => {
     expect(TABLES.map(([table]) => historyRecordOf(table))).toEqual(TABLES.map(([, record]) => record));
     expect(new Set([...TABLES.map(([, record]) => record), 'other'])).toEqual(new Set(HISTORY_RECORDS));
     expect(historyRecordOf('audit_events')).toBeNull();
@@ -240,6 +242,7 @@ describe('the field-level bilo → sada', () => {
     expect(historyOperandOf('position', 'leader')).toEqual({ type: 'text', value: 'leader' });
     expect(historyOperandOf('position', 3)).toEqual({ type: 'number', value: 3 });
     expect(historyOperandOf('absence_type_id', 'a1')).toEqual({ type: 'absence-type', id: 'a1' });
+    expect(historyOperandOf('job_role_id', 'r1')).toEqual({ type: 'job-role', id: 'r1' });
     expect(historyOperandOf('shift_type_id', 's1')).toEqual({ type: 'shift-type', id: 's1' });
     expect(historyOperandOf('return_team_id', TEAM_B)).toEqual({ type: 'team', id: TEAM_B });
     expect(historyOperandOf('days', '20')).toEqual({ type: 'raw', json: '"20"' });
@@ -1142,7 +1145,7 @@ describe('every real change names a field (retro A4)', () => {
     );
   });
 
-  /** Every column of the 24 audited tables as 0002–0077 leave them (0067's recorder drops `token_hash` and `last_fetched_at`), with a value of its type. */
+  /** Every column of the 25 audited tables as 0002–0078 leave them (0067's recorder drops `token_hash` and `last_fetched_at`), with a value of its type. */
   const AT = '2026-11-10T08:00:00+00:00';
   const BOOKKEEPING = { organization_id: ORG, created_by: ANA_AUTH, created_at: AT };
   const LIVE = { removed_by: null, removed_at: null };
@@ -1185,6 +1188,7 @@ describe('every real change names a field (retro A4)', () => {
       created_at: AT,
       username: 'ana',
       fire_rank: 'vatrogasac',
+      job_role_id: 'jr',
     },
     member_status_versions: { ...BOOKKEEPING, id: 'v', member_id: ANA, active: true, effective_from: '2026-11-01' },
     team_membership_versions: {
@@ -1326,6 +1330,8 @@ describe('every real change names a field (retro A4)', () => {
       team_id: TEAM_A,
       note: 'napomena',
     },
+    // Story 21.12 (0078): a job role, archived and restored in place.
+    job_roles: { ...BOOKKEEPING, id: 'jr', name: 'Dispečer', archived: false },
   };
 
   /** A different value of the same type. */
@@ -1342,7 +1348,7 @@ describe('every real change names a field (retro A4)', () => {
 
   const LIFECYCLE_AT = new Set(['removed_at', 'confirmed_at', 'closed_at', 'answered_at']);
 
-  it('covers the 24 audited tables', () => {
+  it('covers the 25 audited tables', () => {
     expect(Object.keys(AUDITED).map((table) => historyRecordOf(table))).not.toContain(null);
     expect(new Set(Object.keys(AUDITED).map((table) => historyRecordOf(table)))).toEqual(
       new Set(HISTORY_RECORDS.filter((record) => record !== 'other')),

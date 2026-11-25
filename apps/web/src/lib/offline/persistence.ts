@@ -84,12 +84,16 @@ export const DEVICE_SNAPSHOT_KEY = 'shift-query-cache';
  * `personalAssignments`. A shape-3 member has none, and every roster derived
  * from it would ignore an assignment the database holds.
  *
+ * 5 SINCE STORY 21.12: the calendar entry's members gained `jobRole`, and the
+ * `members` entry's rows gained `jobRole`. A shape-4 row has neither, and the
+ * day detail and *Ljudi* would read a role as `undefined`.
+ *
  * TWO BUNDLES AT ONCE. While an old and a new bundle both run (a waiting
  * service worker under `registerType: 'prompt'`, or an old tab left open),
  * each deletes the other's blob on restore. That costs offline reading until
  * the next save, never correctness: neither hydrates the other's shape.
  */
-export const DEVICE_SNAPSHOT_SHAPE = 4;
+export const DEVICE_SNAPSHOT_SHAPE = 5;
 
 /**
  * The `buster` a snapshot of `userId`'s cache is saved and restored under:
@@ -154,7 +158,9 @@ export const DEVICE_SNAPSHOT_THROTTLE_MS = 1000;
  *     swap of the organization, which *Za odluku*, its resolution page, a
  *     swap's decision screen and the admin's *Danas* read (story 12.4);
  *   - `absenceTypes` — `ABSENCE_TYPES_LIST_KEY`, *Organizacija*'s *Vrste
- *     odsutnosti* card, admin-only (story 13.1b).
+ *     odsutnosti* card, admin-only (story 13.1b);
+ *   - `jobRoles` — `JOB_ROLES_LIST_KEY`, *Organizacija*'s *Poslovi* card and
+ *     the member page's *Posao* picker (story 21.12).
  */
 export const PERSISTED_KEY_ROOTS: readonly string[] = [
   'calendar',
@@ -179,6 +185,7 @@ export const PERSISTED_KEY_ROOTS: readonly string[] = [
   'my-swap-requests',
   'organization-swap-requests',
   'absenceTypes',
+  'jobRoles',
 ];
 
 /**

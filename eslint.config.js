@@ -276,6 +276,13 @@ export const FEATURE_PUBLIC = {
     'services/hours-search', // pages, today
     'services/my-hours', // calendar, pages, today
   ],
+  // Story 21.12: *Organizacija*'s *Poslovi* card reads and writes the roles
+  // through their own modules; the member page's *Posao* picker and the
+  // history's names read the list.
+  'job-roles': [
+    'services/list', // history, members, organization
+    'services/write', // organization
+  ],
   // Story 5.1c: the member page composes `components/member-leave-card`,
   // which every page may import. Story 5.2c: the teams feature's dependents
   // name the viewer's own leave key, so a leave write re-reads *Godišnji*.

@@ -942,7 +942,7 @@ describe('the access-control layer is present, so nothing below passes vacuously
       );
       expect(
         policies.map((row) => row.policyname),
-        'stories 1.3a, 1.4a, 1.6, 1.7a, 1.7b, 2.1a, 2.2a, 2.3a, 3.5a, 3.6a, 5.1b, 5.4a, 9.2, 10.3, 10.4, 12.1, 13.1, 13.2, 13.3, 14.1, 17.1, 18.2 and 0025 own exactly these policies; a missing one refuses silently and looks like a working refusal',
+        'stories 1.3a, 1.4a, 1.6, 1.7a, 1.7b, 2.1a, 2.2a, 2.3a, 3.5a, 3.6a, 5.1b, 5.4a, 9.2, 10.3, 10.4, 12.1, 13.1, 13.2, 13.3, 14.1, 17.1, 18.2, 21.12 and 0025 own exactly these policies; a missing one refuses silently and looks like a working refusal',
       ).toEqual([
         // STORY 13.1 (0052): an active admin defines and renames a type or
         // sets its drawing flag. No delete. STORY 13.2 (0053, PO Q2): every
@@ -966,6 +966,11 @@ describe('the access-control layer is present, so nothing below passes vacuously
         'hour_bands_insert_by_own_active_admin',
         'hour_bands_select_own_organization',
         'hour_bands_update_by_own_active_admin',
+        // STORY 21.12 (0078): every active member reads the job roles; an
+        // active admin inserts, renames, archives and restores. No delete.
+        'job_roles_insert_by_own_active_admin',
+        'job_roles_select_own_organization',
+        'job_roles_update_by_own_active_admin',
         // STORY 13.3 (0055): an active admin appends a version of a member's
         // allowance; the read is the admin's for the organization and a
         // member's for their own rows. No update and no delete (AD-2).
@@ -10073,6 +10078,9 @@ interface CalendarMemberRow {
   readonly id: string;
   readonly name: string;
   readonly fire_rank: string | null;
+  /** STORY 21.12 (0078): the member's job role, its id and name, or both null. */
+  readonly job_role_id: string | null;
+  readonly job_role: string | null;
 }
 
 /** `calendar_members()`, as whoever the connection currently is: every column it returns. */
@@ -10109,6 +10117,16 @@ describe('the calendar names every colleague, active or not, as id, name and ran
         const deactivated = await addThrowawayMember(client, organization);
         await client.query(`update members set fire_rank = 'nco' where id = $1`, [colleague.id]);
         await client.query(`update members set fire_rank = 'senior_officer' where id = $1`, [deactivated.id]);
+        // STORY 21.12 (0078): an ARCHIVED role held by the colleague, built as
+        // the owner before any `actAs` (an owner insert names `created_by`).
+        const { rows: roleRows } = await client.query<{ id: string }>(
+          `insert into job_roles (organization_id, name, archived, created_by)
+           values ($1, $2, true, $3) returning id`,
+          [organization, `${THROWAWAY} Vod`, owner.authUserId],
+        );
+        const role = roleRows[0]?.id;
+        if (role === undefined) throw new Error('the job role insert returned no id');
+        await client.query('update members set job_role_id = $1 where id = $2', [role, colleague.id]);
         await ownerVersion(client, {
           organization,
           member: deactivated.id,
@@ -10133,9 +10151,11 @@ describe('the calendar names every colleague, active or not, as id, name and ran
 
           expect(memberIdsOf(rows), `${slug}: the members are not every member`).toEqual(expected);
           for (const row of rows) {
-            expect(Object.keys(row).sort(), `${slug}: a field besides id, name and fire_rank`).toEqual([
+            expect(Object.keys(row).sort(), `${slug}: a field besides id, name, fire_rank and the job role`).toEqual([
               'fire_rank',
               'id',
+              'job_role',
+              'job_role_id',
               'name',
             ]);
             expect(typeof row['name']).toBe('string');
@@ -10146,6 +10166,9 @@ describe('the calendar names every colleague, active or not, as id, name and ran
             id: colleague.id,
             name: `${THROWAWAY} target`,
             fire_rank: 'nco',
+            // An archived role is still named (0078's left join reads it).
+            job_role_id: role,
+            job_role: `${THROWAWAY} Vod`,
           });
           // The newly disclosed history (FR-12): a colleague inactive today,
           // named and ranked.
@@ -10153,6 +10176,8 @@ describe('the calendar names every colleague, active or not, as id, name and ran
             id: deactivated.id,
             name: `${THROWAWAY} target`,
             fire_rank: 'senior_officer',
+            job_role_id: null,
+            job_role: null,
           });
         }
       });
@@ -10270,9 +10295,11 @@ describe('the calendar names every colleague, active or not, as id, name and ran
           }
           for (const row of rows) {
             // No email, username, role, allowance or position.
-            expect(Object.keys(row).sort(), `${slug}/${reader}: a field besides id, name and fire_rank`).toEqual([
+            expect(Object.keys(row).sort(), `${slug}/${reader}: a field besides id, name, fire_rank and the job role`).toEqual([
               'fire_rank',
               'id',
+              'job_role',
+              'job_role_id',
               'name',
             ]);
           }
@@ -25661,6 +25688,191 @@ describe('an accepted swap is told to every admin, and its decision to both memb
   );
 });
 
+// ------------------------------------------------- story 21.12: job roles
+
+/**
+ * STORY 21.12 (`0078`). An organization's job roles are a name and an archived
+ * flag. Every active member reads them, archived ones included; an active
+ * admin adds, renames, archives and restores one; nobody deletes one, and
+ * nothing is seeded. A member's role is `members.job_role_id`, to a role of
+ * their own organization. Every case runs in a rolled-back transaction; every
+ * scene that writes past a policy is built as the owner before `actAs`.
+ */
+describe('job roles are organization data (story 21.12)', () => {
+  it.skipIf(noDatabase).each(FIXTURES)(
+    'lets the $fixture admin add, rename, archive and restore a role, and refuses a taken, blank, long or broken name',
+    async ({ slug, admin }) => {
+      await inRolledBackTransaction(async (client) => {
+        const caller = await memberByUsername(client, slug, admin);
+        await actAs(client, caller.authUserId, caller.organizationId);
+
+        const { rows } = await client.query<{ id: string; createdBy: string }>(
+          `insert into job_roles (organization_id, name) values ($1, $2) returning id, created_by::text as "createdBy"`,
+          [caller.organizationId, `${THROWAWAY} Dispečer`],
+        );
+        const role = rows[0]?.id;
+        if (role === undefined) throw new Error('the job role insert returned no id');
+        expect(rows[0]?.createdBy, `${slug}: the role is not attributed to its author`).toBe(caller.authUserId);
+
+        const duplicate = await refusedThenContinue(client, () =>
+          client.query('insert into job_roles (organization_id, name) values ($1, $2)', [
+            caller.organizationId,
+            ` ${THROWAWAY} dispečer `,
+          ]),
+        );
+        const blank = await refusedThenContinue(client, () =>
+          client.query('insert into job_roles (organization_id, name) values ($1, $2)', [caller.organizationId, '   ']),
+        );
+        const long = await refusedThenContinue(client, () =>
+          client.query('insert into job_roles (organization_id, name) values ($1, $2)', [
+            caller.organizationId,
+            'đ'.repeat(101),
+          ]),
+        );
+        const broken = await refusedThenContinue(client, () =>
+          client.query('insert into job_roles (organization_id, name) values ($1, $2)', [
+            caller.organizationId,
+            `${THROWAWAY}\nVod`,
+          ]),
+        );
+        expect(duplicate.code).toBe('23505');
+        expect(duplicate.message).toContain('job_roles_organization_name_key');
+        expect(blank.code).toBe('23514');
+        expect(blank.message).toContain('job_roles_name_not_blank');
+        expect(long.code).toBe('23514');
+        expect(long.message).toContain('job_roles_name_length');
+        expect(broken.code).toBe('23514');
+        expect(broken.message).toContain('job_roles_name_characters');
+
+        const renamed = await client.query('update job_roles set name = $1 where id = $2', [`${THROWAWAY} Vod`, role]);
+        const archived = await client.query('update job_roles set archived = true where id = $1', [role]);
+        expect(renamed.rowCount, `${slug}: a role cannot be renamed`).toBe(1);
+        expect(archived.rowCount, `${slug}: a role cannot be archived`).toBe(1);
+
+        // An archived role frees its name; restoring it over the live one is the name taken.
+        const { rows: twin } = await client.query<{ id: string }>(
+          'insert into job_roles (organization_id, name) values ($1, $2) returning id',
+          [caller.organizationId, `${THROWAWAY} Vod`],
+        );
+        expect(twin[0]?.id, `${slug}: an archived role still holds its name`).toBeDefined();
+        const restoredOver = await refusedThenContinue(client, () =>
+          client.query('update job_roles set archived = false where id = $1', [role]),
+        );
+        expect(restoredOver.code).toBe('23505');
+        expect(restoredOver.message).toContain('job_roles_organization_name_key');
+
+        await client.query('update job_roles set archived = true where id = $1', [twin[0]?.id]);
+        const restored = await client.query('update job_roles set archived = false where id = $1', [role]);
+        expect(restored.rowCount, `${slug}: an archived role cannot be restored`).toBe(1);
+
+        const deleted = await refusedThenContinue(client, () => client.query('delete from job_roles where id = $1', [role]));
+        expect(deleted.code, 'a role may be deleted').toBe('42501');
+      });
+    },
+  );
+
+  it.skipIf(noDatabase).each(FIXTURES)(
+    'lets the $fixture admin give a member a role and take it away, and the member read it',
+    async ({ slug, admin, member }) => {
+      await inRolledBackTransaction(async (client) => {
+        const caller = await memberByUsername(client, slug, admin);
+        const memberRole = await memberByUsername(client, slug, member);
+        // An archived role, built as the owner before any `actAs`.
+        const { rows: archivedRows } = await client.query<{ id: string }>(
+          `insert into job_roles (organization_id, name, archived, created_by)
+           values ($1, $2, true, $3) returning id`,
+          [caller.organizationId, `${THROWAWAY} Sezonac`, caller.authUserId],
+        );
+        const archived = archivedRows[0]?.id;
+        if (archived === undefined) throw new Error('the archived role insert returned no id');
+
+        await actAs(client, caller.authUserId, caller.organizationId);
+        const { rows } = await client.query<{ id: string }>(
+          'insert into job_roles (organization_id, name) values ($1, $2) returning id',
+          [caller.organizationId, `${THROWAWAY} Vod`],
+        );
+        const role = rows[0]?.id;
+        if (role === undefined) throw new Error('the job role insert returned no id');
+        const given = await client.query('update members set job_role_id = $1 where id = $2', [role, memberRole.id]);
+        expect(given.rowCount, `${slug}: an admin cannot set a member's role`).toBe(1);
+
+        await actAs(client, memberRole.authUserId, memberRole.organizationId);
+        const { rows: read } = await client.query<{ id: string; archived: boolean }>(
+          'select id, archived from job_roles where id = any($1::uuid[]) order by archived',
+          [[role, archived]],
+        );
+        expect(read, `${slug}: a member does not read the roles, archived ones included`).toEqual([
+          { id: role, archived: false },
+          { id: archived, archived: true },
+        ]);
+        const memberInsert = await refusedThenContinue(client, () =>
+          client.query('insert into job_roles (organization_id, name) values ($1, $2)', [
+            memberRole.organizationId,
+            `${THROWAWAY} member`,
+          ]),
+        );
+        const memberUpdate = await client.query('update job_roles set name = $1 where id = $2', [`${THROWAWAY} x`, role]);
+        const memberDelete = await refusedThenContinue(client, () => client.query('delete from job_roles where id = $1', [role]));
+        const selfRole = await client.query('update members set job_role_id = null where id = $1', [memberRole.id]);
+        expect(memberInsert.code).toBe('42501');
+        expect(memberUpdate.rowCount, `${slug}: a member-role account renamed a role`).toBe(0);
+        expect(memberDelete.code).toBe('42501');
+        expect(selfRole.rowCount, `${slug}: a member-role account changed a role`).toBe(0);
+
+        await actAs(client, caller.authUserId, caller.organizationId);
+        const cleared = await client.query('update members set job_role_id = null where id = $1', [memberRole.id]);
+        expect(cleared.rowCount, `${slug}: an admin cannot clear a member's role`).toBe(1);
+        await actAsOwner(client);
+      });
+    },
+  );
+
+  it.skipIf(noDatabase).each(CROSS_TENANT)(
+    'refuses the $fixture admin $otherFixture\'s roles: unread, unwritable, and never a member\'s role',
+    async ({ slug, admin, otherSlug }) => {
+      await inRolledBackTransaction(async (client) => {
+        const other = await organizationId(client, otherSlug);
+        const caller = await memberByUsername(client, slug, admin);
+        // The other tenant's role, built as the owner before any `actAs`.
+        const { rows: foreignRows } = await client.query<{ id: string }>(
+          `insert into job_roles (organization_id, name, created_by)
+           values ($1, $2, $3) returning id`,
+          [other, `${THROWAWAY} foreign`, caller.authUserId],
+        );
+        const foreignRole = foreignRows[0]?.id;
+        if (foreignRole === undefined) throw new Error('the foreign role insert returned no id');
+
+        await actAs(client, caller.authUserId, caller.organizationId);
+        const { rows: seen } = await client.query<{ organizationId: string }>(
+          'select organization_id::text as "organizationId" from job_roles',
+        );
+        expect(seen.map((row) => row.organizationId), `${slug}: ${otherSlug}'s roles leaked`).not.toContain(other);
+        const insert = await refusedThenContinue(client, () =>
+          client.query('insert into job_roles (organization_id, name) values ($1, $2)', [other, `${THROWAWAY} x`]),
+        );
+        const update = await client.query('update job_roles set name = $1 where id = $2', [`${THROWAWAY} y`, foreignRole]);
+        const given = await refusedThenContinue(client, () =>
+          client.query('update members set job_role_id = $1 where id = $2', [foreignRole, caller.id]),
+        );
+        expect(insert.code).toBe('42501');
+        expect(update.rowCount, `${slug}: an admin renamed ${otherSlug}'s role`).toBe(0);
+        expect(given.code, `${slug}: a member was given ${otherSlug}'s role`).toBe('23503');
+        expect(given.message).toContain('members_job_role_fkey');
+        await actAsOwner(client);
+      });
+    },
+  );
+
+  it.skipIf(noDatabase)('gives anon nothing on job_roles', async () => {
+    await inRolledBackTransaction(async (client) => {
+      await client.query('set local role anon');
+      const read = await refusedThenContinue(client, () => client.query('select id from job_roles'));
+      expect(read.code).toBe('42501');
+      await client.query('reset role');
+    });
+  });
+});
+
 // ------------------------------------------------- story 13.1: absence types
 
 /**
@@ -27583,13 +27795,13 @@ describe('a loan is amended, ended early or removed (story 18.4, 0064)', () => {
  * backfill block is run again here, DML only, in a rolled-back transaction.
  */
 
-/** The 23 audited tables (AD-11; `team_loans` since story 18.2, `personal_assignments` since 21.2). */
+/** The 24 audited tables (AD-11; `team_loans` since story 18.2, `personal_assignments` since 21.2, `job_roles` since 21.12). */
 const AUDITED_TABLES = [
   'organizations', 'members', 'member_status_versions', 'team_membership_versions', 'teams', 'hour_bands',
   'shift_types', 'shift_type_versions', 'rotation_patterns', 'rotation_steps', 'rotation_assignments',
   'shift_type_overrides', 'roster_overrides', 'leave_records', 'conflict_resolutions', 'leave_requests',
   'leave_request_decisions', 'swap_requests', 'swap_request_decisions', 'absence_types', 'leave_allowances',
-  'team_loans', 'personal_assignments',
+  'team_loans', 'personal_assignments', 'job_roles',
 ] as const;
 
 interface AuditEvent {

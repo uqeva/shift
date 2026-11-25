@@ -4,7 +4,7 @@ import { OfflineWriteNote } from '@/components/offline-write-note';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { At, Envelope, Medal, ShieldCheck, User } from '@/components/ui/icon';
+import { At, Briefcase, Envelope, Medal, ShieldCheck, User } from '@/components/ui/icon';
 import { Input } from '@/components/ui/input';
 import { InputGroup, InputGroupIcon } from '@/components/ui/input-group';
 import { Label } from '@/components/ui/label';
@@ -13,6 +13,7 @@ import { Select } from '@/components/ui/select';
 import { t } from '@/lib/i18n';
 import { useWriteGate } from '@/lib/offline/use-write-gate';
 import { keepFocusOnAlert } from '@/utils/retry-focus';
+import { NO_JOB_ROLE, jobRoleInitialValue, type JobRoleRow } from '@/features/job-roles/services/list';
 import type { MemberEdit } from '@/features/members/hooks/use-member-edit';
 import { memberLevelMessageKey, type MemberListRow } from '@/features/members/services/list';
 import {
@@ -52,7 +53,7 @@ function Fact({ label, children }: { readonly label: string; readonly children: 
  * landed save leaves once its dialog has closed.
  */
 export function MemberBasicsCard({ edit }: { readonly edit: MemberEdit }): ReactNode {
-  const { form, offersRank, readRefusal, refusal, confirmed, pending, basicsDialog, allowanceDialog } = edit;
+  const { form, offersRank, offersJobRole, readRefusal, refusal, confirmed, pending, basicsDialog, allowanceDialog } = edit;
   /**
    * A PARTIAL SAVE once its dialog has closed: the other fields landed and the
    * rename did not, and the card keeps saying both.
@@ -69,6 +70,11 @@ export function MemberBasicsCard({ edit }: { readonly edit: MemberEdit }): React
         <Fact label={t('ljudi.email')}>{member.email ?? t('ljudi.basics.noEmail')}</Fact>
         <Fact label={t('ljudi.role')}>{t(memberLevelMessageKey(member.role))}</Fact>
         {offersRank ? <Fact label={t('ljudi.rank.label')}>{t(rankMessageKey(member.fireRank))}</Fact> : null}
+        {/* STORY 21.12: the job role, only while one is held or a live one
+            exists, so an organization with no role sees the card as before. */}
+        {offersJobRole ? (
+          <Fact label={t('ljudi.jobRole.label')}>{member.jobRole?.name ?? t('ljudi.jobRole.none')}</Fact>
+        ) : null}
       </dl>
     );
   }
@@ -163,6 +169,8 @@ export function MemberBasicsDialog({ edit }: { readonly edit: MemberEdit }): Rea
     emailField,
     roleField,
     rankField,
+    jobRoleField,
+    jobRoleOptions,
     pending,
     form,
     refusal,
@@ -201,6 +209,43 @@ export function MemberBasicsDialog({ edit }: { readonly edit: MemberEdit }): Rea
             {rankOptionsFor(member.fireRank).map((option) => (
               <option key={rankValue(option)} value={rankValue(option)}>
                 {t(rankMessageKey(option))}
+              </option>
+            ))}
+          </Select>
+        </InputGroup>
+      </div>
+    );
+  }
+
+  /**
+   * The *Posao* picker (story 21.12): *Bez posla*, every live role, and the
+   * member's own role while it is archived. Drawn only once the roles read
+   * answered (`jobRoleOptions`), so a save never writes over a role it could
+   * not show.
+   */
+  function renderJobRole(member: MemberListRow, options: readonly JobRoleRow[]): ReactNode {
+    return (
+      <div className="grid gap-2">
+        <Label htmlFor="member-job-role">{t('ljudi.jobRole.label')}</Label>
+        <InputGroup>
+          <InputGroupIcon>
+            <Briefcase />
+          </InputGroupIcon>
+          <Select
+            ref={jobRoleField}
+            id="member-job-role"
+            name="jobRole"
+            defaultValue={jobRoleInitialValue(member.jobRole?.id ?? null)}
+            // The value the dialog opened with: a save writes the role only
+            // when the pick differs from it (`jobRoleEditOf`).
+            data-opened-with={jobRoleInitialValue(member.jobRole?.id ?? null)}
+            aria-describedby={refusal === null ? undefined : MEMBER_FORM_ERROR_ID}
+            className="h-11"
+          >
+            <option value={NO_JOB_ROLE}>{t('ljudi.jobRole.none')}</option>
+            {options.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.name}
               </option>
             ))}
           </Select>
@@ -315,6 +360,7 @@ export function MemberBasicsDialog({ edit }: { readonly edit: MemberEdit }): Rea
             </InputGroup>
           </div>
           {offersRank ? renderRank(member) : null}
+          {jobRoleOptions === null ? null : renderJobRole(member, jobRoleOptions)}
         </div>
         {refusal === null ? null : (
           <Notice id={MEMBER_FORM_ERROR_ID} role="alert">

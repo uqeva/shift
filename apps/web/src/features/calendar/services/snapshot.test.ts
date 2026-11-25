@@ -189,6 +189,7 @@ describe('the read', () => {
         id: VIEWER_MEMBER,
         name: VIEWER_NAME,
         fireRank: null,
+        jobRole: null,
         memberships: [{ teamId: (rows.teams[0] as { id: string }).id, position: null, effectiveFrom: SEEDED }],
         statuses: [],
         loans: [],
@@ -555,7 +556,8 @@ describe('the read', () => {
           count: 1,
         },
         membersAnswerOf([
-          { ...calendarMemberRow(colleague, 'Čedo Zorić', 'nco'), email: 'never@carried.hr' },
+          // STORY 21.12: a job role, its id and name off the left join (0078).
+          { ...calendarMemberRow(colleague, 'Čedo Zorić', 'nco', { id: 'role-vod', name: 'Vod' }), email: 'never@carried.hr' },
           calendarMemberRow(VIEWER_MEMBER, VIEWER_NAME),
           calendarMemberRow(namesake, 'Čedo Zorić'),
           calendarMemberRow('00000000-0000-4000-8000-0000000000c2', 'Ante Babić'),
@@ -569,12 +571,22 @@ describe('the read', () => {
     expect(outcome.snapshot.usesFireRanks).toBe(true);
     // Croatian collation: `Č` after `C`, before `L`; one name twice, by id.
     expect(outcome.snapshot.members).toEqual([
-      { id: '00000000-0000-4000-8000-0000000000c2', name: 'Ante Babić', fireRank: null, memberships: [], statuses: [], loans: [], personalAssignments: [] },
-      { id: namesake, name: 'Čedo Zorić', fireRank: null, memberships: [], statuses: [], loans: [], personalAssignments: [] },
+      {
+        id: '00000000-0000-4000-8000-0000000000c2',
+        name: 'Ante Babić',
+        fireRank: null,
+        jobRole: null,
+        memberships: [],
+        statuses: [],
+        loans: [],
+        personalAssignments: [],
+      },
+      { id: namesake, name: 'Čedo Zorić', fireRank: null, jobRole: null, memberships: [], statuses: [], loans: [], personalAssignments: [] },
       {
         id: colleague,
         name: 'Čedo Zorić',
         fireRank: 'nco',
+        jobRole: { id: 'role-vod', name: 'Vod' },
         memberships: [
           { teamId: 'pilot-smjena-a', position: 'commander', effectiveFrom: SEEDED },
           { teamId: 'pilot-smjena-b', position: 'driver', effectiveFrom: '2026-09-15' },
@@ -587,6 +599,7 @@ describe('the read', () => {
         id: VIEWER_MEMBER,
         name: VIEWER_NAME,
         fireRank: null,
+        jobRole: null,
         memberships: [{ teamId: 'pilot-smjena-a', position: null, effectiveFrom: SEEDED }],
         statuses: [{ active: true, effectiveFrom: '2021-03-01' }],
         loans: [],
@@ -596,6 +609,7 @@ describe('the read', () => {
         id: inactive,
         name: 'Zoran Umirovljeni',
         fireRank: 'officer',
+        jobRole: null,
         memberships: [{ teamId: 'pilot-smjena-c', position: 'firefighter', effectiveFrom: SEEDED }],
         statuses: [
           { active: true, effectiveFrom: SEEDED },
@@ -678,6 +692,10 @@ describe('the read', () => {
       membersAnswerOf([calendarMemberRow(VIEWER_MEMBER, VIEWER_NAME, 3)]),
       membersAnswerOf([calendarMemberRow(VIEWER_MEMBER, VIEWER_NAME, false)]),
       membersAnswerOf([{ id: VIEWER_MEMBER, name: VIEWER_NAME }]),
+      // STORY 21.12: a job role that is not both an id and a name, or both null.
+      membersAnswerOf([{ ...calendarMemberRow(VIEWER_MEMBER, VIEWER_NAME), job_role_id: 'role-vod' }]),
+      membersAnswerOf([{ ...calendarMemberRow(VIEWER_MEMBER, VIEWER_NAME), job_role: 'Vod' }]),
+      membersAnswerOf([{ ...calendarMemberRow(VIEWER_MEMBER, VIEWER_NAME), job_role_id: 7, job_role: 'Vod' }]),
     ]) {
       expect(await read(tableOf(answerOf(PILOT), members)), JSON.stringify(members)).toEqual(REFUSED);
     }
@@ -743,6 +761,16 @@ describe('the read', () => {
 
     expect(shared.ok).toBe(true);
     vi.restoreAllMocks();
+  });
+
+  it('reads a members row without the job role keys as no role: a database before 0078 (story 21.12)', async () => {
+    const outcome = await read(
+      tableOf(answerOf(PILOT), membersAnswerOf([{ id: VIEWER_MEMBER, name: VIEWER_NAME, fire_rank: null }])),
+    );
+
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.snapshot.members.map((member) => member.jobRole)).toEqual([null]);
   });
 
   it('ignores a valid version of a member the members read does not yet name (story 3.4a)', async () => {

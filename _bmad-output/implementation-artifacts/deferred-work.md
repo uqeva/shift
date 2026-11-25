@@ -2230,7 +2230,7 @@
     - holiday lists for countries other than Croatia;
     - notifications when a holiday is added;
     - two personal shifts for one member on one date;
-    - a fourth fixed team position (*Vod*), now expressible as a job role;
+    - RESOLVED in part (Vod as a job role) by 21.12 (2026-11-25) — a fourth fixed team position (*Vod*): *Vod*, or any organization-specific title, is now a job role an admin names, shows and filters on. STILL OPEN: whether team positions themselves become job roles is the founder's (see the 21.12 entry);
     - a setting to hide *Sati na blagdan*: the column shows whenever the period has a worked holiday;
     - floaters proposing themselves for an open shift (only the admin picks).
   evidence: Proposal §3 and §6.
@@ -2333,3 +2333,21 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-21-21-smjenko-the-public-page.md`
   summary: OWNER the founder (content, before publishing). Story 21.21's review found the page's copy is the builder's wording and leaves out several things: provider identification in the footer (legal entity, address, OIB, as Croatian e-commerce law expects of an information-society service), a named data controller and contact behind the privacy line, the pilot's terms (free or not, how long, what happens to the data after), and sharing and search basics (`og:*` tags, `<link rel="canonical">` to the apex, which needs the domain as a fourth build input, and `robots.txt`). The *Blagdani* card describes 21.16-21.18, which are not built yet; the page publishes after epic 21, so check it then.
   evidence: 21.21 review (Blind Hunter); `apps/landing/src/index.html`.
+
+## Deferred from: story 21.12, job roles are organization data (2026-11-25)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-12-job-roles-are-organization-data.md`
+  summary: OWNER the next story that touches *Ručni raspored* (21.5, or a small follow-up): 21.4 merged (#369) before 21.12, so the grid does not show roles yet. Epic AC 21.12 "*Ručni raspored* … the role shows beside the name and is a filter chip". The grid did not exist on 21.12's baseline. 21.4 shows each row's role beside the name (from `MemberListRow.jobRole`, or the calendar snapshot's `CalendarMember.jobRole`) and offers a *Posao* chip in its *Filtri* panel, reusing *Ljudi*'s facet vocabulary (`posao` URL key, `all`/`none`/role id, unknown → all, the chip drawn only while a role is held). The same entry carries the calendar's role filter: *Kalendar*'s month is team columns, so a role narrows nothing there; the grid's person rows are where it belongs.
+  evidence: Spec 21.12 § Epic AC Deviations (the grid; the calendar's chip).
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-12-job-roles-are-organization-data.md`
+  summary: OWNER product, a later story. A member-role session's *Ljudi* directory (`team_roster()`, story 7.17) does not show a colleague's job role. Showing it means replacing `team_roster` again (each member's jsonb gains the role name), its parser in `features/teams/services/roster.ts` and the directory's line. Admins see the role in *Ljudi* and every member sees it in the calendar's day detail.
+  evidence: Spec 21.12 § Epic AC Deviations (the directory).
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-12-job-roles-are-organization-data.md`
+  summary: OWNER the founder (consider). A fire crew now has two vocabularies for one idea: FR-18a's fixed team positions (*zapovjednik*, *vozač*, *vatrogasac*; versioned with the membership, required while the organization uses fire ranks) and free job roles (*Vod*, or anything an admin names). 21.12 keeps them apart and moves no value, so nothing is lost. Whether positions should later become job roles (a data migration and a policy change to 0015) is a product decision.
+  evidence: Spec 21.12 § Design Notes (roles vs ranks and positions); founder's brief listing *Zapovjednik/Vozač/Vod/Vatrogasac*.
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-12-job-roles-are-organization-data.md`
+  summary: OWNER the founder (copy). *Bez posla* (no job role: the member-page fact, the picker's empty option and the *Ljudi* filter's "none") can read as "out of work" in everyday Croatian. Alternatives: *Nije dodijeljen*, *Bez posla u organizaciji*, or a dash. 21.12 kept the wording the planning used.
+  evidence: 21.12 review (blind hunter).
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-12-job-roles-are-organization-data.md`
+  summary: OWNER product, small. Polish left from the 21.12 review: *Ljudi*'s search does not match the role name shown under a name; the *Poslovi* card has no *Pokušaj ponovno* on a failed first read; a rename to the same name still sends a write; a member save refused by `members_job_role_fkey` (a role id from a stale tab) reads as *unavailable*, not *stale*, and does not re-read the roles.
+  evidence: 21.12 review (blind hunter, edge-case hunter).

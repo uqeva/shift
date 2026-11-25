@@ -1393,6 +1393,58 @@ async function cleanUpAbsenceTypes(client: pg.Client, slug: string, names: reado
 }
 
 /**
+ * The prefix every job role `job-roles.spec.ts` adds starts with (story
+ * 21.12), so a cleanup can sweep what an earlier, interrupted attempt left.
+ */
+export const E2E_JOB_ROLE_PREFIX = 'E2E posao';
+
+/** The id of the run organization's job role named `name`, read as the owner, or `null`. */
+export async function jobRoleIdInSql(slug: string, name: string): Promise<string | null> {
+  const client = await connect();
+  try {
+    const { rows } = await client.query<{ id: string }>(
+      `select r.id::text as id from job_roles r join organizations o on o.id = r.organization_id
+        where o.slug = $1 and r.name = $2`,
+      [slug, name],
+    );
+    return rows[0]?.id ?? null;
+  } finally {
+    await client.end();
+  }
+}
+
+/**
+ * Deletes the run organization's job roles named in `names`, and every one
+ * carrying {@link E2E_JOB_ROLE_PREFIX} (story 21.12). As the owner, past
+ * `0078`'s missing delete privilege: no session deletes a role. A member holds
+ * a role with no cascade (`members_job_role_fkey`), so every member holding
+ * one of them is set back to no role first, in the same transaction.
+ * Idempotent.
+ */
+export async function cleanUpJobRolesInSql(slug: string, names: readonly string[]): Promise<void> {
+  const client = await connect();
+  const doomed = `r.organization_id = o.id and o.slug = $1 and (r.name = any($2::text[]) or r.name like $3)`;
+  const parameters = [slug, names, `${E2E_JOB_ROLE_PREFIX}%`];
+  try {
+    await client.query('begin');
+    await client.query(
+      `update members m set job_role_id = null
+         from job_roles r, organizations o
+        where ${doomed}
+          and m.organization_id = r.organization_id and m.job_role_id = r.id`,
+      parameters,
+    );
+    await client.query(`delete from job_roles r using organizations o where ${doomed}`, parameters);
+    await client.query('commit');
+  } catch (cause) {
+    await client.query('rollback').catch(() => undefined);
+    throw cause;
+  } finally {
+    await client.end();
+  }
+}
+
+/**
  * A session-level advisory lock on `key`, polled for at most
  * {@link ROTATION_LOCK_WAIT_MS}, with `onHeld` run once it is held. The hold is
  * returned synchronously; see {@link holdRotation}.

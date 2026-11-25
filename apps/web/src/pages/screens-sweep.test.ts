@@ -422,7 +422,8 @@ describe('the screen is read at all, so every sweep below means something', () =
     // A HUNDRED AND SIX SINCE STORY 19.3: step 1's rules.
     // A HUNDRED AND TEN SINCE STORY 19.4: the setup frame, its steps, its progress rules and its link rules.
     // A HUNDRED AND TWELVE SINCE STORY 21.4: *Ručni raspored* and its rules.
-    expect(KEY_SOURCES).toHaveLength(112);
+    // A HUNDRED AND FOURTEEN SINCE STORY 21.12: the job role list's and write's rules.
+    expect(KEY_SOURCES).toHaveLength(114);
   });
 
   // Vacuous-pass guard. A renamed or moved file would make each "contains no"

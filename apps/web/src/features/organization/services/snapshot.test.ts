@@ -1520,7 +1520,8 @@ describe('the surface reads once, under one key', () => {
     // query options and key, in its own hook — never a second organization read.
     // AND, SINCE STORY 13.1b, the *Vrste odsutnosti* card's read of the
     // absence types: another table, through its own list's query options.
-    expect(occurrences(screen, 'useQuery('), 'the screen issues a fourth query').toBe(3);
+    // AND, SINCE STORY 21.12, the *Poslovi* card's read of the job roles.
+    expect(occurrences(screen, 'useQuery('), 'the screen issues a fifth query').toBe(4);
     expect(occurrences(screen, 'hourBandsQueryOptions('), 'the bands are read other than by their list').toBe(1);
     expect(occurrences(screen, 'absenceTypesQueryOptions('), 'the types are read other than by their list').toBe(1);
     expect(occurrences(hook, 'useQuery('), 'the one query is not the hook\'s').toBe(1);

@@ -79,6 +79,7 @@ import {
   resetPassword,
   resetStageOf,
   memberPatchOf,
+  jobRoleChangedBy,
   saveAllowance,
   ALLOWANCE_UNCHANGED,
   allowanceSaveOf,
@@ -201,6 +202,7 @@ function member(fields: Partial<MemberListRow> = {}): MemberListRow {
     leaveAllowance: { startingDays: leaveAllowanceDays, versions: [] },
     leaveYearStart: { month: 1, day: 1 },
     fireRank: null,
+    jobRole: null,
     authUserId: 'account-1',
     statusVersions: [],
     teamVersions: [],
@@ -435,6 +437,30 @@ describe('a PostgREST refusal means the same thing on both write paths', () => {
     // `details` holds what was typed, never a constraint.
     expect(editFailureOf({ code: '23514', details: 'members_name_length' })).toBe(MEMBER_WRITE_INVALID);
     expect(memberWriteMessageKey(MEMBER_NAME_TOO_LONG)).toBe('ljudi.form.error.nameTooLong');
+  });
+
+  it("reads another tenant's job role, or one gone, as the service (story 21.12)", () => {
+    expect(
+      editFailureOf({
+        code: '23503',
+        message: 'insert or update on table "members" violates foreign key constraint "members_job_role_fkey"',
+      }),
+    ).toBe(MEMBER_WRITE_UNAVAILABLE);
+  });
+
+  it('names a save that changes the job role, and only one (story 21.12)', () => {
+    expect(jobRoleChangedBy({ jobRoleId: 'role-vod' }, null)).toBe(true);
+    expect(jobRoleChangedBy({ jobRoleId: null }, 'role-vod')).toBe(true);
+    expect(jobRoleChangedBy({ jobRoleId: 'role-vod' }, 'role-vod')).toBe(false);
+    expect(jobRoleChangedBy({ jobRoleId: null }, null)).toBe(false);
+    expect(jobRoleChangedBy({ name: 'Ana' }, 'role-vod')).toBe(false);
+  });
+
+  it('sends a job role only when the edit carries one: null is Bez posla, absent is untouched (story 21.12)', () => {
+    expect(memberPatchOf({ jobRoleId: 'role-vod' })).toEqual({ job_role_id: 'role-vod' });
+    expect(memberPatchOf({ jobRoleId: null })).toEqual({ job_role_id: null });
+    expect(memberPatchOf({ name: 'Ana' })).toEqual({ name: 'Ana' });
+    expect(MEMBER_EDIT_COLUMNS.split(',')).toContain('job_role_id');
   });
 
   it('never claims a username is taken on the path that does not write one', () => {

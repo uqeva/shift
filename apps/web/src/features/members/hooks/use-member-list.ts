@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useEffectEvent, useMemo, useRef, useState, type ChangeEvent } from 'react';
 
 import {
+  ALL_ROLES,
   ALL_TEAMS,
   DEFAULT_FILTERS,
   MEMBERS_LIST_KEY,
@@ -22,6 +23,7 @@ import {
   membersTodayOf,
   membersViewOf,
   nextSortState,
+  roleToStore,
   teamToStore,
   type MemberColumnKey,
   type MembersFilters,
@@ -139,10 +141,11 @@ export function useMemberList(search: MembersSearch, navigate: MembersNavigate) 
         level: filters.level,
         team: filters.team,
         status: filters.status,
+        jobRoleFilter: filters.jobRoleFilter,
         sort: filters.sort,
         today,
       }),
-    [members, text, filters.level, filters.team, filters.status, filters.sort, today],
+    [members, text, filters.level, filters.team, filters.status, filters.jobRoleFilter, filters.sort, today],
   );
 
   // THE CONTROLS ARE DEAD WHILE THERE IS NOTHING TO NARROW: a live filter over
@@ -157,6 +160,8 @@ export function useMemberList(search: MembersSearch, navigate: MembersNavigate) 
   // A TEAM THAT LEFT THE OPTIONS LEAVES THE URL TOO, replacing the entry: a
   // stale id falls back to every team (`teamToStore`), once the answer is real.
   const settledTeam = teamToStore(filters.team, narrowed.team, members, today);
+  // STORY 21.12: the same for a role nobody holds any more.
+  const settledRole = roleToStore(filters.jobRoleFilter, narrowed.appliedRole, members);
 
   /**
    * Write `next` to the URL, and return the state it leaves. A change that
@@ -188,6 +193,15 @@ export function useMemberList(search: MembersSearch, navigate: MembersNavigate) 
     dropLeftTeam();
   }, [settledTeam, filters.team]);
 
+  const dropLeftRole = useEffectEvent((): void => {
+    write({ ...filters, search: text, jobRoleFilter: ALL_ROLES }, true);
+  });
+
+  useEffect(() => {
+    if (settledRole === filters.jobRoleFilter) return;
+    dropLeftRole();
+  }, [settledRole, filters.jobRoleFilter]);
+
   /** Write `next` to the URL as a new entry, and return the state it leaves. */
   function go(next: MembersFilters): string {
     return write(next, false);
@@ -204,7 +218,7 @@ export function useMemberList(search: MembersSearch, navigate: MembersNavigate) 
   function pickChip(key: string, id: string): string {
     const chip = chooseChip(key);
 
-    return chip === null ? stateKey : go(memberChipChoiceOf(shown, chip, id, narrowed.teams));
+    return chip === null ? stateKey : go(memberChipChoiceOf(shown, chip, id, narrowed.teams, narrowed.roles));
   }
 
   /** A chip's ✕. */

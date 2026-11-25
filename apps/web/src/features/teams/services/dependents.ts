@@ -108,6 +108,20 @@ export const MEMBER_SAVE_DEPENDENTS: readonly QueryKey[] = [
   MEMBER_ROLE_KEY,
 ];
 
+/**
+ * A member's own row saved WITH A CHANGED JOB ROLE (story 21.12): as any
+ * member save, and the calendar snapshot too, whose day detail names each
+ * member's role (`calendar_members()`, 0078).
+ */
+export const MEMBER_JOB_ROLE_SAVE_DEPENDENTS: readonly QueryKey[] = [...MEMBER_SAVE_DEPENDENTS, CALENDAR_KEY];
+
+/**
+ * A job role added, renamed, archived or restored (story 21.12): the member
+ * list, which embeds each member's role beside the name, and the calendar
+ * snapshot, whose day detail names it. Nothing derives from a role.
+ */
+export const JOB_ROLE_WRITE_DEPENDENTS: readonly QueryKey[] = [MEMBERS_LIST_KEY, CALENDAR_KEY];
+
 /** An hour band added, changed or removed (story 4.1b): the snapshot *Sati* derives band hours from. */
 export const HOUR_BAND_WRITE_DEPENDENTS: readonly QueryKey[] = [CALENDAR_KEY];
 
