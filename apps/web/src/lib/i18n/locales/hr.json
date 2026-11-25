@@ -2955,6 +2955,61 @@
       "inertNote": "Ostaju zapisane. Ukloni ih u Kalendaru ako više ne trebaju.",
       "unknownMember": "Nepoznata osoba",
       "erasures": "{count, plural, one {Spremanje briše # sukob s odsutnošću. Potvrdit ćeš ga u sljedećem koraku.} few {Spremanje briše # sukoba s odsutnošću. Potvrdit ćeš ih u sljedećem koraku.} other {Spremanje briše # sukoba s odsutnošću. Potvrdit ćeš ih u sljedećem koraku.}}"
-    }
+    },
+    "fill": {
+      "open": "Popuni uzorkom",
+      "title": "Popuni uzorkom",
+      "lede": "Koraci se ponavljaju dan za danom kroz cijeli raspon. Dani ulaze u nespremljene promjene i svaki možeš poslije izmijeniti.",
+      "steps": "Koraci uzorka",
+      "choice": "Korak {position}",
+      "choose": "Odaberi",
+      "off": "Slobodno",
+      "count": "Broj dana u koraku {position}",
+      "times": "×",
+      "remove": "Ukloni korak {position}",
+      "add": "Dodaj korak",
+      "offset": "Počni od koraka",
+      "offsetHint": "Dan uzorka na kojem su odabrane osobe prvog dana raspona.",
+      "offsetOption": "{day}. dan uzorka · korak {position}: {name}",
+      "offsetEmpty": "Prvo odaberi smjenu i broj dana u svakom koraku.",
+      "from": "Od",
+      "to": "Do",
+      "submit": "Popuni"
+    },
+    "copy": {
+      "open": "Kopiraj",
+      "title": "Kopiraj",
+      "lede": "Kopiraju se samo ručno dodijeljeni dani. Dan bez dodjele u izvoru briše dodjelu na istom danu u cilju. Dani ulaze u nespremljene promjene.",
+      "mode": "Što kopiraš",
+      "week": "Tjedan",
+      "month": "Mjesec",
+      "sourceWeek": "Tjedan koji počinje",
+      "targetWeek": "Kopiraj u tjedan koji počinje",
+      "sourceMonth": "Izvorni mjesec",
+      "targetMonth": "Kopiraj u mjesec",
+      "monthOption": "{month} {year}.",
+      "monthNote": "U kraći mjesec kopira se onoliko dana koliko on ima.",
+      "submit": "Kopiraj"
+    },
+    "plan": {
+      "people": "Osobe",
+      "cancel": "Odustani",
+      "close": "Zatvori",
+      "placed": "{count, plural, =0 {Nijedan dan nije promijenjen.} one {# dan je u nespremljenim promjenama.} few {# dana su u nespremljenim promjenama.} other {# dana je u nespremljenim promjenama.}}",
+      "skipped": "{count, plural, one {# dan je preskočen jer mu je smjena ili tim arhiviran ili osobe više nema u rasporedu.} few {# dana su preskočena jer im je smjena ili tim arhiviran ili osobe više nema u rasporedu.} other {# dana je preskočeno jer im je smjena ili tim arhiviran ili osobe više nema u rasporedu.}}",
+      "error": {
+        "people": "Odaberi barem jednu osobu.",
+        "range": "Upiši datume od i do; datum do ne smije biti prije datuma od.",
+        "tooLong": "Raspon smije imati najviše 366 dana.",
+        "steps": "Dodaj barem jedan korak.",
+        "stepType": "Odaberi smjenu ili slobodno u svakom koraku.",
+        "stepCount": "Broj dana u koraku je cijeli broj od 1 do 366.",
+        "source": "Odaberi izvor.",
+        "target": "Odaberi cilj.",
+        "same": "Cilj mora biti drukčiji od izvora.",
+        "failed": "Ovo trenutačno nije moguće popuniti. Osvježi stranicu i pokušaj ponovno."
+      }
+    },
+    "rowLine": "{role} · {source}"
   }
 }

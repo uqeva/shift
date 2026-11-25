@@ -211,13 +211,21 @@ export {
 export {
   PERSONAL_ASSIGNMENT_OFF,
   PERSONAL_ASSIGNMENT_SHIFT,
+  MAX_PLANNED_DAYS,
   checkPersonalAssignments,
+  copiedAssignmentsOf,
+  filledAssignmentsOf,
   hasTeam,
+  patternDaysOf,
   personalAssignmentOn,
   personalShiftOf,
+  type PatternStep,
   type PersonalAssignment,
   type PersonalAssignmentKind,
   type PersonalShift,
+  type PlannedAssignment,
+  type PlannedMember,
+  type PlannedValue,
 } from './personal.js';
 
 export {

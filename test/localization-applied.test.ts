@@ -483,6 +483,12 @@ const SOURCES = [
   join(webRoot, 'src', 'features', 'planning', 'components', 'manual-save-bar.tsx'),
   join(webRoot, 'src', 'features', 'planning', 'services', 'manual-preview.ts'),
   join(webRoot, 'src', 'features', 'planning', 'services', 'manual-save.ts'),
+  // Story 21.5: *Popuni uzorkom* and *Kopiraj*, their dialogs and the rules module that words their refusals.
+  join(webRoot, 'src', 'features', 'planning', 'components', 'manual-plan-buttons.tsx'),
+  join(webRoot, 'src', 'features', 'planning', 'components', 'manual-fill-dialog.tsx'),
+  join(webRoot, 'src', 'features', 'planning', 'components', 'manual-copy-dialog.tsx'),
+  join(webRoot, 'src', 'features', 'planning', 'components', 'manual-people-field.tsx'),
+  join(webRoot, 'src', 'features', 'planning', 'services', 'manual-fill.ts'),
   join(webRoot, 'src', 'features', 'history', 'hooks', 'use-change-history.ts'),
   join(webRoot, 'src', 'features', 'history', 'components', 'history-body.tsx'),
   join(webRoot, 'src', 'features', 'history', 'components', 'history-filters.tsx'),

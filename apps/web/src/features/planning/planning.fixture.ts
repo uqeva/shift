@@ -41,6 +41,8 @@ export const C = 'pilot-smjena-c';
 export const DAY_TEAM = 'pilot-dnevni';
 /** A team with no member, whose rotation a test may start after the month. */
 export const LATE_TEAM = 'pilot-kasni';
+/** An archived team with no member (story 21.5: a copied assignment counted with it is left out). */
+export const ARCHIVED_TEAM = 'pilot-stari';
 export const DAN = 'pilot-dan';
 export const NOC = 'pilot-noc';
 export const SLOBODNO = 'pilot-slobodno';
@@ -74,7 +76,7 @@ export async function planningSnapshotOf({
 }: PlanningSetup = {}): Promise<CalendarSnapshot> {
   const rows = {
     ...PILOT,
-    teams: [...PILOT.teams, teamRow(DAY_TEAM, 'Dnevni'), teamRow(LATE_TEAM, 'Kasni')],
+    teams: [...PILOT.teams, teamRow(DAY_TEAM, 'Dnevni'), teamRow(LATE_TEAM, 'Kasni'), teamRow(ARCHIVED_TEAM, 'Stari', { archived: true })],
     assignments: [...PILOT.assignments, ...rotations],
     types: [...PILOT.types, typeRow(ARCHIVED_TYPE, 'Staro', '2026-09-25T20:07:49.339741+00:00', { archived: true, times: ['08:00:00', '16:00:00'] })],
   };
@@ -100,7 +102,7 @@ export async function planningSnapshotOf({
       calendarMemberRow(VIEWER_MEMBER, VIEWER_NAME),
       calendarMemberRow(ANA, 'Ana Anić'),
       calendarMemberRow(DORA, 'Dora Dorić'),
-      calendarMemberRow(IVA, 'Iva Ivić'),
+      calendarMemberRow(IVA, 'Iva Ivić', null, { id: 'pilot-role-student', name: 'Student' }),
     ]),
     overridesAnswerOf([]),
     rosterOverridesAnswerOf(rosterOverrides),

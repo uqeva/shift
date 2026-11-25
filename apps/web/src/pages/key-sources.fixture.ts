@@ -1234,17 +1234,22 @@ export const KEY_SOURCES = [
   {
     // STORY 21.4: *Ručni raspored* — the page, the grid and its legend, the
     // picker, the save bar and *Što se mijenja*.
+    // 118 SINCE STORY 21.5: forty more — *Popuni uzorkom*'s eighteen keys,
+    // nineteen uses (*Slobodno* twice); *Kopiraj*'s thirteen; the people
+    // field's legend and *Bez tima* and each dialog's *Odustani* and close
+    // (six); and the save bar's two lines. 119 WITH 21.12'S ENTRY: a row's job role beside its source.
     name: 'the Ručni raspored destination',
     file: RUCNI_RASPORED,
     keys: translationKeys,
-    strings: 78,
+    strings: 119,
   },
   {
     // STORY 21.4: the preview's shift and inert-override lines, and the save's refusals.
+    // 26 SINCE STORY 21.5: the ten refusals of a fill or copy.
     name: 'the Ručni raspored rules',
     file: RUCNI_RASPORED_KEYS,
     keys: messageKeyUnions,
-    strings: 16,
+    strings: 26,
   },
   {
     // STORY 14.3: the PDF's words — the title (the caption), the header's

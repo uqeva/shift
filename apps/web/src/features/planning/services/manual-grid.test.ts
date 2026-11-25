@@ -91,6 +91,17 @@ describe('the month as the grid draws it (UX-DR72, UX-DR73)', () => {
     expect(month.dates[2]).toMatchObject({ date: '2026-10-03', weekend: true });
   });
 
+  it("carries each row's job role, or none (story 21.12's entry, built by 21.5)", () => {
+    const month = manualMonthOf(plain, MONTH, TODAY, NO_DRAFT);
+
+    expect(month.rows.map((row) => [row.memberId, row.jobRole])).toEqual([
+      [ANA, null],
+      [VIEWER_MEMBER, null],
+      [DORA, null],
+      [IVA, 'Student'],
+    ]);
+  });
+
   it('names each row its source: rotacija tima for a team with a rotation, ručno otherwise and with no team', () => {
     const month = manualMonthOf(plain, MONTH, TODAY, NO_DRAFT);
 

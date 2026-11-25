@@ -863,6 +863,32 @@ export async function teamLoansOfInSql(slug: string, memberId: string): Promise<
   }
 }
 
+/** A live Personal Assignment as 0077 stores it (story 21.5's e2e). */
+export interface StoredPersonalAssignment {
+  readonly date: string;
+  readonly kind: string;
+  readonly shiftTypeId: string | null;
+  readonly teamId: string | null;
+}
+
+/** Every LIVE Personal Assignment of `memberId` in the run organization `slug`, by date (story 21.5). Read-only. */
+export async function personalAssignmentsOfInSql(slug: string, memberId: string): Promise<StoredPersonalAssignment[]> {
+  const client = await connect();
+  try {
+    const { rows } = await client.query<StoredPersonalAssignment>(
+      `select p.date::text as date, p.kind, p.shift_type_id::text as "shiftTypeId", p.team_id::text as "teamId"
+         from personal_assignments p join organizations o on o.id = p.organization_id
+        where o.slug = $1 and p.member_id = $2 and p.removed_at is null
+        order by p.date`,
+      [slug, memberId],
+    );
+
+    return rows;
+  } finally {
+    await client.end();
+  }
+}
+
 /** How a request {@link seedLeaveRequest} writes stands: pending, or closed as 0040's definers close one. */
 export type SeededRequestStatus = 'pending' | 'approved' | 'rejected' | 'withdrawn';
 

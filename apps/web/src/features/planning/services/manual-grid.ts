@@ -311,6 +311,8 @@ export interface ManualCell extends ManualCellRef {
 export interface ManualRow {
   readonly memberId: string;
   readonly name: string;
+  /** The member's job role's name, shown beside the name (story 21.12, re-owned by 21.5), or `null` for none. */
+  readonly jobRole: string | null;
   readonly source: ManualRowSource;
   readonly cells: readonly ManualCell[];
 }
@@ -349,14 +351,19 @@ export interface ManualMonth {
   readonly legend: readonly ManualLegendEntry[];
 }
 
-/** Saturday or Sunday, by the civil date alone (no zone). */
-export function isWeekend(date: string): boolean {
+/** The weekday of a civil date (no zone): 0 is Sunday, 6 Saturday. */
+export function weekdayOf(date: string): number {
   const [year, month, day] = date.split('-').map(Number) as [number, number, number];
-  // Sakamoto's method: 0 is Sunday.
+  // Sakamoto's method.
   const offsets = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4] as const;
   const y = month < 3 ? year - 1 : year;
-  const weekday =
-    (y + Math.floor(y / 4) - Math.floor(y / 100) + Math.floor(y / 400) + (offsets[month - 1] ?? 0) + day) % 7;
+
+  return (y + Math.floor(y / 4) - Math.floor(y / 100) + Math.floor(y / 400) + (offsets[month - 1] ?? 0) + day) % 7;
+}
+
+/** Saturday or Sunday, by the civil date alone (no zone). */
+export function isWeekend(date: string): boolean {
+  const weekday = weekdayOf(date);
 
   return weekday === 0 || weekday === 6;
 }
@@ -461,6 +468,7 @@ export function manualMonthOf(calendar: CalendarSnapshot, month: string, today: 
     const row: ManualRow = {
       memberId: member.id,
       name: member.name,
+      jobRole: member.jobRole?.name ?? null,
       source: teamId !== null && hasRotation(after, teamId, last) ? SOURCE_TEAM : SOURCE_MANUAL,
       cells,
     };

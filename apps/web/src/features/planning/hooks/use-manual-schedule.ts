@@ -3,7 +3,7 @@ import { onlineManager, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 
 import { useCalendarSnapshot } from '@/features/calendar/hooks/use-calendar-snapshot';
-import { CALENDAR_KEY, calendarSurfaceStateOf } from '@/features/calendar/services/snapshot';
+import { CALENDAR_KEY, calendarSurfaceStateOf, type CalendarSnapshot } from '@/features/calendar/services/snapshot';
 import { isCalendarMonth, monthHeaderOf } from '@/features/calendar/utils/month';
 import { useErasureConfirmation, type ShownErasures } from '@/features/conflicts/hooks/use-erasure-confirmation';
 import { useErasureReads } from '@/features/conflicts/hooks/use-erasure-reads';
@@ -36,6 +36,17 @@ import {
   type ManualRefusal,
   type ManualRpc,
 } from '@/features/planning/services/manual-save';
+import {
+  PLAN_FAILED,
+  copiedDraftOf,
+  filledDraftOf,
+  plannedDefaultsOf,
+  type CopyForm,
+  type FillForm,
+  type PlannedOutcome,
+  type PlannedRefusal,
+} from '@/features/planning/services/manual-fill';
+import { COPY_OPEN_ID, FILL_OPEN_ID } from '@/features/planning/utils/element-ids';
 import { MEMBERSHIP_WRITE_DEPENDENTS, refreshAfterWrite } from '@/features/teams/services/dependents';
 import { useOrganizationToday } from '@/hooks/organization-today';
 import { writesOnline } from '@/lib/offline/use-write-gate';
@@ -64,6 +75,24 @@ export type ManualNavigate = (next: ManualSearch, options?: { readonly replace?:
 /** The picker, open on its cells. */
 export interface ManualPicking {
   readonly cells: readonly ManualCellRef[];
+}
+
+/** *Popuni uzorkom* or *Kopiraj* (story 21.5), open with what it starts from. */
+export interface ManualPlanning {
+  readonly kind: typeof PLAN_FILL | typeof PLAN_COPY;
+  /** The people pre-checked and the range pre-filled: the selection's, else the month's (on a phone, the person shown). */
+  readonly memberIds: readonly string[];
+  readonly from: string;
+  readonly to: string;
+}
+
+export const PLAN_FILL = 'fill';
+export const PLAN_COPY = 'copy';
+
+/** What the last fill or copy put into the draft, said on the save bar. */
+export interface ManualPlanned {
+  readonly placed: number;
+  readonly skipped: number;
 }
 
 /** The id of the grid's heading (the month), which names the grid and the day list. */
@@ -112,6 +141,8 @@ export function useManualSchedule(search: ManualSearch, navigate: ManualNavigate
   const [refusal, setRefusal] = useState<ManualRefusal | null>(null);
   const [unchecked, setUnchecked] = useState(false);
   const [saved, setSaved] = useState<number | null>(null);
+  const [planning, setPlanning] = useState<ManualPlanning | null>(null);
+  const [planned, setPlanned] = useState<ManualPlanned | null>(null);
   const dragging = useRef<{ readonly from: ManualCellRef; moved: boolean; cells: readonly ManualCellRef[] } | null>(null);
   const erasures = useErasureConfirmation<ManualDraft>(pending, () => saveButton.current);
 
@@ -155,11 +186,13 @@ export function useManualSchedule(search: ManualSearch, navigate: ManualNavigate
   function show(next: string | null): void {
     setSelected([]);
     setAnchor(null);
+    setPlanned(null);
     navigate({ ...(search.osoba === undefined ? {} : { osoba: search.osoba }), ...(next === null ? {} : { mjesec: next }) });
   }
 
   /** The phone's member. */
   function choosePerson(memberId: string): void {
+    setPlanned(null);
     navigate({ ...search, osoba: memberId }, { replace: true });
   }
 
@@ -189,7 +222,71 @@ export function useManualSchedule(search: ManualSearch, navigate: ManualNavigate
 
     setDraft((current) => draftWith(snapshot, current, picking.cells, value));
     setRefusal(null);
+    setPlanned(null);
     closePicker();
+  }
+
+  // ------------------------------------------------- fill and copy (21.5)
+
+  /** *Popuni uzorkom* or *Kopiraj*, from the selection's people and dates (on a phone, the person shown and the month). */
+  function openPlanning(kind: ManualPlanning['kind'], onPhone: boolean): void {
+    if (shown === null || pending) return;
+
+    // THE PERSON SHOWN only on a phone (review): on the grid, no selection pre-checks nobody.
+    const defaults = plannedDefaultsOf(shown.rows, shown.dates, selected, onPhone ? (person?.memberId ?? null) : null);
+
+    setSaved(null);
+    setPlanning({ kind, memberIds: defaults.memberIds, from: defaults.from, to: defaults.to });
+  }
+
+  // A MONTH NO LONGER SHOWN (a failed re-read) closes a fill or copy, rather than leaving it to reopen later (review).
+  useEffect(() => {
+    if (shown === null && planning !== null) setPlanning(null);
+  }, [shown, planning]);
+
+  /** The dialog closed: focus back on the button that opened it. */
+  function closePlanning(): void {
+    const opener = planning?.kind === PLAN_COPY ? COPY_OPEN_ID : FILL_OPEN_ID;
+
+    setPlanning(null);
+    focusLater([() => document.getElementById(opener)], () => saveButton.current);
+  }
+
+  /** A planned outcome into the draft, or the field it refuses. */
+  function plan(outcome: (read: CalendarSnapshot) => PlannedOutcome): PlannedRefusal | null {
+    if (snapshot === null) return PLAN_FAILED;
+
+    let result: PlannedOutcome;
+
+    try {
+      result = outcome(snapshot);
+    } catch (cause) {
+      // A read the domain cannot plan over (a precondition broken): nothing is drafted.
+      console.error(MANUAL_UNAVAILABLE, cause);
+
+      return PLAN_FAILED;
+    }
+
+    if (!result.ok) return result.code;
+
+    setDraft(result.planned.draft);
+    setPlanned({ placed: result.planned.placed, skipped: result.planned.skipped });
+    setRefusal(null);
+    setSelected([]);
+    setAnchor(null);
+    closePlanning();
+
+    return null;
+  }
+
+  /** *Popuni*: the pattern's days into the draft. */
+  function fill(form: FillForm): PlannedRefusal | null {
+    return plan((read) => filledDraftOf(read, draft, form));
+  }
+
+  /** *Kopiraj*: the source's assignments into the draft at the target. */
+  function copy(form: CopyForm): PlannedRefusal | null {
+    return plan((read) => copiedDraftOf(read, draft, form));
   }
 
   // ---------------------------------------------------------------- pointer
@@ -327,6 +424,7 @@ export function useManualSchedule(search: ManualSearch, navigate: ManualNavigate
     setSelected([]);
     setRefusal(null);
     setUnchecked(false);
+    setPlanned(null);
   }
 
   /** A refusal said on the bar; a stale one re-reads the calendar (the draft is kept). */
@@ -383,6 +481,7 @@ export function useManualSchedule(search: ManualSearch, navigate: ManualNavigate
     setRefusal(null);
     setUnchecked(false);
     setSaved(null);
+    setPlanned(null);
 
     try {
       const check = await manualCheckOf(readErasures.readAndShare, draft, onlineManager.isOnline());
@@ -493,6 +592,8 @@ export function useManualSchedule(search: ManualSearch, navigate: ManualNavigate
     types,
     teams,
     picking,
+    planning,
+    planned,
     pending,
     checked,
     refusal,
@@ -508,6 +609,10 @@ export function useManualSchedule(search: ManualSearch, navigate: ManualNavigate
     openPicker,
     closePicker,
     pick,
+    openPlanning,
+    closePlanning,
+    fill,
+    copy,
     pointerDown,
     pointerEnter,
     pointerUp,

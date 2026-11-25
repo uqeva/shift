@@ -173,9 +173,11 @@ context:
 
 **Results (2026-11-25, after review pass 1, on `e5d3032`):** `pnpm --filter @shift/domain build`, `pnpm typecheck` (apps, e2e, smoke, perf) and `pnpm lint` exit 0. `pnpm build` exit 0. Domain: 23 files, 1038 tests. Web: 189 files, 7005 tests. DB-free root files `resource-hygiene`, `supabase-scaffold`, `feature-boundaries`: 2669 tests. All pass. `index.css` and no theme token changed, so the theme root files do not apply. A headless-Chromium render of the real `ManualGrid` and `ManualMemberDays` (static markup, the built CSS) was checked at 1280, 800 and 390 px. At 1280 and 800 px the strip sits at the viewport's top once the page scrolls, the grid has no vertical scroll room, only its scroller moves sideways (the page is never wider than the viewport), and the name column and the group words stay left. At 390 px the day list does not overflow.
 
+**Status:** merged as PR #369, squash `a5cf067`, `CI passed` green (run 45677635516). Run 45674578672 failed only on `test/localization-applied.test.ts` (the new page missing from `SOURCES`), fixed before the green run; every e2e shard, the DB suite and the runtime parity passed in the green run.
+
 **Residual risks:**
 - CI run 1 failed in `Test (Vitest, local Supabase)` on `test/localization-applied.test.ts` (every page must be in `SOURCES`): the new page and the planning feature were added there, and the file (DB-free) then passed locally after `pnpm build`, 322 tests.
-- No DB, e2e or perf run locally (STRICT DATABASE RULE; CI is the gate). The two e2e files changed (`e2e/utils/i18n.ts`, `phone-navigation.spec.ts`: the tenth destination in the sidebar and *Više*) run first in CI. No e2e opens `/rucni-raspored` (deferred-work).
+- No DB, e2e or perf run locally (STRICT DATABASE RULE). CI settled the DB suite and both changed e2e files (`e2e/utils/i18n.ts`, `phone-navigation.spec.ts`), green in run 45677635516. No e2e opened `/rucni-raspored`; 21.5 adds one (deferred-work). No perf case covers the page (deferred-work).
 - The hook's pointer, drag and keyboard wiring is checked by the render and by typecheck only; a touch drag on a tablet is untested.
 - Process note: as in 21.1 and 21.2, the implementation ran in the orchestrating session (its investigation was in context), not in a fresh step-03 subagent. Review ran with four context-free subagents.
 
