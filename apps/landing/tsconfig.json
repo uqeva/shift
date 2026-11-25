@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // `dom` for the Chromium check's `page.evaluate` callbacks, which run in
+    // the page; `build.ts` itself uses Node only.
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "types": ["node"],
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "allowImportingTsExtensions": true
+  },
+  "//": "Type-checks the build script, the Chromium check and its Playwright config. Node runs `build.ts` directly (type stripping), so nothing is emitted.",
+  "include": ["build.ts", "check/**/*.ts", "playwright.config.ts"]
+}

@@ -991,6 +991,22 @@ export default [
     },
   },
 
+  // Story 21.21: the public page's Chromium check is the same kind of file
+  // (Node, with `page.evaluate` callbacks in the page); its build script is
+  // plain Node.
+  {
+    files: ['apps/landing/check/**/*.ts'],
+    languageOptions: {
+      globals: { ...globals.node, ...globals.browser },
+    },
+  },
+  {
+    files: ['apps/landing/build.ts'],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
+
   // ------------------------------------------- e2e: the page-object rule
   // A spec never reaches the screen through a raw Playwright `Page`: every
   // locator lives in its page object (`e2e/pages/*`, `e2e/README.md`). Refused

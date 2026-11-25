@@ -883,6 +883,11 @@ The derivation lives in one pure package that cannot reach for data. The store e
     - the first view, fonts included, under 150 kB transferred;
     - axe at phone and desktop width, in both themes.
   - **The name.** The page names the product *Smjenko*. Renaming the app itself (the manifest, `hr.json`, Auth mail's sender) is not part of this AD (E-5, accepted by the founder 2026-11-25: the landing page only for now; renaming the app is a later one-story decision).
+  - **Amended 2026-11-25 (21.21).**
+    - *The name clause* is superseded by story 21.24 (the founder reversed E-5 the same day): the app is *Smjenko* too, and the page reuses 21.24's mark (inline, decorative) and copies its `favicon.svg`, `favicon.ico` and Apple touch icon from `apps/web/public`, byte-identical.
+    - *Headers.* Every response also carries `X-Frame-Options: DENY` (beside `frame-ancestors 'none'`, as `shift-web`), so the image sends six security headers, each exactly once; HSTS is `max-age=31536000` for the page's own host, WITHOUT `includeSubDomains` (unlike `shift-web`): at the apex it would pin every subdomain to HTTPS for a year, and adding it, or `preload`, is the founder's later decision.
+    - *The production build mode.* `build` fills missing inputs with `example.invalid` placeholders (CI's build); `build:production` refuses a missing `LANDING_APP_URL` or `LANDING_CONTACT_EMAIL`, any reserved name (`.invalid`, `.test`, `.example`, `.localhost`, `example.com/.org/.net`) or loopback, a non-`https:` URL (plain `http:` only to a loopback host, outside production), a URL with credentials and a malformed address, naming the input and writing nothing. The founder's address is `info@<domain>` (2026-11-25), set as `LANDING_CONTACT_EMAIL` at build, never committed.
+    - *The deploy job wiring is deferred.* CI's `landing-image` job builds the image with placeholders, probes it offline and checks the page in Chromium on every PR, and `CI passed` needs it; the deploy job (20.6) does not build or push `shift-landing` yet. Until it does, staging's image is built and deployed by hand (DEPLOY.md §9.14), and the wiring is a `deferred-work.md` entry.
 
 ### Dependency direction
 

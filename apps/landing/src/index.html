@@ -1,0 +1,194 @@
+<!doctype html>
+<!--
+  STORY 21.21 (AD-28). Smjenko's public page, written by hand. No script, no
+  inline handler, no `style` attribute and no origin but the three build
+  inputs: `build.ts` fills each `{{…}}` (HTML-escaped) and keeps the signup
+  block only when LANDING_SIGNUP_URL is set. test/landing.test.ts holds it.
+-->
+<html lang="hr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Smjenko · raspored smjena za DVD-ove, zaštitarske tvrtke i svaki posao u smjenama</title>
+    <meta
+      name="description"
+      content="Smjenko slaže turnus, vodi zamjene, godišnje i sate, a svatko svoj raspored vidi na mobitelu. Za dobrovoljna vatrogasna društva, zaštitarske tvrtke i svaki posao u smjenama."
+    />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="theme-color" content="#E8EDF5" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0A1020" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />
+    <link rel="preload" href="{{FONT_PRELOAD}}" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="{{STYLESHEET}}" />
+  </head>
+  <body>
+    <a class="skip-link" href="#sadrzaj">Preskoči na sadržaj</a>
+
+    <header class="site-header">
+      <div class="bar">
+        <a class="brand" href="/">
+          <svg class="mark" aria-hidden="true" focusable="false" viewBox="0 0 512 512">
+            <rect width="512" height="512" rx="112" fill="#0F172A" />
+            <g fill="none" stroke-width="58">
+              <path stroke="#3FA0FA" d="M315 154a68 68 0 1 0-63 102" />
+              <path stroke="#FFF" d="M260 256a68 68 0 1 1-63 102" />
+            </g>
+            <rect class="mark-edge" x="6" y="6" width="500" height="500" rx="106" fill="none" stroke="#FFF" stroke-opacity=".16" stroke-width="12" />
+          </svg>
+          <span class="wordmark">Smjenko</span>
+        </a>
+        <nav class="nav" aria-label="Glavna navigacija">
+          <a class="button button-quiet" href="{{APP_URL}}">Prijava</a>
+          <!-- signup -->
+          <a class="button button-quiet" href="{{SIGNUP_URL}}">Registriraj se</a>
+          <!-- /signup -->
+          <a class="button button-ink" href="#kontakt">Javi se</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="sadrzaj" tabindex="-1">
+      <section class="hero" aria-labelledby="naslov">
+        <div class="hero-text">
+          <p class="eyebrow">Smjenko</p>
+          <h1 id="naslov">Raspored smjena za <span class="nowrap">DVD-ove</span>, zaštitarske tvrtke i svaki posao u&nbsp;smjenama</h1>
+          <p class="lede">
+            Smjenko slaže turnus, vodi zamjene, godišnje odmore i sate, a svatko svoj raspored vidi na mobitelu.
+            Bez tablica koje kruže e-poštom i bez fotografija rasporeda u grupi.
+          </p>
+          <p class="actions">
+            <a class="button button-ink" href="#kontakt">Javi se</a>
+            <a class="button button-card" href="{{APP_URL}}">Prijava</a>
+          </p>
+        </div>
+
+        <figure class="preview" aria-hidden="true">
+          <div class="preview-card">
+            <div class="preview-head">
+              <span class="preview-title">Studeni</span>
+              <span class="preview-team">Tim A</span>
+            </div>
+            <ol class="month">
+              <li class="day d">D</li><li class="day n">N</li><li class="day off"></li><li class="day off"></li><li class="day d">D</li><li class="day n">N</li><li class="day off"></li>
+              <li class="day off"></li><li class="day d">D</li><li class="day n">N</li><li class="day off"></li><li class="day off"></li><li class="day d">D</li><li class="day n">N</li>
+              <li class="day off"></li><li class="day off"></li><li class="day d swap">D</li><li class="day n">N</li><li class="day off"></li><li class="day off"></li><li class="day d">D</li>
+              <li class="day n">N</li><li class="day off"></li><li class="day off"></li><li class="day d">D</li><li class="day n leave">N</li><li class="day off"></li><li class="day off"></li>
+            </ol>
+          </div>
+        </figure>
+      </section>
+
+      <section class="section" aria-labelledby="mogucnosti">
+        <h2 id="mogucnosti">Što Smjenko radi</h2>
+        <ul class="cards features">
+          <li class="card">
+            <h3>Turnus i ručni raspored</h3>
+            <p>
+              Turnus (dan, noć, slobodno, slobodno ili bilo koji drugi) složite jednom i Smjenko ga sam nastavlja iz
+              mjeseca u mjesec. Tko ne radi po turnusu, dobije ručnu mrežu: upisuje se dan po dan, <em>kao na papiru</em>.
+            </p>
+          </li>
+          <li class="card">
+            <h3>Zamjene</h3>
+            <p>
+              Zamjena se upiše za dan i osobu, a turnus ostaje kakav jest. Svi odmah vide tko stvarno radi, i tko je
+              što promijenio.
+            </p>
+          </li>
+          <li class="card">
+            <h3>Godišnji odmor</h3>
+            <p>
+              Zahtjevi, odobrenja i preostali dani na jednom mjestu. Kad godišnji padne na smjenu, Smjenko to pokaže
+              i traži odluku.
+            </p>
+          </li>
+          <li class="card">
+            <h3>Sati i izvoz</h3>
+            <p>
+              Sati po danu i noći za svakoga, po mjesecu i za cijelu godinu, s izvozom u Excel i PDF za obračun.
+            </p>
+          </li>
+          <li class="card">
+            <h3>Kalendar na mobitelu</h3>
+            <p>
+              Svatko otvara svoj raspored na mobitelu, i kad nema signala. Smjene se mogu dodati i u kalendar
+              telefona.
+            </p>
+          </li>
+          <li class="card">
+            <h3>Podsjetnici</h3>
+            <p>Obavijest prije smjene, e-poštom ili na mobitel, kad je tko želi.</p>
+          </li>
+          <li class="card">
+            <h3>Blagdani</h3>
+            <p>Državni blagdani i neradni dani vidljivi su u kalendaru i rasporedu, pa se smjena na blagdan ne previdi.</p>
+          </li>
+        </ul>
+      </section>
+
+      <section class="section" aria-labelledby="za-koga">
+        <h2 id="za-koga">Za koga je</h2>
+        <ul class="cards audience">
+          <li class="card">
+            <h3>Dobrovoljna vatrogasna društva</h3>
+            <p>Dežurstva po timovima, dan i noć, i jasno tko je u smjeni kad stigne poziv.</p>
+          </li>
+          <li class="card">
+            <h3>Zaštitarske tvrtke</h3>
+            <p>Više objekata, više timova i sati koji se moraju poklopiti s obračunom.</p>
+          </li>
+          <li class="card">
+            <h3>Svaki posao u smjenama</h3>
+            <p>Zdravstvo, proizvodnja, skladišta, ugostiteljstvo: gdje god se radi u smjenama, raspored je isti posao.</p>
+          </li>
+        </ul>
+      </section>
+
+      <section class="section" aria-labelledby="pilot">
+        <h2 id="pilot">Kako ide pilot</h2>
+        <ol class="steps">
+          <li class="step">
+            <h3>Javite se</h3>
+            <p>Napišite nam ukratko tko ste, koliko vas je i kako danas radite raspored.</p>
+          </li>
+          <li class="step">
+            <h3>Postavimo zajedno</h3>
+            <p>Unesemo vaše timove, smjene i turnus, i provjerimo da raspored izgleda kao vaš.</p>
+          </li>
+          <li class="step">
+            <h3>Radite s njim</h3>
+            <p>Vaši ljudi dobiju pristup i koriste Smjenko na mobitelu i računalu. Primjedbe slušamo i ispravljamo.</p>
+          </li>
+          <li class="step">
+            <h3>Odlučite</h3>
+            <p>Na kraju pilota sami odlučite nastavljate li. Vaši podaci ostaju vaši.</p>
+          </li>
+        </ol>
+      </section>
+
+      <section class="section contact" id="kontakt" aria-labelledby="javi-se">
+        <div class="card contact-card">
+          <h2 id="javi-se">Javi se</h2>
+          <p>Zanima vas pilot ili imate pitanje? Pišite nam na adresu:</p>
+          <p class="email">{{CONTACT_EMAIL}}</p>
+          <p class="actions">
+            <a class="button button-ink" href="{{MAILTO}}">Pošalji e-poruku</a>
+          </p>
+          <p class="aside">Već koristite Smjenko? <a href="{{APP_URL}}">Prijava</a></p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p class="footer-lead">Bez kolačića i praćenja.</p>
+      <p>
+        Ova stranica ne postavlja kolačiće, nema analitiku ni alate za praćenje i ne učitava ništa s tuđih
+        poslužitelja. Adresu e-pošte s kojom nam pišete koristimo samo da vam odgovorimo.
+      </p>
+      <p>© Smjenko</p>
+    </footer>
+  </body>
+</html>

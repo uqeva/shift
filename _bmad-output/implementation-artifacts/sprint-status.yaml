@@ -764,7 +764,7 @@ development_status:
   21-18-holidays-show-on-the-calendar-the-schedule-and-the-grid: ready-for-dev  # after 21.16, 21.4
   21-19-worked-holiday-hours-are-their-own-figure: ready-for-dev  # after 21.16; cuttable to a follow-up (proposal 3)
   21-20-each-team-has-its-own-minimum: ready-for-dev  # independent
-  21-21-smjenko-the-public-page: ready-for-dev  # independent; publishing waits: contact address (E-4), apex DNS (founder)
+  21-21-smjenko-the-public-page: review  # built, CI pending; feat/21-21-landing (no PR yet); independent; publishing waits: apex DNS and the info@<domain> mail route (founder; address decided 2026-11-25, a build input)
   21-22-teams-are-called-timovi: review  # built, CI pending; on feat/smjenko-brand with 21.24 (spec-21-24); founder chose Timovi (E-6, 2026-11-25); reverses epic 18 retro A2
   21-24-smjenko-brand-name-logo-and-icons: review  # built, CI pending; feat/smjenko-brand; founder 2026-11-25: E-5 reversed (app named Smjenko), logo concept C
   21-23-compact-toolbar-and-filters: review  # built, CI pending; founder request 2026-11-25; presentation only, after 21.3
