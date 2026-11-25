@@ -223,7 +223,10 @@ export const HOURS_SOURCE_CHANGE = 'CHANGE';
 export const HOURS_SOURCE_REPLACEMENT = 'REPLACEMENT';
 /** Story 18.5: a shift of the loan team a Loan put the member on (`posudba`). */
 export const HOURS_SOURCE_LOAN = 'LOAN';
-/** Story 21.1 (R14.5): a Personal Shift, a shift a Personal Assignment gave the member by hand. */
+/**
+ * Story 21.1 (R14.5): a Personal Shift, a shift a Personal Assignment gave the
+ * member by hand, or (story 21.9, R15.3) one their personal rotation projects.
+ */
 export const HOURS_SOURCE_PERSONAL = 'PERSONAL';
 
 /**
@@ -231,9 +234,9 @@ export const HOURS_SOURCE_PERSONAL = 'PERSONAL';
  * it (`CHANGE`), a roster override that put the member on another team's
  * shift (`REPLACEMENT`, which wins when both apply), or a Loan that put them
  * on the loan team (`LOAN`, story 18.5: below `REPLACEMENT`, above `CHANGE`,
- * as the loan is why the shift is theirs at all), or a Personal Assignment
- * (`PERSONAL`, story 21.1: a Personal Shift is never via an override, a loan
- * or a change, so it never competes with them).
+ * as the loan is why the shift is theirs at all), or a Personal Assignment or
+ * a personal rotation (`PERSONAL`, stories 21.1 and 21.9: a Personal Shift is
+ * never via an override, a loan or a change, so it never competes with them).
  */
 export type HoursSource =
   | typeof HOURS_SOURCE_ROTATION
@@ -309,7 +312,7 @@ interface MonthWalk {
 }
 
 function sourceOf(shift: MemberShift): HoursSource {
-  if (shift.personalAssignmentId !== undefined) return HOURS_SOURCE_PERSONAL;
+  if (shift.personalAssignmentId !== undefined || shift.personalRotation === true) return HOURS_SOURCE_PERSONAL;
   if (shift.viaOverride) return HOURS_SOURCE_REPLACEMENT;
   if (shift.loanId !== undefined) return HOURS_SOURCE_LOAN;
   return shift.overridden ? HOURS_SOURCE_CHANGE : HOURS_SOURCE_ROTATION;

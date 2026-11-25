@@ -752,7 +752,7 @@ development_status:
   21-6-personal-shifts-are-read-wherever-shifts-are-read: ready-for-dev  # after 21.2
   21-7-a-leave-over-a-personal-shift-is-a-conflict-and-a-replacemen: ready-for-dev  # after 21.6
   21-8-swaps-give-and-take-personal-shifts: ready-for-dev  # after 21.6
-  21-9-the-schedule-source-rule-in-the-domain: ready-for-dev  # after 21.1
+  21-9-the-schedule-source-rule-in-the-domain: review  # built, CI pending; PR #373; domain only, no migration
   21-10-an-admin-gives-a-member-their-own-rotation-or-makes-them-man: ready-for-dev  # after 21.9, 21.4
   21-11-a-seasonal-member-s-season-is-set-in-one-step: ready-for-dev  # independent
   21-12-job-roles-are-organization-data: review  # built, CI pending (0078)

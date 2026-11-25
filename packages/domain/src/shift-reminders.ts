@@ -61,7 +61,8 @@ export interface ShiftReminder {
    * Story 21.2 (AD-18 as amended): `ASSIGNMENT` for the shift of a Personal
    * Assignment, which `enqueue_shift_reminders` writes only while that row is
    * live and keys by its id. ABSENT for a team shift, the item's original
-   * eight keys (R14.7). 21.9 adds `PERSONAL_ROTATION`.
+   * eight keys (R14.7). 21.10 adds `PERSONAL_ROTATION`; until then a personal
+   * rotation's shift is skipped (story 21.9).
    */
   readonly source?: typeof SHIFT_REMINDER_SOURCE_ASSIGNMENT;
   /** The assignment's id, with `source` only. */
@@ -98,6 +99,10 @@ export function shiftRemindersDueOf(
 
   const reminders: ShiftReminder[] = [];
   for (const shift of atWorkShiftsOf(inputs, window.from, window.to)) {
+    // Story 21.9: a personal rotation's shift has no item form yet. Sent as it is, a teamed one would read as a
+    // team shift and a teamless one would refuse the whole chunk. Its `PERSONAL_ROTATION` form ships with 21.10's
+    // assembly, which replaces this skip; until then no assembly carries a schedule version.
+    if (shift.personalRotation === true) continue;
     const startsAt = instantOf(shift.date, shift.startMinute, inputs.timeZone);
     if (startsAt <= now) continue;
     for (const lead of leads) {

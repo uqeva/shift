@@ -27,17 +27,28 @@
  * effective team; {@link personalShiftOn} gives the shift it makes instead. A
  * member with no assignment derives exactly as before (R14.7).
  *
+ * THE SCHEDULE SOURCE (story 21.9, engine rules R15): below an assignment, a
+ * member whose source on a date is a personal rotation or manual only is on no
+ * base roster either; {@link personalShiftOn} gives a personal rotation's
+ * shift. A member with no schedule version derives exactly as before (R15.6).
+ *
  * Every breached precondition throws a `RangeError` naming the offending value.
  */
 
 import { checkDate } from './calendar.js';
 import {
   PERSONAL_ASSIGNMENT_SHIFT,
+  SCHEDULE_SOURCE_PERSONAL,
+  SCHEDULE_SOURCE_TEAM,
   personalAssignmentOn,
+  personalRotationShiftOf,
   personalShiftOf,
+  scheduleSourceOn,
   type PersonalAssignment,
   type PersonalShift,
+  type ScheduleVersion,
 } from './personal.js';
+import type { RotationStep } from './projection.js';
 
 /**
  * One stored version of a member's team membership
@@ -95,6 +106,11 @@ export interface RosterMember {
    * R14); absent or empty, every date follows their schedule as before.
    */
   readonly personalAssignments?: readonly PersonalAssignment[] | undefined;
+  /**
+   * Every version of this member's schedule source, in any order (story 21.9,
+   * R15); absent or empty, they follow their team's rotation on every date.
+   */
+  readonly scheduleVersions?: readonly ScheduleVersion[] | undefined;
 }
 
 /**
@@ -268,14 +284,17 @@ export function effectiveTeamOn(
 /**
  * The roster of `teamId` on `date` (R11.2): every member of `members` who is
  * active on that date ({@link activeOn}), whose EFFECTIVE team on it
- * ({@link effectiveTeamOn}) is `teamId`, and who holds no Personal Assignment
- * on it (R14.2), with their position, in the order of `members`. With no loan,
- * the effective team is the home team of {@link membershipOn}, so the roster is
- * exactly the one before loans (R11.4); with no assignment, exactly the one
- * before Personal Assignments (R14.7).
+ * ({@link effectiveTeamOn}) is `teamId`, who holds no Personal Assignment on
+ * it (R14.2), and whose schedule source on it is their team's rotation (R15.3),
+ * with their position, in the order of `members`. With no loan, the effective
+ * team is the home team of {@link membershipOn}, so the roster is exactly the
+ * one before loans (R11.4); with no assignment, exactly the one before
+ * Personal Assignments (R14.7); with no schedule version, exactly the one
+ * before schedule sources (R15.6).
  *
  * @throws RangeError on any precondition of {@link activeOn},
- *   {@link effectiveTeamOn} or `checkPersonalAssignments` for any member.
+ *   {@link effectiveTeamOn}, `checkPersonalAssignments` or
+ *   `checkScheduleVersions` for any member.
  */
 export function shiftRoster(members: readonly RosterMember[], teamId: string, date: string): readonly RosterEntry[] {
   checkDate('the date', date);
@@ -283,7 +302,7 @@ export function shiftRoster(members: readonly RosterMember[], teamId: string, da
   for (const member of members) {
     const membership = effectiveTeamOn(member, date);
     const active = activeOn(member.statuses, date);
-    if (active && membership !== null && membership.teamId === teamId && !assignedOn(member, date)) {
+    if (active && membership !== null && membership.teamId === teamId && !assignedOn(member, date) && followsTeamOn(member, date)) {
       roster.push({ memberId: member.id, position: membership.position });
     }
   }
@@ -296,24 +315,53 @@ function assignedOn(member: Pick<RosterMember, 'personalAssignments'>, date: str
   return assignments !== undefined && assignments.length > 0 && personalAssignmentOn(assignments, date) !== null;
 }
 
+/** Whether `member`'s schedule source on `date` is their team's rotation (R15.3); checks their versions. */
+function followsTeamOn(member: Pick<RosterMember, 'scheduleVersions'>, date: string): boolean {
+  const versions = member.scheduleVersions;
+  return versions === undefined || versions.length === 0 || scheduleSourceOn(versions, date).source === SCHEDULE_SOURCE_TEAM;
+}
+
 /**
- * THE PERSONAL SHIFT of `member` on `date` (R14.3): their Personal Assignment
- * that date, when it is a working one and they are active, counted with the
- * team it names, else their effective team ({@link effectiveTeamOn}), else no
- * team; `null` otherwise — no assignment, a non-working type, a day off, or an
- * inactive date.
+ * THE PERSONAL SHIFT of `member` on `date`, in R15.3's order:
+ *
+ * 1. their Personal Assignment that date (R14.3): when it is a working one and
+ *    they are active, a shift counted with the team it names, else their
+ *    effective team ({@link effectiveTeamOn}), else no team; otherwise none;
+ * 2. with no assignment, their personal rotation when it is their schedule
+ *    source that date (story 21.9, R15.3): its projected type over `steps`,
+ *    when it is a working one and they are active, counted with their
+ *    effective team, else no team;
+ *
+ * and `null` otherwise: a non-working type or step, a day off, an inactive
+ * date, their team's rotation or manual only.
  *
  * @throws RangeError on any precondition of {@link activeOn},
- *   {@link effectiveTeamOn} or `checkPersonalAssignments`.
+ *   {@link effectiveTeamOn}, `checkPersonalAssignments`,
+ *   `checkScheduleVersions` or `personalRotationShiftTypeOf` (among them a
+ *   personal rotation whose pattern has no steps among `steps`).
  */
 export function personalShiftOn(
-  member: Pick<RosterMember, 'memberships' | 'statuses' | 'loans' | 'personalAssignments'>,
+  member: Pick<RosterMember, 'memberships' | 'statuses' | 'loans' | 'personalAssignments' | 'scheduleVersions'>,
   date: string,
   workingShiftTypeIds: ReadonlySet<string>,
+  steps: readonly RotationStep[],
 ): PersonalShift | null {
   const assignment = personalAssignmentOn(member.personalAssignments ?? [], date);
-  if (assignment === null) return null;
-  return personalShiftOf(assignment, activeOn(member.statuses, date), effectiveTeamOn(member, date)?.teamId ?? null, workingShiftTypeIds);
+  if (assignment !== null) {
+    return personalShiftOf(assignment, activeOn(member.statuses, date), effectiveTeamOn(member, date)?.teamId ?? null, workingShiftTypeIds);
+  }
+  const versions = member.scheduleVersions ?? [];
+  if (versions.length === 0) return null;
+  const version = scheduleSourceOn(versions, date);
+  if (version.source !== SCHEDULE_SOURCE_PERSONAL) return null;
+  return personalRotationShiftOf(
+    version,
+    steps,
+    date,
+    activeOn(member.statuses, date),
+    effectiveTeamOn(member, date)?.teamId ?? null,
+    workingShiftTypeIds,
+  );
 }
 
 /**
@@ -436,8 +484,16 @@ export function rosterOverridesAt<Override extends RosterOverride>(
  * team or with none, or a day off, leaves the override applying: a double
  * booking, which warns.
  *
+ * SCHEDULE SOURCES (story 21.9, R15.8): with no assignment that date, a member
+ * whose source is a personal rotation counts with their effective team on
+ * every date of it, whatever the step, so an override putting them on that
+ * team is inert: their day with that team is their rotation's, changed by a
+ * Personal Assignment. One putting them on another team applies. A member on
+ * manual only counts with no team, so one putting them on applies.
+ *
  * @throws RangeError on any precondition of {@link activeOn},
- *   {@link effectiveTeamOn} or `checkPersonalAssignments`.
+ *   {@link effectiveTeamOn}, `checkPersonalAssignments` or
+ *   `checkScheduleVersions`.
  */
 export function rosterOverrideApplies(
   defaultRoster: readonly RosterEntry[],
@@ -453,13 +509,21 @@ export function rosterOverrideApplies(
   return activeOn(put?.statuses ?? [], override.date);
 }
 
-/** Whether `member` holds a `SHIFT` assignment on `date` counted with `teamId` (R14.3's counting; R14.9). */
+/**
+ * Whether `member`'s day on `date` counts with `teamId` (R14.9, R15.8): a
+ * `SHIFT` assignment counted with it (R14.3's counting), or, with no
+ * assignment, a personal rotation while it is their effective team.
+ */
 function countsWithOn(member: RosterMember, teamId: string, date: string): boolean {
   const assignments = member.personalAssignments;
-  if (assignments === undefined || assignments.length === 0) return false;
-  const assignment = personalAssignmentOn(assignments, date);
-  if (assignment === null || assignment.kind !== PERSONAL_ASSIGNMENT_SHIFT) return false;
-  return (assignment.teamId ?? effectiveTeamOn(member, date)?.teamId ?? null) === teamId;
+  const assignment = assignments === undefined || assignments.length === 0 ? null : personalAssignmentOn(assignments, date);
+  if (assignment !== null) {
+    if (assignment.kind !== PERSONAL_ASSIGNMENT_SHIFT) return false;
+    return (assignment.teamId ?? effectiveTeamOn(member, date)?.teamId ?? null) === teamId;
+  }
+  const versions = member.scheduleVersions;
+  if (versions === undefined || versions.length === 0 || scheduleSourceOn(versions, date).source !== SCHEDULE_SOURCE_PERSONAL) return false;
+  return effectiveTeamOn(member, date)?.teamId === teamId;
 }
 
 /**

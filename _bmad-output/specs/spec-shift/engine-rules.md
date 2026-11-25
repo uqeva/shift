@@ -280,6 +280,11 @@ Leave Requests (CAP-19) and Swap Requests (CAP-22) are stored assertions by a Me
 - **R15.5** A Rotation Pattern may be used by Teams and by Members alike. Editing a pattern follows R1 and AD-2 for every user of it.
 - **R15.6** With no schedule-source version in an Organization, every derivation is byte-identical to what it was before.
 - **R15.7** Worked example. Day worker W is in Team D, which has no Rotation. From the 2nd, W has a personal rotation on the pattern [1. smjena ×5, Slobodno ×2, 2. smjena ×5, Slobodno ×2] at step 1. W works mornings in weeks one and three and afternoons in weeks two and four, all counted with D. A Personal Assignment of a day off on the 10th makes that date free, and the 11th follows the pattern again. A 24-hour Team's Member set to manual only leaves that Team's base roster from their effective date, and has only what is assigned to them.
+- **R15.8** *(Added 2026-11-25, story 21.9: the domain's decisions.)*
+  - A personal rotation's offset step is the step the Member stands on at the version's effective date: the version is its own anchor.
+  - A working step of an active Member is a Personal Shift of that type, with that type's times in effect on the date (R12.1). It counts with the Member's effective Team, or with no Team when they have none (R14.3, R14.9). Like an assignment's shift, it has no projected Shift Type, and no Shift Type Override changes it. A non-working step is a day off. An inactive date has no shift.
+  - A Roster Override that puts a Member on the Team their personal rotation counts with is inert on every date of that source, whatever the step. Their days with that Team are their rotation's, and a Personal Assignment changes one (R15.3, step 1). This mirrors R14.9. An override putting them on another Team applies, as a double booking. One taking them off a base roster they are not on is inert (R14.2). A Member on manual only counts with no Team, so an override putting them on a shift applies.
+  - In staffing, a personal rotation's shifts join R14.6's groups as an assignment's do. A shift of the Scheduled Shift's type is counted on it.
 
 ## 16. Job roles and floaters (added 2026-11-25, sprint-change-proposal-2026-11-25-pilot-readiness; implemented by stories 21.12, 21.13 and 21.14)
 

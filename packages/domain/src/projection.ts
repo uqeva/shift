@@ -191,22 +191,38 @@ function projectedStep(
   checkDate('the date', date);
   checkDate(`the anchor of team ${assignment.teamId}'s rotation`, assignment.anchorDate);
 
-  const ordered = orderedSteps(steps, assignment.patternId);
-  const offsetIndex = ordered.findIndex((step) => step.id === assignment.offsetStepId);
+  return stepOnDate(orderedSteps(steps, assignment.patternId), assignment.patternId, assignment.offsetStepId, assignment.anchorDate, date);
+}
+
+/**
+ * THE R1 FORMULA over steps already ordered by {@link orderedSteps}: the step
+ * `steps[(offsetIndex + daysBetween(anchorDate, date)) mod cycleLength]`,
+ * where `offsetIndex` is the index of `offsetStepId`. The one place a step is
+ * projected: a team's rotation (above) and a member's personal rotation
+ * (`personal.ts`, story 21.9) both read it. INTERNAL: not re-exported from
+ * `index.ts`.
+ *
+ * @throws RangeError when the offset step is not among `ordered`, or a date is
+ *   not a calendar `YYYY-MM-DD`.
+ */
+export function stepOnDate(
+  ordered: readonly RotationStep[],
+  patternId: string,
+  offsetStepId: string,
+  anchorDate: string,
+  date: string,
+): RotationStep {
+  const offsetIndex = ordered.findIndex((step) => step.id === offsetStepId);
   if (offsetIndex < 0) {
-    throw new RangeError(
-      `offset step ${assignment.offsetStepId} is not a step of rotation pattern ${assignment.patternId}`,
-    );
+    throw new RangeError(`offset step ${offsetStepId} is not a step of rotation pattern ${patternId}`);
   }
-  const index = modulo(offsetIndex + daysBetween(assignment.anchorDate, date), ordered.length);
+  const index = modulo(offsetIndex + daysBetween(anchorDate, date), ordered.length);
   // `index` is in [0, length) by construction. Checked all the same, so a
   // defect in the arithmetic surfaces as a RangeError naming it, never as a
   // TypeError on an undefined step.
   const step = ordered[index];
   if (step === undefined) {
-    throw new RangeError(
-      `index ${index} names no step of rotation pattern ${assignment.patternId}, which has ${ordered.length}`,
-    );
+    throw new RangeError(`index ${index} names no step of rotation pattern ${patternId}, which has ${ordered.length}`);
   }
   return step;
 }

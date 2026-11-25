@@ -46,7 +46,7 @@ import { shiftHalvesOf, type ShiftTypeWithVersions } from './hours.js';
 import { checkRange, LEAVE_HALF_FIRST, LEAVE_HALF_SECOND, type LeaveHalf } from './leave.js';
 import { overrideStandingOf, type RotationVersionStamp, type StampedShiftTypeOverride } from './overrides.js';
 import type { RotationAssignment, RotationStep } from './projection.js';
-import type { PersonalAssignment } from './personal.js';
+import type { PersonalAssignment, ScheduleVersion } from './personal.js';
 import type { Loan, MembershipVersion, RosterOverride, StatusVersion } from './roster.js';
 import { memberScheduleOfMonth, monthOf, adjacentMonth } from './schedule.js';
 
@@ -75,6 +75,12 @@ export interface ScheduleMember {
    * they hold none.
    */
   readonly personalAssignments?: readonly PersonalAssignment[] | undefined;
+  /**
+   * Every version of their schedule source (story 21.9, R15). Optional until
+   * the assembly carries them (story 21.10); absent, they follow their team's
+   * rotation on every date.
+   */
+  readonly scheduleVersions?: readonly ScheduleVersion[] | undefined;
 }
 
 /** A live roster override with the instant it was written or last confirmed (µs), which decides whether it is in force. */
@@ -110,6 +116,7 @@ export interface ScheduleInputs {
   readonly memberId: string;
   readonly teams: readonly ScheduleTeam[];
   readonly shiftTypes: readonly ShiftTypeWithVersions[];
+  /** The steps of every pattern a rotation version or a member's schedule version (story 21.9) names. */
   readonly steps: readonly RotationStep[];
   readonly assignments: readonly RotationAssignment[];
   /** One stamp per assignment: when that version was saved (µs). */
@@ -144,6 +151,12 @@ export interface AtWorkShift {
   readonly loanId?: string;
   /** The Personal Assignment this shift is (story 21.1); ABSENT on every other shift. */
   readonly personalAssignmentId?: string;
+  /**
+   * The shift is a personal rotation's (story 21.9, R15.3); ABSENT on every
+   * other shift. The reminder item's and the feed's personal-rotation forms
+   * (AD-18, AD-20) read it; they ship with story 21.10's assembly.
+   */
+  readonly personalRotation?: true;
   /** On a Half-day Record, the half worked (R12.2); ABSENT on a whole shift. */
   readonly workedHalf?: LeaveHalf;
 }
@@ -234,6 +247,7 @@ export function atWorkShiftsOf(inputs: ScheduleInputs, from: string, to: string)
     statuses: member.statuses,
     loans: member.loans,
     personalAssignments: member.personalAssignments,
+    scheduleVersions: member.scheduleVersions,
     assignments: inputs.assignments,
     steps: inputs.steps,
     overrides: overrideStandingOf(inputs.assignmentStamps, inputs.overrides).inForce,
@@ -271,6 +285,7 @@ export function atWorkShiftsOf(inputs: ScheduleInputs, from: string, to: string)
           viaOverride: shift.viaOverride,
           ...(shift.loanId === undefined ? {} : { loanId: shift.loanId }),
           ...(shift.personalAssignmentId === undefined ? {} : { personalAssignmentId: shift.personalAssignmentId }),
+          ...(shift.personalRotation === true ? { personalRotation: true as const } : {}),
         };
         if (half !== undefined) {
           const halvesOf = shiftHalvesOf(version.startMinute, version.endMinute);
