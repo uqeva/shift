@@ -3856,3 +3856,103 @@ Notifications; the founder's, when one exists (`deferred-work.md`).
    (`KONG_LOG_LEVEL=info`), restart Kong, read, and set it back.
 7. **Recovered?** The next run closes the issue; run the workflow by hand to
    confirm at once. Write what happened in the issue before it closes.
+
+### 9.14 The public page: the `shift-landing` image (story 21.21)
+
+Smjenko's public page (AD-28) is its own static image, `shift-landing`
+(`deploy/landing/Dockerfile`), beside `shift-web` and independent of it: one
+hand-written Croatian page, a 404 page, one stylesheet, the app's own Outfit
+and icons, no script, no cookie and no third-party request. `shift-web` is
+unchanged.
+
+**Build inputs** (none committed; the repository is public):
+
+| Input | Value | Notes |
+| --- | --- | --- |
+| `LANDING_APP_URL` | `https://app.<domain>` (staging: `https://staging.<domain>`) | the *Prijava* link |
+| `LANDING_CONTACT_EMAIL` | `info@<domain>` (the founder's decision of 2026-11-25; delivered by Cloudflare Email Routing) | *Javi se*: shown as text and as a `mailto:` link |
+| `LANDING_SIGNUP_URL` | unset | *Registriraj se* is drawn only when it is set; set it only once production signup opens (D-S5) |
+
+```bash
+pnpm --filter @shift/landing build             # placeholders (example.invalid), as CI builds it
+LANDING_APP_URL=https://app.<domain> \
+LANDING_CONTACT_EMAIL=info@<domain> \
+  pnpm --filter @shift/landing build:production # refuses a missing, invalid or placeholder input
+docker build -f deploy/landing/Dockerfile -t shift-landing:<environment>-<sha> .
+bash scripts/ci/probe-landing-image.sh shift-landing:<environment>-<sha> apps/landing/dist
+```
+
+`build:production` refuses, naming the input and leaving `dist` as it was: a
+missing `LANDING_APP_URL` or `LANDING_CONTACT_EMAIL`; in any URL or the
+address's domain, a reserved name (`.invalid`, `.test`, `.example`,
+`.localhost`, `example.com`, `example.org`, `example.net` and their
+subdomains, a trailing dot ignored) or a loopback (`localhost`, `127.0.0.0/8`,
+`0.0.0.0`, `[::1]`); a URL that is not `https:` (plain `http:` is allowed only
+to a loopback host, and only in a plain build) or carries a user name or
+password; and an address that is not `local@domain.tld` (no `%`, no leading,
+trailing or double dot, never an IP literal). Every value is HTML-escaped
+where it lands, and the build is swapped into `dist` only once it is whole.
+
+**The image.** `shift-web`'s pinned `nginx-unprivileged` base (§9.7), files
+owned by root, `nginx -t` at build, uid 101, a `HEALTHCHECK` on `/`. Every
+answer, the 404s, a 405, a 304 and nginx's own 400 included, carries
+(`deploy/landing/security-headers.conf`):
+
+```text
+Content-Security-Policy: default-src 'none'; style-src 'self'; img-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+Strict-Transport-Security: max-age=31536000
+Referrer-Policy: no-referrer
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Permissions-Policy: <every feature off, as shift-web's>
+```
+
+HSTS here pins the page's own host only. Unlike `shift-web`'s, it has no
+`includeSubDomains`: served at the apex, that would pin every subdomain of
+`<domain>` to HTTPS for a year, and no `preload`. Adding either at the apex is
+the founder's later decision, made in `security-headers.conf`, the probe and
+`test/landing.test.ts` together.
+
+| Request | Answer |
+| --- | --- |
+| `/`, `/index.html` | `200`, `no-cache` |
+| `/favicon.svg`, `/favicon.ico`, `/apple-touch-icon-180x180.png` | `200`, `no-cache` |
+| `/assets/<hashed>` (the stylesheet, the two fonts) | `200`, `public, max-age=31536000, immutable` |
+| anything else, `/assets/` and `/404.html` included | the 404 page with `404`, `no-cache` (no SPA fallback) |
+
+**Checks (CI's `landing-image` job, on every PR).** The placeholder build, the
+image, the offline probe above (`--network none`, read-only root), then the
+page on the runner's loopback in Chromium (`apps/landing/check/page.spec.ts`):
+axe at 320 and 1280 px in both themes, no request to another origin, no
+cookie, no console error, no horizontal scroll, 44 px links, and the first view
+under 150 kB transferred. It pushes nothing.
+
+**The inputs are baked in.** The page is static, so each image holds its
+environment's addresses. Staging's image is never promoted to production:
+each environment's image is built from the same commit with its own inputs
+(and its own tag), and a rollback is redeploying that environment's previous
+tag.
+
+**Before publishing: the address must work.** `info@<domain>` is delivered by
+Cloudflare Email Routing, which adds its MX and SPF records at the apex. The
+founder confirms in Cloudflare that the route and those records are active,
+then sends a test message to `info@<domain>` from an outside mailbox and sees
+it arrive. Only then is a production page with that address deployed.
+
+**Staging, until the pipeline builds it.** The deploy job (20.6) does not
+build `shift-landing` yet (`deferred-work.md`): it needs per-environment
+inputs and a Coolify resource the operator creates. Until then it is deployed
+by hand as staging's images are (§9.11): build it on the host from the
+branch's commit with staging's inputs and `build:production`, probe it, push
+it to the loopback registry as `127.0.0.1:<registry-port>/shift-landing:staging`,
+and create a Coolify Docker-image application in the `staging` environment:
+port 8080, a hostname the founder chooses (for example `www.staging.<domain>`),
+HTTPS forced, `--read-only --tmpfs /tmp`, 64 MiB, 0.1 CPU (as `shift-web`).
+
+**Production (after 20.9).** A second Coolify application in production,
+from GHCR as `shift-web` is, built with production's inputs, serving the apex
+`https://<domain>` with `https://www.<domain>` redirected to it (a Traefik
+redirect in Coolify). It needs the apex DNS record, which is the founder's
+step: an `A` record for `<domain>` (and one for `www.<domain>`) to the
+server's public IPv4, DNS-only, as the other names (§9.11). Nothing in the
+repository names the domain or the address.

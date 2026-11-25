@@ -2325,3 +2325,11 @@
   summary: OWNER story 21.6 or 21.7. The grid draws no leave, so an admin planning a day cannot see that the member is absent until *Spremi* (and then only a teamless shift is warned). The paper shows absences. The calendar's leave hatch (`marks`) could be drawn in the cell, and named in its label.
   evidence: Story 21.4 review (blind).
 
+## Deferred from: story 21.21, Smjenko, the public page (2026-11-25)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-21-smjenko-the-public-page.md`
+  summary: OWNER the operator, with 20.6's deploy job once it is enabled. The deploy job does not build, probe, push or deploy `shift-landing`: it needs per-environment build inputs (`LANDING_APP_URL`, `LANDING_CONTACT_EMAIL` = `info@<domain>`, `LANDING_SIGNUP_URL` unset) as environment variables, `build:production`, the probe, a GHCR tag `shift-landing:<environment>` and a Coolify application uuid per environment (`COOLIFY_LANDING_UUID`), all of which the operator creates first. Until then staging's image is built and deployed by hand through the loopback registry (DEPLOY.md §9.14), and production waits for 20.9 and the founder's apex DNS record (`<domain>` and `www.<domain>`).
+  evidence: Spec 21.21 Design Notes; AD-28 `Amended 2026-11-25 (21.21)`; CI's `landing-image` job builds with placeholders only.
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-21-smjenko-the-public-page.md`
+  summary: OWNER the founder (content, before publishing). Story 21.21's review found the page's copy is the builder's wording and leaves out several things: provider identification in the footer (legal entity, address, OIB, as Croatian e-commerce law expects of an information-society service), a named data controller and contact behind the privacy line, the pilot's terms (free or not, how long, what happens to the data after), and sharing and search basics (`og:*` tags, `<link rel="canonical">` to the apex, which needs the domain as a fourth build input, and `robots.txt`). The *Blagdani* card describes 21.16-21.18, which are not built yet; the page publishes after epic 21, so check it then.
+  evidence: 21.21 review (Blind Hunter); `apps/landing/src/index.html`.

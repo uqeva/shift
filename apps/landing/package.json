@@ -1,0 +1,19 @@
+{
+  "name": "@shift/landing",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "//": "AD-28 (story 21.21): Smjenko's public page. One hand-written Croatian HTML page, a 404 page and one stylesheet, with no framework and no client script, built by `build.ts` (Node, no dependency) into `dist` and served by the `shift-landing` image (`deploy/landing`). Its one dependency is the app's own font, copied byte-identical. `check/` is the Chromium check CI runs against the running image (axe-core and Playwright from the root).",
+  "scripts": {
+    "build": "node build.ts",
+    "build:production": "node build.ts --production",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@fontsource-variable/outfit": "5.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "typescript": "7.0.2"
+  }
+}

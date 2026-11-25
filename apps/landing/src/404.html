@@ -1,0 +1,63 @@
+<!doctype html>
+<!--
+  STORY 21.21 (AD-28). The answer to any path the image does not hold, with
+  status 404 (no SPA fallback). The same rules as index.html.
+-->
+<html lang="hr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Stranica ne postoji · Smjenko</title>
+    <meta name="robots" content="noindex" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="referrer" content="no-referrer" />
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preload" href="{{FONT_PRELOAD}}" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="{{STYLESHEET}}" />
+  </head>
+  <body>
+    <a class="skip-link" href="#sadrzaj">Preskoči na sadržaj</a>
+
+    <header class="site-header">
+      <div class="bar">
+        <a class="brand" href="/">
+          <svg class="mark" aria-hidden="true" focusable="false" viewBox="0 0 512 512">
+            <rect width="512" height="512" rx="112" fill="#0F172A" />
+            <g fill="none" stroke-width="58">
+              <path stroke="#3FA0FA" d="M315 154a68 68 0 1 0-63 102" />
+              <path stroke="#FFF" d="M260 256a68 68 0 1 1-63 102" />
+            </g>
+            <rect class="mark-edge" x="6" y="6" width="500" height="500" rx="106" fill="none" stroke="#FFF" stroke-opacity=".16" stroke-width="12" />
+          </svg>
+          <span class="wordmark">Smjenko</span>
+        </a>
+        <nav class="nav" aria-label="Glavna navigacija">
+          <a class="button button-quiet" href="{{APP_URL}}">Prijava</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="sadrzaj" tabindex="-1">
+      <section class="section not-found" aria-labelledby="naslov">
+        <div class="card contact-card">
+          <h1 id="naslov">Ta stranica ne postoji</h1>
+          <p>Adresa je možda pogrešno upisana ili je stranica uklonjena.</p>
+          <p class="actions">
+            <a class="button button-ink" href="/">Na početnu</a>
+            <a class="button button-card" href="{{APP_URL}}">Prijava</a>
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p class="footer-lead">Bez kolačića i praćenja.</p>
+      <p>
+        Ova stranica ne postavlja kolačiće, nema analitiku ni alate za praćenje i ne učitava ništa s tuđih
+        poslužitelja. Adresu e-pošte s kojom nam pišete koristimo samo da vam odgovorimo.
+      </p>
+      <p>© Smjenko</p>
+    </footer>
+  </body>
+</html>

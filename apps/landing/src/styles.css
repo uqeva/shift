@@ -1,0 +1,689 @@
+/*
+ * STORY 21.21 (AD-28). Smjenko's public page: one stylesheet, direction G
+ * ("Staklo", DESIGN.md). No framework, no external URL, no `@import`.
+ *
+ * TOKENS. Every custom property below has the name and the value it has in
+ * `apps/web/src/index.css` (light in `:root`, dark in the
+ * `prefers-color-scheme: dark` block): test/landing.test.ts holds each one
+ * equal, both themes. The page follows the OS's scheme only: it has no
+ * script, so no theme control.
+ *
+ * FONT. The app's own Outfit (`@fontsource-variable/outfit` 5.3.0), its latin
+ * and latin-ext subsets with the package's own unicode-ranges, copied
+ * byte-identical and hashed by build.ts (`./fonts/…` is rewritten to the
+ * hashed name beside this file in `/assets/`). Never Google, never a CDN.
+ *
+ * GLASS. The header is the over-content glass (content scrolls under it), the
+ * blobs are three static radial gradients on one fixed layer, never animated.
+ * With no blur support, with reduced transparency asked for, and under forced
+ * colours, the glass falls back solid, as the app's does.
+ */
+
+/* outfit-latin-ext-wght-normal */
+@font-face {
+  font-family: 'Outfit Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url(./fonts/outfit-latin-ext-wght-normal.woff2) format('woff2-variations');
+  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
+}
+
+/* outfit-latin-wght-normal */
+@font-face {
+  font-family: 'Outfit Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url(./fonts/outfit-latin-wght-normal.woff2) format('woff2-variations');
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+
+:root {
+  color-scheme: light;
+  --radius: 1rem;
+  --elevation-sh: 0 1px 3px oklch(0 0 0 / 7%), 0 4px 16px oklch(0 0 0 / 5%);
+  --elevation-sh-lg: 0 8px 32px oklch(0 0 0 / 10%);
+  --glass-over-content: oklch(1 0 0 / 80%);
+  --glass-border: oklch(1 0 0 / 80%);
+  --glass-blob-1: oklch(0.8624 0.0676 260.91);
+  --glass-blob-2: oklch(0.8797 0.073 304.58);
+  --glass-blob-3: oklch(0.9216 0.0474 173);
+  --ink: oklch(0.2101 0.0318 264.66);
+  --ink-foreground: oklch(1 0 0);
+  --glass-blur: 24px;
+  --glass-saturate: 160%;
+  --glass-shadow: 0 10px 40px oklch(0.2838 0.0571 268.66 / 10%);
+  --background: oklch(0.9446 0.012 259.82);
+  --foreground: oklch(0.2077 0.0398 265.75);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2077 0.0398 265.75);
+  --muted: oklch(0.9683 0.0069 247.9);
+  --muted-foreground: oklch(0.4924 0.0345 257.79);
+  --border: oklch(0.9288 0.0126 255.51);
+  --ring: oklch(0.3099 0.1185 265.66);
+  --primary: oklch(0.4805 0.1627 264.98);
+  --primary-foreground: oklch(1 0 0);
+  --shift-slot-1: oklch(0.9491 0.0186 242.97);
+  --shift-slot-1-foreground: oklch(0.3911 0.0842 244.54);
+  --shift-slot-2: oklch(0.2684 0.0312 252.76);
+  --shift-slot-2-foreground: oklch(0.8766 0.0239 250.09);
+  --shift-nonworking: oklch(0.9627 0.0051 247.88);
+  --shift-nonworking-border: transparent;
+  --modifier-overridden: oklch(0.582 0.1334 289.32);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --elevation-sh: 0 1px 3px oklch(0 0 0 / 30%), 0 4px 16px oklch(0 0 0 / 22%);
+    --elevation-sh-lg: 0 8px 32px oklch(0 0 0 / 45%);
+    --glass-over-content: oklch(0.2077 0.0398 265.75 / 80%);
+    --glass-border: oklch(1 0 0 / 10%);
+    --glass-blob-1: oklch(0.3653 0.1148 263.45 / 45%);
+    --glass-blob-2: oklch(0.3275 0.111 295.7 / 45%);
+    --glass-blob-3: oklch(0.368 0.064 173.14 / 45%);
+    --ink: oklch(0.9683 0.0069 247.9);
+    --ink-foreground: oklch(0.1831 0.0309 263.38);
+    --glass-blur: 24px;
+    --glass-saturate: 140%;
+    --glass-shadow: 0 10px 40px oklch(0 0 0 / 45%);
+    --background: oklch(0.1765 0.0346 267.28);
+    --foreground: oklch(0.9288 0.0126 255.51);
+    --card: oklch(0.2432 0.0444 259.63);
+    --card-foreground: oklch(0.9288 0.0126 255.51);
+    --muted: oklch(0.2888 0.0504 260.22);
+    --muted-foreground: oklch(0.7107 0.0351 256.79);
+    --border: oklch(1 0 0 / 10%);
+    --ring: oklch(0.9197 0.0346 256.34);
+    --primary: oklch(0.691 0.1602 249.98);
+    --primary-foreground: oklch(0.2004 0.0397 259.82);
+    --shift-slot-1: oklch(0.3543 0.0751 235.02);
+    --shift-slot-1-foreground: oklch(0.8908 0.0549 233.25);
+    --shift-slot-2: oklch(0.3309 0.0217 259.38);
+    --shift-slot-2-foreground: oklch(0.9137 0.0168 259.42);
+    --shift-nonworking: oklch(0.2084 0.0353 259.49);
+    --shift-nonworking-border: oklch(1 0 0 / 7%);
+    --modifier-overridden: oklch(0.6843 0.1236 290.86);
+  }
+}
+
+/* ---------------------------------------------------------------- base */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: 'Outfit Variable', ui-sans-serif, system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  scroll-padding-top: 5.5rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: var(--background);
+  color: var(--foreground);
+  font-size: 1rem;
+  line-height: 1.6;
+  overflow-wrap: break-word;
+}
+
+/* The page's blobs: static, behind everything, never a press target. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    radial-gradient(42rem 34rem at 6% 4%, var(--glass-blob-1), transparent 70%),
+    radial-gradient(38rem 32rem at 96% 18%, var(--glass-blob-2), transparent 70%),
+    radial-gradient(46rem 36rem at 58% 104%, var(--glass-blob-3), transparent 70%);
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+h1 {
+  font-size: clamp(1.875rem, 1.2rem + 3.2vw, 3.25rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  font-size: clamp(1.5rem, 1.2rem + 1.4vw, 2.125rem);
+}
+
+h3 {
+  font-size: 1.125rem;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--primary);
+  text-underline-offset: 0.2em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+main:focus {
+  outline: none;
+}
+
+/* ---------------------------------------------------------------- skip link */
+
+.skip-link {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 100;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 1rem;
+  border-radius: calc(var(--radius) - 2px);
+  background: var(--ink);
+  color: var(--ink-foreground);
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(-200%);
+}
+
+.skip-link:focus {
+  transform: none;
+}
+
+/* ---------------------------------------------------------------- header */
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding: 0.75rem 1rem 0;
+}
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 0.375rem 0.375rem 0.375rem 0.75rem;
+  border-radius: 1.5rem;
+  background-color: var(--glass-over-content);
+  box-shadow:
+    inset 0 0 0 1px var(--glass-border),
+    var(--glass-shadow);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .bar {
+    background-color: var(--card);
+    box-shadow:
+      inset 0 0 0 1px var(--border),
+      var(--glass-shadow);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .bar {
+    background-color: var(--card);
+    box-shadow:
+      inset 0 0 0 1px var(--border),
+      var(--glass-shadow);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  color: var(--foreground);
+  text-decoration: none;
+  border-radius: 0.75rem;
+}
+
+.mark {
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  forced-color-adjust: none;
+}
+
+/* The dark theme's hairline: the tile's edge on dark glass (story 21.24). */
+.mark-edge {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .mark-edge {
+    display: inline;
+  }
+}
+
+.wordmark {
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* ---------------------------------------------------------------- buttons */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 1.125rem;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius) - 2px);
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.button-ink {
+  background-color: var(--ink);
+  color: var(--ink-foreground);
+}
+
+.button-ink:hover {
+  background-color: color-mix(in oklch, var(--ink) 88%, var(--background));
+}
+
+.button-card {
+  background-color: var(--card);
+  color: var(--card-foreground);
+  border-color: var(--border);
+  box-shadow: var(--elevation-sh);
+}
+
+.button-card:hover {
+  background-color: var(--muted);
+}
+
+.button-quiet {
+  padding: 0 0.75rem;
+  color: var(--foreground);
+}
+
+.button-quiet:hover {
+  background-color: var(--muted);
+}
+
+/* ---------------------------------------------------------------- layout */
+
+main {
+  display: block;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+.hero {
+  display: grid;
+  gap: 2.5rem;
+  align-items: center;
+  padding: 3rem 0 3.5rem;
+}
+
+.hero-text {
+  display: grid;
+  gap: 1.25rem;
+  max-width: 40rem;
+}
+
+.eyebrow {
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.lede {
+  font-size: 1.125rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.section {
+  display: grid;
+  gap: 1.5rem;
+  padding: 2.5rem 0;
+}
+
+.cards,
+.steps {
+  display: grid;
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  display: grid;
+  align-content: start;
+  gap: 0.5rem;
+  padding: 1.25rem;
+  border-radius: var(--radius);
+  background-color: var(--card);
+  color: var(--card-foreground);
+  box-shadow: var(--elevation-sh);
+}
+
+.card p {
+  color: var(--muted-foreground);
+}
+
+.card em {
+  color: var(--card-foreground);
+  font-style: italic;
+}
+
+.steps {
+  counter-reset: step;
+}
+
+.step {
+  display: grid;
+  align-content: start;
+  gap: 0.375rem;
+  padding: 1.25rem 1.25rem 1.25rem 4rem;
+  border-radius: var(--radius);
+  background-color: var(--card);
+  color: var(--card-foreground);
+  box-shadow: var(--elevation-sh);
+  position: relative;
+  counter-increment: step;
+}
+
+.step::before {
+  content: counter(step);
+  position: absolute;
+  top: 1.125rem;
+  left: 1.25rem;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  background-color: var(--ink);
+  color: var(--ink-foreground);
+  font-weight: 600;
+}
+
+.step p {
+  color: var(--muted-foreground);
+}
+
+/* ---------------------------------------------------------------- preview */
+
+.preview {
+  margin: 0;
+  justify-self: center;
+  width: 100%;
+  max-width: 22rem;
+}
+
+.preview-card {
+  padding: 1rem;
+  border-radius: 1.25rem;
+  background-color: var(--card);
+  box-shadow: var(--elevation-sh-lg);
+}
+
+.preview-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.75rem;
+  color: var(--card-foreground);
+}
+
+.preview-title {
+  font-weight: 600;
+}
+
+.preview-team {
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+}
+
+.month {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.day {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.day.d {
+  background-color: var(--shift-slot-1);
+  color: var(--shift-slot-1-foreground);
+}
+
+.day.n {
+  background-color: var(--shift-slot-2);
+  color: var(--shift-slot-2-foreground);
+}
+
+.day.off {
+  background-color: var(--shift-nonworking);
+  box-shadow: inset 0 0 0 1px var(--shift-nonworking-border);
+}
+
+.day.swap {
+  box-shadow: inset 0 0 0 2px var(--modifier-overridden);
+}
+
+.day.leave {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    color-mix(in oklch, currentColor 16%, transparent) 0 4px,
+    transparent 4px 8px
+  );
+}
+
+/* ---------------------------------------------------------------- contact */
+
+.contact-card {
+  gap: 1rem;
+  max-width: 40rem;
+  padding: 1.75rem 1.25rem;
+}
+
+.contact-card > p {
+  color: var(--card-foreground);
+}
+
+.email {
+  font-size: clamp(1.125rem, 1rem + 1vw, 1.5rem);
+  font-weight: 600;
+  user-select: text;
+  -webkit-user-select: text;
+  overflow-wrap: anywhere;
+}
+
+.contact-card .aside {
+  color: var(--muted-foreground);
+}
+
+.contact-card .aside a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 600;
+}
+
+.not-found {
+  padding: 4rem 0;
+}
+
+/* ---------------------------------------------------------------- footer */
+
+.site-footer {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 72rem;
+  margin: 2rem auto 0;
+  padding: 2rem 1rem 3rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.9375rem;
+}
+
+.footer-lead {
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------- widths */
+
+/* The phone first: below 400 px the header keeps the mark, Prijava and the
+ * primary action, the word mark shrinks, and nothing scrolls sideways. */
+@media (max-width: 399.98px) {
+  .bar {
+    padding-left: 0.5rem;
+  }
+
+  .wordmark {
+    font-size: 1.0625rem;
+  }
+
+  .button {
+    padding: 0 0.75rem;
+  }
+
+  .button-quiet {
+    padding: 0 0.5rem;
+  }
+}
+
+@media (min-width: 40rem) {
+  .cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .contact-card {
+    padding: 2.25rem;
+  }
+}
+
+@media (min-width: 64rem) {
+  .hero {
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    padding: 5rem 0 4.5rem;
+  }
+
+  .features {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .audience {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .steps {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* ---------------------------------------------------------------- forced colours */
+
+@media (forced-colors: active) {
+  .bar {
+    background-color: Canvas;
+    border: 1px solid CanvasText;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .button,
+  .card,
+  .step,
+  .preview-card {
+    border: 1px solid CanvasText;
+  }
+
+  .skip-link {
+    border: 1px solid CanvasText;
+  }
+
+  :focus-visible {
+    outline-color: Highlight;
+  }
+}
+
+/* ---------------------------------------------------------------- print */
+
+@media print {
+  body::before,
+  .site-header,
+  .preview {
+    display: none;
+  }
+}

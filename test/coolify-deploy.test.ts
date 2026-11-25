@@ -1177,6 +1177,7 @@ describe('the pipeline deploys through Coolify (story 20.6)', () => {
       'functions-image',
       'runtime-parity',
       'web-image',
+      'landing-image',
       'changes',
       'e2e',
     ]);

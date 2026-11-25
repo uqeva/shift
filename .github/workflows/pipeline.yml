@@ -99,7 +99,7 @@ jobs:
       - name: ShellCheck
         run: |
           shellcheck --version
-          shellcheck -x deploy/host/*.sh deploy/host/alert-hook.example deploy/web/render-headers.sh scripts/ci/registry.sh scripts/ci/deploy-images.sh scripts/ci/runtime-parity.sh
+          shellcheck -x deploy/host/*.sh deploy/host/alert-hook.example deploy/web/render-headers.sh scripts/ci/probe-landing-image.sh scripts/ci/registry.sh scripts/ci/deploy-images.sh scripts/ci/runtime-parity.sh
 
       - uses: ./.github/actions/setup
 
@@ -241,6 +241,68 @@ jobs:
 
       - name: Probe it offline
         run: bash scripts/ci/probe-web-image.sh "shift-web:ci-$GITHUB_SHA" apps/web/dist
+
+  # Story 21.21 (AD-28): Smjenko's public page, BUILT ONLY, with the
+  # `example.invalid` placeholders (no LANDING_* input exists here, and none is
+  # committed). The probe runs the image with `--network none` and a read-only
+  # root and checks every answer's six headers, the routes, the 404s and the
+  # caching; then the page runs on the runner's loopback and Chromium checks it
+  # at 320 and 1280 px in both themes (axe, no third party, no cookie, no
+  # console error, no horizontal scroll, the first view under 150 kB).
+  # Building it per environment with real inputs and deploying it is not wired
+  # yet (DEPLOY.md §9.14, `deferred-work.md`). No registry credential here.
+  landing-image:
+    name: Landing image (build, offline probe, Chromium)
+    needs: quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup
+
+      - name: Build apps/landing (placeholders)
+        run: pnpm --filter @shift/landing build
+
+      - name: Build shift-landing (not pushed)
+        run: docker build --pull -f deploy/landing/Dockerfile -t "shift-landing:ci-$GITHUB_SHA" .
+
+      - name: Probe it offline
+        run: bash scripts/ci/probe-landing-image.sh "shift-landing:ci-$GITHUB_SHA" apps/landing/dist
+
+      - uses: ./.github/actions/playwright
+
+      # Twice: as built (signup closed), then rebuilt with a placeholder
+      # LANDING_SIGNUP_URL, so the header's four links at 320 px are checked
+      # too. Each image runs on the runner's loopback only; a container that
+      # never answers fails the step with its log, and is removed either way.
+      - name: Check the page in Chromium (signup closed, then open)
+        run: |
+          check() { # <image> <port> <container>
+            docker run -d --name "$3" --read-only --tmpfs /tmp -p "127.0.0.1:$2:8080" "$1" > /dev/null
+            ready=0
+            for _ in $(seq 1 30); do
+              if curl -fsS -o /dev/null "http://127.0.0.1:$2/"; then ready=1; break; fi
+              sleep 1
+            done
+            if [ "$ready" != 1 ]; then
+              echo "::error title=Landing check::$1 never answered on 127.0.0.1:$2"
+              docker logs "$3" 2>&1 | tail -n 40
+              docker rm -f "$3" > /dev/null
+              return 1
+            fi
+            status=0
+            LANDING_BASE_URL="http://127.0.0.1:$2" pnpm exec playwright test -c apps/landing/playwright.config.ts || status=$?
+            docker rm -f "$3" > /dev/null
+            return "$status"
+          }
+          check "shift-landing:ci-$GITHUB_SHA" 8088 shift-landing-check
+          LANDING_SIGNUP_URL=https://app.example.invalid/registracija pnpm --filter @shift/landing build
+          grep -q 'Registriraj se' apps/landing/dist/index.html
+          docker build -f deploy/landing/Dockerfile -t "shift-landing:ci-signup-$GITHUB_SHA" .
+          check "shift-landing:ci-signup-$GITHUB_SHA" 8089 shift-landing-check-signup
 
   test:
     name: Test (Vitest, local Supabase)
@@ -490,7 +552,7 @@ jobs:
   # A flake on main does not, and a docs-only PR skips E2E even then.
   ci-passed:
     name: CI passed
-    needs: [quality, build, test, functions-image, runtime-parity, web-image, changes, e2e]
+    needs: [quality, build, test, functions-image, runtime-parity, web-image, landing-image, changes, e2e]
     if: ${{ always() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -751,7 +813,7 @@ jobs:
   # ------------------------------------------------------------------ notify
   notify:
     name: Notify
-    needs: [quality, build, test, functions-image, runtime-parity, web-image, e2e, deploy-staging, smoke-staging, deploy-production, smoke-production]
+    needs: [quality, build, test, functions-image, runtime-parity, web-image, landing-image, e2e, deploy-staging, smoke-staging, deploy-production, smoke-production]
     if: (failure() || cancelled()) && github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
