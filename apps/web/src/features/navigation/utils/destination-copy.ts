@@ -22,6 +22,7 @@ const DESCRIPTIONS: Readonly<Record<NavigationKey, ReturnType<typeof destination
   'nav.sati': 'shell.description.sati',
   'nav.godisnji': 'shell.description.godisnji',
   'nav.zaOdluku': 'shell.description.zaOdluku',
+  'nav.rucniRaspored': 'shell.description.rucniRaspored',
   'nav.ljudi': 'shell.description.ljudi',
   'nav.povijestPromjena': 'shell.description.povijestPromjena',
   'nav.postavkeRotacije': 'shell.description.postavkeRotacije',
@@ -37,6 +38,7 @@ export function destinationDescriptionMessageKey(
   | 'shell.description.sati'
   | 'shell.description.godisnji'
   | 'shell.description.zaOdluku'
+  | 'shell.description.rucniRaspored'
   | 'shell.description.ljudi'
   | 'shell.description.povijestPromjena'
   | 'shell.description.postavkeRotacije'

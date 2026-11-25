@@ -745,9 +745,9 @@ development_status:
   # unblocked. Production 20.9 stays after this epic.
   epic-21: in-progress  # pilot readiness; gates 20.9 (founder 2026-11-25)
   21-1-the-personal-assignment-rule-in-the-domain: done  # PR #363, squash 771ce06, CI green
-  21-2-a-personal-assignment-is-a-recorded-exception: review  # built, CI pending (0077)
-  21-3-the-calendar-scrolls-with-the-page-kalendar-bez-unutarnjeg-s: review  # built, CI pending; independent; before 21.4
-  21-4-an-admin-plans-the-month-in-ručni-raspored: ready-for-dev  # after 21.2, 21.3
+  21-2-a-personal-assignment-is-a-recorded-exception: done  # PR #365, squash d23aef6, CI green
+  21-3-the-calendar-scrolls-with-the-page-kalendar-bez-unutarnjeg-s: done  # PR #364, squash 9ea215f, CI green
+  21-4-an-admin-plans-the-month-in-ručni-raspored: review  # built, CI pending
   21-5-popuni-uzorkom-and-kopiraj-fill-a-range: ready-for-dev  # after 21.4
   21-6-personal-shifts-are-read-wherever-shifts-are-read: ready-for-dev  # after 21.2
   21-7-a-leave-over-a-personal-shift-is-a-conflict-and-a-replacemen: ready-for-dev  # after 21.6

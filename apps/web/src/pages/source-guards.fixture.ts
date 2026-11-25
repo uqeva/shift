@@ -298,6 +298,22 @@ export const POVIJEST_PROMJENA: readonly string[] = [
   join(HISTORY_FEATURE, 'components', 'history-export.tsx'),
 ];
 
+/** Story 21.4's *Ručni raspored*: the route module and the planning feature's components. */
+export const RUCNI_RASPORED: readonly string[] = [
+  join(srcRoot, 'pages', 'rucni-raspored.tsx'),
+  join(srcRoot, 'features', 'planning', 'components', 'manual-grid.tsx'),
+  join(srcRoot, 'features', 'planning', 'components', 'manual-member-days.tsx'),
+  join(srcRoot, 'features', 'planning', 'components', 'manual-picker.tsx'),
+  join(srcRoot, 'features', 'planning', 'components', 'manual-preview-dialog.tsx'),
+  join(srcRoot, 'features', 'planning', 'components', 'manual-save-bar.tsx'),
+];
+
+/** Story 21.4's rules: the preview's line keys and the save's refusals, off their `\w*MessageKey` unions. */
+export const RUCNI_RASPORED_KEYS: readonly string[] = [
+  join(srcRoot, 'features', 'planning', 'services', 'manual-preview.ts'),
+  join(srcRoot, 'features', 'planning', 'services', 'manual-save.ts'),
+];
+
 /** Story 14.2's rules: the history's words, off `t()` and its `\w*MessageKey` unions. */
 export const HISTORY_ROWS_KEYS = join(HISTORY_FEATURE, 'services', 'history-rows.ts');
 
@@ -1225,6 +1241,14 @@ export const SCREENS = [
   // THREE SINCE STORY 14.3: *Izvezi u PDF*.
   // FOUR SINCE EPIC 14 RETRO A9: *Prikaži još*, under rows drawn in steps.
   { name: 'the Povijest promjena destination', file: POVIJEST_PROMJENA, expectedFields: 0, expectedButtons: 4 },
+  // STORY 21.4. On *Ručni raspored*: TWO fields, *Računaj u tim…* in the
+  // picker and the phone's *Osoba*; and TEN buttons — the page's *Uredi
+  // odabrano* and its read's retry; in the picker a shift type (written once
+  // inside the map over the types), *Slobodno* and *Očisti*; on the save bar
+  // *Odbaci*, *Spremi* and the unchecked save's *Provjeri ponovno*; and in
+  // *Što se mijenja* *Natrag na uređivanje* and its *Spremi*. The grid's
+  // cells are `gridcell`s and the phone's dates plain buttons, never a `<Button>`.
+  { name: 'the Ručni raspored destination', file: RUCNI_RASPORED, expectedFields: 2, expectedButtons: 10 },
   // STORY 9.3. On the request form: the od and do `<Input>`s, *Pošalji*,
   // *Odustani* (a `<Button asChild>` link back to Godišnji), the figures'
   // unavailable alert's retry, *Natrag na Godišnji* above the title (written

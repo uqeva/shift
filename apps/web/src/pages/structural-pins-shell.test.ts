@@ -68,6 +68,8 @@ const BUILT_SLUGS = [
   'godisnji',
   'za-odluku',
   'povijest-promjena',
+  // TEN SINCE STORY 21.4: `/rucni-raspored`, the month planned by hand, arrives built.
+  'rucni-raspored',
 ];
 
 /** Every registered destination, however much of it is built. */

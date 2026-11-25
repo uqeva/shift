@@ -18,6 +18,8 @@ import {
   FILTER_BAR_KEYS,
   GODISNJI,
   POVIJEST_PROMJENA,
+  RUCNI_RASPORED,
+  RUCNI_RASPORED_KEYS,
   LEAVE_REQUEST,
   HOUR_BAND_EDIT,
   HOUR_BAND_LIST,
@@ -1198,7 +1200,8 @@ export const KEY_SOURCES = [
     file: POVIJEST_PROMJENA,
     keys: translationKeys,
     // FIFTY-EIGHT SINCE STORY 21.23: the lede gone, `Izvoz` and its menu's name added.
-    strings: 58,
+    // FIFTY-NINE SINCE STORY 21.4: a grid save's `Prikaži {n} dana`.
+    strings: 59,
   },
   {
     // STORY 14.2: the history's words — the record, action, field, value,
@@ -1219,7 +1222,26 @@ export const KEY_SOURCES = [
     keys: (text: string) => [...translationKeys(text), ...messageKeyUnions(text)],
     // STORY 19.4: the onboarding dismissal's field label.
     // 154 SINCE STORY 21.2: a personal assignment's note's field label, `Napomena`.
-    strings: 154,
+    // 166 SINCE STORY 21.4 (with its review: a note beside an assignment): the record `Ručni raspored`, the action
+    // `planirano`, the two kinds, an assignment's kind label, its two values
+    // (`slobodno`, a type with its team) and a grouped save's kind line,
+    // and the unknown type twice and team once more inside those values.
+    strings: 166,
+  },
+  {
+    // STORY 21.4: *Ručni raspored* — the page, the grid and its legend, the
+    // picker, the save bar and *Što se mijenja*.
+    name: 'the Ručni raspored destination',
+    file: RUCNI_RASPORED,
+    keys: translationKeys,
+    strings: 78,
+  },
+  {
+    // STORY 21.4: the preview's shift and inert-override lines, and the save's refusals.
+    name: 'the Ručni raspored rules',
+    file: RUCNI_RASPORED_KEYS,
+    keys: messageKeyUnions,
+    strings: 16,
   },
   {
     // STORY 14.3: the PDF's words — the title (the caption), the header's
@@ -2095,10 +2117,11 @@ export const KEY_SOURCES = [
     // NINE over two unions: a description per destination key (eight), and
     // the one place *Više* names by a shorter word than the label.
     // TEN SINCE STORY 14.2: *Povijest promjena*'s description.
+    // ELEVEN SINCE STORY 21.4: *Ručni raspored*'s description.
     name: 'the destination copy mapping',
     file: DESTINATION_COPY_KEYS,
     keys: messageKeyUnions,
-    strings: 10,
+    strings: 11,
   },
   // ONE each, exactly. The seven together are what make the set comparison
   // below hold once `hr.json` gained eight `nav.*` keys: a key declared and

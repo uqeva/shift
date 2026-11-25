@@ -79,6 +79,9 @@ export const HISTORY_RECORDS = [
   // Story 16.5: a member's calendar link (`calendar_feed_tokens`, 0067),
   // never its token or hash (the recorder drops both).
   'calendar-feed',
+  // Story 21.4: a Personal Assignment (`personal_assignments`, 0077), the
+  // grid's *Ručni raspored*. One save is one entry per member (`planned`).
+  'personal-assignment',
   // A table this build does not know yet (an audited table added after it):
   // drawn as a generic record, its fields as raw operands, never a failed read.
   'other',
@@ -99,6 +102,8 @@ export const HISTORY_ACTIONS = [
   'restored',
   'amended',
   'decided',
+  // Story 21.4: one save of *Ručni raspored* for one member, its dates listed.
+  'planned',
   'history-begins',
 ] as const;
 
@@ -139,6 +144,19 @@ export type HistoryOperand =
       readonly id: string;
     }
   | { readonly type: 'enum'; readonly field: HistoryEnumField; readonly value: string }
+  /**
+   * Story 21.4: one Personal Assignment as a grouped save's date line reads it:
+   * its kind as stored (`SHIFT`, `OFF`), its shift type, the team it counts
+   * with and its note, each `null` for none.
+   */
+  | {
+      readonly type: 'personal-assignment';
+      readonly kind: string;
+      readonly shiftTypeId: string | null;
+      readonly teamId: string | null;
+      /** The admin's note on the row, or `null` (21.2: a field admins see). */
+      readonly note: string | null;
+    }
   | { readonly type: 'raw'; readonly json: string };
 
 /** The fields whose values are drawn from a fixed vocabulary. */
@@ -252,6 +270,11 @@ export interface HistoryEntry {
   readonly changes: readonly HistoryChange[];
   /** Backfilled by 0061 from attribution columns, not recorded live. */
   readonly reconstructed: boolean;
+  /**
+   * Story 21.4: on a `planned` entry only, how many dates the save changed for
+   * its member — its `changes` hold one `date` line each. ABSENT otherwise.
+   */
+  readonly days?: number;
 }
 
 // ---------------------------------------------------------------- tables
@@ -280,6 +303,7 @@ const RECORD_OF_TABLE: Readonly<Record<string, HistoryRecord>> = {
   leave_allowances: 'leave-allowance',
   team_loans: 'loan',
   calendar_feed_tokens: 'calendar-feed',
+  personal_assignments: 'personal-assignment',
 };
 
 /** The record an audited table holds, or `null` for a table this build does not know. */
@@ -317,6 +341,11 @@ const AMEND_KEYS: Readonly<Record<string, readonly string[]>> = {
   // as one *izmijenjeno* entry; a first creation stays *dodano*, a turn-off
   // *uklonjeno*.
   calendar_feed_tokens: ['member_id'],
+  // Story 21.4 (0077's `save_personal_assignments`): a replaced cell is a
+  // removal and an insert of one member and date. A live save is grouped per
+  // member ({@link PLANNED_TABLE}); the pair stands for an event with no
+  // transaction.
+  personal_assignments: ['member_id', 'date'],
 };
 
 // ---------------------------------------------------------------- fields
@@ -1198,6 +1227,106 @@ function entryOf(event: AuditEvent, scope: EntryScope): HistoryEntry {
   };
 }
 
+// ---------------------------------------------------------------- planned saves
+
+/**
+ * The table whose live saves are one entry per member (story 21.4, AD-11 as
+ * the epic decided it): 0077's `save_personal_assignments` writes every cell
+ * of a save in one transaction, a removal and an insert for a replaced one.
+ */
+const PLANNED_TABLE = 'personal_assignments';
+
+/** The date line's column: `date:` and the date, so each line of a `planned` entry is keyed by its own date. */
+export const HISTORY_PLANNED_DATE_PREFIX = 'date:';
+
+/** A live event of {@link PLANNED_TABLE}: its transaction and member as one key; `null` for any other. */
+function plannedKeyOf(event: AuditEvent): string | null {
+  if (event.tableName !== PLANNED_TABLE || event.transactionId === null) return null;
+
+  const member = (event.newRow ?? event.oldRow)?.['member_id'];
+
+  if (typeof member !== 'string' || member === '') return null;
+
+  return JSON.stringify([event.transactionId, member]);
+}
+
+/** A row as it stands: `null` for none, or for a removed row (its `removed_at` set). */
+function liveRowOf(row: AuditRow | null): AuditRow | null {
+  return row === null || isSet(row, 'removed_at') ? null : row;
+}
+
+function idOrNull(value: unknown): string | null {
+  return typeof value === 'string' && value !== '' ? value : null;
+}
+
+/** A live assignment row as a date line's side: `none` for no row, `raw` for a kind that is not text. */
+function assignmentOperandOf(row: AuditRow | null): HistoryOperand {
+  if (row === null) return NONE;
+
+  const kind = row['kind'];
+
+  if (typeof kind !== 'string') return rawOf(kind ?? null);
+
+  return {
+    type: 'personal-assignment',
+    kind,
+    shiftTypeId: idOrNull(row['shift_type_id']),
+    teamId: idOrNull(row['team_id']),
+    note: idOrNull(row['note']),
+  };
+}
+
+/**
+ * One member's save as one `planned` entry: for each date, the row live
+ * before the transaction and the row live after it, as a `date` line (a date
+ * whose two sides are the same says nothing; a note is part of a side), oldest
+ * date first; `days` counts the lines. At the newest event's place, by its
+ * author.
+ */
+function plannedEntryOf(group: readonly AuditEvent[], scope: EntryScope): HistoryEntry {
+  const ordered = [...group].sort((first, second) => first.id - second.id);
+  const newest = ordered[ordered.length - 1] as AuditEvent;
+  const before = new Map<string, AuditRow | null>();
+  const after = new Map<string, AuditRow | null>();
+
+  for (const event of ordered) {
+    const date = (event.newRow ?? event.oldRow)?.['date'];
+
+    if (typeof date !== 'string') continue;
+    if (!before.has(date)) before.set(date, liveRowOf(event.oldRow));
+    after.set(date, liveRowOf(event.newRow));
+  }
+
+  const changes: HistoryChange[] = [];
+
+  for (const date of [...before.keys()].sort()) {
+    const was = assignmentOperandOf(before.get(date) ?? null);
+    const now = assignmentOperandOf(after.get(date) ?? null);
+
+    if (sameValue(was, now)) continue;
+
+    changes.push({ field: 'date', column: `${HISTORY_PLANNED_DATE_PREFIX}${date}`, before: was, after: now });
+  }
+
+  const subjects = subjectsOfRows(
+    PLANNED_TABLE,
+    ordered.flatMap((event) => [event.newRow, event.oldRow]),
+  );
+
+  return {
+    id: String(newest.id),
+    eventIds: ordered.map((event) => event.id),
+    occurredAt: newest.occurredAt,
+    day: newest.day,
+    kind: { record: 'personal-assignment', action: 'planned' },
+    author: authorOf(newest, scope.members),
+    subjects: { members: subjects.members, teams: subjects.teams, label: null },
+    changes,
+    reconstructed: false,
+    days: changes.length,
+  };
+}
+
 function amendedEntryOf(removal: AuditEvent, insert: AuditEvent, scope: EntryScope): HistoryEntry {
   const record = historyRecordOf(insert.tableName) ?? 'other';
   const newer = insert.id > removal.id ? insert : removal;
@@ -1232,7 +1361,16 @@ export function historyEntriesOf(events: readonly AuditEvent[], context: History
     requests: requestIndexOf(events),
     current: currentRequestsOf(context.requests ?? []),
   };
-  const pairs = amendPairsOf(events);
+  // STORY 21.4: a live save of the grid is grouped per member, never paired.
+  const planned = new Map<string, AuditEvent[]>();
+
+  for (const event of events) {
+    const key = plannedKeyOf(event);
+
+    if (key !== null) pushTo(planned, key, event);
+  }
+
+  const pairs = amendPairsOf(events.filter((event) => plannedKeyOf(event) === null));
   const partnerOf = new Map<number, number>();
 
   for (const [removal, insert] of pairs) {
@@ -1247,6 +1385,18 @@ export function historyEntriesOf(events: readonly AuditEvent[], context: History
   for (const event of events) {
     if (done.has(event.id)) continue;
     done.add(event.id);
+
+    const plannedKey = plannedKeyOf(event);
+    const group = plannedKey === null ? undefined : planned.get(plannedKey);
+
+    if (group !== undefined) {
+      for (const grouped of group) done.add(grouped.id);
+
+      const entry = plannedEntryOf(group, scope);
+
+      if (inPeriod(entry.day, context.period)) entries.push(entry);
+      continue;
+    }
 
     const partnerId = partnerOf.get(event.id);
     const partner = partnerId === undefined ? undefined : byId.get(partnerId);

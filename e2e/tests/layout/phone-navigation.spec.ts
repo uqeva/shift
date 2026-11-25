@@ -21,7 +21,8 @@ const MEMBER_TABS = [hr.nav.danas, hr.nav.kalendar, hr.nav.sati, hr.nav.godisnji
 /** The sheet's rows by destination name: each row's label and its one-line
  *  description come from the same key. */
 // STORY 14.2: *Povijest promjena* under *Pregled*, after Godišnji.
-const ADMIN_MORE = ['sati', 'godisnji', 'povijestPromjena', 'postavkeRotacije', 'organizacija'] as const;
+// STORY 21.4: *Ručni raspored* after Godišnji, in binding order.
+const ADMIN_MORE = ['sati', 'godisnji', 'rucniRaspored', 'povijestPromjena', 'postavkeRotacije', 'organizacija'] as const;
 /** Story 7.17: the member's fifth destination, the team directory, under *Pregled*. */
 const MEMBER_MORE = ['ljudi'] as const;
 
@@ -224,6 +225,8 @@ test.describe('at a desktop viewport', () => {
       hr.nav.sati,
       hr.nav.godisnji,
       hr.nav.zaOdluku,
+      // STORY 21.4: *Ručni raspored*, admin-only daily work beside Za odluku.
+      hr.nav.rucniRaspored,
       hr.nav.ljudi,
       hr.nav.povijestPromjena,
     ]);

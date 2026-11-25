@@ -98,9 +98,11 @@ describe('the kind of an event', () => {
     ['team_loans', 'loan'],
     // Story 16.5: the calendar link (0067), named rather than `other`.
     ['calendar_feed_tokens', 'calendar-feed'],
+    // Story 21.4: a Personal Assignment (0077), named rather than `other`.
+    ['personal_assignments', 'personal-assignment'],
   ];
 
-  it('names one record per audited table, all 23, and nothing else', () => {
+  it('names one record per audited table, all 24, and nothing else', () => {
     expect(TABLES.map(([table]) => historyRecordOf(table))).toEqual(TABLES.map(([, record]) => record));
     expect(new Set([...TABLES.map(([, record]) => record), 'other'])).toEqual(new Set(HISTORY_RECORDS));
     expect(historyRecordOf('audit_events')).toBeNull();
@@ -617,6 +619,142 @@ describe('an amend is one entry', () => {
   });
 });
 
+describe('a grid save is one entry per member (story 21.4)', () => {
+  const DAY = 'st-day';
+  const NIGHT = 'st-night';
+  const row = (id: string, member: string, date: string, extra: AuditRow = {}): AuditRow => ({
+    organization_id: ORG,
+    id,
+    member_id: member,
+    date,
+    kind: 'SHIFT',
+    shift_type_id: DAY,
+    team_id: null,
+    note: null,
+    removed_at: null,
+    removed_by: null,
+    ...extra,
+  });
+  const removed = (old: AuditRow, transactionId: string): AuditEvent =>
+    event({
+      tableName: 'personal_assignments',
+      operation: 'UPDATE',
+      transactionId,
+      oldRow: old,
+      newRow: { ...old, removed_at: '2026-11-10T08:00:00+00:00', removed_by: ANA_AUTH },
+    });
+  const inserted = (fresh: AuditRow, transactionId: string): AuditEvent =>
+    event({ tableName: 'personal_assignments', operation: 'INSERT', transactionId, newRow: fresh });
+
+  it('groups one transaction per member: a planned entry with one date line per date, oldest first, and its count', () => {
+    const anaOld = row('a0', ANA, '2026-11-13', { shift_type_id: NIGHT });
+    // In write order (0077: each item's removal before its insert), read newest first.
+    const events = [
+      removed(row('a1', ANA, '2026-11-12'), '900'),
+      removed(anaOld, '900'),
+      inserted(row('a2', ANA, '2026-11-13', { team_id: TEAM_B }), '900'),
+      inserted(row('a3', ANA, '2026-11-14', { kind: 'OFF', shift_type_id: null }), '900'),
+      inserted(row('i2', IVO, '2026-11-12'), '900'),
+    ];
+    const entries = historyEntriesOf([...events].reverse(), CONTEXT);
+
+    expect(entries).toHaveLength(2);
+
+    const [ivo, ana] = entries as [HistoryEntry, HistoryEntry];
+
+    expect(ivo.kind).toEqual({ record: 'personal-assignment', action: 'planned' });
+    expect(ivo.days).toBe(1);
+    expect(ivo.subjects).toEqual({ members: [IVO], teams: [], label: null });
+    expect(ana.kind).toEqual({ record: 'personal-assignment', action: 'planned' });
+    expect(ana.days).toBe(3);
+    expect(ana.subjects).toEqual({ members: [ANA], teams: [TEAM_B], label: null });
+    expect(ana.changes).toEqual([
+      {
+        field: 'date',
+        column: 'date:2026-11-12',
+        before: { type: 'personal-assignment', kind: 'SHIFT', shiftTypeId: DAY, teamId: null, note: null },
+        after: { type: 'none' },
+      },
+      {
+        field: 'date',
+        column: 'date:2026-11-13',
+        before: { type: 'personal-assignment', kind: 'SHIFT', shiftTypeId: NIGHT, teamId: null, note: null },
+        after: { type: 'personal-assignment', kind: 'SHIFT', shiftTypeId: DAY, teamId: TEAM_B, note: null },
+      },
+      {
+        field: 'date',
+        column: 'date:2026-11-14',
+        before: { type: 'none' },
+        after: { type: 'personal-assignment', kind: 'OFF', shiftTypeId: null, teamId: null, note: null },
+      },
+    ]);
+    expect(ana.eventIds).toEqual([...ana.eventIds].sort((first, second) => first - second));
+    expect(ana.eventIds).toHaveLength(4);
+    expect(ana.id).toBe(String(Math.max(...ana.eventIds)));
+    expect(ana.author).toEqual({ kind: 'member', memberId: ANA });
+  });
+
+  it('keeps two saves of one member apart, and leaves the days field off every other entry', () => {
+    const first = inserted(row('a1', ANA, '2026-11-12'), '910');
+    const second = inserted(row('a2', ANA, '2026-11-13'), '911');
+    const team = event({ tableName: 'teams', operation: 'INSERT', newRow: { id: TEAM_A, name: 'A' } });
+    const entries = historyEntriesOf([team, second, first], CONTEXT);
+
+    expect(entries.map((entry) => entry.days)).toEqual([undefined, 1, 1]);
+    expect(Object.hasOwn(entries[0] as HistoryEntry, 'days')).toBe(false);
+  });
+
+  it('shows a note-only replacement as its date line, the note part of each side (review)', () => {
+    const old = row('a1', ANA, '2026-11-12', { note: 'stara' });
+    const removal = removed(old, '920');
+    const entry = only([inserted({ ...old, id: 'a2', note: 'nova' }, '920'), removal]);
+
+    expect(entry.kind.action).toBe('planned');
+    expect(entry.days).toBe(1);
+    expect(entry.changes.map((change) => [change.before, change.after])).toEqual([
+      [
+        { type: 'personal-assignment', kind: 'SHIFT', shiftTypeId: 'st-day', teamId: null, note: 'stara' },
+        { type: 'personal-assignment', kind: 'SHIFT', shiftTypeId: 'st-day', teamId: null, note: 'nova' },
+      ],
+    ]);
+  });
+
+  it('draws a real update of a grid row inside a transaction as at least one line, no value raw (retro A4, grouped path)', () => {
+    const before = row('a1', ANA, '2026-11-12');
+
+    for (const after of [
+      { ...before, note: 'nova' },
+      { ...before, shift_type_id: NIGHT },
+      { ...before, team_id: TEAM_A },
+      { ...before, kind: 'OFF', shift_type_id: null },
+    ]) {
+      const entry = only([event({ tableName: 'personal_assignments', operation: 'UPDATE', transactionId: '940', oldRow: before, newRow: after })]);
+
+      expect(entry.changes.length).toBeGreaterThan(0);
+      for (const change of entry.changes) {
+        expect(change.field).not.toBeNull();
+        for (const operand of [change.before, change.after]) expect(operand.type).not.toBe('raw');
+      }
+    }
+  });
+
+  it('pairs a replacement with no transaction on its member and date, as an amend', () => {
+    const old = row('a1', ANA, '2026-11-12');
+    const removal = { ...removed(old, 'x'), transactionId: null, origin: 'backfill' as const, occurredAt: 'same' };
+    const insert = { ...inserted({ ...old, id: 'a2', shift_type_id: NIGHT }, 'x'), transactionId: null, origin: 'backfill' as const, occurredAt: 'same' };
+    const entry = only([insert, removal]);
+
+    expect(entry.kind).toEqual({ record: 'personal-assignment', action: 'amended' });
+    expect(entry.days).toBeUndefined();
+  });
+
+  it('drops a planned entry whose save falls outside the period', () => {
+    const outside = { ...inserted(row('a1', ANA, '2026-12-02'), '930'), day: '2026-12-01' };
+
+    expect(historyEntriesOf([outside], CONTEXT)).toEqual([]);
+  });
+});
+
 describe('the period', () => {
   it('ends the day choices on today, inclusive', () => {
     expect(historyPeriodOf('7-dana', '2026-11-16')).toEqual({ from: '2026-11-10', to: '2026-11-16' });
@@ -1004,7 +1142,7 @@ describe('every real change names a field (retro A4)', () => {
     );
   });
 
-  /** Every column of the 23 audited tables as 0002–0074 leave them (0067's recorder drops `token_hash` and `last_fetched_at`), with a value of its type. */
+  /** Every column of the 24 audited tables as 0002–0077 leave them (0067's recorder drops `token_hash` and `last_fetched_at`), with a value of its type. */
   const AT = '2026-11-10T08:00:00+00:00';
   const BOOKKEEPING = { organization_id: ORG, created_by: ANA_AUTH, created_at: AT };
   const LIVE = { removed_by: null, removed_at: null };
@@ -1177,6 +1315,17 @@ describe('every real change names a field (retro A4)', () => {
     },
     // Story 16.5: as the recorder writes it, without `token_hash` and `last_fetched_at`.
     calendar_feed_tokens: { ...BOOKKEEPING, ...LIVE, id: 'cf', member_id: ANA },
+    personal_assignments: {
+      ...BOOKKEEPING,
+      ...LIVE,
+      id: 'pa',
+      member_id: ANA,
+      date: '2026-11-12',
+      kind: 'SHIFT',
+      shift_type_id: 'st-day',
+      team_id: TEAM_A,
+      note: 'napomena',
+    },
   };
 
   /** A different value of the same type. */
@@ -1193,7 +1342,7 @@ describe('every real change names a field (retro A4)', () => {
 
   const LIFECYCLE_AT = new Set(['removed_at', 'confirmed_at', 'closed_at', 'answered_at']);
 
-  it('covers the 23 audited tables', () => {
+  it('covers the 24 audited tables', () => {
     expect(Object.keys(AUDITED).map((table) => historyRecordOf(table))).not.toContain(null);
     expect(new Set(Object.keys(AUDITED).map((table) => historyRecordOf(table)))).toEqual(
       new Set(HISTORY_RECORDS.filter((record) => record !== 'other')),
@@ -1214,7 +1363,9 @@ describe('every real change names a field (retro A4)', () => {
   it.each(CASES)('draws an update of %s changing only %s as at least one change, no value a bare id', (table, column) => {
     const before = AUDITED[table] as AuditRow;
     const after = { ...before, [column]: changed(before[column]) };
-    const entry = only([event({ tableName: table, operation: 'UPDATE', oldRow: before, newRow: after })]);
+    // A grid save (story 21.4) is grouped by its transaction: the generic read is one with none.
+    const transaction = table === 'personal_assignments' ? { transactionId: null } : {};
+    const entry = only([event({ tableName: table, operation: 'UPDATE', oldRow: before, newRow: after, ...transaction })]);
 
     expect(entry.changes.length).toBeGreaterThan(0);
     for (const change of entry.changes) {

@@ -2,13 +2,15 @@
 title: 'Story 21.3: the calendar scrolls with the page (Kalendar bez unutarnjeg scrolla)'
 type: 'feature'
 created: '2026-11-25'
-status: 'in-review'
+status: 'done'
 baseline_commit: '0c119338f43c509736b10acda0dc039c00a5f5db'
 review_loop_iteration: 1
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-21-context.md'
   - '{project-root}/_bmad-output/planning-artifacts/ux-designs/ux-shift-2026-09-02/DESIGN.md'
 ---
+
+Status: done. Merged as #364, squash `9ea215f` (2026-11-25), after `CI passed` went green on `033de0c` (run 45630509774: every job SUCCESS, the four E2E shards and Test (Vitest, local Supabase) included). Rewritten by story 21.4, which set the sprint status `done`.
 
 Baseline: `origin/main` at `0c11933` (#362). Touches the hot file `apps/web/src/index.css`; no other 21.x story in flight touches it (21.1 is `packages/domain` only).
 
@@ -105,7 +107,7 @@ Epic AC "the e2e month snapshots are unchanged apart from layout": there are no 
 
 **Results (2026-11-25, after review loop 1):** `pnpm typecheck` exit 0 (apps, e2e, smoke, perf); `pnpm lint` exit 0; `pnpm --filter @shift/web test` 6925 passed; `pnpm build` exit 0; the four theme root files with `resource-hygiene` and `supabase-scaffold` 3562 passed (`index.css` changed, so the theme files ran). The real `CalendarGrid` and `CalendarTeamDays` were rendered to static HTML with the built CSS in headless Chromium: at 1280 px (3 teams) and 800 px (14 teams) the strip's column widths equal the grid's and stay aligned after a sideways scroll, the strip sits at the viewport's top once the page scrolls, the grid has no vertical scroll room and the page none sideways; the phone list at 320 and 390 px does not overflow (at 320 px with a 32 px root font it does by 5 px, shared with *Moj raspored*: deferred-work). e2e and `pnpm test:perf` never ran locally: CI is their first run (layout.spec.ts and calendar.spec.ts rewritten), perf is the operator's (deferred-work).
 
-**Residual risk:** an e2e step that resizes to a phone width in a way the viewport grep missed would still expect the grid; the erasure specs resize to 390 px with a day dialog open, which now swaps the grid for the list under the URL-driven dialog (expected to stay open, unverified until CI).
+**Residual risk (rewritten by story 21.4 from CI):** CI settled the e2e. Run 1 on PR #364 (45626785892) failed in `E2E (Playwright, shard 2/4)` on one step of `layout.spec.ts`'s wide-grid case ("the corner left the viewport's top": the probe scrolled less than the strip's own offset). The fix pushed only for CI was `033de0c` ("scroll past the strip's own offset before probing"). Run 2 (45630509774) was green: every E2E shard passed, the erasure specs that resize to 390 px with a day dialog open included. `pnpm test:perf` (NFR-22) is still unmeasured; it is the operator's (deferred-work), and CI does not settle it.
 
 ## Suggested Review Order
 

@@ -46,7 +46,7 @@ export function HistoryTable({
             </TableCell>
             <TableCell className="align-top">{row.subject}</TableCell>
             <TableCell className="min-w-48 align-top">
-              <HistoryChanges changes={row.changes} />
+              <HistoryChanges changes={row.changes} days={row.days} />
             </TableCell>
           </TableRow>
         ))}

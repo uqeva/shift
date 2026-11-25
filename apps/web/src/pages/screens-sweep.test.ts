@@ -334,7 +334,8 @@ describe('the screen is read at all, so every sweep below means something', () =
     // FORTY-ONE SINCE STORY 19.2: the signup screens.
     // FORTY-THREE SINCE STORY 16.5: *Kalendar na mobitelu* and the member page's card.
     // FORTY-FOUR SINCE STORY 19.4: the setup frame and the *Danas* card.
-    expect(SCREENS).toHaveLength(44);
+    // FORTY-FIVE SINCE STORY 21.4: *Ručni raspored*.
+    expect(SCREENS).toHaveLength(45);
     //
     // FORTY-NINE SINCE STORY 3.6b: `@/features/calendar/services/roster-write`.
     //
@@ -420,7 +421,8 @@ describe('the screen is read at all, so every sweep below means something', () =
     // A HUNDRED AND FIVE SINCE STORY 17.1: the reminder settings rules.
     // A HUNDRED AND SIX SINCE STORY 19.3: step 1's rules.
     // A HUNDRED AND TEN SINCE STORY 19.4: the setup frame, its steps, its progress rules and its link rules.
-    expect(KEY_SOURCES).toHaveLength(110);
+    // A HUNDRED AND TWELVE SINCE STORY 21.4: *Ručni raspored* and its rules.
+    expect(KEY_SOURCES).toHaveLength(112);
   });
 
   // Vacuous-pass guard. A renamed or moved file would make each "contains no"

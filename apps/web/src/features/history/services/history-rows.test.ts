@@ -536,3 +536,59 @@ describe('the rows are drawn in steps, and a departed member keeps their name (e
     ).toBe('Ana');
   });
 });
+
+describe('a grid save is one row per member, its dates listed (story 21.4)', () => {
+  const live = { organization_id: 'org', member_id: 'ana', note: null, removed_at: null, removed_by: null };
+  const removal = event({
+    id: 11,
+    tableName: 'personal_assignments',
+    operation: 'UPDATE',
+    transactionId: '77',
+    oldRow: { ...live, id: 'p1', date: '2026-11-12', kind: 'SHIFT', shift_type_id: 's1', team_id: null },
+    newRow: { ...live, id: 'p1', date: '2026-11-12', kind: 'SHIFT', shift_type_id: 's1', team_id: null, removed_at: 'x' },
+  });
+  const replaced = event({
+    id: 12,
+    tableName: 'personal_assignments',
+    operation: 'INSERT',
+    transactionId: '77',
+    newRow: { ...live, id: 'p2', date: '2026-11-12', kind: 'OFF', shift_type_id: null, team_id: null },
+  });
+  const added = event({
+    id: 13,
+    tableName: 'personal_assignments',
+    operation: 'INSERT',
+    transactionId: '77',
+    newRow: { ...live, id: 'p3', date: '2026-11-13', kind: 'SHIFT', shift_type_id: 's1', team_id: 'a' },
+  });
+
+  it('says the kind as Ručni raspored with its day count, and each date as its own line', () => {
+    const events = [added, replaced, removal];
+    const entries = historyEntriesOf(events, { period: PERIOD, members: [{ id: 'ana', authUserId: 'auth-ana' }] });
+    const [row] = historyRowsOf(entries, historyNamesOf(events, LISTS), ZONE);
+
+    expect(row?.kind).toBe('Ručni raspored: 2 dana');
+    expect(row?.days).toBe(2);
+    expect(row?.subject).toBe('Ana Anić i Smjena A');
+    expect(row?.changes).toEqual([
+      { column: 'date:2026-11-12', field: formatIsoDate('2026-11-12'), before: 'Dnevna', after: 'slobodno' },
+      { column: 'date:2026-11-13', field: formatIsoDate('2026-11-13'), before: null, after: 'Dnevna · tim Smjena A' },
+    ]);
+  });
+
+  it('words the record, the action and both kinds, and leaves the days off every other row', () => {
+    expect(t(historyRecordMessageKey('personal-assignment'))).toBe('Ručni raspored');
+    expect(t(historyActionMessageKey('planned'))).toBe('planirano');
+    expect(historyEnumMessageKey('kind', 'SHIFT')).toBe('history.enum.kindShift');
+    expect(historyEnumMessageKey('kind', 'OFF')).toBe('history.enum.kindOff');
+    expect(t('history.planned', { count: 1 })).toBe('Ručni raspored: 1 dan');
+    expect(
+      historyOperandText({ type: 'personal-assignment', kind: 'SHIFT', shiftTypeId: 's1', teamId: null, note: 'zamjena' }, historyNamesOf([], LISTS)),
+    ).toBe('Dnevna (zamjena)');
+
+    const team = event({ id: 20, tableName: 'teams', operation: 'INSERT', newRow: { id: 'a', name: 'Smjena A' } });
+    const [row] = historyRowsOf(historyEntriesOf([team], { period: PERIOD, members: [] }), historyNamesOf([team], LISTS), ZONE);
+
+    expect(row !== undefined && Object.hasOwn(row, 'days')).toBe(false);
+  });
+});

@@ -472,6 +472,17 @@ const SOURCES = [
   // Story 14.2: *Povijest promjena*, the ninth destination, and its feature —
   // its hook, components, and the rules module that words every row.
   join(webRoot, 'src', 'pages', 'povijest-promjena.tsx'),
+  // Story 21.4: *Ručni raspored*, the tenth destination, and its feature —
+  // the hook, the components and the rule modules that word the preview and the save.
+  join(webRoot, 'src', 'pages', 'rucni-raspored.tsx'),
+  join(webRoot, 'src', 'features', 'planning', 'hooks', 'use-manual-schedule.ts'),
+  join(webRoot, 'src', 'features', 'planning', 'components', 'manual-grid.tsx'),
+  join(webRoot, 'src', 'features', 'planning', 'components', 'manual-member-days.tsx'),
+  join(webRoot, 'src', 'features', 'planning', 'components', 'manual-picker.tsx'),
+  join(webRoot, 'src', 'features', 'planning', 'components', 'manual-preview-dialog.tsx'),
+  join(webRoot, 'src', 'features', 'planning', 'components', 'manual-save-bar.tsx'),
+  join(webRoot, 'src', 'features', 'planning', 'services', 'manual-preview.ts'),
+  join(webRoot, 'src', 'features', 'planning', 'services', 'manual-save.ts'),
   join(webRoot, 'src', 'features', 'history', 'hooks', 'use-change-history.ts'),
   join(webRoot, 'src', 'features', 'history', 'components', 'history-body.tsx'),
   join(webRoot, 'src', 'features', 'history', 'components', 'history-filters.tsx'),
