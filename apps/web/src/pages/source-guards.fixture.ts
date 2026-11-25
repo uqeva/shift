@@ -1161,7 +1161,10 @@ export const SCREENS = [
   // detail's footer, a `<Button asChild>` link to the swap proposal.
   // THIRTY-SIX SINCE STORY 16.1: *Ispiši*, one button in one of two slots —
   // the end of the Card's head row from 640 px, the page header below it.
-  { name: 'the Kalendar destination', file: KALENDAR, expectedFields: 6, expectedButtons: 36 },
+  // THIRTY-SEVEN SINCE STORY 21.3: *Sve smjene* on a phone is a day list of
+  // every shown team, each team's day a button (`CalendarTeamDays`), written
+  // once inside the map over a date's cells.
+  { name: 'the Kalendar destination', file: KALENDAR, expectedFields: 6, expectedButtons: 37 },
   // STORY 12.2. On the swap proposal: the colleague and return `<Select>`s,
   // *Pošalji*, *Odustani* (a `<Button asChild>` link back to Kalendar), the
   // snapshot's unavailable alert's retry, *Natrag na Kalendar* above the title

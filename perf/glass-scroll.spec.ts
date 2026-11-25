@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { expect, test, type CDPSession, type Page } from '@playwright/test';
+import { expect, test, type Browser, type CDPSession, type Page } from '@playwright/test';
 
 import { CalendarPage } from '../e2e/pages/calendar.page.ts';
 import { LoginPage } from '../e2e/pages/login.page.ts';
@@ -12,16 +12,18 @@ import { hr } from '../e2e/utils/i18n.ts';
  * trace on a real low-end Android (DESIGN.md, glass rule 7; UX-DR53). That
  * trace stays a human step (`deferred-work.md`).
  *
- * TWO MEASUREMENTS, both on a phone viewport (390 × 844, DPR 3, touch), as an
- * admin on *Kalendar*'s *Sve smjene* grid, all teams:
+ * THREE MEASUREMENTS, the first two on a phone viewport (390 × 844, DPR 3, touch), as an
+ * admin on *Kalendar*'s *Sve smjene*, all teams — on a phone the day list of
+ * every team since story 21.3, which has no scroller of its own: the page
+ * scrolls it:
  *
  *  1. NFR-22, a mid-range phone on a mobile network: 4× CPU throttling, and
  *     Fast 4G bandwidth (9 Mbit/s down, 1.5 Mbit/s up) at Lighthouse's 150 ms
  *     mobile round trip, which is slower than DevTools' preset. Cold: no HTTP
- *     cache and no service worker. From navigation to the month's grid on
+ *     cache and no service worker. From navigation to the month's team days on
  *     screen, at most 2000 ms.
  *  2. The glass budget, a low-end phone: 6× CPU throttling (DevTools' low-tier
- *     mobile). A Chromium trace while the grid scrolls through one month,
+ *     mobile). A Chromium trace while the page scrolls through one month,
  *     moves to the next and scrolls through that one, under the glass tab bar
  *     and the glass sticky head. No frame may spend over 50 ms in paint or
  *     composite. That is read two ways: no paint, raster, layerize or
@@ -29,6 +31,10 @@ import { hr } from '../e2e/utils/i18n.ts';
  *     whose rendering phase (from `renderStart` to its end: style, layout,
  *     paint and commit on the main thread) is over 50 ms. Long animation
  *     frames are only reported over 50 ms, so with none the phase reads 0.
+ *  3. The same glass budget at a TABLET width (800 × 600, no touch; story
+ *     21.3): *Sve smjene* is the grid there, scrolled by the page under its
+ *     sticky team strip, whose copy table doubles the cell DOM. Its trace is
+ *     `glass-scroll-grid-trace.json`, its summary `glassBudgetGrid`.
  *
  * WHAT A PROXY CANNOT SHOW. CPU throttling slows the renderer's main thread;
  * the GPU, raster and compositor threads of this machine are not throttled,
@@ -36,12 +42,14 @@ import { hr } from '../e2e/utils/i18n.ts';
  * thread holds; only the real-device trace (`deferred-work.md`) says a weak
  * phone GPU does.
  *
- * The trace (`glass-scroll-trace.json`, opens in DevTools → Performance) and
+ * The traces (`glass-scroll-trace.json` and `glass-scroll-grid-trace.json`, open in DevTools → Performance) and
  * `summary.json` are written to `test-results-perf/` for the PR.
  */
 
 const OUT = fileURLToPath(new URL('../test-results-perf/', import.meta.url));
-const TRACE = `${OUT}glass-scroll-trace.json`;
+/** The phone's trace, and the grid's at a tablet width (story 21.3), under `OUT`. */
+const TRACE_FILE = 'glass-scroll-trace.json';
+const GRID_TRACE_FILE = 'glass-scroll-grid-trace.json';
 const SUMMARY = `${OUT}summary.json`;
 
 const NFR_22_MS = 2000;
@@ -97,28 +105,39 @@ async function signIn(page: Page): Promise<void> {
   await new LoginPage(page).signIn(org, username, password);
 }
 
-/** Opens *Kalendar* and makes sure the grid (*Sve smjene*), not the day list, shows. */
-async function openGrid(calendar: CalendarPage, page: Page): Promise<void> {
+/**
+ * *Sve smjene* is shown: on a phone (story 21.3) the day list of every team,
+ * its mode pressed and its first team day drawn.
+ */
+async function expectAllTeams(calendar: CalendarPage, timeout = 5_000): Promise<void> {
+  await expect(calendar.modes().sve, 'Sve smjene is not the mode shown (was it not remembered?)').toHaveAttribute(
+    'aria-pressed',
+    'true',
+    { timeout },
+  );
+  await expect(calendar.dayList.getByRole('button').first()).toBeVisible({ timeout });
+}
+
+/** Opens *Kalendar* and makes sure *Sve smjene* (all teams), not *Moj raspored*, shows. */
+async function openAllTeams(calendar: CalendarPage, page: Page): Promise<void> {
   await calendar.goto();
   await expect(calendar.monthHeading()).toBeVisible();
   const modeSwitch = page.getByRole('button', { name: hr.kalendar.mode.sve, exact: true });
   // Wait until the screen has settled on one mode before deciding.
-  await expect(calendar.grid.or(modeSwitch).first()).toBeVisible();
-  if (!(await calendar.grid.isVisible())) {
-    await page.getByRole('button', { name: hr.kalendar.mode.sve, exact: true }).click();
-  }
-  await expect(calendar.grid).toBeVisible();
+  await expect(modeSwitch).toBeVisible();
+  if ((await modeSwitch.getAttribute('aria-pressed')) !== 'true') await modeSwitch.click();
+  await expectAllTeams(calendar);
 }
 
 async function throttle(session: CDPSession, rate: number): Promise<void> {
   await session.send('Emulation.setCPUThrottlingRate', { rate });
 }
 
-test('NFR-22: the month grid renders within two seconds on a mid-range phone', async ({ page }) => {
+test('NFR-22: the month renders within two seconds on a mid-range phone', async ({ page }) => {
   await signIn(page);
   const calendar = new CalendarPage(page);
-  // Once unthrottled, so the mode the screen remembers is the grid.
-  await openGrid(calendar, page);
+  // Once unthrottled, so the mode the screen remembers is Sve smjene.
+  await openAllTeams(calendar, page);
 
   const session = await page.context().newCDPSession(page);
   await session.send('Network.enable');
@@ -135,22 +154,34 @@ test('NFR-22: the month grid renders within two seconds on a mid-range phone', a
   // already signed in, as a member's phone is.
   const started = Date.now();
   await page.goto('/kalendar');
-  await expect(calendar.grid, 'the grid did not come back (was Sve smjene not remembered?)').toBeVisible({
-    timeout: 30_000,
-  });
-  await expect(calendar.grid.getByRole('gridcell').first()).toBeVisible();
+  await expectAllTeams(calendar, 30_000);
   const elapsed = Date.now() - started;
 
   summary['browser'] = page.context().browser()?.version();
-  summary['nfr22'] = { cpuThrottling: 4, network: '9/1.5 Mbit/s, 150 ms', coldMonthGridMs: elapsed, budgetMs: NFR_22_MS };
+  summary['nfr22'] = { cpuThrottling: 4, network: '9/1.5 Mbit/s, 150 ms', coldMonthMs: elapsed, shown: 'Sve smjene, the day list of every team (story 21.3)', budgetMs: NFR_22_MS };
   writeSummary();
-  expect(elapsed, `the month grid took ${String(elapsed)} ms`).toBeLessThanOrEqual(NFR_22_MS);
+  expect(elapsed, `the month took ${String(elapsed)} ms`).toBeLessThanOrEqual(NFR_22_MS);
 });
 
-test('the glass budget: scrolling two months spends no frame over 50 ms in paint or composite on a low-end phone', async ({
-  page,
-  browser,
-}) => {
+/** One glass-budget measurement: where it scrolls, and where its trace and summary go. */
+interface GlassCase {
+  /** The trace file under `test-results-perf/`. */
+  readonly trace: string;
+  /** The key of `summary.json` it writes. */
+  readonly key: string;
+  /** Opens *Sve smjene* in the form this width draws, and waits for it. */
+  readonly open: (calendar: CalendarPage, page: Page) => Promise<void>;
+  /** Waits for the form again after the month changes. */
+  readonly shown: (calendar: CalendarPage) => Promise<void>;
+  /** Where the pointer sits while the wheel turns: over the month. */
+  readonly pointer: { readonly x: number; readonly y: number };
+}
+
+/**
+ * Scrolls two months under 6× CPU throttling and holds every paint or
+ * composite task and every long animation frame's rendering phase to 50 ms.
+ */
+async function measureGlassBudget(page: Page, browser: Browser, glass: GlassCase): Promise<void> {
   await page.addInitScript(() => {
     (window as unknown as { __loaf: boolean }).__loaf = PerformanceObserver.supportedEntryTypes.includes(
       'long-animation-frame',
@@ -171,7 +202,7 @@ test('the glass budget: scrolling two months spends no frame over 50 ms in paint
 
   await signIn(page);
   const calendar = new CalendarPage(page);
-  await openGrid(calendar, page);
+  await glass.open(calendar, page);
 
   const session = await page.context().newCDPSession(page);
   await throttle(session, 6);
@@ -179,9 +210,10 @@ test('the glass budget: scrolling two months spends no frame over 50 ms in paint
     (window as unknown as { __frames: unknown[] }).__frames.length = 0;
   });
 
+  const tracePath = `${OUT}${glass.trace}`;
   mkdirSync(OUT, { recursive: true });
   await browser.startTracing(page, {
-    path: TRACE,
+    path: tracePath,
     categories: [
       'devtools.timeline',
       'disabled-by-default-devtools.timeline',
@@ -193,12 +225,12 @@ test('the glass budget: scrolling two months spends no frame over 50 ms in paint
 
   const scrolled: number[] = [];
   const scrollThrough = async (): Promise<void> => {
-    await page.mouse.move(195, 500);
+    await page.mouse.move(glass.pointer.x, glass.pointer.y);
     for (let step = 0; step < 16; step += 1) {
       await page.mouse.wheel(0, 320);
       await page.waitForTimeout(120);
     }
-    // How far it got: the page's scroll, or the grid's own scroller's.
+    // How far it got: the page's scroll (the month has no vertical scroller of its own), or any element's.
     scrolled.push(
       await page.evaluate(() => {
         let furthest = window.scrollY;
@@ -218,7 +250,7 @@ test('the glass budget: scrolling two months spends no frame over 50 ms in paint
     await scrollThrough();
     await calendar.nextButton.click();
     await expect(calendar.monthHeading()).not.toHaveText(heading);
-    await expect(calendar.grid).toBeVisible();
+    await glass.shown(calendar);
     await scrollThrough();
   } finally {
     await browser.stopTracing();
@@ -232,7 +264,7 @@ test('the glass budget: scrolling two months spends no frame over 50 ms in paint
   );
 
   // The trace's paint and composite tasks, longest first.
-  const parsed = JSON.parse(readFileSync(TRACE, 'utf8')) as
+  const parsed = JSON.parse(readFileSync(tracePath, 'utf8')) as
     | { traceEvents: { name: string; ph: string; dur?: number }[] }
     | { name: string; ph: string; dur?: number }[];
   const events = Array.isArray(parsed) ? parsed : parsed.traceEvents;
@@ -245,9 +277,10 @@ test('the glass budget: scrolling two months spends no frame over 50 ms in paint
   const longestRenderMs = Math.max(0, ...frames.map((frame) => frame.render));
   const longFrames = frames.filter((frame) => frame.duration > FRAME_BUDGET_MS);
 
-  summary['glassBudget'] = {
+  summary[glass.key] = {
     cpuThrottling: 6,
-    trace: 'test-results-perf/glass-scroll-trace.json',
+    viewport: page.viewportSize(),
+    trace: `test-results-perf/${glass.trace}`,
     longestPaintOrCompositeTaskMs: Number(longestTaskMs.toFixed(1)),
     longestByTask: Object.fromEntries([...longestByName].map(([name, ms]) => [name, Number(ms.toFixed(1))])),
     scrolledPx: scrolled,
@@ -262,4 +295,51 @@ test('the glass budget: scrolling two months spends no frame over 50 ms in paint
   expect(longestByName.size, 'the trace holds no paint or composite task, so nothing was measured').toBeGreaterThan(0);
   expect(longestTaskMs, 'a paint or composite task ran over 50 ms').toBeLessThanOrEqual(FRAME_BUDGET_MS);
   expect(longestRenderMs, 'a frame spent over 50 ms rendering').toBeLessThanOrEqual(FRAME_BUDGET_MS);
+}
+
+test('the glass budget: scrolling two months spends no frame over 50 ms in paint or composite on a low-end phone', async ({
+  page,
+  browser,
+}) => {
+  await measureGlassBudget(page, browser, {
+    trace: TRACE_FILE,
+    key: 'glassBudget',
+    open: openAllTeams,
+    shown: (calendar) => expectAllTeams(calendar),
+    pointer: { x: 195, y: 500 },
+  });
+});
+
+/** *Sve smjene*'s grid from 640 px (story 21.3): the table, its sticky strip and the strip's copy, drawn. */
+async function expectGrid(calendar: CalendarPage): Promise<void> {
+  await expect(calendar.grid).toBeVisible();
+  await expect(calendar.grid.getByRole('gridcell').first()).toBeVisible();
+  await expect(calendar.strip).toBeVisible();
+}
+
+/** Opens *Kalendar*'s *Sve smjene* at a grid width: the grid, never the day list. */
+async function openGridAtWidth(calendar: CalendarPage, page: Page): Promise<void> {
+  await calendar.goto('?prikaz=sve');
+  await expect(calendar.monthHeading()).toBeVisible();
+  await expect(page.getByRole('button', { name: hr.kalendar.mode.sve, exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expectGrid(calendar);
+}
+
+test.describe('at a tablet width (story 21.3)', () => {
+  // The grid from 640 px: the page scrolls it under the sticky strip, whose
+  // copy table doubles the cell DOM. Not a phone, so no touch or mobile viewport.
+  test.use({ viewport: { width: 800, height: 600 }, deviceScaleFactor: 1, isMobile: false, hasTouch: false });
+
+  test('the glass budget: scrolling two months of the grid and its strip spends no frame over 50 ms in paint or composite', async ({
+    page,
+    browser,
+  }) => {
+    await measureGlassBudget(page, browser, {
+      trace: GRID_TRACE_FILE,
+      key: 'glassBudgetGrid',
+      open: openGridAtWidth,
+      shown: expectGrid,
+      pointer: { x: 500, y: 400 },
+    });
+  });
 });

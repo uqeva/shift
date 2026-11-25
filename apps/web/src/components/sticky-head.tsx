@@ -18,8 +18,10 @@ import { STICKY_HEAD_HEIGHT_VAR, filtersCoveredBy, stickyHeadHeightOf } from '@/
  * Its height, live, plus room for that line, is `--sticky-head` on the root
  * while it is mounted: the page's scroll padding clears it (`index.css`), so a
  * cell or a control revealed by `scrollIntoView` lands below it rather than
- * under it, and the calendar's grid bounds its scroller by it, so the team
- * header stays in view below it.
+ * under it. A phone's *Sve smjene* is a day list (story 21.3), so the
+ * calendar grid's sticky team strip never meets the head; the strip reads
+ * `--sticky-head` below 640 px only as a guard for the fractional width
+ * between `usePhone()`'s query and the `sm` breakpoint.
  *
  * It sits inside the screen's Card: a sticky element sticks within its
  * container, so it leaves with the Card and never covers what follows it.

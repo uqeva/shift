@@ -52,10 +52,13 @@ import { keepFocusOnAlert } from '@/utils/retry-focus';
  * TWO MODES (story 3.2a), `?prikaz=moj|sve`: *Moj raspored*, the viewer's
  * own day list, and *Sve smjene*, the grid. With no `prikaz`, a member-role
  * account below 640 px lands on the day list and everyone else on the grid.
- * Below 640 px the grid is COMPRESSED by CSS alone — one letter per team
- * header and per cell, the full names `sr-only` — and is the same table.
+ * Below 640 px *Sve smjene* is not a grid at all (story 21.3): `usePhone()`
+ * draws the month as a day list of every shown team instead, so a phone never
+ * scrolls sideways. ONE SCROLL, the page's: the grid has no inner vertical
+ * scroller; its team header is a sticky strip at the top of the viewport and
+ * only a wide month scrolls sideways, inside the grid's own box.
  *
- * THE GRID IS AN ARIA GRID (story 3.2b), full and compressed alike: one tab
+ * THE GRID IS AN ARIA GRID (story 3.2b): one tab
  * stop, the arrows, Home and End moving focus by `@/features/calendar/utils/grid-keys`,
  * and every data cell a `gridcell` named in full. The legend shows only while
  * a mark is on screen. The day list stays a plain list.

@@ -153,11 +153,6 @@ export class CalendarPage extends BasePage {
     return scope.getByText(text, options);
   }
 
-  /** The drawn, `aria-hidden` letter of a compressed header or cell. */
-  letterOf(locator: Locator): Locator {
-    return locator.locator('[aria-hidden="true"]').first();
-  }
-
   // --------------------------------------------------------------- grid
 
   /** The calendar grid, named by the month heading. */
@@ -168,6 +163,37 @@ export class CalendarPage extends BasePage {
   /** Any grid at all, named or not. */
   get anyGrid(): Locator {
     return this.page.getByRole('grid');
+  }
+
+  /**
+   * The grid's sticky team strip (story 21.3): a visual copy of the header
+   * row, `aria-hidden`, outside the grid's horizontal scroller. Its `inert`
+   * copy is {@link stripCopy}, the element that follows the scroller sideways.
+   */
+  get strip(): Locator {
+    return this.page.locator('[data-grid-strip]');
+  }
+
+  get stripCopy(): Locator {
+    return this.page.locator('[data-grid-strip-copy]');
+  }
+
+  /** The grid's one scroller, horizontal only (story 21.3). */
+  get gridScroller(): Locator {
+    return this.page.locator('[data-grid-scroller]');
+  }
+
+  /**
+   * *Sve smjene* on a phone (story 21.3): a team's day buttons in the day list
+   * of every shown team, by the team in their full labels.
+   */
+  teamDaysOf(teamName: string): Locator {
+    return this.dayList.getByRole('button', { name: new RegExp(`^.+?, ${escapeRegExp(teamName)}, `) });
+  }
+
+  /** *Sve smjene* on a phone: the teams shown, as the buttons on the list's first day. */
+  async teamDayCount(): Promise<number> {
+    return this.dayListItems.first().getByRole('button').count();
   }
 
   /** A team's column header. */
@@ -224,11 +250,6 @@ export class CalendarPage extends BasePage {
     return this.grid.locator(
       `[role="gridcell"][data-row="${String(position.row)}"][data-column="${String(position.column)}"]`,
     );
-  }
-
-  /** A compressed cell's drawn box, the target a finger meets. */
-  targetOf(cell: Locator): Locator {
-    return cell.locator('div').first();
   }
 
   /** The grid's cell for `teamName` on `date`. */
