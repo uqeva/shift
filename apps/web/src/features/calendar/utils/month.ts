@@ -4,6 +4,7 @@ import {
   datesOfMonth,
   deriveShiftTimes,
   effectiveTeamOn,
+  hasTeam,
   leaveSpanOf,
   memberScheduleOfMonth,
   membershipOn,
@@ -604,10 +605,13 @@ function marksLookupOf(
 ): MarksLookup {
   return {
     shortStaffedTeamDates: new Set(shortStaffed.map((shift) => teamDateKeyOf(shift.teamId, shift.date))),
-    teamDates: new Set(marks.collisions.map((collision) => teamDateKeyOf(collision.teamId, collision.date))),
+    // Story 21.1: a collision with no team marks no team cell; story 21.7 reads it.
+    teamDates: new Set(marks.collisions.filter(hasTeam).map((collision) => teamDateKeyOf(collision.teamId, collision.date))),
     uncoveredTeamDates: new Set(marks.uncovered.map((key) => teamDateKeyOf(key.teamId, key.date))),
     memberTeamDates: new Set(
-      marks.collisions.map((collision) => memberTeamDateKeyOf(collision.memberId, collision.teamId, collision.date)),
+      marks.collisions
+        .filter(hasTeam)
+        .map((collision) => memberTeamDateKeyOf(collision.memberId, collision.teamId, collision.date)),
     ),
     leave: marks.leave,
   };
@@ -1139,7 +1143,8 @@ export function calendarDayListOf(
     weekday: weekdayOf(day.date),
     isToday: day.date === today,
     inactive: !day.active,
-    shifts: day.shifts.map((shift) => ({
+    // Story 21.1: a Personal Shift counted with no team is not drawn yet; story 21.6 draws it.
+    shifts: day.shifts.filter(hasTeam).map((shift) => ({
       teamId: shift.teamId,
       cell: cellOf(
         lookup,

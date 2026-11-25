@@ -142,6 +142,14 @@ describe('the calendar (AD-20, D-S2)', () => {
     expect(text.endsWith('END:VCALENDAR\r\n')).toBe(true);
   });
 
+  it('leaves out a Personal Shift counted with no team until its own UID form (story 21.1; AD-20 as amended, story 21.2)', () => {
+    const window = { from: '2026-11-01', to: '2026-11-30' };
+    const kept = shift('2026-11-03', TEAM_A, DAN, 420, 1140);
+    const teamless: AtWorkShift = { ...shift('2026-11-04', TEAM_A, DAN, 420, 1140), teamId: null, personalAssignmentId: 'a-1' };
+    const both = calendarOf({ inputs: NAMED, window, stamp: STAMP, uidDomain: FEED_UID_DOMAIN, shifts: [kept, teamless] });
+    expect(both).toBe(calendarOf({ inputs: NAMED, window, stamp: STAMP, uidDomain: FEED_UID_DOMAIN, shifts: [kept] }));
+  });
+
   it('gives a zone without daylight saving one constant observance (golden)', () => {
     matchesGolden(
       'tokyo.ics',

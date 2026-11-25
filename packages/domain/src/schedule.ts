@@ -24,6 +24,7 @@
 
 import { checkDate, civilDayNumber, dateOfCivilDay } from './calendar.js';
 import { applyOverride, overridesByTeamAndDate, type ScheduledShiftType, type ShiftTypeOverride } from './overrides.js';
+import { checkPersonalAssignments, personalShiftOf, type PersonalAssignment } from './personal.js';
 import { projectedShiftTypeOn, type RotationAssignment, type RotationStep } from './projection.js';
 import {
   checkLoans,
@@ -271,6 +272,14 @@ export interface MemberScheduleInput {
    * None anywhere, they are never lent.
    */
   readonly loans?: readonly Loan[] | undefined;
+  /**
+   * Every live Personal Assignment of the same member, in any order (story
+   * 21.1, R14). Absent, those of this member's entry in `members` are read;
+   * given, they must be the same as that entry's (an entry without
+   * `personalAssignments` holding none). None anywhere, every date follows
+   * their schedule as before.
+   */
+  readonly personalAssignments?: readonly PersonalAssignment[] | undefined;
   /** Every rotation version, of any team; only the teams the member belongs to or is lent to are read. */
   readonly assignments: readonly RotationAssignment[];
   /** The steps of every pattern a version names. */
@@ -319,6 +328,39 @@ function loansOf(input: MemberScheduleInput): readonly Loan[] {
   return loans;
 }
 
+/** An assignment list's identity, order-free, as {@link loansKeyOf} is a loan list's. */
+function assignmentsKeyOf(assignments: readonly PersonalAssignment[]): string {
+  return JSON.stringify(
+    assignments
+      .map((assignment) => JSON.stringify([assignment.id, assignment.date, assignment.kind, assignment.shiftTypeId, assignment.teamId]))
+      .sort(),
+  );
+}
+
+/**
+ * The member's Personal Assignments (story 21.1), by the rule of
+ * {@link loansOf}: `input.personalAssignments`, else those of their entry in
+ * `input.members`, else none — checked by `checkPersonalAssignments`. The
+ * rosters read the entry, so the month must judge each date by the same list.
+ *
+ * @throws RangeError when `input.personalAssignments` is given, the member
+ *   has an entry in `input.members`, and the two differ; and on any
+ *   precondition of `checkPersonalAssignments`.
+ */
+function personalAssignmentsOf(input: MemberScheduleInput): readonly PersonalAssignment[] {
+  const entry = input.members.find((member) => member.id === input.memberId);
+  const assignments = input.personalAssignments ?? entry?.personalAssignments ?? [];
+  if (
+    input.personalAssignments !== undefined &&
+    entry !== undefined &&
+    assignmentsKeyOf(input.personalAssignments) !== assignmentsKeyOf(entry.personalAssignments ?? [])
+  ) {
+    throw new RangeError(`the personal assignments of member ${input.memberId} differ from those of their entry in the members`);
+  }
+  checkPersonalAssignments(assignments);
+  return assignments;
+}
+
 /**
  * One shift of a member's day (story 3.6a): the team, the shift type it works
  * and the one its rotation projects (both `null` when no rotation version is
@@ -327,7 +369,11 @@ function loansOf(input: MemberScheduleInput): readonly Loan[] {
  * roster override (`viaOverride`) rather than as a member of the team.
  */
 export interface MemberShift {
-  readonly teamId: string;
+  /**
+   * The team the shift is of. `null` only on a Personal Shift counted with no
+   * team (story 21.1, R14.3): a member on no team, given a shift by hand.
+   */
+  readonly teamId: string | null;
   readonly shiftTypeId: string | null;
   readonly projectedShiftTypeId: string | null;
   readonly overridden: boolean;
@@ -341,6 +387,13 @@ export interface MemberShift {
    * a roster override put them on carries none.
    */
   readonly loanId?: string;
+  /**
+   * The Personal Assignment this shift is (story 21.1, R14.3): set only on a
+   * Personal Shift, and ABSENT otherwise, so a month with no assignment is
+   * exactly what it was before (R14.7). A Personal Shift has no projected
+   * type (`null`), and is neither overridden nor changed by a roster override.
+   */
+  readonly personalAssignmentId?: string;
 }
 
 /**
@@ -358,6 +411,12 @@ export interface MemberScheduleDay {
    */
   readonly active: boolean;
   readonly shifts: readonly MemberShift[];
+  /**
+   * The member's Personal Assignment that date (story 21.1, R14), working or
+   * not, kept even on an inactive date (R14.3: it then derives nothing); ABSENT
+   * when they hold none, so a month with no assignment is unchanged (R14.7).
+   */
+  readonly personalAssignment?: PersonalAssignment;
 }
 
 /**
@@ -376,6 +435,13 @@ export interface MemberScheduleDay {
  * in `input.members` — the list the rosters read — so the month and the
  * rosters never judge one date by two different loan lists.
  *
+ * PERSONAL ASSIGNMENTS (story 21.1, R14): on a date the member holds one, it
+ * is their day (R14.2): their effective team's shift is not theirs, and a
+ * working assignment of an active member is a Personal Shift in its place
+ * (R14.3, `personalShiftOf`), first in the day; a non-working one or a day off
+ * leaves no shift of their own. Roster overrides putting them on a shift still
+ * apply after it. Their assignments are read as their loans are.
+ *
  * @throws RangeError when `month` is not a `YYYY-MM` in years 0001–9999, when
  *   a membership or status version's `effectiveFrom` is not a calendar
  *   `YYYY-MM-DD`, when two membership versions or two status versions share
@@ -384,7 +450,8 @@ export interface MemberScheduleDay {
  *   {@link projectedShiftTypeOn} for a team the member is in, is lent to or is
  *   put on, on any of `checkRosterOverrides`, `checkLoans` or `shiftRoster`,
  *   and when `input.loans` and this member's entry in `input.members` hold
- *   different loans.
+ *   different loans; on any precondition of `checkPersonalAssignments`, and
+ *   when `input.personalAssignments` and that entry hold different ones.
  */
 export function memberScheduleOfMonth(input: MemberScheduleInput, month: string): readonly MemberScheduleDay[] {
   const dates = datesOfMonth(month);
@@ -392,6 +459,7 @@ export function memberScheduleOfMonth(input: MemberScheduleInput, month: string)
   const memberships = orderedVersions('team membership', input.memberships);
   const statuses = orderedVersions('member status', input.statuses);
   const loans = loansOf(input);
+  const assignments = new Map(personalAssignmentsOf(input).map((assignment) => [assignment.date, assignment]));
 
   const versionsOf = new Map<string, RotationAssignment[]>();
   for (const assignment of input.assignments) {
@@ -419,8 +487,23 @@ export function memberScheduleOfMonth(input: MemberScheduleInput, month: string)
     const active = versionOn(statuses, date)?.active ?? true;
     const effective = active ? effectiveTeamOn({ memberships, loans }, date) : null;
     const teamId = effective?.teamId ?? null;
+    const assignment = assignments.get(date);
 
-    if (teamId !== null) {
+    if (assignment !== undefined) {
+      // R14.2: the assignment is their day; their team's shift is not theirs.
+      const personal = personalShiftOf(assignment, active, teamId, working);
+      if (personal !== null) {
+        shifts.push({
+          teamId: personal.teamId,
+          shiftTypeId: personal.shiftTypeId,
+          projectedShiftTypeId: null,
+          overridden: false,
+          rosterChanged: false,
+          viaOverride: false,
+          personalAssignmentId: personal.personalAssignmentId,
+        });
+      }
+    } else if (teamId !== null) {
       const scheduled = scheduledOf(teamId, date);
       const applied = appliedRosterOverrides(rosterOverrides, input.members, working, scheduled, teamId, date);
       if (!applied.some((override) => override.memberOutId === input.memberId)) {
@@ -440,7 +523,7 @@ export function memberScheduleOfMonth(input: MemberScheduleInput, month: string)
       }
     }
 
-    return { date, active, shifts };
+    return assignment === undefined ? { date, active, shifts } : { date, active, shifts, personalAssignment: assignment };
   });
 }
 

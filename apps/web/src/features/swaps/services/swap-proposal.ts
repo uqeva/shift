@@ -2,6 +2,7 @@ import {
   activeOn,
   adjacentMonth,
   effectiveTeamOn,
+  hasTeam,
   memberScheduleOfMonth,
   monthOf,
   type CollisionResolution,
@@ -365,7 +366,10 @@ export function swapReturnOptionsOf(
         if (day.date < today) continue;
         if (!activeOn(snapshot.viewer.statuses, day.date)) continue;
 
-        const shifts = [...day.shifts].sort((left, right) => (teamOrder.get(left.teamId) ?? 0) - (teamOrder.get(right.teamId) ?? 0));
+        // Story 21.1: a Personal Shift counted with no team is not offered until story 21.8.
+        const shifts = day.shifts
+          .filter(hasTeam)
+          .sort((left, right) => (teamOrder.get(left.teamId) ?? 0) - (teamOrder.get(right.teamId) ?? 0));
 
         for (const shift of shifts) {
           if (shift.teamId === given.teamId && day.date === given.isoDate) continue;

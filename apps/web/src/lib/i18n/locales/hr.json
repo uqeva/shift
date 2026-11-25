@@ -1081,7 +1081,8 @@
         "rotation": "rotacija",
         "change": "promjena",
         "replacement": "zamjena",
-        "loan": "posudba"
+        "loan": "posudba",
+        "personal": "osobni raspored"
       }
     },
     "error": {

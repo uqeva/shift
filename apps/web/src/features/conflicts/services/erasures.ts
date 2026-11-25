@@ -1,4 +1,4 @@
-import { collisionKeyOf, erasedCollisionsOf, scheduledShiftTypeOn } from '@shift/domain';
+import { collisionKeyOf, erasedCollisionsOf, hasTeam, scheduledShiftTypeOn } from '@shift/domain';
 
 import type { CalendarSnapshot } from '@/features/calendar/services/snapshot';
 import { dayMonthOf, overrideStandingOfCalendar, weekdayOf, workingShiftTypeIdsOf } from '@/features/calendar/utils/month';
@@ -184,7 +184,9 @@ export function erasuresOf(
   const inForce = overrideStandingOfCalendar(after).inForce;
   const working = new Set(workingShiftTypeIdsOf(after));
 
+  // Story 21.1: an erasure with no team is listed from story 21.7, with the collision key it stores.
   return erased
+    .filter(hasTeam)
     .map((collision): ErasureRow => {
       const memberName = members.get(collision.memberId);
       const teamName = teams.get(collision.teamId);

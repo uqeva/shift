@@ -2964,6 +2964,8 @@ const SANCTIONED_SCREEN_KEYS = [
   'loans.mark.ahead',
   'loans.mark.now',
   'sati.explain.source.loan',
+  // Story 21.1: a Personal Shift's hours source (`osobni raspored`).
+  'sati.explain.source.personal',
   'history.record.loan',
   // STORY 16.1 (UX-DR56): the month's print — *Ispiši* and the printed
   // header's title, *Moj raspored*'s filter in words and the time printed.

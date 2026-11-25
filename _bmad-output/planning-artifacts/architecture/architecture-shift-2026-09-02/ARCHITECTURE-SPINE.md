@@ -461,7 +461,7 @@ The derivation lives in one pure package that cannot reach for data. The store e
   - **Push TTL, amended.** `max(0, min(startsAt − now, 900 s, due + 15 min − now))`, `now` the handler's clock and `due` = `startsAt − n hours` for an `H<n>` lead (none for the evening before): never past the start, never more than 15 minutes, never past 0072's bound. A reminder whose TTL is 0 is not posted at all: it fails `REMINDER_LATE`. Every other code keeps the day.
   - **The late bound (`0072`).** `private.reminder_late(operands, created_at)`: late once 15 minutes past the due instant of an `H<n>` lead (`startsAt − n hours`, with `leadHours` agreeing with the lead), or 20 minutes after the row was written (`created_at`, every lead: the evening before's due instant needs the zone). The claim settles a pending `SHIFT_REMINDER` row `REMINDER_LATE` when it is, after the expiry settle and before the lead one, and its select never returns such a row. So an `H<n>` reminder never reaches a device more than 15 minutes after it fell due, and an evening-before one at most about 35 minutes after it was written. Comparisons of instants, not a domain answer; 0070's other clauses, the return type and the grants are unchanged.
 - **Amended 2026-11-25 (Epic 21 planning; AD-26, AD-27) — batched schedule notices, and a reminder of a personal shift.**
-  - **Batched.** A personal-assignment save writes one `SCHEDULE_ASSIGNED` row per affected member, `{ from, to, days }`, never one per cell. A schedule-source version writes `SCHEDULE_SOURCE_CHANGED`, `{ effectiveFrom, source }`. Both go through `private.notify_members` and its rule, and a change wholly before the organization's today notifies nobody. Holidays, job roles, floaters and team minimums notify nobody (founder-decidable, E-3).
+  - **Batched.** A personal-assignment save writes one `SCHEDULE_ASSIGNED` row per affected member, `{ from, to, days }`, never one per cell. A schedule-source version writes `SCHEDULE_SOURCE_CHANGED`, `{ effectiveFrom, source }`. Both go through `private.notify_members` and its rule, and a change wholly before the organization's today notifies nobody. Holidays, job roles, floaters and team minimums notify nobody (E-3, accepted by the founder 2026-11-25).
   - **A reminder of a personal shift.** An `enqueue_shift_reminders` item gains `source`, which is `TEAM` (today's item, with `teamId`), `PERSONAL_ROTATION` (`teamId` nullable) or `ASSIGNMENT` (`personalAssignmentId`, `teamId` nullable). The RPC skips an `ASSIGNMENT` item unless that row is live, the member's, and of that date and shift type.
     - The subject is today's for `TEAM`, `md5('SHIFT_REMINDER:'||member||':'||date||':p:'||lead)` for a personal rotation, and `…':a:'||personalAssignmentId||':'||lead` for an assignment.
     - With no team, the operands carry no `teamId` and no `teamName`. `notify` renders the variant without a team (`Za 2 h radiš: {smjena} {od}–{do}`), and the link has no `danSmjena`.
@@ -772,7 +772,7 @@ The derivation lives in one pure package that cannot reach for data. The store e
       - checks every item before writing anything (the member is the organization's, the shift type and team are the organization's and not archived, the dates are calendar dates), and any breach is 22023 `PERSONAL_ASSIGNMENTS_INVALID` and no write;
       - per item, soft-removes the live row of that member and date and inserts the new one, attributed; an item equal to the live row writes nothing;
       - answers the counts.
-    - **Reads:** an active admin reads the table, notes included. Every active member reads the live rows' id, member, date, kind, shift type and team through the definer `calendar_personal_assignments()`, never a note or an author. This rests on the ground the founder ratified for loans: the calendar shows who works. It is founder-decidable (E-2), and the default is member-wide.
+    - **Reads:** an active admin reads the table, notes included. Every active member reads the live rows' id, member, date, kind, shift type and team through the definer `calendar_personal_assignments()`, never a note or an author. This rests on the ground the founder ratified for loans: the calendar shows who works. Member-wide is E-2's default, accepted by the founder on 2026-11-25.
     - **Notifications, batched (AD-18 as amended).** Inside the save, 0043's `shift.notify_suppress` flag silences any per-row trigger. The definer then writes **one** `SCHEDULE_ASSIGNED` row per affected member per save, through `private.notify_members` and its one rule, with operands `{ from, to, days }` (the first and last changed date, and the count) and `subject_id` a fresh `gen_random_uuid()` for the call. A member whose changed dates all fall before the organization's today is not told.
   - **`member_schedule_versions`** (story 21.10). Versioned (AD-2), like `rotation_assignments`.
     - Columns: `organization_id` first; `id`; `member_id`; `effective_from date`; `source text`, `TEAM`, `PERSONAL` or `MANUAL`; for `PERSONAL` only, `rotation_pattern_id` and an offset that is a composite foreign key to a step **of that pattern** (AD-3, as `rotation_assignments` has it), both null otherwise (named checks); AD-11's `created_by`/`created_at`.
@@ -806,6 +806,13 @@ The derivation lives in one pure package that cannot reach for data. The store e
       - `personalShiftOn(member, date)`, the member's own shift from an assignment or a personal rotation, with the counted team;
       - `baseRosterMembersOn(team, date)`, the members who follow that team's rotation that date.
     - `shiftRoster` (R11.2) reads the last of these, so every roster reader follows without knowing the rule. Staffing builds R14.6's groups, `atWorkShiftsOf` returns personal shifts (`teamId: string | null`, `source: 'TEAM' | 'PERSONAL_ROTATION' | 'ASSIGNMENT'`, and `personalAssignmentId` when it comes from one), and hours tag them `PERSONAL`.
+    - **Amended 2026-11-25 (story 21.1), the shape as built for R14.**
+      - Assignments ride on the member, as loans do (18.1): `RosterMember.personalAssignments` and `ScheduleMember.personalAssignments`, each `{ id, date, kind, shiftTypeId, teamId }` with no `memberId`. `MemberScheduleInput.personalAssignments` is optional and must equal the member's entry. So every input that carries `members` carries them, with no flat list to keep in step. The lists stay optional until 21.2's assembly fills them.
+      - `domain/personal` (`personal.ts`) holds the assignment, its checks and the pure shift rule (`personalShiftOf`). `personalShiftOn(member, date, working)` composes it with the member's versions in `roster.ts`, so `roster.ts` imports `personal.ts` and never the reverse. The base-roster rule lives in `shiftRoster` itself: an assigned member is on no base roster. There is no separate `baseRosterMembersOn`. 21.9 adds the schedule source in the same place.
+      - Output shapes widen `teamId` to `string | null` on `MemberShift`, `AtWorkShift`, `Collision`, `HoursOperand`, `LeaveShift` and `ShiftReminder`. A Personal Shift carries `personalAssignmentId`, and the member's day carries `personalAssignment`. Both are absent otherwise, so R14.7 holds.
+      - `AtWorkShift` gains no `source` field yet, because a field on every shift would move every at-work figure. `personalAssignmentId` marks an assignment's shift. 21.2 adds the reminder item's `source` (AD-18 as amended), and 21.9 adds the personal-rotation form.
+      - Staffing exposes `staffingOn(input, team, date)` for R14.6's groups, and `peopleAtWorkOn(…, shiftTypeId?)` for one of them.
+      - `CollisionResolution.teamId` stays `string` until 21.7 stores a null key.
     - `domain/floaters` returns R16.2's ordered suggestions as ids and counts.
     - The pattern fill is `domain/personal`'s `filledAssignmentsOf(pattern steps, offset, members, from, to)`: the items a save would write, never stored as a rule. Copy is `copiedAssignmentsOf(source range, target start, members)`, which copies assignments only, so a target date whose source had none is cleared.
     - **The guard.** Over both fixtures (AD-15), with no assignment, no schedule version and no floater, every derivation is byte-identical to before (R14.7, R15.6).
@@ -834,7 +841,7 @@ The derivation lives in one pure package that cannot reach for data. The store e
     - Holiday hours (21.19, R13.7) are computed on read beside the band figures and are never part of the band partition (DI-7).
     - `StaffingInput` gains `teamMinimums`, and one `minimumOf(input, teamId)` gives the team's own minimum or the organization's.
     - Each story proves the byte-identical guard (R13.5).
-  - **Notifications: none.** A holiday is an organization-wide fact everyone sees, and a minimum is an admin setting (founder-decidable, E-3).
+  - **Notifications: none.** A holiday is an organization-wide fact everyone sees, and a minimum is an admin setting (E-3, accepted by the founder 2026-11-25).
 
 ### AD-28 — The public page is a separate static image with no runtime and no third party
 
@@ -860,7 +867,7 @@ The derivation lives in one pure package that cannot reach for data. The store e
     - `lang="hr"`, one `h1`, headings in order, `alt` on every image, and a skip link;
     - the first view, fonts included, under 150 kB transferred;
     - axe at phone and desktop width, in both themes.
-  - **The name.** The page names the product *Smjenko*. Renaming the app itself (the manifest, `hr.json`, Auth mail's sender) is not part of this AD (founder-decidable, E-5).
+  - **The name.** The page names the product *Smjenko*. Renaming the app itself (the manifest, `hr.json`, Auth mail's sender) is not part of this AD (E-5, accepted by the founder 2026-11-25: the landing page only for now; renaming the app is a later one-story decision).
 
 ### Dependency direction
 

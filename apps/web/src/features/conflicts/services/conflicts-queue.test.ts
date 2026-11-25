@@ -573,7 +573,7 @@ describe('resolutions (story 5.4a)', () => {
     const domain = domainOf(snapshot, rows);
     const [resolved] = domain;
 
-    if (resolved === undefined) throw new Error('no collision');
+    if (resolved === undefined || resolved.teamId === null) throw new Error('no collision');
 
     const view = viewOf(snapshot, rows, '2026-09-01', [resolutionOf(resolved.memberId, resolved.date, resolved.teamId)]);
 

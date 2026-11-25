@@ -2,6 +2,7 @@ import {
   HOURS_FIGURE_BAND,
   HOURS_FIGURE_LEAVE,
   HOURS_FIGURE_TOTAL,
+  HOURS_SOURCE_PERSONAL,
   HOURS_SOURCE_ROTATION,
   leaveDaysOfMonth,
   memberHoursOfMonth,
@@ -153,6 +154,8 @@ describe('an explained figure is the figure on the view', () => {
     expect(first?.label).toMatch(/^Smjena [A-D] · (Dan|Noć) · rotacija$/);
     expect(first?.source).toBe(HOURS_SOURCE_ROTATION);
     expect(t(hoursSourceMessageKey(HOURS_SOURCE_ROTATION))).toBe('rotacija');
+    // Story 21.1: a Personal Shift's source reads `osobni raspored` (the PRD's word, story 21.6's AC).
+    expect(t(hoursSourceMessageKey(HOURS_SOURCE_PERSONAL))).toBe('osobni raspored');
     expect(new Set(view.lines.map((line) => line.key)).size).toBe(view.lines.length);
   });
 

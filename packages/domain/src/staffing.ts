@@ -23,6 +23,15 @@
  * short-staffed. Minimum Members is current-state (AD-2), so the same input
  * with another minimum re-reports past dates too (R10.4).
  *
+ * PERSONAL SHIFTS (story 21.1, R14.6, amending R10.1): the shifts of team T on
+ * a date are T's working Scheduled Shift, if any, and one GROUP for each other
+ * working shift type among the Personal Shifts counted with T that date. The
+ * people at work on the Scheduled Shift are its roster after the roster
+ * overrides plus the Personal Shifts counted with T of the same type; those in
+ * a group are its Personal Shifts; both less everyone absent, each member
+ * counted once. Each is short-staffed by R10.2. With no Personal Assignment,
+ * every team has its Scheduled Shift alone, exactly as before (R14.7).
+ *
  * Results are ids, codes and numbers only (AD-8): no name and no text, and
  * nothing here reads a fire rank or a team position (FR-18a) — a roster entry's
  * position is carried by `roster.ts` and never looked at.
@@ -35,7 +44,8 @@
 import { checkDate } from './calendar.js';
 import type { CollisionLeaveRecord } from './collisions.js';
 import { checkRange, isHalfDay } from './leave.js';
-import { rosterOn } from './roster.js';
+import type { PersonalShift } from './personal.js';
+import { personalShiftOn, rosterOn, type RosterMember } from './roster.js';
 import { adjacentMonth, monthOf, scheduleOfMonth, type ScheduleInput } from './schedule.js';
 
 export const SHORT_STAFFED = 'SHORT_STAFFED';
@@ -133,28 +143,93 @@ function checkWindow(from: string, to: string): void {
   }
 }
 
+/** One member's Personal Shift, by the member. */
+interface MemberPersonalShift extends PersonalShift {
+  readonly memberId: string;
+}
+
+/**
+ * The Personal Shifts counted with a team on a date (R14.3, R14.6), in the
+ * order of `members`, computed once per date and only over the members who
+ * hold any assignment: with none, every lookup is empty and nothing is read.
+ */
+function personalShiftsIndexOf(
+  members: readonly RosterMember[],
+  working: ReadonlySet<string>,
+): (date: string, teamId: string) => readonly MemberPersonalShift[] {
+  const assigned = members.filter((member) => (member.personalAssignments ?? []).length > 0);
+  const byDate = new Map<string, ReadonlyMap<string, readonly MemberPersonalShift[]>>();
+  return (date, teamId) => {
+    if (assigned.length === 0) return [];
+    let byTeam = byDate.get(date);
+    if (byTeam === undefined) {
+      const indexed = new Map<string, MemberPersonalShift[]>();
+      for (const member of assigned) {
+        const shift = personalShiftOn(member, date, working);
+        if (shift === null || shift.teamId === null) continue;
+        const entry = { ...shift, memberId: member.id };
+        const known = indexed.get(shift.teamId);
+        if (known === undefined) indexed.set(shift.teamId, [entry]);
+        else known.push(entry);
+      }
+      byTeam = indexed;
+      byDate.set(date, byTeam);
+    }
+    return byTeam.get(teamId) ?? [];
+  };
+}
+
+/**
+ * One staffed shift of a team on a date: the team's Scheduled Shift
+ * (`group: false`), or a group of Personal Shifts of one other working type
+ * counted with it (`group: true`, R14.6).
+ */
+interface StaffedShift extends Staffing {
+  readonly date: string;
+  readonly teamId: string;
+  readonly group: boolean;
+}
+
 /**
  * Every working shift of the teams of `input.teamIds` from `from` to `to`, with
- * its people at work, soonest first and then in the order of `teamIds`.
+ * its people at work, soonest first, then in the order of `teamIds`, and
+ * within a team on a date its Scheduled Shift first, then its groups in the
+ * order their first Personal Shift's member appears in `members`.
  */
-function staffedShiftsOf(
-  input: StaffingInput,
-  from: string,
-  to: string,
-): readonly (Staffing & { readonly date: string; readonly teamId: string })[] {
+function staffedShiftsOf(input: StaffingInput, from: string, to: string): readonly StaffedShift[] {
   const onLeave = leaveIndexOf(input.leaveRecords);
   const working = new Set(input.workingShiftTypeIds);
-  const shifts: (Staffing & { readonly date: string; readonly teamId: string })[] = [];
+  const personalOf = personalShiftsIndexOf(input.members, working);
+  const shifts: StaffedShift[] = [];
+  // Each member once: a member put on by an override who also holds a Personal Shift of the type is one person.
+  const atWorkOf = (memberIds: readonly string[], date: string): number =>
+    [...new Set(memberIds)].filter((memberId) => !onLeave(memberId, date)).length;
 
   const last = monthOf(to);
   for (let month: string | null = monthOf(from); month !== null; month = month === last ? null : adjacentMonth(month, 1)) {
     for (const row of scheduleOfMonth(input, month)) {
       if (row.date < from || row.date > to) continue;
       for (const cell of row.cells) {
-        if (cell.shiftTypeId === null || !working.has(cell.shiftTypeId)) continue;
-        const { roster } = rosterOn(input.members, input.rosterOverrides, cell.teamId, row.date);
-        const atWork = roster.filter((entry) => !onLeave(entry.memberId, row.date)).length;
-        shifts.push({ date: row.date, teamId: cell.teamId, shiftTypeId: cell.shiftTypeId, atWork });
+        const personal = personalOf(row.date, cell.teamId);
+        const scheduled = cell.shiftTypeId !== null && working.has(cell.shiftTypeId) ? cell.shiftTypeId : null;
+        if (scheduled !== null) {
+          const { roster } = rosterOn(input.members, input.rosterOverrides, cell.teamId, row.date);
+          const people = [
+            ...roster.map((entry) => entry.memberId),
+            ...personal.filter((shift) => shift.shiftTypeId === scheduled).map((shift) => shift.memberId),
+          ];
+          shifts.push({ date: row.date, teamId: cell.teamId, shiftTypeId: scheduled, atWork: atWorkOf(people, row.date), group: false });
+        }
+        const groups = new Map<string, string[]>();
+        for (const shift of personal) {
+          if (shift.shiftTypeId === scheduled) continue;
+          const known = groups.get(shift.shiftTypeId);
+          if (known === undefined) groups.set(shift.shiftTypeId, [shift.memberId]);
+          else known.push(shift.memberId);
+        }
+        for (const [shiftTypeId, memberIds] of groups) {
+          shifts.push({ date: row.date, teamId: cell.teamId, shiftTypeId, atWork: atWorkOf(memberIds, row.date), group: true });
+        }
       }
     }
   }
@@ -168,41 +243,84 @@ function staffedShiftsOf(
  * read `minimumMembers` beyond checking it. `teamId` need not be in
  * `input.teamIds`.
  *
+ * With `shiftTypeId` (story 21.1, R14.6), the team's shift of that type that
+ * date: its Scheduled Shift when it works that type, else the group of
+ * Personal Shifts of that type counted with it, else `null`. Without it, the
+ * Scheduled Shift alone, as before; {@link staffingOn} gives every one.
+ *
  * @throws RangeError when `date` is not a calendar `YYYY-MM-DD`, on any
  *   precondition of the leave records or the minimum, and on any of
- *   {@link scheduleOfMonth} or {@link rosterOn}.
+ *   {@link scheduleOfMonth}, {@link rosterOn} or `personalShiftOn`.
  */
-export function peopleAtWorkOn(input: StaffingInput, teamId: string, date: string): Staffing | null {
+export function peopleAtWorkOn(input: StaffingInput, teamId: string, date: string, shiftTypeId?: string): Staffing | null {
   checkDate('the date', date);
   checkMinimum(input.minimumMembers);
-  const [shift] = staffedShiftsOf({ ...input, teamIds: [teamId] }, date, date);
+  const shifts = staffedShiftsOf({ ...input, teamIds: [teamId] }, date, date);
+  const shift = shiftTypeId === undefined ? shifts.find((one) => !one.group) : shifts.find((one) => one.shiftTypeId === shiftTypeId);
   return shift === undefined ? null : { shiftTypeId: shift.shiftTypeId, atWork: shift.atWork };
 }
 
 /**
- * Every short-staffed shift from `from` to `to` (R10.2) of the teams of
- * `input.teamIds`: each working shift whose people at work number fewer than
- * `input.minimumMembers`. None at all when the minimum is `null`. Soonest
- * first, then in the order of `teamIds`. Reads its input and writes nothing.
+ * Every shift of `teamId` on `date` with its people at work (story 21.1,
+ * R14.6): its working Scheduled Shift first, if it has one, then one group per
+ * other working type among the Personal Shifts counted with it. Empty when it
+ * has neither. With no Personal Assignment, at most the Scheduled Shift, as
+ * {@link peopleAtWorkOn} gives it.
  *
- * @throws RangeError when the window is not two calendar dates in order, when
- *   the minimum is neither `null` nor a whole number of at least 1, on any
- *   precondition of the leave records, and on any of {@link scheduleOfMonth}
- *   or {@link rosterOn}.
+ * @throws RangeError on any precondition of {@link peopleAtWorkOn}.
  */
-export function shortStaffedShiftsOf(input: StaffingInput, from: string, to: string): readonly ShortStaffedShift[] {
+export function staffingOn(input: StaffingInput, teamId: string, date: string): readonly Staffing[] {
+  checkDate('the date', date);
+  checkMinimum(input.minimumMembers);
+  return staffedShiftsOf({ ...input, teamIds: [teamId] }, date, date).map((shift) => ({
+    shiftTypeId: shift.shiftTypeId,
+    atWork: shift.atWork,
+  }));
+}
+
+/** {@link shortStaffedShiftsOf} with each shift's `group` flag kept, for matching across a change. */
+function shortStaffedOf(input: StaffingInput, from: string, to: string): readonly (ShortStaffedShift & { readonly group: boolean })[] {
   checkWindow(from, to);
   checkMinimum(input.minimumMembers);
   const minimum = input.minimumMembers;
   if (minimum === null) return [];
   return staffedShiftsOf(input, from, to)
     .filter((shift) => isShortStaffed(shift.atWork, minimum))
-    .map((shift) => ({ code: SHORT_STAFFED, date: shift.date, teamId: shift.teamId, shiftTypeId: shift.shiftTypeId, atWork: shift.atWork, minimum }));
+    .map((shift) => ({
+      code: SHORT_STAFFED,
+      date: shift.date,
+      teamId: shift.teamId,
+      shiftTypeId: shift.shiftTypeId,
+      atWork: shift.atWork,
+      minimum,
+      group: shift.group,
+    }));
 }
 
-/** The key a short-staffed shift is matched by across a change: its team and date. */
-function shiftKeyOf(shift: Pick<ShortStaffedShift, 'date' | 'teamId'>): string {
-  return JSON.stringify([shift.date, shift.teamId]);
+/**
+ * Every short-staffed shift from `from` to `to` (R10.2) of the teams of
+ * `input.teamIds`: each working shift — a Scheduled Shift or a group of
+ * Personal Shifts (R14.6) — whose people at work number fewer than
+ * `input.minimumMembers`. None at all when the minimum is `null`. Soonest
+ * first, then in the order of `teamIds`, then a team's Scheduled Shift before
+ * its groups. Reads its input and writes nothing.
+ *
+ * @throws RangeError when the window is not two calendar dates in order, when
+ *   the minimum is neither `null` nor a whole number of at least 1, on any
+ *   precondition of the leave records, and on any of {@link scheduleOfMonth},
+ *   {@link rosterOn} or `personalShiftOn`.
+ */
+export function shortStaffedShiftsOf(input: StaffingInput, from: string, to: string): readonly ShortStaffedShift[] {
+  return shortStaffedOf(input, from, to).map(({ group: _group, ...shift }) => shift);
+}
+
+/** A short-staffed shift's keys: by type, and, for a Scheduled Shift, by team and date alone. */
+function typeKeyOf(shift: Pick<ShortStaffedShift, 'date' | 'teamId' | 'shiftTypeId'>): string {
+  return JSON.stringify(['TYPE', shift.date, shift.teamId, shift.shiftTypeId]);
+}
+
+function scheduledKeyOf(shift: Pick<ShortStaffedShift, 'date' | 'teamId'>): string {
+  return JSON.stringify(['SCHEDULED', shift.date, shift.teamId]);
 }
 
 /**
@@ -212,6 +330,11 @@ function shiftKeyOf(shift: Pick<ShortStaffedShift, 'date' | 'teamId'>): string {
  * in `before`, is not returned. A shift is matched by its team and date, so
  * one whose type a change turns from one working type to another, and stays
  * short, is not newly short. Reads its inputs and writes nothing.
+ *
+ * Story 21.1 (R14.6): a group of Personal Shifts is matched by its date, team
+ * and type, since a team may have several groups on one date; a Scheduled
+ * Shift also matches a group of its own type, so a short group that becomes the
+ * Scheduled Shift's type (or the reverse) is not newly short either.
  *
  * `before` and `after` are one organization before and after ONE change, so
  * they ask for the same `teamIds`: a team only `after` asks for would report
@@ -223,6 +346,12 @@ function shiftKeyOf(shift: Pick<ShortStaffedShift, 'date' | 'teamId'>): string {
  *   either input.
  */
 export function newlyShortStaffedOf(before: StaffingInput, after: StaffingInput, from: string, to: string): readonly ShortStaffedShift[] {
-  const already = new Set(shortStaffedShiftsOf(before, from, to).map(shiftKeyOf));
-  return shortStaffedShiftsOf(after, from, to).filter((shift) => !already.has(shiftKeyOf(shift)));
+  const already = new Set<string>();
+  for (const shift of shortStaffedOf(before, from, to)) {
+    already.add(typeKeyOf(shift));
+    if (!shift.group) already.add(scheduledKeyOf(shift));
+  }
+  return shortStaffedOf(after, from, to)
+    .filter((shift) => !already.has(typeKeyOf(shift)) && (shift.group || !already.has(scheduledKeyOf(shift))))
+    .map(({ group: _group, ...shift }) => shift);
 }

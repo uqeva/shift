@@ -25,7 +25,7 @@ const uj5Of = (memberId: string): ScheduleInputs => inputsOf(uj5.organization, m
 function line(shift: AtWorkShift): string {
   const short = (id: string): string => id.replace(/^(pilot|uj5)-(smjena-)?/, '');
   const extras = [shift.viaOverride ? 'override' : '', shift.loanId ?? '', shift.workedHalf ?? ''].filter((one) => one !== '');
-  return [shift.date, short(shift.teamId), short(shift.shiftTypeId), shift.startMinute, shift.endMinute, ...extras].join(' ');
+  return [shift.date, short(shift.teamId ?? 'no-team'), short(shift.shiftTypeId), shift.startMinute, shift.endMinute, ...extras].join(' ');
 }
 
 const linesOn = (inputs: ScheduleInputs, from: string, to: string): readonly string[] =>

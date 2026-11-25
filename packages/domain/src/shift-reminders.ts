@@ -47,7 +47,11 @@ export const REMINDER_WINDOW_AFTER_MS = 5 * 60 * 1000;
 export interface ShiftReminder {
   readonly memberId: string;
   readonly date: string;
-  readonly teamId: string;
+  /**
+   * `null` for a Personal Shift counted with no team (story 21.1, R14.3). The
+   * item's `ASSIGNMENT` form (AD-18 as amended) is story 21.2's.
+   */
+  readonly teamId: string | null;
   readonly shiftTypeId: string;
   readonly lead: ReminderLead;
   readonly start: number;

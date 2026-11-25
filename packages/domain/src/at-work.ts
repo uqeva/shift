@@ -23,6 +23,12 @@
  *   half splits none, as in hours. A half whose worked side has no minute
  *   (a one-minute shift) leaves no at-work shift.
  *
+ * PERSONAL SHIFTS (story 21.1, R14.5): a member's day in
+ * `memberScheduleOfMonth` holds their Personal Shift on a date they hold a
+ * working Personal Assignment, so it is an at-work shift like any other, with
+ * its `personalAssignmentId`, and with `teamId: null` when it counts with no
+ * team.
+ *
  * Which overrides are IN FORCE is `overrideStandingOf`'s, over the rotation
  * versions' stamps and each override's `writtenAt`: one a rotation change
  * left pending review is not applied, as the browser does not apply it.
@@ -40,6 +46,7 @@ import { shiftHalvesOf, type ShiftTypeWithVersions } from './hours.js';
 import { checkRange, LEAVE_HALF_FIRST, LEAVE_HALF_SECOND, type LeaveHalf } from './leave.js';
 import { overrideStandingOf, type RotationVersionStamp, type StampedShiftTypeOverride } from './overrides.js';
 import type { RotationAssignment, RotationStep } from './projection.js';
+import type { PersonalAssignment } from './personal.js';
 import type { Loan, MembershipVersion, RosterOverride, StatusVersion } from './roster.js';
 import { memberScheduleOfMonth, monthOf, adjacentMonth } from './schedule.js';
 
@@ -62,6 +69,12 @@ export interface ScheduleMember {
   readonly statuses: readonly StatusVersion[];
   /** Their live Loans overlapping the window (story 18.2): no reason, no author. */
   readonly loans: readonly Loan[];
+  /**
+   * Their live Personal Assignments in the window (story 21.1, R14): no note,
+   * no author. Optional until the assembly carries them (story 21.2); absent,
+   * they hold none.
+   */
+  readonly personalAssignments?: readonly PersonalAssignment[] | undefined;
 }
 
 /** A live roster override with the instant it was written or last confirmed (µs), which decides whether it is in force. */
@@ -119,7 +132,8 @@ export interface ScheduleInputs {
  */
 export interface AtWorkShift {
   readonly date: string;
-  readonly teamId: string;
+  /** `null` for a Personal Shift counted with no team (story 21.1, R14.3). */
+  readonly teamId: string | null;
   readonly shiftTypeId: string;
   readonly startMinute: number;
   /** Always after `startMinute`; at most 2879. */
@@ -128,6 +142,8 @@ export interface AtWorkShift {
   readonly viaOverride: boolean;
   /** The Loan that put them on this team that date; ABSENT when none. */
   readonly loanId?: string;
+  /** The Personal Assignment this shift is (story 21.1); ABSENT on every other shift. */
+  readonly personalAssignmentId?: string;
   /** On a Half-day Record, the half worked (R12.2); ABSENT on a whole shift. */
   readonly workedHalf?: LeaveHalf;
 }
@@ -217,6 +233,7 @@ export function atWorkShiftsOf(inputs: ScheduleInputs, from: string, to: string)
     memberships: member.memberships,
     statuses: member.statuses,
     loans: member.loans,
+    personalAssignments: member.personalAssignments,
     assignments: inputs.assignments,
     steps: inputs.steps,
     overrides: overrideStandingOf(inputs.assignmentStamps, inputs.overrides).inForce,
@@ -244,7 +261,7 @@ export function atWorkShiftsOf(inputs: ScheduleInputs, from: string, to: string)
 
       for (const { shift, shiftTypeId, version } of timed) {
         if (version === null) continue;
-        if (!teamIds.has(shift.teamId)) {
+        if (shift.teamId !== null && !teamIds.has(shift.teamId)) {
           throw new RangeError(`the schedule names team ${shift.teamId} on ${day.date}, which is not given`);
         }
         const base = {
@@ -253,6 +270,7 @@ export function atWorkShiftsOf(inputs: ScheduleInputs, from: string, to: string)
           shiftTypeId,
           viaOverride: shift.viaOverride,
           ...(shift.loanId === undefined ? {} : { loanId: shift.loanId }),
+          ...(shift.personalAssignmentId === undefined ? {} : { personalAssignmentId: shift.personalAssignmentId }),
         };
         if (half !== undefined) {
           const halvesOf = shiftHalvesOf(version.startMinute, version.endMinute);

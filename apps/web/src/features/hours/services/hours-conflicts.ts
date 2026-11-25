@@ -1,5 +1,6 @@
 import {
   collisionsOf,
+  hasTeam,
   monthOf,
   unresolvedCollisionsOf,
   type Collision,
@@ -199,12 +200,13 @@ export function hoursLeaveOf(
     const records = own.map((record) => ({ ...record, memberId: viewer.memberId }));
 
     // THE SAME FUNNEL as the admin's (story 5.5d): a replacement that no
-    // longer applies hides nothing, so a member's own *Sati* agrees.
+    // longer applies hides nothing, so a member's own *Sati* agrees. Story
+    // 21.1: with a team only, as `unresolvedOf` (story 21.7 reads the rest).
     return {
       collisions: unresolvedCollisionsOf(
         collisionsOf(collisionInputOf(snapshot, records)),
         effectiveResolutionsOf(snapshot, resolutions),
-      ),
+      ).filter(hasTeam),
       leaveRecords: byMemberOf(records),
     };
   }

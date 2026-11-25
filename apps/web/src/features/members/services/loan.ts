@@ -526,7 +526,8 @@ function workingOf(snapshot: CalendarSnapshot, day: MemberScheduleDay | undefine
   const working = new Map<string, { teamId: string; shiftTypeId: string }>();
 
   for (const shift of day?.shifts ?? []) {
-    if (shift.shiftTypeId === null) continue;
+    // Story 21.1: a Personal Shift counted with no team is read from story 21.6.
+    if (shift.shiftTypeId === null || shift.teamId === null) continue;
 
     const type = snapshot.types.find((candidate) => candidate.id === shift.shiftTypeId);
 

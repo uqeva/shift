@@ -1599,10 +1599,11 @@ export const KEY_SOURCES = [
     // ELEVEN SINCE STORY 13.2: the leave's fixed name is gone; a leave column's
     // dialog is named by `leaveColumnNameOf`, `@/features/hours/services/my-hours`'s.
     // TWELVE SINCE STORY 18.5: a loan shift's source, `posudba`.
+    // THIRTEEN SINCE STORY 21.1: a Personal Shift's source, `osobni raspored`.
     name: 'the hours explanation rules',
     file: HOURS_EXPLANATION_KEYS,
     keys: (text: string) => [...translationKeys(text), ...messageKeyUnions(text)],
-    strings: 12,
+    strings: 13,
   },
   {
     // STORY 18.5: a member's own loan, covering today or ahead, off

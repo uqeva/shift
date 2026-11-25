@@ -3,6 +3,7 @@ import {
   HOURS_FIGURE_TOTAL,
   HOURS_SOURCE_CHANGE,
   HOURS_SOURCE_LOAN,
+  HOURS_SOURCE_PERSONAL,
   HOURS_SOURCE_REPLACEMENT,
   HOURS_SOURCE_ROTATION,
   collisionKeyOf,
@@ -170,7 +171,8 @@ export function hoursSourceMessageKey(
   | 'sati.explain.source.rotation'
   | 'sati.explain.source.change'
   | 'sati.explain.source.replacement'
-  | 'sati.explain.source.loan' {
+  | 'sati.explain.source.loan'
+  | 'sati.explain.source.personal' {
   switch (source) {
     case HOURS_SOURCE_ROTATION:
       return 'sati.explain.source.rotation';
@@ -181,6 +183,9 @@ export function hoursSourceMessageKey(
     // Story 18.5: a shift a Loan put the member on (`posudba`, UX-DR59).
     case HOURS_SOURCE_LOAN:
       return 'sati.explain.source.loan';
+    // Story 21.1: a shift a Personal Assignment gave the member (`osobni raspored`, the PRD's word for it in hours).
+    case HOURS_SOURCE_PERSONAL:
+      return 'sati.explain.source.personal';
   }
 }
 
@@ -192,7 +197,10 @@ interface LineNames {
 }
 
 /** A team's and a shift type's names as stored. @throws RangeError for one the snapshot lacks. */
-function namesOf(names: LineNames, teamId: string, shiftTypeId: string): { readonly team: string; readonly shiftType: string } {
+function namesOf(names: LineNames, teamId: string | null, shiftTypeId: string): { readonly team: string; readonly shiftType: string } {
+  // Story 21.1: a Personal Shift counted with no team reads `bez tima` from story 21.6; until then the explanation is unavailable.
+  if (teamId === null) throw new RangeError(`a shift of type ${shiftTypeId} counts with no team`);
+
   const team = names.teams.get(teamId);
   const shiftType = names.types.get(shiftTypeId);
 
@@ -337,7 +345,7 @@ function leaveEquationOf(
   const schedule = new Map(memberScheduleOfMonth(input, month).map((day) => [day.date, day]));
 
   const lines = charged.map(({ date, days }): LeaveExplanationLine => {
-    const shifts = new Map<string, { readonly teamId: string; readonly shiftTypeId: string }>();
+    const shifts = new Map<string, { readonly teamId: string | null; readonly shiftTypeId: string }>();
 
     for (const shift of schedule.get(date)?.shifts ?? []) {
       if (shift.shiftTypeId !== null && working.has(shift.shiftTypeId)) {
