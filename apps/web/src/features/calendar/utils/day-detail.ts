@@ -321,7 +321,7 @@ function personalShiftsWithOf(snapshot: CalendarSnapshot, teamId: string, date: 
   const working = new Set(workingShiftTypeIdsOf(snapshot));
 
   return assigned.flatMap((member) => {
-    const shift = personalShiftOn(member, date, working);
+    const shift = personalShiftOn(member, date, working, snapshot.steps);
 
     return shift === null || shift.teamId !== teamId ? [] : [{ member, shiftTypeId: shift.shiftTypeId }];
   });
