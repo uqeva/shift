@@ -405,9 +405,17 @@ test.describe('a wide grid at 800 px (story 21.3)', () => {
 
   test('stacks corner, strip, date column, cells, each opaque', async ({ page, calendarPage, fixture }) => {
     const scroller = await wideGrid(page, calendarPage, fixture);
+    // Past the strip's own place in the page, so it is STUCK, with rows under
+    // it: a fixed scroll would leave it short of sticking wherever the page
+    // header, the filters and the Card's head above it are taller than that.
     await page.evaluate(() => {
-      window.scrollBy(0, 300);
+      const strip = document.querySelector('[data-grid-strip]');
+      if (strip === null) throw new Error('E2E: no strip');
+      window.scrollTo(0, strip.getBoundingClientRect().top + window.scrollY + 300);
     });
+    await expect
+      .poll(() => page.evaluate(() => document.querySelector('[data-grid-strip]')?.getBoundingClientRect().top))
+      .toBe(0);
     await scroller.evaluate((element) => {
       element.scrollLeft = 150;
     });
