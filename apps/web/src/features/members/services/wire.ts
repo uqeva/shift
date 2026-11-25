@@ -609,6 +609,9 @@ function namesAValue(code: string | undefined): boolean {
   return code !== undefined && VALUE_CLASSES.includes(code.slice(0, 2));
 }
 
+/** `0078`'s foreign key from a member to their job role, as PostgreSQL quotes it. */
+const JOB_ROLE_FOREIGN_KEY = '"members_job_role_fkey"';
+
 /**
  * A PostgREST refusal on `members`, as this application's own failure.
  *
@@ -639,6 +642,12 @@ export function editFailureOf(error: PostgrestFailure): MemberWriteFailure {
     return ORGANIZATION_WOULD_HAVE_NO_ADMIN;
   }
   if (error.code === INSUFFICIENT_PRIVILEGE) return MEMBER_WRITE_REFUSED;
+  // STORY 21.12: a job role the database cannot find for this organization
+  // (`members_job_role_fkey`, 23503) — another tenant's id, or one gone from
+  // under a stale picker. Nothing on the form is wrong: the service answer.
+  if (error.code === '23503' && (error.message ?? '').includes(JOB_ROLE_FOREIGN_KEY)) {
+    return MEMBER_WRITE_UNAVAILABLE;
+  }
   // THE ONE CHECK THAT NAMES ITS FIELD: a name over `0036`'s maximum, which
   // the input's `maxLength` keeps out of a typed edit.
   if (error.code === CHECK_VIOLATION && (error.message ?? '').includes(NAME_LENGTH_CHECK)) {

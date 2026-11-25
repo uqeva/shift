@@ -185,6 +185,23 @@ describe('the day detail (story 3.4b)', () => {
     });
   });
 
+  it("names a member's job role after the line, and nothing for one with none (story 21.12)", async () => {
+    const snapshot = await onSmjenaB();
+    const withRole = {
+      ...snapshot,
+      members: snapshot.members.map((member) =>
+        member.id === ANA ? { ...member, jobRole: { id: 'role-vod', name: 'Vod' } } : member,
+      ),
+    };
+
+    expect(dayDetailOf(withRole, TEAM, WORKING)?.roster).toEqual([
+      { id: ANA, name: 'Ana', fireRank: 'firefighter', position: 'driver', jobRole: 'Vod' },
+      { id: BORIS, name: 'Boris', fireRank: null, position: null },
+    ]);
+    // ABSENT, never `undefined` or `null`, on a member with no role.
+    expect(Object.keys(dayDetailOf(snapshot, TEAM, WORKING)?.roster[1] ?? {})).not.toContain('jobRole');
+  });
+
   it("reads the weekday and range exactly as the grid's row and cell do, and the date with its year", async () => {
     const snapshot = await onSmjenaB();
     const month = calendarMonthOf(snapshot, { mjesec: '2020-01' }, '2020-01-15');

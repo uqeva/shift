@@ -17,6 +17,7 @@ import {
   ABSENCE_TYPES_TABLE,
   absenceTypesQueryOptions,
 } from '@/features/absence-types/services/list';
+import { JOB_ROLES_LIST_KEY, JOB_ROLES_TABLE, jobRolesQueryOptions } from '@/features/job-roles/services/list';
 import { HISTORY_KEY_ROOT, historyQueryOptions, type HistoryTable } from '@/features/history/services/history-read';
 import {
   historyBeginsViewOf,
@@ -158,6 +159,11 @@ export function useChangeHistory(search: HistorySearch, navigate: HistoryNavigat
     ...absenceTypesQueryOptions(() => supabaseClient().from(ABSENCE_TYPES_TABLE)),
     enabled: online,
   });
+  // STORY 21.12: the job roles a member's role change names.
+  const jobRolesRead = useQuery({
+    ...jobRolesQueryOptions(() => supabaseClient().from(JOB_ROLES_TABLE)),
+    enabled: online,
+  });
 
   const failed =
     organizationRead.isError ||
@@ -174,6 +180,10 @@ export function useChangeHistory(search: HistorySearch, navigate: HistoryNavigat
   const teamsData = teamsRead.data;
   const shiftTypesData = shiftTypesRead.data;
   const absenceTypesData = absenceTypesRead.data;
+  // STORY 21.12: never a gate. With no roles read (offline, or a failed
+  // read), a role change names the role from the events' own rows, else in a
+  // neutral word, and the page is drawn as before.
+  const jobRolesData = jobRolesRead.data;
 
   // THE PERIOD'S ENTRIES, NAMES AND OPTIONS: once per answer, never per chip.
   const snapshot = useMemo(() => {
@@ -205,6 +215,7 @@ export function useChangeHistory(search: HistorySearch, navigate: HistoryNavigat
       teams: teamsData,
       shiftTypes: shiftTypesData.types,
       absenceTypes: absenceTypesData,
+      jobRoles: jobRolesData ?? [],
     });
     const options = historyFilterOptionsOf(entries);
     const beginning = historyBeginsOf(historyEventsInZone(historyData.markers, zone), entries);
@@ -219,7 +230,7 @@ export function useChangeHistory(search: HistorySearch, navigate: HistoryNavigat
       teams: historyTeamOptionsOf(options.teams, names),
       kinds: historyKindOptionsOf(options.kinds),
     };
-  }, [zone, period, historyData, membersData, teamsData, shiftTypesData, absenceTypesData]);
+  }, [zone, period, historyData, membersData, teamsData, shiftTypesData, absenceTypesData, jobRolesData]);
 
   const offered = historyFiltersOffered(
     filters,
@@ -333,6 +344,7 @@ export function useChangeHistory(search: HistorySearch, navigate: HistoryNavigat
       TEAMS_LIST_KEY,
       SHIFT_TYPES_LIST_KEY,
       ABSENCE_TYPES_LIST_KEY,
+      JOB_ROLES_LIST_KEY,
     ]) {
       void queryClient.invalidateQueries({ queryKey }, { cancelRefetch: false });
     }

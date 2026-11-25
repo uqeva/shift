@@ -1,4 +1,4 @@
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 
 import {
@@ -6,6 +6,14 @@ import {
   type DialogOpening,
   type MemberScreen,
 } from '@/features/members/hooks/member-edit-context';
+import {
+  JOB_ROLES_TABLE,
+  jobRoleEditOf,
+  jobRoleOpenedWithOf,
+  jobRoleOptionsFor,
+  jobRolesOffered,
+  jobRolesQueryOptions,
+} from '@/features/job-roles/services/list';
 import { MEMBERS_LIST_KEY, MEMBERS_TABLE } from '@/features/members/services/list';
 import {
   MEMBER_ENTRY_EMAIL,
@@ -18,6 +26,7 @@ import {
   allowanceSaveOf,
   enteredAllowance,
   heldAllowanceOf,
+  jobRoleChangedBy,
   memberEntryRefusalOf,
   raisedForMember,
   saveAllowance,
@@ -37,7 +46,12 @@ import {
 } from '@/features/members/services/write';
 import { MEMBER_PAGE_HEADING_ID } from '@/features/members/utils/element-ids';
 import { rankEditOf } from '@/features/members/utils/rank';
-import { MEMBER_SAVE_DEPENDENTS, NO_DEPENDENTS, refreshAfterWrite } from '@/features/teams/services/dependents';
+import {
+  MEMBER_JOB_ROLE_SAVE_DEPENDENTS,
+  MEMBER_SAVE_DEPENDENTS,
+  NO_DEPENDENTS,
+  refreshAfterWrite,
+} from '@/features/teams/services/dependents';
 import { supabaseClient } from '@/lib/supabase/client';
 import { focusLater } from '@/utils/focus-later';
 import { NO_TEXT } from '@/utils/text';
@@ -62,6 +76,8 @@ export function useMemberBasics(screen: MemberScreen) {
   const leaveField = useRef<HTMLInputElement>(null);
   const roleField = useRef<HTMLSelectElement>(null);
   const rankField = useRef<HTMLSelectElement>(null);
+  // STORY 21.12: the *Posao* picker, drawn only once the roles read answered.
+  const jobRoleField = useRef<HTMLSelectElement>(null);
   const basicsOpener = useRef<HTMLButtonElement>(null);
   const allowanceOpener = useRef<HTMLButtonElement>(null);
   // A REF as well as state: state drives the disabled button, and state is
@@ -108,6 +124,18 @@ export function useMemberBasics(screen: MemberScreen) {
     setAllowanceOpen(null);
     focusLater([], byId(MEMBER_PAGE_HEADING_ID));
   }, [basicsGone]);
+
+  // STORY 21.12: the organization's job roles, every active member's read.
+  // `null` until it has answered, and while it fails: then no *Posao*
+  // control is drawn, and a save leaves the stored role alone.
+  const jobRolesRead = useQuery(jobRolesQueryOptions(() => supabaseClient().from(JOB_ROLES_TABLE)));
+  const jobRoles = jobRolesRead.data ?? null;
+  const heldJobRole = form.member?.jobRole ?? null;
+  const heldJobRoleId = heldJobRole?.id ?? null;
+  /** Whether the card names a role at all: one is held, or a live one exists. */
+  const offersJobRole = jobRolesOffered(jobRoles, heldJobRoleId);
+  /** The picker's roles, or `null` while there is no answer to offer them from. */
+  const jobRoleOptions = jobRoles === null || !offersJobRole ? null : jobRoleOptionsFor(jobRoles, heldJobRole);
 
   // THE YEAR *Promijeni pravo* WOULD SET, and the allowance it resolves to now:
   // `null` while today or the leave-year start is unknown, which disables it.
@@ -182,6 +210,7 @@ export function useMemberBasics(screen: MemberScreen) {
     const leave = leaveField.current;
     const role = roleField.current;
     const rank = rankField.current;
+    const jobRole = jobRoleField.current;
 
     if (
       member === null ||
@@ -263,7 +292,23 @@ export function useMemberBasics(screen: MemberScreen) {
         // stored rank alone: the setting hides ranks and never deletes them.
         ...rankEditOf(member.fireRank, rank?.value ?? null, offersRank),
       };
+
+      // STORY 21.12: ONLY WHILE THE PICKER IS DRAWN, and only a CHANGED,
+      // offered pick (`jobRoleEditOf`): an untouched or stale picker leaves
+      // the stored role alone. The value it opened with rides on the element.
+      const jobRoleId =
+        jobRole === null || jobRoleOptions === null
+          ? undefined
+          : jobRoleEditOf(jobRoleOpenedWithOf(jobRole), jobRole.value, jobRoleOptions);
+
+      if (jobRoleId !== undefined) edits = { ...edits, jobRoleId };
     }
+
+    // STORY 21.12: a changed job role re-reads the calendar snapshot too,
+    // whose day detail names it (`MEMBER_JOB_ROLE_SAVE_DEPENDENTS`).
+    const savedDependents = jobRoleChangedBy(edits, member.jobRole?.id ?? null)
+      ? MEMBER_JOB_ROLE_SAVE_DEPENDENTS
+      : MEMBER_SAVE_DEPENDENTS;
 
     saving.current = true;
     setFailure(null);
@@ -306,7 +351,7 @@ export function useMemberBasics(screen: MemberScreen) {
         await refreshAfterWrite(
           queryClient,
           MEMBERS_LIST_KEY,
-          scope === BASICS_SAVE && (outcome.ok || outcome.refusal.saved) ? MEMBER_SAVE_DEPENDENTS : NO_DEPENDENTS,
+          scope === BASICS_SAVE && (outcome.ok || outcome.refusal.saved) ? savedDependents : NO_DEPENDENTS,
         );
       } catch (cause) {
         console.error(MEMBER_WRITE_UNAVAILABLE, cause);
@@ -328,6 +373,9 @@ export function useMemberBasics(screen: MemberScreen) {
     leaveField,
     roleField,
     rankField,
+    jobRoleField,
+    offersJobRole,
+    jobRoleOptions,
     pending,
     invalidField,
     refusal,

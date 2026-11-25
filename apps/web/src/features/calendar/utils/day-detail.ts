@@ -123,6 +123,12 @@ export interface DayDetailMember {
   /** Their position in the team on that date; shown, never used. */
   readonly position: string | null;
   /**
+   * STORY 21.12: the member's job role's name, shown in muted text after the
+   * line. ABSENT for a member with none, so a day where nobody holds a role
+   * is the detail it was.
+   */
+  readonly jobRole?: string;
+  /**
    * STORY 18.5 (UX-DR59): on this team through a Loan, and whom from — the
    * `posudba iz tima {tim}` mark. ABSENT for everyone else, so a day with no loan
    * is the detail it was (R11.4).
@@ -335,7 +341,9 @@ export function dayDetailOf(snapshot: CalendarSnapshot, teamId: string, date: st
       throw new RangeError(`member ${entry.memberId} is rostered but is not in the snapshot`);
     }
 
-    const listed = { id: entry.memberId, name: member?.name ?? null, fireRank: member?.fireRank ?? null, position: entry.position };
+    const named = { id: entry.memberId, name: member?.name ?? null, fireRank: member?.fireRank ?? null, position: entry.position };
+    const role = member?.jobRole ?? null;
+    const listed: DayDetailMember = role === null ? named : { ...named, jobRole: role.name };
     // A member put on by a roster override is never marked: the override, not a loan, put them here.
     const lentFrom = member === undefined || entry.added ? null : lentFromShownOf(snapshot, member, teamId, date);
 

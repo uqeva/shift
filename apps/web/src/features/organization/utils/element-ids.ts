@@ -20,6 +20,8 @@ export const ORGANIZATION_CARRY_OVER_HEADING_ID = 'organization-carry-over-headi
 export const ORGANIZATION_HOUR_BANDS_HEADING_ID = 'organization-hour-bands-heading';
 /** The *Vrste odsutnosti* card (story 13.1b): the types, and the one dialog that adds or edits one. */
 export const ORGANIZATION_ABSENCE_TYPES_HEADING_ID = 'organization-absence-types-heading';
+/** The *Poslovi* card (story 21.12): the job roles, and the one dialog that adds or renames one. */
+export const ORGANIZATION_JOB_ROLES_HEADING_ID = 'organization-job-roles-heading';
 
 /** The card each dialog closes back onto, by its heading. */
 export const ORGANIZATION_DIALOG_CARD_HEADING_IDS = {
@@ -129,3 +131,15 @@ export const ORGANIZATION_ABSENCE_TYPE_ERROR_ID = 'organization-absence-type-err
 export const ORGANIZATION_ABSENCE_TYPE_SAVE_ID = 'organization-absence-type-save';
 /** What annual leave's locked choice is described by after a refusal: the hint AND the refusal. */
 export const ORGANIZATION_ABSENCE_TYPE_ANNUAL_REFUSED_DESCRIPTION = `${ORGANIZATION_ABSENCE_TYPE_ANNUAL_HINT_ID} ${ORGANIZATION_ABSENCE_TYPE_ERROR_ID}`;
+
+/**
+ * The job role dialog (story 21.12), one for adding and renaming: its title,
+ * the name field, the refusal and Spremi. Its own ids, as the absence type
+ * dialog's are.
+ */
+export const ORGANIZATION_JOB_ROLE_DIALOG_HEADING_ID = 'organization-job-role-dialog-heading';
+export const ORGANIZATION_JOB_ROLE_NAME_FIELD_ID = 'organization-job-role-name';
+export const ORGANIZATION_JOB_ROLE_ERROR_ID = 'organization-job-role-error';
+export const ORGANIZATION_JOB_ROLE_SAVE_ID = 'organization-job-role-save';
+/** The card's own refusal of an archive or a restore, which the row's button points at. */
+export const ORGANIZATION_JOB_ROLES_ERROR_ID = 'organization-job-roles-error';

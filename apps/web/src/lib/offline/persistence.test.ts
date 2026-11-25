@@ -2,6 +2,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ABSENCE_TYPES_LIST_KEY } from '@/features/absence-types/services/list';
+import { JOB_ROLES_LIST_KEY } from '@/features/job-roles/services/list';
 import { CALENDAR_KEY } from '@/features/calendar/services/snapshot';
 import { ERASURE_CHECK_KEY_PART as FEATURE_ERASURE_CHECK_KEY_PART } from '@/features/conflicts/hooks/use-erasure-reads';
 import { ACTING_ADMINS_KEY } from '@/features/conflicts/services/resolved-conflicts';
@@ -172,6 +173,7 @@ describe('what is kept on the device', () => {
         MY_SWAP_REQUESTS_KEY,
         ORGANIZATION_SWAP_REQUESTS_KEY,
         ABSENCE_TYPES_LIST_KEY,
+        JOB_ROLES_LIST_KEY,
       ].map((key) => {
         expect(key).toHaveLength(1);
 
@@ -350,17 +352,18 @@ describe('a kept snapshot is restored for its owner alone', () => {
     expect(storage.entries.has(DEVICE_SNAPSHOT_KEY)).toBe(false);
   });
 
-  it('is shape 4: story 21.2 added `personalAssignments` to the calendar snapshot\'s members and viewer', () => {
-    // A shape-3 calendar member has no `personalAssignments` (and a shape-2
-    // one no `loans`, story 18.2), and every roster derived from it would
-    // ignore an assignment the database holds.
-    expect(DEVICE_SNAPSHOT_SHAPE).toBe(4);
+  it('is shape 5: story 21.12 added `jobRole` to the calendar snapshot\'s members and the member list\'s rows', () => {
+    // A shape-4 member has no `jobRole` (a shape-3 one no
+    // `personalAssignments`, story 21.2; a shape-2 one no `loans`, story
+    // 18.2), and the day detail and *Ljudi* would read it as `undefined`.
+    expect(DEVICE_SNAPSHOT_SHAPE).toBe(5);
   });
 
   it.each([
     ['an earlier', '1:member-a'],
     ['an older', '2:member-a'],
-    ['the previous', '3:member-a'],
+    ['an earlier still', '3:member-a'],
+    ['the previous', '4:member-a'],
     ['a later', `${String(DEVICE_SNAPSHOT_SHAPE + 1)}:member-a`],
   ])('restores nothing the same user saved in %s shape, and deletes the copy', async (_, buster) => {
     const storage = memoryStorage();

@@ -102,6 +102,8 @@ export interface HistoryNames {
   readonly teams: ReadonlyMap<string, string>;
   readonly shiftTypes: ReadonlyMap<string, string>;
   readonly absenceTypes: ReadonlyMap<string, string>;
+  /** STORY 21.12: job roles by id, from the current list and the rows the events hold. */
+  readonly jobRoles: ReadonlyMap<string, string>;
   /**
    * Rotation steps and roster overrides by id, from the rows the events read
    * hold — never a second read (retro A4). One the read lacks is drawn in a
@@ -117,6 +119,8 @@ export interface HistoryNameLists {
   readonly teams: readonly { readonly id: string; readonly name: string }[];
   readonly shiftTypes: readonly { readonly id: string; readonly name: string }[];
   readonly absenceTypes: readonly { readonly id: string; readonly name: string }[];
+  /** STORY 21.12: the job roles, archived ones included; `[]` while none were read. */
+  readonly jobRoles: readonly { readonly id: string; readonly name: string }[];
 }
 
 const NAMED_TABLES = {
@@ -124,6 +128,7 @@ const NAMED_TABLES = {
   teams: 'teams',
   shiftTypes: 'shift_types',
   absenceTypes: 'absence_types',
+  jobRoles: 'job_roles',
 } as const;
 
 function namesFrom(
@@ -210,6 +215,7 @@ export function historyNamesOf(
     teams: namesFrom(NAMED_TABLES.teams, events, lists.teams),
     shiftTypes: namesFrom(NAMED_TABLES.shiftTypes, events, lists.shiftTypes),
     absenceTypes: namesFrom(NAMED_TABLES.absenceTypes, events, lists.absenceTypes),
+    jobRoles: namesFrom(NAMED_TABLES.jobRoles, events, lists.jobRoles),
     rotationSteps: rowsFrom('rotation_steps', events, stepOf),
     rosterOverrides: rowsFrom('roster_overrides', events, overrideOf),
   };
@@ -296,6 +302,7 @@ const RECORD_KEYS: Readonly<Record<HistoryRecord, ReturnType<typeof historyRecor
   loan: 'history.record.loan',
   'calendar-feed': 'history.record.calendarFeed',
   'personal-assignment': 'history.record.personalAssignment',
+  'job-role': 'history.record.jobRole',
   other: 'history.record.other',
 };
 
@@ -327,6 +334,7 @@ export function historyRecordMessageKey(
   | 'history.record.loan'
   | 'history.record.calendarFeed'
   | 'history.record.personalAssignment'
+  | 'history.record.jobRole'
   | 'history.record.other' {
   return RECORD_KEYS[record];
 }
@@ -394,6 +402,7 @@ const FIELD_KEYS: Readonly<Record<HistoryField, ReturnType<typeof historyFieldMe
   email: 'history.field.email',
   role: 'history.field.role',
   fireRank: 'history.field.fireRank',
+  jobRole: 'history.field.jobRole',
   leaveAllowanceDays: 'history.field.leaveAllowanceDays',
   member: 'history.field.member',
   memberOut: 'history.field.memberOut',
@@ -460,6 +469,7 @@ export function historyFieldMessageKey(
   | 'history.field.email'
   | 'history.field.role'
   | 'history.field.fireRank'
+  | 'history.field.jobRole'
   | 'history.field.leaveAllowanceDays'
   | 'history.field.member'
   | 'history.field.memberOut'
@@ -692,6 +702,8 @@ export function historyOperandText(operand: HistoryOperand, names: HistoryNames)
       return named(names.shiftTypes, operand.id, t('history.value.unknownShiftType'));
     case 'absence-type':
       return named(names.absenceTypes, operand.id, t('history.value.unknownAbsenceType'));
+    case 'job-role':
+      return named(names.jobRoles, operand.id, t('history.value.unknownJobRole'));
     case 'rotation-pattern':
       return patternText(operand.id, names);
     case 'rotation-step':

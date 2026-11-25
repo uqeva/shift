@@ -2,6 +2,8 @@ import {
   ABSENCE_TYPE_LIST_KEYS,
   ABSENCE_TYPE_WRITE_KEYS,
   ACCENT_KEYS,
+  JOB_ROLE_LIST_KEYS,
+  JOB_ROLE_WRITE_KEYS,
   AUTH_LAYOUT,
   CALENDAR_EMPTY_DAY_KEYS,
   CALENDAR_MODIFIER_KEYS,
@@ -255,7 +257,7 @@ export const KEY_SOURCES = [
   // saved lines, the dialog title, the cap's label and hint, the expiry's
   // group label, its day and month labels and their empty choices, and the
   // first year's label and hint.
-  { name: 'the organization settings surface', file: SETTINGS, keys: translationKeys, strings: 107 },
+  { name: 'the organization settings surface', file: SETTINGS, keys: translationKeys, strings: 125 },
   {
     // EIGHT on the member list since story 1.5b, up from five, and the number is
     // still small because most of what this screen says is read off a table
@@ -328,7 +330,7 @@ export const KEY_SOURCES = [
     file: MEMBER_LIST,
     keys: translationKeys,
     // STORY 19.4: the one-person line (ljudi.alone).
-    strings: 43,
+    strings: 51,
   },
   {
     // STORY 1.7a. EIGHT on the team list: its heading, the link back
@@ -934,7 +936,7 @@ export const KEY_SOURCES = [
     // ONE HUNDRED AND NINETY-SEVEN SINCE STORY 21.23: the compact toolbar —
     // `Prikaz` and `Izvoz` with their menus' names, and the shared bar's
     // `Filtri` group, trigger and count, `Aktivni filtri` and `Primijeni`.
-    strings: 197,
+    strings: 198,
   },
   {
     // STORY 12.2. On the swap proposal: its heading (twice, once while the
@@ -1226,7 +1228,8 @@ export const KEY_SOURCES = [
     // `planirano`, the two kinds, an assignment's kind label, its two values
     // (`slobodno`, a type with its team) and a grouped save's kind line,
     // and the unknown type twice and team once more inside those values.
-    strings: 166,
+    // 169 SINCE STORY 21.12: the job role record, its field label and the unknown role.
+    strings: 169,
   },
   {
     // STORY 21.4: *Ručni raspored* — the page, the grid and its legend, the
@@ -1498,6 +1501,22 @@ export const KEY_SOURCES = [
     file: ABSENCE_TYPE_WRITE_KEYS,
     keys: messageKeyUnions,
     strings: 10,
+  },
+  {
+    // STORY 21.12: the read failure, off `jobRolesMessageKey`.
+    name: 'the job role list rules',
+    file: JOB_ROLE_LIST_KEYS,
+    keys: messageKeyUnions,
+    strings: 1,
+  },
+  {
+    // STORY 21.12: seven refusals — the blank, long, control-character and
+    // taken name, the stale card, the outright refusal and the service — and
+    // four confirmations: an add, a rename, an archive and a restore.
+    name: 'the job role write rules',
+    file: JOB_ROLE_WRITE_KEYS,
+    keys: messageKeyUnions,
+    strings: 11,
   },
   {
     // STORY 10.3: the organization's email-notifications switch — its two
@@ -1878,7 +1897,7 @@ export const KEY_SOURCES = [
     name: 'the member edit form',
     file: MEMBER_EDIT,
     keys: translationKeys,
-    strings: 201,
+    strings: 205,
   },
   {
     // THIRTEEN on the member write path's rules: eleven `ljudi.form.error.*`
@@ -1965,7 +1984,7 @@ export const KEY_SOURCES = [
     name: 'the member list rules',
     file: MEMBER_LIST_KEYS,
     keys: memberListKeys,
-    strings: 31,
+    strings: 33,
   },
   {
     // STORY 11.2: the short-staffed block every save that can cause one draws

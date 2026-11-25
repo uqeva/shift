@@ -43,6 +43,10 @@ export const SETTINGS_SCREEN_PARTS = {
   // hook holding its read and its two writes.
   absenceTypes: ['features', 'organization', 'components', 'organization-absence-types-card.tsx'],
   absenceTypesHook: ['features', 'organization', 'hooks', 'use-organization-absence-types.ts'],
+  // STORY 21.12: the *Poslovi* card, with its one dialog, and the hook holding
+  // its read and its writes.
+  jobRoles: ['features', 'organization', 'components', 'organization-job-roles-card.tsx'],
+  jobRolesHook: ['features', 'organization', 'hooks', 'use-organization-job-roles.ts'],
   accentLabel: ['features', 'organization', 'utils', 'accent-label.ts'],
 } as const;
 

@@ -43,3 +43,20 @@ export function CellView({ cell }: { readonly cell: MemberCell }): ReactNode {
     </span>
   );
 }
+
+/**
+ * A member's job role beside their name (story 21.12), in muted text under it,
+ * preceded by the visually hidden separator so a screen reader announces the
+ * name and the role as two things. Nothing for a member with no role, so a
+ * list where nobody holds one is as it was.
+ */
+export function JobRoleNote({ role }: { readonly role: string | null }): ReactNode {
+  if (role === null) return null;
+
+  return (
+    <span className="block break-words text-xs text-muted-foreground">
+      <span className="sr-only">{t('ljudi.status.separator')}</span>
+      {role}
+    </span>
+  );
+}

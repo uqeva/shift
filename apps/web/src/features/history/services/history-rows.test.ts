@@ -53,6 +53,7 @@ const LISTS = {
   teams: [{ id: 'a', name: 'Smjena A' }],
   shiftTypes: [{ id: 's1', name: 'Dnevna' }],
   absenceTypes: [{ id: 'g', name: 'Godišnji odmor' }],
+  jobRoles: [],
 };
 
 beforeAll(async () => {
@@ -256,6 +257,22 @@ describe('the rows the table draws and 14.3 prints', () => {
     expect(historyKindOptionsOf([{ id: 'leave-record:added', count: 1 }])[0]?.label).toBe(
       `${t('history.record.leaveRecord')} · ${t('history.action.added')}`,
     );
+  });
+});
+
+describe('a job role (story 21.12)', () => {
+  it('is named from the current list, then from the rows the events hold, else a neutral word', () => {
+    const renamed: Pick<AuditEvent, 'tableName' | 'oldRow' | 'newRow'> = {
+      tableName: 'job_roles',
+      oldRow: null,
+      newRow: { id: 'r-old', name: 'Sezonac', archived: true },
+    };
+    const names = historyNamesOf([renamed], { ...LISTS, jobRoles: [{ id: 'r-vod', name: 'Vod' }] });
+
+    expect(historyOperandText({ type: 'job-role', id: 'r-vod' }, names)).toBe('Vod');
+    expect(historyOperandText({ type: 'job-role', id: 'r-old' }, names)).toBe('Sezonac');
+    expect(historyOperandText({ type: 'job-role', id: 'r-gone' }, names)).toBe(t('history.value.unknownJobRole'));
+    expect(historyRecordMessageKey('job-role')).toBe('history.record.jobRole');
   });
 });
 
@@ -526,7 +543,7 @@ describe('the rows are drawn in steps, and a departed member keeps their name (e
     const deletedRow = { tableName: 'members', oldRow: { id: 'member-gone', name: 'Goran' }, newRow: null };
     const olderDelete = { tableName: 'members', oldRow: { id: 'member-gone', name: 'Goran staro' }, newRow: null };
     const inRead = { tableName: 'members', oldRow: null, newRow: { id: 'member-gone', name: 'Goran u razdoblju' } };
-    const lists = { members: [{ id: 'member-ana', name: 'Ana' }], teams: [], shiftTypes: [], absenceTypes: [] };
+    const lists = { members: [{ id: 'member-ana', name: 'Ana' }], teams: [], shiftTypes: [], absenceTypes: [], jobRoles: [] };
 
     // As the hook passes them: the read's events, then the departed rows newest first.
     expect(historyNamesOf([deletedRow, olderDelete], lists).members.get('member-gone')).toBe('Goran');

@@ -557,6 +557,11 @@ export const ABSENCE_TYPE_LIST_KEYS = join(srcRoot, 'features', 'absence-types',
 
 export const ABSENCE_TYPE_WRITE_KEYS = join(srcRoot, 'features', 'absence-types', 'services', 'write.ts');
 
+/** Story 21.12: the job role list's and write's rules, each a `\w*MessageKey` module. */
+export const JOB_ROLE_LIST_KEYS = join(srcRoot, 'features', 'job-roles', 'services', 'list.ts');
+
+export const JOB_ROLE_WRITE_KEYS = join(srcRoot, 'features', 'job-roles', 'services', 'write.ts');
+
 export const SHIFT_TYPE_LIST_HOOK = join(srcRoot, ...SHIFT_TYPE_LIST_PARTS.hook);
 
 export const SHIFT_TYPE_EDIT_HOOK = join(srcRoot, ...SHIFT_TYPE_EDIT_PARTS.hook);
@@ -972,7 +977,7 @@ export const SCREENS = [
   // dialog's name field, Odustani and Spremi.
   // NINE FIELDS AND SIXTEEN BUTTONS since story 13.4: the carry-over card's
   // `Uredi`, and its dialog's cap, expiry day and month, and first year.
-  { name: 'the organization settings surface', file: SETTINGS, expectedFields: 9, expectedButtons: 16 },
+  { name: 'the organization settings surface', file: SETTINGS, expectedFields: 10, expectedButtons: 21 },
   // THREE on the member list, and the count is what keeps a fourth from
   // arriving unreviewed: the search field, the permission-level filter, and ONE
   // `<Button>` — the sort control, written once inside a map over
@@ -1086,7 +1091,7 @@ export const SCREENS = [
   // *Razlog*; and its card button, retry, cancel and *Spremi*.
   // FORTY-THREE BUTTONS SINCE STORY 18.4: a loan row's *Izmijeni posudbu* and
   // the amend dialog's *Završi danas*. *Ukloni posudbu* is the shared Switch.
-  { name: 'the member edit form', file: MEMBER_EDIT, expectedFields: 16, expectedButtons: 43 },
+  { name: 'the member edit form', file: MEMBER_EDIT, expectedFields: 17, expectedButtons: 43 },
   // STORY 1.7a. FOUR on the team list: the link back to `Ljudi`, the one name
   // `<Input>`, the add `<Button>`, and ONE row link written once inside the map
   // over the teams — the same count at zero teams as at nine. SIX on one team:

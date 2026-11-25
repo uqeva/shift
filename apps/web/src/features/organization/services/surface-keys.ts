@@ -2,6 +2,7 @@ import type { QueryKey } from '@tanstack/react-query';
 
 import { ABSENCE_TYPES_LIST_KEY } from '@/features/absence-types/services/list';
 import { HOUR_BANDS_LIST_KEY } from '@/features/hour-bands/services/list';
+import { JOB_ROLES_LIST_KEY } from '@/features/job-roles/services/list';
 import {
   ORGANIZATION_SNAPSHOT_KEY,
   ORGANIZATION_UNAVAILABLE,
@@ -14,7 +15,8 @@ import { ZONE_NOT_NEEDED, zoneFromReads, type NoteZone } from '@/lib/offline/fre
 /**
  * *Organizacija* `/organizacija` as one snapshot (story 8.2d): the
  * organization row, the hour bands its *Satni pojasi* card summarizes, and
- * the absence types its *Vrste odsutnosti* card lists (story 13.1b).
+ * the absence types its *Vrste odsutnosti* card lists (story 13.1b), and the
+ * job roles its *Poslovi* card lists (story 21.12).
  * `useOrganizationSettings`, `useOrganizationHourBands` and
  * `useOrganizationAbsenceTypes` all decide over
  * this one set — each observing its own read and deciding the other's from
@@ -27,6 +29,7 @@ export const ORGANIZATION_SURFACE_KEYS: readonly QueryKey[] = [
   ORGANIZATION_SNAPSHOT_KEY,
   HOUR_BANDS_LIST_KEY,
   ABSENCE_TYPES_LIST_KEY,
+  JOB_ROLES_LIST_KEY,
 ];
 
 /**

@@ -82,6 +82,8 @@ export const HISTORY_RECORDS = [
   // Story 21.4: a Personal Assignment (`personal_assignments`, 0077), the
   // grid's *Ručni raspored*. One save is one entry per member (`planned`).
   'personal-assignment',
+  // Story 21.12: a job role (`job_roles`, 0078).
+  'job-role',
   // A table this build does not know yet (an audited table added after it):
   // drawn as a generic record, its fields as raw operands, never a failed read.
   'other',
@@ -138,6 +140,7 @@ export type HistoryOperand =
         | 'team'
         | 'shift-type'
         | 'absence-type'
+        | 'job-role'
         | 'rotation-pattern'
         | 'rotation-step'
         | 'roster-override';
@@ -201,6 +204,8 @@ export const HISTORY_FIELDS = [
   'email',
   'role',
   'fireRank',
+  // Story 21.12 (0078): a member's job role.
+  'jobRole',
   'leaveAllowanceDays',
   'member',
   'memberOut',
@@ -304,6 +309,7 @@ const RECORD_OF_TABLE: Readonly<Record<string, HistoryRecord>> = {
   team_loans: 'loan',
   calendar_feed_tokens: 'calendar-feed',
   personal_assignments: 'personal-assignment',
+  job_roles: 'job-role',
 };
 
 /** The record an audited table holds, or `null` for a table this build does not know. */
@@ -392,6 +398,7 @@ type FieldType =
   | 'team'
   | 'shift-type'
   | 'absence-type'
+  | 'job-role'
   | 'rotation-pattern'
   | 'rotation-step'
   | 'roster-override'
@@ -424,6 +431,7 @@ const FIELD_OF_COLUMN: Readonly<Record<string, readonly [HistoryField, FieldType
   email: ['email', 'text'],
   role: ['role', 'enum'],
   fire_rank: ['fireRank', 'text'],
+  job_role_id: ['jobRole', 'job-role'],
   leave_allowance_days: ['leaveAllowanceDays', 'number'],
   member_id: ['member', 'member'],
   member_out_id: ['memberOut', 'member'],
@@ -558,6 +566,7 @@ export function historyOperandOf(column: string, value: unknown): HistoryOperand
     case 'team':
     case 'shift-type':
     case 'absence-type':
+    case 'job-role':
     case 'rotation-pattern':
     case 'rotation-step':
     case 'roster-override':

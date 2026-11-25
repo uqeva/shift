@@ -12,6 +12,7 @@ import {
   ORGANIZATION_CONFLICT_RESOLUTIONS_KEY,
 } from '@/features/conflicts/services/resolutions';
 import { HOUR_BANDS_LIST_KEY } from '@/features/hour-bands/services/list';
+import { JOB_ROLES_LIST_KEY } from '@/features/job-roles/services/list';
 import {
   LEAVE_OVERVIEW_RECORDS_KEY,
   LEAVE_RECORDS_KEY,
@@ -45,6 +46,8 @@ import {
   CONFLICT_RESOLUTION_HELD_DEPENDENTS,
   CONFLICT_RESOLUTION_WRITE_DEPENDENTS,
   ABSENCE_TYPE_WRITE_DEPENDENTS,
+  JOB_ROLE_WRITE_DEPENDENTS,
+  MEMBER_JOB_ROLE_SAVE_DEPENDENTS,
   HOUR_BAND_WRITE_DEPENDENTS,
   LEAVE_REQUEST_APPROVAL_DEPENDENTS,
   LEAVE_REQUEST_REJECTION_DEPENDENTS,
@@ -150,6 +153,9 @@ const CLASSIFIED: Readonly<Record<string, readonly QueryKey[]>> = {
   // Story 13.1b: the organization's absence types, which only *Vrste odsutnosti*'s
   // own writes name: *Sati* reads them off the calendar snapshot (story 13.2).
   ABSENCE_TYPES_LIST_KEY: [ABSENCE_TYPES_LIST_KEY],
+  // Story 21.12: the organization's job roles, which only *Poslovi*'s own
+  // writes name; the members list and the calendar carry each member's role.
+  JOB_ROLES_LIST_KEY: [JOB_ROLES_LIST_KEY],
 };
 
 /**
@@ -492,6 +498,21 @@ describe('the reads a team or membership write makes stale', () => {
         LEAVE_OVERVIEW_RECORDS_KEY,
         ABSENCE_TYPES_LIST_KEY,
       ],
+    },
+    {
+      write: 'a job role added, renamed, archived or restored (story 21.12)',
+      own: JOB_ROLES_LIST_KEY,
+      dependents: JOB_ROLE_WRITE_DEPENDENTS,
+      // Its own list, the members list that embeds each member's role, and
+      // the calendar snapshot whose day detail names it.
+      stale: [MEMBERS_LIST_KEY, CALENDAR_KEY, JOB_ROLES_LIST_KEY],
+    },
+    {
+      write: 'a member saved with a changed job role (story 21.12)',
+      own: MEMBERS_LIST_KEY,
+      dependents: MEMBER_JOB_ROLE_SAVE_DEPENDENTS,
+      // As any member save, and the calendar snapshot naming the role.
+      stale: [MEMBERS_LIST_KEY, ROSTER_A, ROSTER_B, ROTATION_KEY, CALENDAR_KEY, MEMBER_NAME_KEY, MEMBER_ROLE_KEY],
     },
     {
       write: 'a refusal',

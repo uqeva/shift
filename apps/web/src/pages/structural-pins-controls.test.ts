@@ -57,7 +57,7 @@ describe('every select is the one Select primitive, in the one Input look', () =
     );
   }
 
-  it('finds all fifteen, so the comparison is not vacuous', () => {
+  it('finds all sixteen, so the comparison is not vacuous', () => {
     // FOURTEEN AGAIN SINCE STORY 13.4: the carry-over expiry's day and month.
     // THIRTEEN: the twelve visual refresh B held to one literal, and the shift
     // type kind on `/postavke-rotacije`, which that block never listed.
@@ -69,7 +69,8 @@ describe('every select is the one Select primitive, in the one Input look', () =
     // TWELVE SINCE STORY 7.18: the accent and the fire-rank setting are
     // radio groups in their dialogs, not selects.
     // FIFTEEN SINCE STORY 18.3: the member page's loan dialog's team.
-    expect(selectClasses()).toHaveLength(15);
+    // SIXTEEN SINCE STORY 21.12: the member page's *Posao*.
+    expect(selectClasses()).toHaveLength(16);
   });
 
   it('composes only the 44 px height onto each, so no screen restyles the primitive', () => {

@@ -120,6 +120,14 @@ import {
   statusFilterMessageKey,
   statusValueMessageKey,
   memberAllowanceOn,
+  ALL_ROLES,
+  CHIP_ROLE,
+  NO_ROLE,
+  chooseRole,
+  roleChipShown,
+  roleFilterMessageKey,
+  roleToStore,
+  type LevelFilter,
 } from '@/features/members/services/list';
 import { TEAM_HISTORY, TEAM_HISTORY_ANSWERS, TEAM_HISTORY_SPAN } from '@/features/members/team-history.fixture';
 import { initLocalization, t } from '@/lib/i18n';
@@ -166,6 +174,7 @@ function member(fields: Partial<MemberListRow> & { readonly id: string }): Membe
     leaveAllowance: { startingDays: leaveAllowanceDays, versions: [] },
     leaveYearStart: { month: 1, day: 1 },
     fireRank: null,
+    jobRole: null,
     authUserId: `account-${fields.id}`,
     statusVersions: [],
     teamVersions: [],
@@ -206,6 +215,7 @@ function row(fields: Readonly<Record<string, unknown>>): Record<string, unknown>
     role: 'member_role',
     leave_allowance_days: 20,
     fire_rank: null,
+    job_role: null,
     auth_user_id: `account-${String(fields['id'] ?? 'member')}`,
     member_status_versions: [],
     team_membership_versions: [],
@@ -304,6 +314,11 @@ describe('the read asks for exactly what the surface needs, and for the count', 
     // STORY 1.7b adds the TEAM history, each version with its team's name.
     // STORY 13.3 adds the allowance versions and the organization's
     // leave-year start, which the leave column resolves today's allowance from.
+    // STORY 21.12 embeds the job role by its foreign key's name.
+    const role = 'job_role:job_roles!members_job_role_fkey(id,name,archived)';
+
+    expect(MEMBERS_COLUMNS).toContain(`,fire_rank,${role},`);
+
     const embed =
       'member_status_versions(active,effective_from),' +
       'team_membership_versions(team_id,position,effective_from,teams(name)),' +
@@ -311,7 +326,7 @@ describe('the read asks for exactly what the surface needs, and for the count', 
       'organizations(timezone,leave_year_start_month,leave_year_start_day)';
 
     expect(MEMBERS_COLUMNS.endsWith(`,${embed}`)).toBe(true);
-    expect(MEMBERS_COLUMNS.slice(0, -(embed.length + 1)).split(',').sort()).toEqual(
+    expect(MEMBERS_COLUMNS.slice(0, -(embed.length + 1)).replace(`,${role}`, '').split(',').sort()).toEqual(
       [
         'auth_user_id',
         'email',
@@ -350,6 +365,7 @@ describe('the read asks for exactly what the surface needs, and for the count', 
       leaveAllowance: { startingDays: 25, versions: [] },
       leaveYearStart: { month: 1, day: 1 },
       fireRank: 'officer',
+      jobRole: null,
       authUserId: 'account-m1',
       statusVersions: [],
       teamVersions: [],
@@ -1361,6 +1377,7 @@ describe('the reset is offered only while the URL differs from its defaults (sto
       search: NO_TEXT,
       level: ALL_LEVELS,
       team: ALL_TEAMS,
+      jobRoleFilter: ALL_ROLES,
       status: STATUS_ACTIVE,
       sort: { key: NAME_COLUMN, direction: ASCENDING },
     });
@@ -2701,12 +2718,20 @@ describe('the search, filters and sort live in the URL, with every default left 
       search: 'ana',
       level: 'member_role',
       team: 'team-alfa',
+      jobRoleFilter: 'role-vod',
       status: STATUS_ALL,
       sort: { key: LEAVE_COLUMN, direction: DESCENDING },
     };
     const search = membersSearchFor(filters);
 
-    expect(search).toEqual({ trazi: 'ana', razina: 'clan', smjena: 'team-alfa', status: 'svi', sort: '-godisnji' });
+    expect(search).toEqual({
+      trazi: 'ana',
+      razina: 'clan',
+      smjena: 'team-alfa',
+      posao: 'role-vod',
+      status: 'svi',
+      sort: '-godisnji',
+    });
     expect(membersFiltersOf(search)).toEqual(filters);
   });
 
@@ -2791,9 +2816,9 @@ describe('the chips say what is set, and each press is a change of the filters (
   ];
 
   it('draws the status chip set at its default, and every other chip unset', () => {
-    expect(MEMBER_CHIPS).toEqual([CHIP_LEVEL, CHIP_TEAM, CHIP_STATUS]);
-    expect(MEMBER_CHIPS.map((key) => memberChipActive(DEFAULT_FILTERS, ALL_TEAMS, key))).toEqual([false, false, true]);
-    expect(memberChipsActiveCount(DEFAULT_FILTERS, ALL_TEAMS)).toBe(1);
+    expect(MEMBER_CHIPS).toEqual([CHIP_LEVEL, CHIP_TEAM, CHIP_ROLE, CHIP_STATUS]);
+    expect(MEMBER_CHIPS.map((key) => memberChipActive(DEFAULT_FILTERS, ALL_TEAMS, key))).toEqual([false, false, false, true]);
+    expect(memberChipsActiveCount(DEFAULT_FILTERS, ALL_TEAMS, ALL_ROLES)).toBe(1);
     expect(memberChipActive({ ...DEFAULT_FILTERS, status: STATUS_ALL }, ALL_TEAMS, CHIP_STATUS)).toBe(false);
     expect(memberChipActive(DEFAULT_FILTERS, 'team-alfa', CHIP_TEAM)).toBe(true);
   });
@@ -2827,5 +2852,90 @@ describe('the chips say what is set, and each press is a change of the filters (
     expect(STATUS_FILTERS.map(chooseStatus)).toEqual(STATUS_FILTERS);
     expect(chooseStatus('x')).toBe(DEFAULT_STATUS);
     expect(DEFAULT_STATUS).toBe(STATUS_ACTIVE);
+  });
+});
+
+describe('the job role: shown and filtered on (story 21.12)', () => {
+  const VOD = { id: 'role-vod', name: 'Vod', archived: false };
+  const DISPATCH = { id: 'role-dispatch', name: 'Dispečer', archived: true };
+  const members = [
+    member({ id: 'a', name: 'Ana', jobRole: VOD }),
+    member({ id: 'b', name: 'Bruno', jobRole: VOD, role: 'admin' }),
+    member({ id: 'c', name: 'Cvita', jobRole: DISPATCH }),
+    member({ id: 'd', name: 'Dora' }),
+  ];
+  const narrow = (role: string, level: LevelFilter = ALL_LEVELS) =>
+    narrowMembers(members, NO_TEXT, level, DEFAULT_SORT, TODAY, ALL_TEAMS, STATUS_ALL, role);
+
+  it('parses the embedded role, none as null, and refuses a malformed one', () => {
+    expect(memberListRowOf(row({ job_role: { id: 'r', name: 'Vod', archived: false } }))?.jobRole).toEqual({
+      id: 'r',
+      name: 'Vod',
+      archived: false,
+    });
+    expect(memberListRowOf(row({ job_role: null }))?.jobRole).toBeNull();
+    expect(memberListRowOf(row({ job_role: { id: 'r', name: 'Vod' } }))).toBeNull();
+    expect(memberListRowOf(row({ job_role: undefined }))).toBeNull();
+    expect(memberListRowOf(row({ job_role: [] }))).toBeNull();
+  });
+
+  it('offers every role somebody holds by name, archived too, between every role and no role, with faceted counts', () => {
+    const narrowed = narrow(ALL_ROLES);
+
+    expect(narrowed.roles).toEqual([
+      { value: ALL_ROLES, roleName: NO_TEXT, count: 4 },
+      { value: DISPATCH.id, roleName: 'Dispečer', count: 1 },
+      { value: VOD.id, roleName: 'Vod', count: 2 },
+      { value: NO_ROLE, roleName: NO_TEXT, count: 1 },
+    ]);
+    // The role options count over the level; the level options over the role.
+    expect(narrow(ALL_ROLES, 'admin').roles.map((option) => option.count)).toEqual([1, 0, 1, 0]);
+    expect(narrow(VOD.id).counts).toEqual({ [ALL_LEVELS]: 2, admin: 1, member_role: 1 });
+  });
+
+  it('narrows to the members holding a role, or none, and an unknown id to everyone', () => {
+    expect(narrow(VOD.id).rows.map((one) => one.id)).toEqual(['a', 'b']);
+    expect(narrow(VOD.id).appliedRole).toBe(VOD.id);
+    expect(narrow(NO_ROLE).rows.map((one) => one.id)).toEqual(['d']);
+    expect(narrow('role-gone').rows).toHaveLength(4);
+    expect(narrow('role-gone').appliedRole).toBe(ALL_ROLES);
+    expect(roleToStore('role-gone', ALL_ROLES, members)).toBe(ALL_ROLES);
+    expect(roleToStore('role-gone', ALL_ROLES, null)).toBe('role-gone');
+  });
+
+  it('draws no Posao chip while nobody holds a role, unless one is chosen', () => {
+    const none = narrowMembers([member({ id: 'd', name: 'Dora' })], NO_TEXT, ALL_LEVELS, DEFAULT_SORT, TODAY);
+
+    expect(roleChipShown(none.roles, ALL_ROLES)).toBe(false);
+    expect(roleChipShown(none.roles, NO_ROLE)).toBe(true);
+    expect(roleChipShown(narrow(ALL_ROLES).roles, ALL_ROLES)).toBe(true);
+  });
+
+  it('round-trips ?posao= through the URL, every role left out', () => {
+    expect(membersFiltersOf({ posao: 'none' }).jobRoleFilter).toBe(NO_ROLE);
+    expect(membersFiltersOf({ posao: '' }).jobRoleFilter).toBe(ALL_ROLES);
+    expect(membersSearchFor({ ...DEFAULT_FILTERS, jobRoleFilter: ALL_ROLES })).toEqual({});
+    expect(membersSearchFor({ ...DEFAULT_FILTERS, jobRoleFilter: NO_ROLE })).toEqual({ posao: 'none' });
+    expect(membersSearchKeyOf({ posao: 'none' })).not.toBe(membersSearchKeyOf({}));
+  });
+
+  it('counts the APPLIED role in Filtri · N, never a stale id the URL still holds', () => {
+    const stale = { ...DEFAULT_FILTERS, jobRoleFilter: 'role-gone' };
+
+    expect(memberChipsActiveCount(stale, ALL_TEAMS, narrow('role-gone').appliedRole)).toBe(1);
+    expect(memberChipsActiveCount(stale, ALL_TEAMS, narrow(VOD.id).appliedRole)).toBe(2);
+  });
+
+  it('sets, picks and removes the Posao chip', () => {
+    const options = narrow(ALL_ROLES).roles;
+
+    expect(memberChipActive(DEFAULT_FILTERS, ALL_TEAMS, CHIP_ROLE, VOD.id)).toBe(true);
+    expect(memberChipChoiceOf(DEFAULT_FILTERS, CHIP_ROLE, VOD.id, [], options).jobRoleFilter).toBe(VOD.id);
+    expect(memberChipChoiceOf(DEFAULT_FILTERS, CHIP_ROLE, 'role-gone', [], options).jobRoleFilter).toBe(ALL_ROLES);
+    expect(memberChipRemovalOf({ ...DEFAULT_FILTERS, jobRoleFilter: VOD.id }, CHIP_ROLE).jobRoleFilter).toBe(ALL_ROLES);
+    expect(chooseRole(NO_ROLE, options)).toBe(NO_ROLE);
+    expect(roleFilterMessageKey(ALL_ROLES)).toBe('ljudi.chip.allRoles');
+    expect(roleFilterMessageKey(NO_ROLE)).toBe('ljudi.jobRole.none');
+    expect(roleFilterMessageKey(VOD.id)).toBeNull();
   });
 });

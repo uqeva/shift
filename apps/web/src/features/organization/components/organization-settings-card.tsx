@@ -9,10 +9,12 @@ import { OrganizationEmailNotificationsCard } from '@/features/organization/comp
 import { OrganizationMinimumMembersCard } from '@/features/organization/components/organization-minimum-members-card';
 import { OrganizationFireRanksCard } from '@/features/organization/components/organization-fire-ranks-card';
 import { OrganizationHourBandsCard } from '@/features/organization/components/organization-hour-bands-card';
+import { OrganizationJobRolesCard } from '@/features/organization/components/organization-job-roles-card';
 import { OrganizationProfileCard } from '@/features/organization/components/organization-profile-card';
 import { OrganizationTimeCard } from '@/features/organization/components/organization-time-card';
 import type { OrganizationAbsenceTypes } from '@/features/organization/hooks/use-organization-absence-types';
 import type { OrganizationHourBands } from '@/features/organization/hooks/use-organization-hour-bands';
+import type { OrganizationJobRoles } from '@/features/organization/hooks/use-organization-job-roles';
 import type { OrganizationSettings } from '@/features/organization/hooks/use-organization-settings';
 import { ORGANIZATION_READ_RETRY_ID } from '@/features/organization/utils/element-ids';
 import { ORGANIZATION_ERROR_ID, organizationMessageKey } from '@/features/organization/utils/messages';
@@ -27,7 +29,9 @@ import { keepFocusOnAlert } from '@/utils/retry-focus';
  * dialog with one Spremi; a seventh,
  * *Satni pojasi*, a summary of the hour bands with the way to their editor;
  * and an eighth, *Vrste odsutnosti* (story 13.1b), the absence types with one
- * dialog to add a type or edit one. No field is mounted on the page.
+ * dialog to add a type or edit one; and a ninth, *Poslovi* (story 21.12), the
+ * job roles with one dialog to add or rename a role and each row's archive or
+ * restore. No field is mounted on the page.
  *
  * WHAT IS DELIBERATELY NOT HERE:
  *
@@ -53,10 +57,12 @@ export function OrganizationSettingsCard({
   settings,
   hourBands,
   absenceTypes,
+  jobRoles,
 }: {
   readonly settings: OrganizationSettings;
   readonly hourBands: OrganizationHourBands;
   readonly absenceTypes: OrganizationAbsenceTypes;
+  readonly jobRoles: OrganizationJobRoles;
 }): ReactNode {
   const { snapshot, answered, organization, readFailure, readRetry, readAttempts, retryRead } = settings;
 
@@ -95,6 +101,7 @@ export function OrganizationSettingsCard({
         <OrganizationMinimumMembersCard settings={settings} organization={organization} />
         <OrganizationHourBandsCard hourBands={hourBands} />
         <OrganizationAbsenceTypesCard absenceTypes={absenceTypes} />
+        <OrganizationJobRolesCard jobRoles={jobRoles} />
       </>
     );
   }

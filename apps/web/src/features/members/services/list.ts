@@ -124,6 +124,11 @@ export const MEMBERS_LIST_KEY = ['members'] as const;
  * position is versioned with the team, so it arrives in the same embed and
  * the edit screen's team block reads both off one history.
  *
+ * STORY 21.12 EMBEDS THE MEMBER'S JOB ROLE (`0078`): its id, name and archived
+ * flag, or `null`. NAMED BY ITS FOREIGN KEY (`members_job_role_fkey`), so the
+ * embed stays unambiguous once 21.13's `floater_roles` adds a second path
+ * between the two tables. Shown beside the name and filtered on; never used.
+ *
  * STORY 13.3 EMBEDS THE ALLOWANCE VERSIONS (`0055`) and the organization's
  * leave-year start: `leave_allowance_days` is the starting allowance, and
  * every balance surface resolves the allowance of the leave year it counts
@@ -131,6 +136,7 @@ export const MEMBERS_LIST_KEY = ['members'] as const;
  */
 export const MEMBERS_COLUMNS =
   'organization_id,id,auth_user_id,name,username,email,role,leave_allowance_days,fire_rank,' +
+  'job_role:job_roles!members_job_role_fkey(id,name,archived),' +
   'member_status_versions(active,effective_from),' +
   'team_membership_versions(team_id,position,effective_from,teams(name)),' +
   'leave_allowances(id,leave_year,days),' +
@@ -293,6 +299,11 @@ export interface MemberListRow {
    */
   readonly fireRank: string | null;
   /**
+   * The member's job role (`0078`, story 21.12), archived or not, or `null`
+   * for none. Shown beside the name and filtered on; never used.
+   */
+  readonly jobRole: MemberJobRole | null;
+  /**
    * The account this member signs in with (`members.auth_user_id`). Rendered
    * nowhere; the edit screen compares it with the session's subject so the
    * deactivation control is never offered on the caller's own row.
@@ -326,6 +337,43 @@ export interface MemberStatusVersion {
   readonly active: boolean;
   /** An ISO calendar date, `YYYY-MM-DD`, in the organization's own frame. */
   readonly effectiveFrom: string;
+}
+
+/** A member's job role as the member screens name it (story 21.12). */
+export interface MemberJobRole {
+  readonly id: string;
+  readonly name: string;
+  readonly archived: boolean;
+}
+
+/**
+ * The embedded `job_role`, or `undefined` when it is malformed: `null` is no
+ * role; anything else must carry a text id, a text name and the flag.
+ */
+export function memberJobRoleIn(row: Record<string, unknown>): MemberJobRole | null | undefined {
+  const role = row['job_role'];
+
+  if (role === null) return null;
+  if (typeof role !== 'object' || Array.isArray(role) || role === undefined) return undefined;
+
+  const fields = role as Record<string, unknown>;
+  const id = fields['id'];
+  const name = fields['name'];
+  const archived = fields['archived'];
+
+  if (typeof id !== 'string' || id === '' || typeof name !== 'string' || typeof archived !== 'boolean') {
+    return undefined;
+  }
+
+  return { id, name, archived };
+}
+
+/**
+ * The words under a member's name in *Ljudi* (story 21.12): their job role's
+ * name, archived too, or `null` for none, which draws nothing.
+ */
+export function jobRoleNoteOf(member: MemberListRow): string | null {
+  return member.jobRole === null ? null : member.jobRole.name;
 }
 
 /** A team as the member screens name it: its id, and its name. */
@@ -815,6 +863,11 @@ export function memberRowOutcomeOf(row: unknown): RowOutcome {
     return { ok: false, malformed: { field: 'fire_rank', id } };
   }
 
+  // STORY 21.12: the role or none, and nothing else.
+  const jobRole = memberJobRoleIn(fields);
+
+  if (jobRole === undefined) return { ok: false, malformed: { field: 'job_role', id } };
+
   const statusVersions = statusVersionsIn(fields);
 
   if (statusVersions === null) {
@@ -859,6 +912,7 @@ export function memberRowOutcomeOf(row: unknown): RowOutcome {
       leaveAllowance: { startingDays: leaveAllowanceDays, versions: allowanceVersions },
       leaveYearStart: leaveYearStart.start,
       fireRank,
+      jobRole,
       authUserId,
       statusVersions,
       teamVersions,
@@ -1789,6 +1843,81 @@ export function teamToStore(
   return stored === applied ? stored : applied;
 }
 
+/** Every member, whatever their job role (story 21.12). */
+export const ALL_ROLES = 'all';
+
+/** The members holding no job role. */
+export const NO_ROLE = 'none';
+
+/**
+ * A job role filter value, written to the URL as `?posao=` (story 21.12):
+ * {@link ALL_ROLES}, {@link NO_ROLE}, or a role's id. The sentinels cannot
+ * collide with an id, a UUID, as the team filter's cannot.
+ */
+export type RoleFilter = string;
+
+/** One option of the *Posao* filter, with the count it would yield. `role` is the name, data. */
+export interface RoleFilterOption {
+  readonly value: RoleFilter;
+  readonly roleName: string;
+  readonly count: number;
+}
+
+/** The role a member counts under: its id, or {@link NO_ROLE}. */
+function roleFilterValueOf(member: MemberListRow): RoleFilter {
+  return member.jobRole?.id ?? NO_ROLE;
+}
+
+/**
+ * Every role somebody in the snapshot holds, by name in Croatian order, then
+ * by id. DERIVED FROM THE ROWS, as the team options are: a role nobody holds
+ * would only ever state `0`.
+ */
+function rolesHeld(members: readonly MemberListRow[]): MemberJobRole[] {
+  const byId = new Map<string, MemberJobRole>();
+
+  for (const member of members) {
+    const role = member.jobRole;
+
+    if (role !== null && !byId.has(role.id)) byId.set(role.id, role);
+  }
+
+  return [...byId.values()].sort((first, second) => compareText(first.name, second.name) || compareText(first.id, second.id));
+}
+
+/** The role a picker value IS among the options on screen, or every role (see {@link chooseTeam}). */
+export function chooseRole(value: string, options: readonly RoleFilterOption[]): RoleFilter {
+  return options.find((option) => option.value === value)?.value ?? ALL_ROLES;
+}
+
+/** The words a sentinel role option renders as, or `null` for a role, whose name is data. */
+export function roleFilterMessageKey(value: RoleFilter): 'ljudi.chip.allRoles' | 'ljudi.jobRole.none' | null {
+  if (value === ALL_ROLES) return 'ljudi.chip.allRoles';
+  if (value === NO_ROLE) return 'ljudi.jobRole.none';
+
+  return null;
+}
+
+/**
+ * Whether the *Posao* chip is drawn: its options name a role, or one is
+ * chosen. An organization where nobody holds a role draws no chip, so its
+ * list is as it was before roles existed.
+ */
+export function roleChipShown(roles: readonly RoleFilterOption[], chosen: RoleFilter): boolean {
+  return chosen !== ALL_ROLES || roles.some((option) => option.value !== ALL_ROLES && option.value !== NO_ROLE);
+}
+
+/**
+ * The role filter value the screen should STORE, by {@link teamToStore}'s
+ * rule: the applied one once a stored role has left the options, but only
+ * while the answer is real.
+ */
+export function roleToStore(stored: RoleFilter, applied: RoleFilter, members: readonly MemberListRow[] | null): RoleFilter {
+  if (members === null) return stored;
+
+  return stored === applied ? stored : applied;
+}
+
 /** Every member, whatever their status: the status chip's ✕ (story 7.13). */
 export const STATUS_ALL = 'svi';
 /** The members active today: the view the list opens in. */
@@ -1862,15 +1991,18 @@ export interface MembersFilters {
   readonly search: string;
   readonly level: LevelFilter;
   readonly team: TeamFilter;
+  /** The job role (story 21.12): `jobRoleFilter`, never `role`, which is the member's level. */
+  readonly jobRoleFilter: RoleFilter;
   readonly status: StatusFilter;
   readonly sort: SortState;
 }
 
-/** The list as it opens: no search, every level, every team, active today, by name ascending. */
+/** The list as it opens: no search, every level, every team, every role, active today, by name ascending. */
 export const DEFAULT_FILTERS: MembersFilters = {
   search: NO_TEXT,
   level: ALL_LEVELS,
   team: ALL_TEAMS,
+  jobRoleFilter: ALL_ROLES,
   status: DEFAULT_STATUS,
   sort: DEFAULT_SORT,
 };
@@ -1888,17 +2020,20 @@ export function isNarrowed(filters: MembersFilters): boolean {
     filters.search !== DEFAULT_FILTERS.search ||
     filters.level !== DEFAULT_FILTERS.level ||
     filters.team !== DEFAULT_FILTERS.team ||
+    filters.jobRoleFilter !== DEFAULT_FILTERS.jobRoleFilter ||
     filters.status !== DEFAULT_FILTERS.status ||
     filters.sort.key !== DEFAULT_FILTERS.sort.key ||
     filters.sort.direction !== DEFAULT_FILTERS.sort.direction
   );
 }
 
-/** The search parameters `/ljudi` reads: `?trazi=&razina=&smjena=&status=&sort=`, each absent at its default. */
+/** The search parameters `/ljudi` reads: `?trazi=&razina=&smjena=&posao=&status=&sort=`, each absent at its default. */
 export type MembersSearch = {
   readonly trazi?: string | undefined;
   readonly razina?: string | undefined;
   readonly smjena?: string | undefined;
+  /** STORY 21.12: `all` (absent), `none`, or a role's id. */
+  readonly posao?: string | undefined;
   readonly status?: string | undefined;
   readonly sort?: string | undefined;
 };
@@ -1940,11 +2075,13 @@ function sortOfSearch(value: unknown): SortState {
 export function membersFiltersOf(search: Readonly<Record<string, unknown>>): MembersFilters {
   const text = search['trazi'];
   const team = search['smjena'];
+  const role = search['posao'];
 
   return {
     search: searchTextOf(text),
     level: levelOfSearch(search['razina']),
     team: typeof team === 'string' && team !== NO_TEXT ? team : ALL_TEAMS,
+    jobRoleFilter: typeof role === 'string' && role !== NO_TEXT ? role : ALL_ROLES,
     status: chooseStatus(search['status']),
     sort: sortOfSearch(search['sort']),
   };
@@ -1959,6 +2096,7 @@ export function membersSearchFor(filters: MembersFilters): MembersSearch {
     ...(filters.search === NO_TEXT ? {} : { trazi: filters.search }),
     ...(filters.level === ALL_LEVELS ? {} : { razina: LEVEL_SEARCH_VALUES[filters.level] }),
     ...(filters.team === ALL_TEAMS ? {} : { smjena: filters.team }),
+    ...(filters.jobRoleFilter === ALL_ROLES ? {} : { posao: filters.jobRoleFilter }),
     ...(filters.status === DEFAULT_STATUS ? {} : { status: filters.status }),
     ...(sorted ? { sort } : {}),
   };
@@ -1998,17 +2136,23 @@ export function membersAddSearchOf(search: Readonly<Record<string, unknown>>): M
 /** One search as a string, so a change and the state it leaves compare as one key. */
 export function membersSearchKeyOf(search: MembersSearch): string {
   // JSON, never a join: free text holding the separator would make two states one key.
-  return JSON.stringify([search.trazi, search.razina, search.smjena, search.status, search.sort].map((value) => value ?? null));
+  return JSON.stringify(
+    [search.trazi, search.razina, search.smjena, search.posao, search.status, search.sort].map((value) => value ?? null),
+  );
 }
 
-/** The three chips beside the search (story 7.13), in the order they are drawn. */
+/**
+ * The chips beside the search (story 7.13), in the order they are drawn; the
+ * *Posao* chip (story 21.12) only while {@link roleChipShown}.
+ */
 export const CHIP_LEVEL = 'level';
 export const CHIP_TEAM = 'team';
+export const CHIP_ROLE = 'role';
 export const CHIP_STATUS = 'status';
 
-export type MemberChipKey = typeof CHIP_LEVEL | typeof CHIP_TEAM | typeof CHIP_STATUS;
+export type MemberChipKey = typeof CHIP_LEVEL | typeof CHIP_TEAM | typeof CHIP_ROLE | typeof CHIP_STATUS;
 
-export const MEMBER_CHIPS: readonly MemberChipKey[] = [CHIP_LEVEL, CHIP_TEAM, CHIP_STATUS];
+export const MEMBER_CHIPS: readonly MemberChipKey[] = [CHIP_LEVEL, CHIP_TEAM, CHIP_ROLE, CHIP_STATUS];
 
 /** The chip a key names, or `null` for none — never a cast. */
 export function chooseChip(value: string): MemberChipKey | null {
@@ -2020,20 +2164,35 @@ export function chooseChip(value: string): MemberChipKey | null {
  * its default, `aktivni`, because the default view does narrow: its ✕ shows
  * `svi`. `team` is the team the rows were narrowed by.
  */
-export function memberChipActive(filters: MembersFilters, team: TeamFilter, key: MemberChipKey): boolean {
+export function memberChipActive(
+  filters: MembersFilters,
+  team: TeamFilter,
+  key: MemberChipKey,
+  role: RoleFilter = filters.jobRoleFilter,
+): boolean {
   switch (key) {
     case CHIP_LEVEL:
       return filters.level !== ALL_LEVELS;
     case CHIP_TEAM:
       return team !== ALL_TEAMS;
+    case CHIP_ROLE:
+      return role !== ALL_ROLES;
     case CHIP_STATUS:
       return filters.status !== STATUS_ALL;
   }
 }
 
-/** How many chips are set: the phone's `Filtri · N`. */
-export function memberChipsActiveCount(filters: MembersFilters, team: TeamFilter): number {
-  return MEMBER_CHIPS.filter((key) => memberChipActive(filters, team, key)).length;
+/**
+ * How many chips are set: the phone's `Filtri · N`. `team` and `role` are the
+ * APPLIED ones (`narrowed.team`, `narrowed.appliedRole`), so a stale id in the
+ * URL that narrows nothing is not counted.
+ */
+export function memberChipsActiveCount(
+  filters: MembersFilters,
+  team: TeamFilter,
+  role: RoleFilter,
+): number {
+  return MEMBER_CHIPS.filter((key) => memberChipActive(filters, team, key, role)).length;
 }
 
 /**
@@ -2046,12 +2205,15 @@ export function memberChipChoiceOf(
   key: MemberChipKey,
   value: string,
   teams: readonly TeamFilterOption[],
+  roles: readonly RoleFilterOption[] = [],
 ): MembersFilters {
   switch (key) {
     case CHIP_LEVEL:
       return { ...filters, level: chooseLevel(value) };
     case CHIP_TEAM:
       return { ...filters, team: chooseTeam(value, teams) };
+    case CHIP_ROLE:
+      return { ...filters, jobRoleFilter: chooseRole(value, roles) };
     case CHIP_STATUS:
       return { ...filters, status: chooseStatus(value) };
   }
@@ -2064,6 +2226,8 @@ export function memberChipRemovalOf(filters: MembersFilters, key: MemberChipKey)
       return { ...filters, level: ALL_LEVELS };
     case CHIP_TEAM:
       return { ...filters, team: ALL_TEAMS };
+    case CHIP_ROLE:
+      return { ...filters, jobRoleFilter: ALL_ROLES };
     case CHIP_STATUS:
       return { ...filters, status: STATUS_ALL };
   }
@@ -2311,6 +2475,14 @@ export interface MembersNarrowing {
   /** What each status option would yield from the same search, level and team (story 7.13). */
   readonly statuses: Readonly<Record<StatusFilter, number>>;
   /**
+   * The *Posao* filter's options (story 21.12) — every role, the roles
+   * somebody holds by name, and no role — each with what it would yield from
+   * the same search, level, team and status (faceted).
+   */
+  readonly roles: readonly RoleFilterOption[];
+  /** The role the rows were narrowed by: the one asked for, or every role once it is not an option. */
+  readonly appliedRole: RoleFilter;
+  /**
    * The team the rows were actually narrowed by: the one asked for, or
    * {@link ALL_TEAMS} when it is not among {@link teams} any more. The
    * `<select>` shows THIS, so it never claims a team the rows ignore.
@@ -2405,6 +2577,7 @@ export function narrowMembers(
   today: string | null = null,
   team: TeamFilter = ALL_TEAMS,
   status: StatusFilter = STATUS_ALL,
+  role: RoleFilter = ALL_ROLES,
 ): MembersNarrowing {
   const searched = searchedMembers(members, search);
 
@@ -2414,6 +2587,12 @@ export function narrowMembers(
   const values: TeamFilter[] =
     today === null ? [ALL_TEAMS] : [ALL_TEAMS, ...named.map((known) => known.id), NO_TEAM];
   const applied = values.includes(team) ? team : ALL_TEAMS;
+  // STORY 21.12: the roles held, from the whole snapshot, and the chosen one
+  // only while it is still among them (an unknown id narrows nothing).
+  const held = rolesHeld(members);
+  const roleValues: RoleFilter[] = [ALL_ROLES, ...held.map((known) => known.id), NO_ROLE];
+  const appliedRole = roleValues.includes(role) ? role : ALL_ROLES;
+  const roleCounts = new Map<RoleFilter, number>(roleValues.map((value) => [value, 0]));
 
   const counts: Record<LevelFilter, number> = {
     [ALL_LEVELS]: 0,
@@ -2433,23 +2612,30 @@ export function narrowMembers(
     const levelMatches = level === ALL_LEVELS || member.role === level;
     const teamMatches = applied === ALL_TEAMS || onTeam === applied;
     const statusMatch = statusMatches(member, status, today);
+    const holds = roleFilterValueOf(member);
+    const roleMatches = appliedRole === ALL_ROLES || holds === appliedRole;
 
-    if (teamMatches && statusMatch) {
+    if (teamMatches && statusMatch && roleMatches) {
       counts[ALL_LEVELS] += 1;
       counts[member.role] += 1;
     }
 
-    if (levelMatches && statusMatch) {
+    if (levelMatches && statusMatch && roleMatches) {
       teamCounts.set(ALL_TEAMS, (teamCounts.get(ALL_TEAMS) ?? 0) + 1);
       if (onTeam !== null) teamCounts.set(onTeam, (teamCounts.get(onTeam) ?? 0) + 1);
     }
 
-    if (levelMatches && teamMatches) {
+    if (levelMatches && teamMatches && roleMatches) {
       statuses[STATUS_ALL] += 1;
       if (today !== null) statuses[memberStatusOf(member, today).activeToday ? STATUS_ACTIVE : STATUS_INACTIVE] += 1;
     }
 
-    if (levelMatches && teamMatches && statusMatch) filtered.push(member);
+    if (levelMatches && teamMatches && statusMatch) {
+      roleCounts.set(ALL_ROLES, (roleCounts.get(ALL_ROLES) ?? 0) + 1);
+      roleCounts.set(holds, (roleCounts.get(holds) ?? 0) + 1);
+    }
+
+    if (levelMatches && teamMatches && statusMatch && roleMatches) filtered.push(member);
   }
 
   const names = new Map(named.map((known) => [known.id, known.name]));
@@ -2458,12 +2644,18 @@ export function narrowMembers(
     team: names.get(value) ?? NO_TEXT,
     count: teamCounts.get(value) ?? 0,
   }));
+  const roleNames = new Map(held.map((known) => [known.id, known.name]));
+  const roles: RoleFilterOption[] = roleValues.map((value) => ({
+    value,
+    roleName: roleNames.get(value) ?? NO_TEXT,
+    count: roleCounts.get(value) ?? 0,
+  }));
 
   const column = MEMBER_COLUMNS.find((candidate) => candidate.key === sort.key);
   // A sort key no column owns orders nothing rather than throwing: the state is
   // this module's own and cannot reach that, but a `!` here would turn a future
   // mistake into a blank screen instead of an unsorted one.
-  if (column === undefined) return { rows: filtered, counts, teams, statuses, team: applied };
+  if (column === undefined) return { rows: filtered, counts, teams, statuses, roles, appliedRole, team: applied };
 
   // DECORATED once rather than read inside the comparator, which is called
   // O(n log n) times: at Q20's several hundred members that is a few thousand
@@ -2500,6 +2692,8 @@ export function narrowMembers(
     counts,
     teams,
     statuses,
+    roles,
+    appliedRole,
     team: applied,
   };
 }
@@ -2517,6 +2711,8 @@ export interface NarrowingInputs {
   readonly team: TeamFilter;
   /** The status filter's value (story 7.13). */
   readonly status: StatusFilter;
+  /** The job role filter's value (story 21.12); {@link narrowMembers} decides whether it applies. */
+  readonly jobRoleFilter?: RoleFilter;
   readonly sort: SortState;
   /** The organization's today, which the team column sorts by (story 1.7b). */
   readonly today: string | null;
@@ -2532,6 +2728,7 @@ export function narrowFrom(inputs: NarrowingInputs): MembersNarrowing {
     inputs.today,
     inputs.team,
     inputs.status,
+    inputs.jobRoleFilter ?? ALL_ROLES,
   );
 }
 

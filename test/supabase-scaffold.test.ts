@@ -505,7 +505,7 @@ describe('the access-control migration', () => {
     ).toEqual([]);
   });
 
-  it('declares exactly the sixty-seven policies stories 1.3a, 1.4a, 1.4b, 1.6, 1.7a, 1.7b, 2.1a, 2.2a, 2.3a, 3.5a, 3.6a, 5.1b, 5.4a, 9.2, 10.3, 10.4, 12.1, 13.1, 13.3, 14.1, 17.1, 18.2, 21.2, 0025 and 0036 reviewed, and no sixty-eighth', () => {
+  it('declares exactly the seventy policies stories 1.3a, 1.4a, 1.4b, 1.6, 1.7a, 1.7b, 2.1a, 2.2a, 2.3a, 3.5a, 3.6a, 5.1b, 5.4a, 9.2, 10.3, 10.4, 12.1, 13.1, 13.3, 14.1, 17.1, 18.2, 21.2, 21.12, 0025 and 0036 reviewed, and no seventy-first', () => {
     // EXTENDED BY STORY 1.4a, exactly as this comment asked: `0004_organization
     // _settings.sql` adds `organizations_update_by_own_active_admin`, built by
     // copying `members_update_by_own_active_admin`, and its name is added here
@@ -559,6 +559,12 @@ describe('the access-control migration', () => {
       'hour_bands_insert_by_own_active_admin',
       'hour_bands_select_own_organization',
       'hour_bands_update_by_own_active_admin',
+      // STORY 21.12 (0078), and THREE: every active member reads the roles,
+      // archived ones included; an active admin inserts and updates (rename,
+      // archive, restore). No delete policy: a role is never deleted.
+      'job_roles_insert_by_own_active_admin',
+      'job_roles_select_own_organization',
+      'job_roles_update_by_own_active_admin',
       // STORY 13.3, and TWO: an active admin appends a version of a member's
       // allowance, and the read is the admin's for the organization and a
       // member's for their own rows. No update and no delete policy: a
@@ -1231,11 +1237,13 @@ describe('the access-control migration', () => {
     expect(statements).toMatch(/revoke execute on function public\.team_roster\(uuid\) from anon;/);
   });
 
-  it('reads the calendar\'s members through one definer function that returns only id, name and rank', () => {
+  it('reads the calendar\'s members through one definer function that returns only id, name, rank and job role', () => {
     // STORY 3.4a, replacing 3.3b's `calendar_people`. Source text only; the
-    // matrix is `test/rls-isolation.test.ts`.
+    // matrix is `test/rls-isolation.test.ts`. STORY 21.12 (0078) drops and
+    // re-creates it with the member's job role; the LAST definition is the
+    // one in force, so it is the one read.
     const statements = migrationStatements();
-    const members = /create function public\.calendar_members\(\)[\s\S]*?\$\$;/i.exec(statements)?.[0];
+    const members = [...statements.matchAll(/create function public\.calendar_members\(\)[\s\S]*?\$\$;/gi)].at(-1)?.[0];
 
     expect(statements, '0018 does not drop calendar_people').toContain('drop function public.calendar_people();');
     expect(
@@ -1243,14 +1251,18 @@ describe('the access-control migration', () => {
       '0018 drops calendar_people after 0017 creates it',
     ).toBeGreaterThan(statements.indexOf('create function public.calendar_people()'));
     expect(members, 'calendar_members is not declared').toBeDefined();
-    expect(members).toMatch(/returns table \(id uuid, name text, fire_rank text\)/);
+    expect(members).toMatch(/returns table \(id uuid, name text, fire_rank text, job_role_id uuid, job_role text\)/);
     expect(members).toMatch(/language sql/i);
     expect(members).toMatch(/\bstable\b/i);
     expect(members).toMatch(/security definer/i);
     expect(members).toMatch(/set search_path = ''/);
-    expect(members, 'the members select a field besides id, name and fire_rank').toMatch(
-      /select m\.id,\s*m\.name,\s*m\.fire_rank\s+from public\.members m/,
+    expect(members, 'the members select a field besides id, name, fire_rank and the job role').toMatch(
+      /select m\.id,\s*m\.name,\s*m\.fire_rank,\s*m\.job_role_id,\s*r\.name as job_role\s+from public\.members m\s+left join public\.job_roles r\s+on r\.organization_id = m\.organization_id\s+and r\.id = m\.job_role_id/,
     );
+    expect(
+      statements.indexOf('drop function public.calendar_members();'),
+      '0078 drops calendar_members before re-creating it',
+    ).toBeGreaterThan(statements.indexOf('create function public.calendar_members()'));
     expect(members, 'the members read a private column').not.toMatch(
       /\b(email|leave_allowance_days|username|role|position|auth_user_id)\b/,
     );
@@ -3445,6 +3457,46 @@ describe('the access-control migration', () => {
     expect('grant update (name, email, role, username, fire_rank) on table public.members to authenticated;').not.toMatch(
       tableWide,
     );
+    // STORY 21.12 (0078): the member's job role, granted by column, 0056's rule.
+    expect(migrationStatements()).toContain('grant update (job_role_id) on table public.members to authenticated;');
+  });
+
+  it('keeps job roles organization data: named, archived and restored, never deleted or seeded (story 21.12)', () => {
+    // Source text only; the refusals are `test/rls-isolation.test.ts`, in CI.
+    const migration = stripLineComments(readFileSync(join(supabaseRoot, 'migrations', '0078_job_roles.sql'), 'utf8'));
+
+    expect(migration).toMatch(/organization_id uuid not null references organizations \(id\) on delete cascade,/);
+    expect(migration).toMatch(/archived boolean not null default false,/);
+    expect(migration).toMatch(/created_by uuid not null default auth\.uid\(\),/);
+    expect(migration).toMatch(/constraint job_roles_name_not_blank check \(private\.name_key\(name\) <> ''\)/);
+    expect(migration).toMatch(/constraint job_roles_name_length check \(char_length\(name\) <= 100\)/);
+    expect(migration).toContain(
+      "constraint job_roles_name_characters check (name !~ '[\\u0001-\\u001F\\u007F-\\u009F\\u2028\\u2029]')",
+    );
+    expect(migration).toMatch(/constraint job_roles_organization_id_id_key unique \(organization_id, id\)/);
+    expect(migration).toMatch(
+      /create unique index job_roles_organization_name_key\s+on public\.job_roles \(organization_id, private\.name_key\(name\)\)\s+where not archived;/,
+    );
+    expect(migration).toContain('alter table job_roles enable row level security;');
+    expect(migration).toContain('grant insert (organization_id, name) on table public.job_roles to authenticated;');
+    expect(migration).toContain('grant update (name, archived) on table public.job_roles to authenticated;');
+    expect(migration).toMatch(/revoke insert, update, delete, truncate, references, trigger on table public\.job_roles\s+from anon, authenticated;/);
+    expect(migration).toContain('revoke select on table public.job_roles from anon;');
+    expect(migration).toContain('revoke truncate on table public.job_roles from anon, authenticated, service_role;');
+    expect(migration, 'a role is deleted').not.toMatch(/for delete|grant delete/i);
+    expect(migration, 'a role is seeded (DI-8)').not.toMatch(/insert into/i);
+    // The update reaches archived rows too: a restore writes `archived = false` back.
+    expect(policyBody('job_roles_update_by_own_active_admin'), 'an archived role cannot be restored').not.toMatch(
+      /archived = false/,
+    );
+    expect(policyBody('job_roles_insert_by_own_active_admin')).toMatch(/created_by = \(select auth\.uid\(\)\)/);
+    expect(policyBody('job_roles_select_own_organization')).not.toMatch(/member_role = 'admin'/);
+    // A member's role: nullable, to a role of their own organization, no cascade.
+    expect(migration).toMatch(/alter table public\.members\s+add column job_role_id uuid;/);
+    expect(migration).toMatch(
+      /add constraint members_job_role_fkey\s+foreign key \(organization_id, job_role_id\)\s+references public\.job_roles \(organization_id, id\);/,
+    );
+    expect(migration).toMatch(/create index members_organization_job_role_idx\s+on public\.members \(organization_id, job_role_id\);/);
   });
 
   it('gives every organization a nullable carry-over setting, all four columns or none, with no default (story 13.4)', () => {
@@ -3602,6 +3654,8 @@ describe('the access-control migration', () => {
     team_loans: ['organization_id', 'id'],
     // STORY 21.2 (0077), attached in the migration that creates it.
     personal_assignments: ['organization_id', 'id'],
+    // STORY 21.12 (0078), attached in the migration that creates it.
+    job_roles: ['organization_id', 'id'],
   };
 
   /**

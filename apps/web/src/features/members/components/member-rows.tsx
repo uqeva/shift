@@ -12,7 +12,7 @@ import {
   StackedSkeletonRow,
 } from '@/components/ui/stacked-list';
 import { t } from '@/lib/i18n';
-import { CellView } from '@/features/members/components/cell-view';
+import { CellView, JobRoleNote } from '@/features/members/components/cell-view';
 import type { MemberList } from '@/features/members/hooks/use-member-list';
 import {
   LEAVE_COLUMN,
@@ -20,6 +20,7 @@ import {
   NAME_COLUMN,
   STATUS_COLUMN,
   TEAM_COLUMN,
+  jobRoleNoteOf,
   memberActionName,
   memberCellLookOf,
   memberColumnOf,
@@ -99,6 +100,7 @@ function MemberRow({
           >
             {cellContent(nameCell)}
           </Link>
+          <JobRoleNote role={jobRoleNoteOf(member)} />
         </StackedField>
         <StackedField label={t(team.label)} labelHidden>
           <CellView cell={team.cell(member, today)} />

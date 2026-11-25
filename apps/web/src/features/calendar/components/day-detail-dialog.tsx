@@ -101,6 +101,13 @@ function renderRoster(shown: DayDetail, usesFireRanks: boolean): ReactNode {
         return (
           <li key={member.id} className="min-w-0 break-words text-base">
             {line.key === null ? line.text : t(line.key, line.values)}
+            {/* STORY 21.12: the member's job role, muted, after the line. */}
+            {member.jobRole === undefined ? null : (
+              <>
+                <span className="sr-only">{t('ljudi.status.separator')}</span>
+                <span className="ml-2 text-xs text-muted-foreground">{member.jobRole}</span>
+              </>
+            )}
             {lent === null ? null : (
               <>
                 <span className="sr-only">{t('ljudi.status.separator')}</span>

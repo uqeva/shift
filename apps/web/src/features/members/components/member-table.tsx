@@ -18,13 +18,15 @@ import {
 } from '@/components/ui/table';
 import { usePhone } from '@/hooks/viewport';
 import { t } from '@/lib/i18n';
-import { CellView } from '@/features/members/components/cell-view';
+import { CellView, JobRoleNote } from '@/features/members/components/cell-view';
 import { MemberRows } from '@/features/members/components/member-rows';
 import type { MemberList } from '@/features/members/hooks/use-member-list';
 import {
   EMAIL_COLUMN,
   MEMBER_COLUMNS,
+  NAME_COLUMN,
   cellClassNameOf,
+  jobRoleNoteOf,
   memberActionName,
   sortDirectionIndicatorOf,
   sortIndicatorOf,
@@ -160,6 +162,7 @@ export function MemberTable({ list }: { readonly list: MemberList }): ReactNode 
                     {MEMBER_COLUMNS.map((column) => (
                       <TableCell key={column.key} className={cellClassNameOf(column)}>
                         <CellView cell={column.cell(member, today)} />
+                        {column.key === NAME_COLUMN ? <JobRoleNote role={jobRoleNoteOf(member)} /> : null}
                         {column.key === TEAM_COLUMN ? <LoanTeamNote team={loanTeams.get(member.id) ?? null} /> : null}
                       </TableCell>
                     ))}

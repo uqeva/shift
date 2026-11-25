@@ -52,6 +52,7 @@ const SETTINGS_ELEMENT_IDS = join(srcRoot, 'features', 'organization', 'utils', 
 const SETTINGS_ACCENT_LABEL = join(srcRoot, ...SETTINGS_SCREEN_PARTS.accentLabel);
 /** Story 13.1b: the *Vrste odsutnosti* card, whose one add-or-edit dialog is its own hook's. */
 const SETTINGS_ABSENCE_TYPES = join(srcRoot, ...SETTINGS_SCREEN_PARTS.absenceTypes);
+const SETTINGS_JOB_ROLES = join(srcRoot, ...SETTINGS_SCREEN_PARTS.jobRoles);
 
 /**
  * The one signed-URL read behind every lockup.
@@ -88,7 +89,8 @@ describe('every field on the settings surface carries an accessible name', () =>
     // TWO since story 11.1: minimum members' number field. THREE since story
     // 13.1b: an absence type's name. FIVE since story 13.4: the carry-over
     // cap and first leave year, beside the expiry's day and month selects.
-    expect(inputElements(screen)).toHaveLength(5);
+    // SIX since story 21.12: a job role's name.
+    expect(inputElements(screen)).toHaveLength(6);
     expect(selectElements(screen), 'a control became a select again').toHaveLength(4);
     expect(ids, 'a field carries no id constant, so no <Label> can name it').not.toContain(null);
     expect(new Set(ids).size, 'two fields share one id').toBe(ids.length);
@@ -118,7 +120,7 @@ describe('every field on the settings surface carries an accessible name', () =>
       // STORY 13.4: the carry-over cap and first year have hints, as minimum
       // members' field does.
       expect(field, 'a field describes nothing, or names its refusal unconditionally').toMatch(
-        /aria-describedby=\{failure === null \? (undefined : ORGANIZATION_DIALOG_ERROR_ID|undefined : ORGANIZATION_ABSENCE_TYPE_ERROR_ID|ORGANIZATION_MINIMUM_MEMBERS_HINT_ID : ORGANIZATION_MINIMUM_MEMBERS_REFUSED_DESCRIPTION|ORGANIZATION_CARRY_OVER_MAX_DAYS_HINT_ID : ORGANIZATION_CARRY_OVER_MAX_DAYS_REFUSED_DESCRIPTION|ORGANIZATION_CARRY_OVER_FIRST_YEAR_HINT_ID : ORGANIZATION_CARRY_OVER_FIRST_YEAR_REFUSED_DESCRIPTION)\}/,
+        /aria-describedby=\{failure === null \? (undefined : ORGANIZATION_DIALOG_ERROR_ID|undefined : ORGANIZATION_ABSENCE_TYPE_ERROR_ID|undefined : ORGANIZATION_JOB_ROLE_ERROR_ID|ORGANIZATION_MINIMUM_MEMBERS_HINT_ID : ORGANIZATION_MINIMUM_MEMBERS_REFUSED_DESCRIPTION|ORGANIZATION_CARRY_OVER_MAX_DAYS_HINT_ID : ORGANIZATION_CARRY_OVER_MAX_DAYS_REFUSED_DESCRIPTION|ORGANIZATION_CARRY_OVER_FIRST_YEAR_HINT_ID : ORGANIZATION_CARRY_OVER_FIRST_YEAR_REFUSED_DESCRIPTION)\}/,
       );
     }
   });
@@ -149,7 +151,7 @@ describe('every field on the settings surface carries an accessible name', () =>
       // and empty for a new one. STORY 13.4: the carry-over fields from the
       // row's setting as the card reads it (`stored`, `carryOverOf`).
       expect(field, 'a settings field is not seeded from the row').toMatch(
-        /defaultValue=\{(organization\.|stored\?\.|type === null \? NO_TEXT : type\.name\})/,
+        /defaultValue=\{(organization\.|stored\?\.|type === null \? NO_TEXT : type\.name\}|role === null \? NO_TEXT : role\.name\})/,
       );
     }
   });
@@ -255,7 +257,10 @@ describe('the settings page is facts, and each change opens its own dialog (stor
   it('mounts no form outside the one dialog form every change draws', () => {
     // TWO since story 13.1b: the absence type dialog's, in its own card,
     // driven by its own hook rather than the settings hook's dialogs.
-    expect(occurrences(source(SETTINGS), '<form'), 'a third form arrived on the page').toBe(2);
+    // THREE since story 21.12: the job role dialog's, the same way.
+    expect(occurrences(source(SETTINGS), '<form'), 'a fourth form arrived on the page').toBe(3);
+    expect(occurrences(source(SETTINGS_JOB_ROLES), '<form'), 'the job role dialog draws no form').toBe(1);
+    expect(occurrences(source(SETTINGS_JOB_ROLES), 'type="submit"'), 'the job role dialog has two submits').toBe(1);
     expect(occurrences(source(SETTINGS_ABSENCE_TYPES), '<form'), 'the absence type dialog draws no form').toBe(1);
     expect(occurrences(source(SETTINGS_ABSENCE_TYPES), 'type="submit"'), 'the absence type dialog has two submits').toBe(1);
     expect(source(SETTINGS_DIALOG)).toContain('<form');

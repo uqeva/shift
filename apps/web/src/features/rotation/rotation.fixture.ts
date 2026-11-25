@@ -369,9 +369,14 @@ export function calendarOrganizationRow(
   };
 }
 
-/** One row of `calendar_members()`: id, name and fire rank only. */
-export function calendarMemberRow(id: string, name: string, fireRank: unknown = null): Row {
-  return { id, name, fire_rank: fireRank };
+/** One row of `calendar_members()`: id, name, fire rank and (0078) job role only. */
+export function calendarMemberRow(
+  id: string,
+  name: string,
+  fireRank: unknown = null,
+  jobRole: { readonly id: string; readonly name: string } | null = null,
+): Row {
+  return { id, name, fire_rank: fireRank, job_role_id: jobRole?.id ?? null, job_role: jobRole?.name ?? null };
 }
 
 /** `calendar_members()`'s answer: by default the viewer alone. */

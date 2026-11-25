@@ -167,6 +167,9 @@ describe('the member list computes nothing it renders', () => {
       // MEMBER RANK: read for the edit form and guarded like the rest — a rank
       // column on the list is an Ask First, so the list may not reach for it.
       'fireRank',
+      // STORY 21.12: the job role, shown under the name through
+      // `jobRoleNoteOf` and guarded like the rest.
+      'jobRole',
       // STORY 1.6's THREE, all guarded: the account id the edit screen compares
       // with the session's subject, the status history the marker is read off,
       // and the organization's zone that "today" is read in. None may be
@@ -2080,7 +2083,9 @@ describe('a team or membership write re-reads every screen that shows it, once i
     {
       handler: 'submit',
       gate: 'scope === BASICS_SAVE && (outcome.ok || outcome.refusal.saved)',
-      dependents: 'MEMBER_SAVE_DEPENDENTS',
+      // STORY 21.12: `MEMBER_SAVE_DEPENDENTS`, or with the calendar snapshot
+      // beside it when the save changed the job role, chosen before the write.
+      dependents: 'savedDependents',
     },
   ])('re-reads $dependents after a landed $handler on the member edit screen', ({ handler, gate, dependents }) => {
     const body = namedHandler(source(MEMBER_EDIT_HOOK), handler);

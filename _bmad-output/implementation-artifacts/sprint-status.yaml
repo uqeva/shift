@@ -755,7 +755,7 @@ development_status:
   21-9-the-schedule-source-rule-in-the-domain: ready-for-dev  # after 21.1
   21-10-an-admin-gives-a-member-their-own-rotation-or-makes-them-man: ready-for-dev  # after 21.9, 21.4
   21-11-a-seasonal-member-s-season-is-set-in-one-step: ready-for-dev  # independent
-  21-12-job-roles-are-organization-data: ready-for-dev  # independent; before 21.13
+  21-12-job-roles-are-organization-data: review  # built, CI pending (0078)
   21-13-floaters-are-suggested-for-an-uncovered-shift-by-role: ready-for-dev  # after 21.7, 21.12
   21-14-a-floater-covers-a-whole-leave-in-one-action: ready-for-dev  # after 21.13
   21-15-the-holiday-rule-in-the-domain: ready-for-dev  # after 21.9
