@@ -1237,11 +1237,11 @@ export const KEY_SOURCES = [
     // 118 SINCE STORY 21.5: forty more — *Popuni uzorkom*'s eighteen keys,
     // nineteen uses (*Slobodno* twice); *Kopiraj*'s thirteen; the people
     // field's legend and *Bez tima* and each dialog's *Odustani* and close
-    // (six); and the save bar's two lines.
+    // (six); and the save bar's two lines. 119 WITH 21.12'S ENTRY: a row's job role beside its source.
     name: 'the Ručni raspored destination',
     file: RUCNI_RASPORED,
     keys: translationKeys,
-    strings: 118,
+    strings: 119,
   },
   {
     // STORY 21.4: the preview's shift and inert-override lines, and the save's refusals.

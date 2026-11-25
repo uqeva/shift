@@ -102,7 +102,7 @@ export async function planningSnapshotOf({
       calendarMemberRow(VIEWER_MEMBER, VIEWER_NAME),
       calendarMemberRow(ANA, 'Ana Anić'),
       calendarMemberRow(DORA, 'Dora Dorić'),
-      calendarMemberRow(IVA, 'Iva Ivić'),
+      calendarMemberRow(IVA, 'Iva Ivić', null, { id: 'pilot-role-student', name: 'Student' }),
     ]),
     overridesAnswerOf([]),
     rosterOverridesAnswerOf(rosterOverrides),

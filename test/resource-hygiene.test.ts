@@ -3487,6 +3487,8 @@ const SANCTIONED_SCREEN_KEYS = [
   'rucniRaspored.plan.error.target',
   'rucniRaspored.plan.error.same',
   'rucniRaspored.plan.error.failed',
+  // STORY 21.12'S ENTRY, BUILT BY 21.5: a row's job role beside its source.
+  'rucniRaspored.rowLine',
 ];
 
 /** Everything the resource file is permitted to hold, together. */

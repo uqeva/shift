@@ -18,9 +18,15 @@ import { t } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { NO_TEXT } from '@/utils/text';
 
-/** A row's source in words (UX-DR73). */
+/**
+ * A row's line under the name: its job role, when it has one (story 21.12's
+ * entry, built by 21.5), and its source in words (UX-DR73) — `Vod · rotacija
+ * tima`, or `ručno`.
+ */
 export function sourceText(row: ManualRow): string {
-  return row.source === SOURCE_TEAM ? t('rucniRaspored.source.team') : t('rucniRaspored.source.manual');
+  const source = row.source === SOURCE_TEAM ? t('rucniRaspored.source.team') : t('rucniRaspored.source.manual');
+
+  return row.jobRole === null ? source : t('rucniRaspored.rowLine', { role: row.jobRole, source });
 }
 
 /** What a cell holds, in words: the type's name, *slobodno*, or nothing. */

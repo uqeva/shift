@@ -311,6 +311,8 @@ export interface ManualCell extends ManualCellRef {
 export interface ManualRow {
   readonly memberId: string;
   readonly name: string;
+  /** The member's job role's name, shown beside the name (story 21.12, re-owned by 21.5), or `null` for none. */
+  readonly jobRole: string | null;
   readonly source: ManualRowSource;
   readonly cells: readonly ManualCell[];
 }
@@ -466,6 +468,7 @@ export function manualMonthOf(calendar: CalendarSnapshot, month: string, today: 
     const row: ManualRow = {
       memberId: member.id,
       name: member.name,
+      jobRole: member.jobRole?.name ?? null,
       source: teamId !== null && hasRotation(after, teamId, last) ? SOURCE_TEAM : SOURCE_MANUAL,
       cells,
     };

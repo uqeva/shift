@@ -3009,6 +3009,7 @@
         "same": "Cilj mora biti drukčiji od izvora.",
         "failed": "Ovo trenutačno nije moguće popuniti. Osvježi stranicu i pokušaj ponovno."
       }
-    }
+    },
+    "rowLine": "{role} · {source}"
   }
 }
