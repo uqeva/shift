@@ -142,12 +142,36 @@ describe('the calendar (AD-20, D-S2)', () => {
     expect(text.endsWith('END:VCALENDAR\r\n')).toBe(true);
   });
 
-  it('leaves out a Personal Shift counted with no team until its own UID form (story 21.1; AD-20 as amended, story 21.2)', () => {
+  it("gives an assignment's shift its own UID, and a teamless one a SUMMARY with no team (AD-20 as amended, story 21.2)", () => {
+    const window = { from: '2026-11-01', to: '2026-11-30' };
+    const team = shift('2026-11-03', TEAM_A, DAN, 420, 1140);
+    const assigned = shift('2026-11-04', TEAM_B, NOC, 1140, 1860, { personalAssignmentId: 'pa-1' });
+    const teamless: AtWorkShift = { ...shift('2026-11-05', TEAM_A, DAN, 420, 1140), teamId: null, personalAssignmentId: 'pa-2' };
+    for (const uidDomain of [FEED_UID_DOMAIN, DOWNLOAD_UID_DOMAIN] as const) {
+      const unfolded = lines(calendarOf({ inputs: NAMED, window, stamp: STAMP, uidDomain, shifts: [team, assigned, teamless] }));
+      expect(unfolded.filter((line) => line.startsWith('UID:'))).toEqual([
+        `UID:2026-11-03-${TEAM_A}-${MEMBER}@${uidDomain}`,
+        `UID:2026-11-04-a-pa-1-${MEMBER}@${uidDomain}`,
+        `UID:2026-11-05-a-pa-2-${MEMBER}@${uidDomain}`,
+      ]);
+      expect(unfolded.filter((line) => line.startsWith('SUMMARY:'))).toEqual([
+        `SUMMARY:Dan${SUMMARY_SEPARATOR}Smjena A`,
+        expect.stringMatching(/^SUMMARY:Noć · Smjena B\\, Split/) as string,
+        'SUMMARY:Dan',
+      ]);
+    }
+  });
+
+  it('leaves out a teamless shift that is no assignment\'s until 21.9, and refuses an unknown team, as before', () => {
     const window = { from: '2026-11-01', to: '2026-11-30' };
     const kept = shift('2026-11-03', TEAM_A, DAN, 420, 1140);
-    const teamless: AtWorkShift = { ...shift('2026-11-04', TEAM_A, DAN, 420, 1140), teamId: null, personalAssignmentId: 'a-1' };
-    const both = calendarOf({ inputs: NAMED, window, stamp: STAMP, uidDomain: FEED_UID_DOMAIN, shifts: [kept, teamless] });
-    expect(both).toBe(calendarOf({ inputs: NAMED, window, stamp: STAMP, uidDomain: FEED_UID_DOMAIN, shifts: [kept] }));
+    const teamless: AtWorkShift = { ...shift('2026-11-05', TEAM_A, DAN, 420, 1140), teamId: null };
+    expect(calendarOf({ inputs: NAMED, window, stamp: STAMP, uidDomain: FEED_UID_DOMAIN, shifts: [kept, teamless] })).toBe(
+      calendarOf({ inputs: NAMED, window, stamp: STAMP, uidDomain: FEED_UID_DOMAIN, shifts: [kept] }),
+    );
+    expect(() =>
+      calendarOf({ inputs: NAMED, window, stamp: STAMP, uidDomain: FEED_UID_DOMAIN, shifts: [shift('2026-11-03', 'team-unknown', DAN, 420, 1140)] }),
+    ).toThrow(RangeError);
   });
 
   it('gives a zone without daylight saving one constant observance (golden)', () => {

@@ -392,3 +392,65 @@ describe('a reminder already sent is never retracted (story 17.3, D5)', () => {
     expect(handler).toMatch(/fn: typeof CLAIM_RPC \| typeof SETTLE_RPC \| typeof DELETE_SUBSCRIPTION_RPC \| typeof PUSH_DEVICES_RPC/);
   });
 });
+
+describe('story 21.2: a reminder of a Personal Shift with no team, and the batched schedule notice (AD-18 as amended)', () => {
+  /** The operands 0077 writes for a teamless assignment's reminder: neither `teamId` nor `teamName`. */
+  const teamless = (overrides: Record<string, unknown> = {}): Record<string, unknown> => {
+    const { teamId: _team, teamName: _name, ...rest } = operands(overrides);
+    return rest;
+  };
+  const DAY_ALONE = '/kalendar?mjesec=2026-11&dan=2026-11-23';
+
+  it('renders the no-team variant of each lead, linking to the day alone', () => {
+    expect(render(REMINDER_CODE, 'hr', teamless(), TARGET)).toEqual({
+      ok: true,
+      subject: 'Za 2 h radiš: Dnevna 07:00–19:00',
+      text: `${ORGANIZATION_NAME}: za 2 h, 23.11.2026, radiš: Dnevna 07:00–19:00. Pogledaj dan u kalendaru: ${linkTo(DAY_ALONE)}${FOOTER}`,
+    });
+    const { leadHours: _hours, ...eveningTeamless } = teamless({ lead: 'EVENING_BEFORE' });
+    expect(render(REMINDER_CODE, 'hr', eveningTeamless, TARGET)).toMatchObject({ ok: true, subject: 'Sutra radiš: Dnevna 07:00–19:00' });
+    expect(renderPush(REMINDER_CODE, 'hr', teamless(), TARGET)).toMatchObject({ ok: true, url: pathTo(DAY_ALONE) });
+    expect(reminderPathOf(teamless())).toBe(DAY_ALONE);
+    expect(returnTargetOf(DAY_ALONE, (pathname) => pathname === '/kalendar')).toBe(DAY_ALONE);
+  });
+
+  it('refuses a row with a team name and no team id, or a team id and no name', () => {
+    const { teamId: _team, ...nameOnly } = operands();
+    expect(render(REMINDER_CODE, 'hr', nameOnly, TARGET)).toEqual({ ok: false, code: OPERANDS_INVALID });
+    const { teamName: _name, ...idOnly } = operands();
+    expect(render(REMINDER_CODE, 'hr', idOnly, TARGET)).toEqual({ ok: false, code: OPERANDS_INVALID });
+    expect(render(REMINDER_CODE, 'hr', teamless({ shiftTypeName: ' ' }), TARGET)).toEqual({ ok: false, code: OPERANDS_INVALID });
+  });
+
+  it('names no team in the no-team variants, and nothing but its own operands', () => {
+    for (const message of [PODSJETNICI.hoursNoTeam, PODSJETNICI.eveningBeforeNoTeam]) {
+      const names = [...`${message.subject} ${message.body}`.matchAll(/\{(\w+)\}/g)].map((match) => match[1]);
+      expect(new Set(names)).toEqual(
+        new Set([
+          'organizationName',
+          'date',
+          'shiftTypeName',
+          'start',
+          'end',
+          'link',
+          ...(message === PODSJETNICI.hoursNoTeam ? ['leadHours'] : []),
+        ]),
+      );
+      for (const text of [message.subject, message.body].map((one) => one.replace(/\{\w+\}/g, ''))) {
+        expect(text).not.toMatch(/\btim(?:a|u|om|ovi)?\b/iu);
+        expect(text).not.toMatch(/smjen/iu);
+      }
+    }
+  });
+
+  it('renders SCHEDULE_ASSIGNED with the first and last changed date and the count, linking to Kalendar', () => {
+    expect(MESSAGE_OF_CODE['SCHEDULE_ASSIGNED']).toBe('scheduleAssigned');
+    expect(render('SCHEDULE_ASSIGNED', 'hr', { from: '2046-03-02', to: '2046-03-31', days: 12 }, TARGET)).toEqual({
+      ok: true,
+      subject: 'Raspored ti je izmijenjen od 02.03.2046 do 31.03.2046',
+      text: `${ORGANIZATION_NAME}: raspored ti je izmijenjen od 02.03.2046 do 31.03.2046 (izmijenjenih dana: 12). Pogledaj kalendar: ${linkTo('/kalendar')}\n\nObavijesti e-poštom možeš isključiti u aplikaciji, pod Obavijesti: ${linkTo('/obavijesti')}`,
+    });
+    expect(render('SCHEDULE_ASSIGNED', 'hr', { from: '2046-02-30', to: '2046-03-31', days: 1 }, TARGET)).toEqual({ ok: false, code: OPERANDS_INVALID });
+    expect(render('SCHEDULE_ASSIGNED', 'hr', { from: '2046-03-02', to: '2046-03-31' }, TARGET)).toEqual({ ok: false, code: OPERANDS_INVALID });
+  });
+});

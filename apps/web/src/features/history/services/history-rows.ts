@@ -413,6 +413,7 @@ const FIELD_KEYS: Readonly<Record<HistoryField, ReturnType<typeof historyFieldMe
   rosterOverride: 'history.field.rosterOverride',
   returnRosterOverride: 'history.field.returnRosterOverride',
   reason: 'history.field.reason',
+  note: 'history.field.note',
   answer: 'history.field.answer',
   outcome: 'history.field.outcome',
   leaveYear: 'history.field.leaveYear',
@@ -478,6 +479,7 @@ export function historyFieldMessageKey(
   | 'history.field.rosterOverride'
   | 'history.field.returnRosterOverride'
   | 'history.field.reason'
+  | 'history.field.note'
   | 'history.field.answer'
   | 'history.field.outcome'
   | 'history.field.leaveYear'

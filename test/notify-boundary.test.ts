@@ -285,7 +285,8 @@ describe('notify renders from a pinned copy of the obavijesti namespace', () => 
       const rendered = render(
         code,
         'hr',
-        { startDate: '2046-03-02', endDate: '2046-03-06', date: '2046-03-02', effectiveFrom: '2046-03-02', shiftTypeName: 'Dnevna', memberName: 'Ana Kovač', proposerName: 'Ana Kovač', addresseeName: 'Ivo Babić', requestId: REQUEST_ID, teamName: 'Smjena C' },
+        // Story 21.2: `from`, `to` and `days` fill SCHEDULE_ASSIGNED.
+        { startDate: '2046-03-02', endDate: '2046-03-06', date: '2046-03-02', effectiveFrom: '2046-03-02', shiftTypeName: 'Dnevna', memberName: 'Ana Kovač', proposerName: 'Ana Kovač', addresseeName: 'Ivo Babić', requestId: REQUEST_ID, teamName: 'Smjena C', from: '2046-03-02', to: '2046-03-31', days: 12 },
         TARGET,
       );
       if (!rendered.ok) throw new Error(`${code} did not render`);
@@ -342,7 +343,7 @@ describe('notify renders from a pinned copy of the obavijesti namespace', () => 
 const REQUEST_ID = '0b5e7f9a-3c2d-4e1f-8a6b-9c0d1e2f3a4b';
 const EVERY_CODE: readonly {
   code: string;
-  operands: Record<string, string>;
+  operands: Record<string, string | number>;
   path: string;
   subject: string;
   text: string;
@@ -523,6 +524,14 @@ const EVERY_CODE: readonly {
     subject: 'Posudba u timu Smjena C je uklonjena',
     text: `${ORGANIZATION_NAME}: posudba u timu Smjena C od 02.03.2046 do 06.03.2046 je uklonjena. Pogledaj kalendar: {link}`,
   },
+  // Story 21.2 (0077, E-3): one notice per member per personal-assignment save.
+  {
+    code: 'SCHEDULE_ASSIGNED',
+    operands: { from: '2046-03-02', to: '2046-03-31', days: 12 },
+    path: '/kalendar',
+    subject: 'Raspored ti je izmijenjen od 02.03.2046 do 31.03.2046',
+    text: `${ORGANIZATION_NAME}: raspored ti je izmijenjen od 02.03.2046 do 31.03.2046 (izmijenjenih dana: 12). Pogledaj kalendar: {link}`,
+  },
 ];
 
 describe("notify renders every 10.2 code with the organization's name and its sign-in link", () => {
@@ -570,6 +579,8 @@ describe("notify renders every 10.2 code with the organization's name and its si
         'effectiveFrom',
         'shiftTypeName',
         ...(['LOAN_MADE', 'LOAN_CHANGED', 'LOAN_REMOVED'].includes(code) ? ['teamName'] : []),
+        // STORY 21.2: the member's own changed dates and their count.
+        ...(code === 'SCHEDULE_ASSIGNED' ? ['from', 'to', 'days'] : []),
       ];
       const checked = [
         { message: OBAVIJESTI[key], names: allowed },

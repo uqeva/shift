@@ -10,6 +10,8 @@ context:
   - '{project-root}/_bmad-output/specs/spec-shift/engine-rules.md'
 ---
 
+Status: done. Merged as #363, squash `771ce06` (2026-11-25), after `CI passed` went green on `6852cde` (run 45624667240, the PR's only run: every job SUCCESS, Test (Vitest, local Supabase), Runtime parity and the four E2E shards included). Rewritten by story 21.2, which set the sprint status `done`.
+
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 
 ## Intent
@@ -141,11 +143,11 @@ context:
 - `pnpm --filter @shift/ics test` -- 4 files, 32 tests passed.
 - `pnpm --filter ./apps/web test` -- 186 files, 6918 tests passed.
 - `pnpm exec vitest run test/resource-hygiene.test.ts test/supabase-scaffold.test.ts` -- 2 files, 2447 tests passed.
-- Not run locally: the DB-connecting root tests, read and runtime parity, and e2e (STRICT DATABASE RULE). CI is the gate. No migration, parity fixture or e2e-visible surface changed. Gitleaks is the orchestrator's (not run here).
+- Not run locally: the DB-connecting root tests, read and runtime parity, and e2e (STRICT DATABASE RULE). CI ran them on PR #363 (run 45624667240): all green, with no fix pushed for CI. No migration, parity fixture or e2e-visible surface changed. Gitleaks ran in CI's Quality job (green).
 
 **Residual risks:**
-- CI has not run yet: sprint status `review`, built, CI pending.
-- The widened `teamId` is null-safe at every web, ICS and Edge site. With no assignment fed, every web and ICS suite passes unchanged. The first data arrives with 21.2, which must ship the reminder item form at the same time (`deferred-work.md`).
+- CI settled: PR #363 merged with `CI passed` green on its only run (45624667240); sprint status `done`.
+- The widened `teamId` is null-safe at every web, ICS and Edge site. With no assignment fed, every web and ICS suite passes unchanged. The first data arrives with 21.2, which ships the reminder item form, the ICS forms and the assembly in one change (`0077`; the deferred-work entry is RESOLVED).
 - Process note: the implementation ran in the orchestrating session, as 18.1's did, not in a fresh step-03 subagent. The R14.7 digests had to be pinned on the unchanged engine first. Review ran with four context-free subagents.
 
 ## Suggested Review Order

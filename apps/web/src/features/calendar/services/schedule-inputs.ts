@@ -105,6 +105,17 @@ export function scheduleInputsOfCalendar(
           .filter((loan) => overlaps(loan, window))
           .map((loan) => ({ id: loan.id, teamId: loan.teamId, from: loan.from, to: loan.to }))
           .sort((left, right) => byText(left.from, right.from) || byText(left.id, right.id)),
+        // Story 21.2 (AD-19 as amended): every member's, dated in the window, as 0077's assembly.
+        personalAssignments: member.personalAssignments
+          .filter((assignment) => inWindow(assignment.date))
+          .map((assignment) => ({
+            id: assignment.id,
+            date: assignment.date,
+            kind: assignment.kind,
+            shiftTypeId: assignment.shiftTypeId,
+            teamId: assignment.teamId,
+          }))
+          .sort((left, right) => byText(left.date, right.date) || byText(left.id, right.id)),
       }))
       .sort((left, right) => byText(left.id, right.id)),
     overrides: snapshot.overrides

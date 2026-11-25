@@ -350,15 +350,17 @@ describe('a kept snapshot is restored for its owner alone', () => {
     expect(storage.entries.has(DEVICE_SNAPSHOT_KEY)).toBe(false);
   });
 
-  it('is shape 3: story 18.2 added `loans` to the calendar snapshot\'s members and viewer', () => {
-    // A shape-2 calendar member has no `loans`, and every roster derived from
-    // it would ignore a loan the database holds.
-    expect(DEVICE_SNAPSHOT_SHAPE).toBe(3);
+  it('is shape 4: story 21.2 added `personalAssignments` to the calendar snapshot\'s members and viewer', () => {
+    // A shape-3 calendar member has no `personalAssignments` (and a shape-2
+    // one no `loans`, story 18.2), and every roster derived from it would
+    // ignore an assignment the database holds.
+    expect(DEVICE_SNAPSHOT_SHAPE).toBe(4);
   });
 
   it.each([
     ['an earlier', '1:member-a'],
-    ['the previous', '2:member-a'],
+    ['an older', '2:member-a'],
+    ['the previous', '3:member-a'],
     ['a later', `${String(DEVICE_SNAPSHOT_SHAPE + 1)}:member-a`],
   ])('restores nothing the same user saved in %s shape, and deletes the copy', async (_, buster) => {
     const storage = memoryStorage();

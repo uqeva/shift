@@ -22,6 +22,7 @@ import {
   CALENDAR_OVERRIDES_FUNCTION,
   CALENDAR_ROSTER_OVERRIDES_FUNCTION,
   CALENDAR_TEAM_LOANS_FUNCTION,
+  CALENDAR_PERSONAL_ASSIGNMENTS_FUNCTION,
   CALENDAR_READ_STALE_MS,
   CALENDAR_READ_TABLE,
   CALENDAR_UNAVAILABLE,
@@ -70,6 +71,8 @@ import {
   calendarRosterOverrideRow,
   calendarLoanRow,
   loansAnswerOf,
+  personalAssignmentsAnswerOf,
+  calendarPersonalAssignmentRow,
   rosterOverridesAnswerOf,
   statusRow,
   stepRow,
@@ -102,8 +105,9 @@ function tableOf(
   overrides: unknown = overridesAnswerOf(),
   rosterOverrides: unknown = rosterOverridesAnswerOf(),
   loans: unknown = loansAnswerOf(),
+  personalAssignments: unknown = personalAssignmentsAnswerOf(),
 ): Source {
-  return calendarTableOf(answer, members, overrides, rosterOverrides, loans);
+  return calendarTableOf(answer, members, overrides, rosterOverrides, loans, personalAssignments);
 }
 
 const session = viewerSession();
@@ -149,11 +153,14 @@ describe('the read', () => {
       ['rpc', 'calendar_roster_overrides'],
       // STORY 18.2: the fourth, the live loans.
       ['rpc', 'calendar_team_loans'],
+      // STORY 21.2: the fifth, the live Personal Assignments.
+      ['rpc', 'calendar_personal_assignments'],
     ]);
     expect(CALENDAR_MEMBERS_FUNCTION).toBe('calendar_members');
     expect(CALENDAR_OVERRIDES_FUNCTION).toBe('calendar_shift_type_overrides');
     expect(CALENDAR_ROSTER_OVERRIDES_FUNCTION).toBe('calendar_roster_overrides');
     expect(CALENDAR_TEAM_LOANS_FUNCTION).toBe('calendar_team_loans');
+    expect(CALENDAR_PERSONAL_ASSIGNMENTS_FUNCTION).toBe('calendar_personal_assignments');
     expect([CALENDAR_VIEWER_COLUMN, CALENDAR_VIEWER_OPERATOR]).toEqual(['members.auth_user_id', 'eq']);
     expect(CALENDAR_COUNT).toEqual({ count: 'exact' });
     expect(outcome.ok).toBe(true);
@@ -175,6 +182,7 @@ describe('the read', () => {
       memberships: [{ teamId: (rows.teams[0] as { id: string }).id, position: null, effectiveFrom: SEEDED }],
       statuses: [],
       loans: [],
+      personalAssignments: [],
     });
     expect(outcome.snapshot.members).toEqual([
       {
@@ -184,6 +192,7 @@ describe('the read', () => {
         memberships: [{ teamId: (rows.teams[0] as { id: string }).id, position: null, effectiveFrom: SEEDED }],
         statuses: [],
         loans: [],
+        personalAssignments: [],
       },
     ]);
   });
@@ -470,6 +479,7 @@ describe('the read', () => {
       ],
       statuses: [],
       loans: [],
+      personalAssignments: [],
     });
     const none = await read(tableOf(answerOf(PILOT, [viewerRow([])])), session);
 
@@ -559,8 +569,8 @@ describe('the read', () => {
     expect(outcome.snapshot.usesFireRanks).toBe(true);
     // Croatian collation: `Č` after `C`, before `L`; one name twice, by id.
     expect(outcome.snapshot.members).toEqual([
-      { id: '00000000-0000-4000-8000-0000000000c2', name: 'Ante Babić', fireRank: null, memberships: [], statuses: [], loans: [] },
-      { id: namesake, name: 'Čedo Zorić', fireRank: null, memberships: [], statuses: [], loans: [] },
+      { id: '00000000-0000-4000-8000-0000000000c2', name: 'Ante Babić', fireRank: null, memberships: [], statuses: [], loans: [], personalAssignments: [] },
+      { id: namesake, name: 'Čedo Zorić', fireRank: null, memberships: [], statuses: [], loans: [], personalAssignments: [] },
       {
         id: colleague,
         name: 'Čedo Zorić',
@@ -571,6 +581,7 @@ describe('the read', () => {
         ],
         statuses: [],
         loans: [],
+        personalAssignments: [],
       },
       {
         id: VIEWER_MEMBER,
@@ -579,6 +590,7 @@ describe('the read', () => {
         memberships: [{ teamId: 'pilot-smjena-a', position: null, effectiveFrom: SEEDED }],
         statuses: [{ active: true, effectiveFrom: '2021-03-01' }],
         loans: [],
+        personalAssignments: [],
       },
       {
         id: inactive,
@@ -590,6 +602,7 @@ describe('the read', () => {
           { active: false, effectiveFrom: '2026-09-01' },
         ],
         loans: [],
+        personalAssignments: [],
       },
     ]);
     // ONE HISTORY PER PERSON: the viewer's memberships and statuses are
@@ -1053,6 +1066,75 @@ describe('the read', () => {
     expect(outcome.snapshot.viewer.loans).toBe(outcome.snapshot.members.find((member) => member.id === VIEWER_MEMBER)?.loans);
   });
 
+  it('carries each member\'s live Personal Assignments on their entry and on the viewer, by date, and only the six facts (story 21.2)', async () => {
+    const colleague = '00000000-0000-4000-8000-0000000000c1';
+    const outcome = await read(
+      tableOf(
+        answerOf(PILOT),
+        membersAnswerOf([calendarMemberRow(VIEWER_MEMBER, VIEWER_NAME), calendarMemberRow(colleague, 'Ante Babić')]),
+        overridesAnswerOf(),
+        rosterOverridesAnswerOf(),
+        loansAnswerOf(),
+        personalAssignmentsAnswerOf([
+          { ...calendarPersonalAssignmentRow('p2', VIEWER_MEMBER, '2026-10-02', 'OFF'), note: 'never carried' },
+          calendarPersonalAssignmentRow('p1', VIEWER_MEMBER, '2026-10-01', 'SHIFT', 'pilot-dan', null),
+          calendarPersonalAssignmentRow('p3', colleague, '2026-10-01', 'SHIFT', 'pilot-noc', 'pilot-smjena-b'),
+          // One of a member the members read does not yet name is ignored, as a loan is.
+          calendarPersonalAssignmentRow('p4', 'not-yet-named', '2026-10-01', 'OFF'),
+        ]),
+      ),
+    );
+
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    const own = [
+      { id: 'p1', date: '2026-10-01', kind: 'SHIFT', shiftTypeId: 'pilot-dan', teamId: null },
+      { id: 'p2', date: '2026-10-02', kind: 'OFF', shiftTypeId: null, teamId: null },
+    ];
+    expect(outcome.snapshot.viewer.personalAssignments).toEqual(own);
+    expect(outcome.snapshot.members.find((member) => member.id === colleague)?.personalAssignments).toEqual([
+      { id: 'p3', date: '2026-10-01', kind: 'SHIFT', shiftTypeId: 'pilot-noc', teamId: 'pilot-smjena-b' },
+    ]);
+    // ONE LIST PER PERSON: the viewer's are exactly their entry's.
+    expect(outcome.snapshot.viewer.personalAssignments).toBe(
+      outcome.snapshot.members.find((member) => member.id === VIEWER_MEMBER)?.personalAssignments,
+    );
+  });
+
+  it('refuses every bad Personal Assignments answer with its own refusal (story 21.2)', async () => {
+    const logged = quiet();
+    const good = calendarPersonalAssignmentRow('p1', VIEWER_MEMBER, '2026-10-01', 'SHIFT', 'pilot-dan', 'pilot-smjena-b');
+    const off = calendarPersonalAssignmentRow('p2', VIEWER_MEMBER, '2026-10-02', 'OFF');
+
+    for (const answer of [
+      { data: null, error: { code: '42501' } },
+      { data: { id: 'p1' }, error: null },
+      null,
+      personalAssignmentsAnswerOf([null as unknown as Record<string, unknown>]),
+      personalAssignmentsAnswerOf([{ ...good, id: '' }]),
+      personalAssignmentsAnswerOf([{ ...good, member_id: 7 }]),
+      personalAssignmentsAnswerOf([{ ...good, date: '2026-02-30' }]),
+      personalAssignmentsAnswerOf([{ ...good, kind: 'LEAVE' }]),
+      personalAssignmentsAnswerOf([{ ...good, shift_type_id: 'missing' }]),
+      personalAssignmentsAnswerOf([{ ...good, team_id: 'missing' }]),
+      personalAssignmentsAnswerOf([{ ...good, shift_type_id: 7 }]),
+      // A shift naming no type; a day off naming a type or a team (the domain's checks).
+      personalAssignmentsAnswerOf([{ ...good, shift_type_id: null }]),
+      personalAssignmentsAnswerOf([{ ...off, shift_type_id: 'pilot-dan' }]),
+      personalAssignmentsAnswerOf([{ ...off, team_id: 'pilot-smjena-b' }]),
+      // One id twice; two of one member on one date (0077's live key).
+      personalAssignmentsAnswerOf([good, { ...good, date: '2026-10-05' }]),
+      personalAssignmentsAnswerOf([good, { ...off, date: '2026-10-01' }]),
+    ]) {
+      logged.mockClear();
+      expect(
+        await read(tableOf(answerOf(PILOT), membersAnswerOf(), overridesAnswerOf(), rosterOverridesAnswerOf(), loansAnswerOf(), answer)),
+        JSON.stringify(answer),
+      ).toEqual(REFUSED);
+      expect(logged.mock.calls, JSON.stringify(answer)).toEqual([[CALENDAR_UNAVAILABLE, 'personalAssignment']]);
+    }
+  });
+
   it('refuses every bad loans answer with its own refusal (story 18.2)', async () => {
     const logged = quiet();
     const good = calendarLoanRow('l1', VIEWER_MEMBER, 'pilot-smjena-b', '2026-09-10', '2026-09-12');
@@ -1159,7 +1241,9 @@ describe('the surface state, driven through the one query definition', () => {
               ? rosterOverridesAnswerOf()
               : fn === CALENDAR_TEAM_LOANS_FUNCTION
                 ? loansAnswerOf()
-                : membersAnswerOf(),
+                : fn === CALENDAR_PERSONAL_ASSIGNMENTS_FUNCTION
+                  ? personalAssignmentsAnswerOf()
+                  : membersAnswerOf(),
         ),
       select() {
         return {
@@ -1575,12 +1659,12 @@ describe('the calendar only reads, and projects nothing of its own', () => {
     expect(text, 'a `%` projection').not.toMatch(/%/);
     expect(text).not.toMatch(/\.(update|delete|upsert)\(/);
     // Story 3.5b: ONE insert and ONE rpc in each write module (story 3.6b's
-    // roster write is the second), the four read rpcs in the snapshot (the
-    // third is story 3.6a's roster overrides, the fourth story 18.2's loans),
-    // and neither anywhere else.
+    // roster write is the second), the five read rpcs in the snapshot (the
+    // third is story 3.6a's roster overrides, the fourth story 18.2's loans,
+    // the fifth story 21.2's Personal Assignments), and neither anywhere else.
     expect(text.match(/\.insert\(/g)?.length ?? 0, `.insert( in ${file}`).toBe(WRITES.includes(file) ? 1 : 0);
     expect(text.match(/\.rpc\(/g)?.length ?? 0, `.rpc( in ${file}`).toBe(
-      WRITES.includes(file) ? 1 : file === SNAPSHOT ? 4 : 0,
+      WRITES.includes(file) ? 1 : file === SNAPSHOT ? 5 : 0,
     );
     // Story 3.4a: the snapshot CARRIES rank and position off the wire, to be
     // shown by 3.4b — in the named places only, counted, and nowhere else. No

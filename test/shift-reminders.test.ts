@@ -666,3 +666,169 @@ describe('the reminder read with nobody to remind (0070)', () => {
     });
   });
 });
+
+// ------------------------------------------------ story 21.2: the ASSIGNMENT form
+
+/**
+ * STORY 21.2 (`0077`, AD-18 as amended 2026-11-25). An item of a Personal
+ * Assignment's shift carries `source: 'ASSIGNMENT'` and its
+ * `personalAssignmentId`, and its team may be null. It is written only while
+ * that row is live, the member's, a `SHIFT`, and of that date and shift type;
+ * its subject is keyed by the assignment; with no team the operands carry
+ * neither `teamId` nor `teamName`. The team form is unchanged. Every scene is
+ * built as the owner before the service role acts.
+ */
+describe.each(FIXTURES)('the $fixture reminder of a Personal Assignment (0077)', ({ slug, admin, member: memberName }) => {
+  /** Owner scene: one live assignment of `who`, written as `by` would (the save's attribution). */
+  async function assignmentOf(
+    client: Client,
+    who: Member,
+    by: Member,
+    row: { date: string; kind?: 'SHIFT' | 'OFF'; shiftTypeId: string | null; teamId: string | null },
+  ): Promise<string> {
+    const { rows } = await client.query<{ id: string }>(
+      `insert into personal_assignments (organization_id, member_id, date, kind, shift_type_id, team_id, created_by)
+       values ($1, $2, $3::date, $4, $5, $6, $7) returning id::text as id`,
+      [who.organizationId, who.id, row.date, row.kind ?? 'SHIFT', row.shiftTypeId, row.teamId, by.authUserId],
+    );
+    const id = rows[0]?.id;
+    if (id === undefined) throw new Error('the assignment insert returned no id');
+    return id;
+  }
+
+  it.skipIf(noDatabase)('writes a teamless reminder with neither teamId nor teamName, keyed by the assignment, and a teamed one with both', async () => {
+    await inRolledBackTransaction(async (client) => {
+      const who = await member(client, slug, memberName);
+      const by = await member(client, slug, admin);
+      await remindable(client, who, ['H1', 'H2'], true);
+      const { teamId, teamName, shiftTypeId, shiftTypeName } = await teamAndType(client, who.organizationId);
+      const date = await todayOf(client, who.organizationId, 1);
+      const teamless = await assignmentOf(client, who, by, { date, shiftTypeId, teamId: null });
+      const startsAt = await isoFromNow(client, '1 day');
+      const base = { memberId: who.id, date, shiftTypeId, start: 420, end: 1140, startsAt };
+
+      await actAsService(client);
+      expect(await enqueue(client, [{ ...base, teamId: null, lead: 'H1', source: 'ASSIGNMENT', personalAssignmentId: teamless }])).toBe(1);
+      await actAsOwner(client);
+
+      const rows = await remindersOf(client, who);
+      expect(rows.map((row) => row.channel)).toEqual(['email', 'push']);
+      const { rows: keys } = await client.query<{ subject: string }>(
+        `select md5('SHIFT_REMINDER:' || $1 || ':' || $2 || ':a:' || $3 || ':H1')::uuid::text as subject`,
+        [who.id, date, teamless],
+      );
+      for (const row of rows) expect(row.subject).toBe(keys[0]?.subject);
+      expect(rows[0]?.operands).toEqual({ date, start: 420, end: 1140, startsAt, lead: 'H1', leadHours: REMINDER_LEAD_HOURS.H1, shiftTypeName });
+
+      // The same member's assignment counted with a team, on another date: both names, still keyed by the assignment.
+      await client.query('update personal_assignments set removed_by = $2, removed_at = now() where id = $1', [teamless, by.authUserId]);
+      const teamed = await assignmentOf(client, who, by, { date, shiftTypeId, teamId });
+      await actAsService(client);
+      expect(await enqueue(client, [{ ...base, teamId, lead: 'H2', source: 'ASSIGNMENT', personalAssignmentId: teamed }])).toBe(1);
+      await actAsOwner(client);
+      const h2 = (await remindersOf(client, who)).find((row) => row.operands['lead'] === 'H2' && row.channel === 'email');
+      expect(h2?.operands).toEqual({
+        date,
+        teamId,
+        start: 420,
+        end: 1140,
+        startsAt,
+        lead: 'H2',
+        leadHours: REMINDER_LEAD_HOURS.H2,
+        shiftTypeName,
+        teamName,
+      });
+      const { rows: teamedKey } = await client.query<{ subject: string }>(
+        `select md5('SHIFT_REMINDER:' || $1 || ':' || $2 || ':a:' || $3 || ':H2')::uuid::text as subject`,
+        [who.id, date, teamed],
+      );
+      expect(h2?.subject).toBe(teamedKey[0]?.subject);
+    });
+  });
+
+  it.skipIf(noDatabase)('skips an ASSIGNMENT item whose row is removed, another member\'s, a day off, or of another date, type or team', async () => {
+    await inRolledBackTransaction(async (client) => {
+      const who = await member(client, slug, memberName);
+      const by = await member(client, slug, admin);
+      await remindable(client, who, ['H1'], true);
+      const { teamId, shiftTypeId } = await teamAndType(client, who.organizationId);
+      const { rows: madeType } = await client.query<{ id: string }>(
+        `insert into shift_types (organization_id, name, is_working, created_by)
+         values ($1, 'Podsjetnik tip ' || gen_random_uuid()::text, true, $2) returning id::text as id`,
+        [who.organizationId, by.authUserId],
+      );
+      const otherType = madeType[0]!.id;
+      const { rows: madeTeam } = await client.query<{ id: string }>(
+        `insert into teams (organization_id, name, created_by)
+         values ($1, 'Podsjetnik tim ' || gen_random_uuid()::text, $2) returning id::text as id`,
+        [who.organizationId, by.authUserId],
+      );
+      const otherTeam = madeTeam[0]!.id;
+      const date = await todayOf(client, who.organizationId, 1);
+      const nextDate = await todayOf(client, who.organizationId, 2);
+      const removed = await assignmentOf(client, who, by, { date, shiftTypeId, teamId: null });
+      await client.query('update personal_assignments set removed_by = $2, removed_at = now() where id = $1', [removed, by.authUserId]);
+      const off = await assignmentOf(client, who, by, { date: nextDate, kind: 'OFF', shiftTypeId: null, teamId: null });
+      const live = await assignmentOf(client, who, by, { date, shiftTypeId, teamId: null });
+      const adminsOwn = await assignmentOf(client, by, by, { date, shiftTypeId, teamId: null });
+      // A row counted with one team, posted with another.
+      const thirdDate = await todayOf(client, who.organizationId, 3);
+      const teamed = await assignmentOf(client, who, by, { date: thirdDate, shiftTypeId, teamId });
+      const startsAt = await isoFromNow(client, '1 day');
+      const item = (personalAssignmentId: string, overrides: Record<string, unknown> = {}) => ({
+        memberId: who.id,
+        date,
+        teamId: null,
+        shiftTypeId,
+        lead: 'H1',
+        start: 420,
+        end: 1140,
+        startsAt,
+        source: 'ASSIGNMENT',
+        personalAssignmentId,
+        ...overrides,
+      });
+
+      await actAsService(client);
+      expect(
+        await enqueue(client, [
+          item(removed),
+          item(adminsOwn),
+          item(off, { date: nextDate }),
+          item(live, { date: nextDate }),
+          item(live, { shiftTypeId: otherType }),
+          item(teamed, { date: thirdDate, teamId: otherTeam }),
+        ]),
+      ).toBe(0);
+      await actAsOwner(client);
+      expect(await remindersOf(client, who)).toEqual([]);
+    });
+  });
+
+  it.skipIf(noDatabase)('refuses whole a batch with a malformed item form: an explicit TEAM source, no assignment id, a null team on the team form, a stray key', async () => {
+    await inRolledBackTransaction(async (client) => {
+      const who = await member(client, slug, memberName);
+      const { teamId, shiftTypeId } = await teamAndType(client, who.organizationId);
+      const date = await todayOf(client, who.organizationId, 1);
+      const startsAt = await isoFromNow(client, '1 day');
+      const team = { memberId: who.id, date, teamId, shiftTypeId, lead: 'H1', start: 420, end: 1140, startsAt };
+      const assignment = { ...team, teamId: null, source: 'ASSIGNMENT', personalAssignmentId: who.id };
+      const { personalAssignmentId: _id, ...noId } = assignment;
+
+      await actAsService(client);
+      for (const bad of [
+        { ...team, source: 'TEAM' },
+        { ...team, source: 'PERSONAL_ROTATION' },
+        noId,
+        { ...assignment, personalAssignmentId: 'not-a-uuid' },
+        { ...assignment, teamId: 7 },
+        { ...team, teamId: null },
+        { ...assignment, note: 'x' },
+      ]) {
+        const refusal = await refusedThenContinue(client, () => enqueue(client, [bad]));
+        expect({ code: refusal.code, message: refusal.message }, JSON.stringify(bad)).toEqual(ITEMS_INVALID);
+      }
+      await actAsOwner(client);
+    });
+  });
+});

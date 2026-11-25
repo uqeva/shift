@@ -1210,7 +1210,8 @@ export const KEY_SOURCES = [
     // 152 SINCE STORY 16.5: the calendar link's record, `Kalendar na mobitelu`.
     keys: (text: string) => [...translationKeys(text), ...messageKeyUnions(text)],
     // STORY 19.4: the onboarding dismissal's field label.
-    strings: 153,
+    // 154 SINCE STORY 21.2: a personal assignment's note's field label, `Napomena`.
+    strings: 154,
   },
   {
     // STORY 14.3: the PDF's words — the title (the caption), the header's

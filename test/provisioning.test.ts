@@ -701,7 +701,7 @@ describe('every organization table carries row level security, and only its revi
               'leave_request_decisions', 'notification_outbox', 'notification_settings',
               'push_subscriptions', 'swap_requests', 'swap_request_decisions',
               'absence_types', 'leave_allowances', 'audit_events', 'team_loans',
-              'calendar_feed_tokens', 'reminder_settings'
+              'calendar_feed_tokens', 'reminder_settings', 'personal_assignments'
             )
           order by relname`,
       );
@@ -735,6 +735,8 @@ describe('every organization table carries row level security, and only its revi
         'notification_outbox',
         'notification_settings',
         'organizations',
+        // STORY 21.2 (0077): the Personal Assignments, an active admin's read alone.
+        'personal_assignments',
         // STORY 10.4 (0045): a member's devices, own rows only.
         'push_subscriptions',
         // STORY 17.1 (0069): a member's own reminder choice, own row only.
@@ -2445,9 +2447,11 @@ describe('every organization table carries row level security, and only its revi
     absence_types: ['organization_id', 'id'],
     leave_allowances: ['organization_id', 'id'],
     team_loans: ['organization_id', 'id'],
+    // STORY 21.2 (0077), attached in the migration that creates it.
+    personal_assignments: ['organization_id', 'id'],
   };
 
-  it.skipIf(noDatabase)('keeps the change history append-only, read by authenticated alone, and records each of the 22 audited tables through exactly its two triggers (story 14.1)', async () => {
+  it.skipIf(noDatabase)('keeps the change history append-only, read by authenticated alone, and records each of the 23 audited tables through exactly its two triggers (story 14.1; personal_assignments since 21.2)', async () => {
     const client = await connect();
     try {
       // APPEND-ONLY BY PRIVILEGE: `authenticated` SELECT, and nothing else for
@@ -2680,6 +2684,12 @@ describe('the access-control layer runs as the owner and hands that power to nob
     // STORY 18.2. The live loans, read past the admin-only select policy with
     // no reason and no author, on 3.5a's attributes.
     { name: 'calendar_team_loans', argumentCount: 0 },
+    // STORY 21.2 (0077). The live Personal Assignments, read past the
+    // admin-only select policy with no note and no author (E-2), and the one
+    // writer, past the table's missing write grants, attributing every row and
+    // writing the batched notice through `notify_members`.
+    { name: 'calendar_personal_assignments', argumentCount: 0 },
+    { name: 'save_personal_assignments', argumentCount: 1 },
     // STORY 3.5b. The one function that writes: it soft-removes a live
     // override past the table's missing update grant, attributing the removal
     // itself, on the same attributes.
@@ -2913,6 +2923,10 @@ describe('the access-control layer runs as the owner and hands that power to nob
     { name: 'calendar_roster_overrides', argumentCount: 0, expected: ['authenticated'] },
     // STORY 18.2. The live loans, on the same terms.
     { name: 'calendar_team_loans', argumentCount: 0, expected: ['authenticated'] },
+    // STORY 21.2 (0077). The live Personal Assignments and the one writer,
+    // `authenticated`'s alone; the writer refuses all but an active admin.
+    { name: 'calendar_personal_assignments', argumentCount: 0, expected: ['authenticated'] },
+    { name: 'save_personal_assignments', argumentCount: 1, expected: ['authenticated'] },
     // STORY 3.5b. The removal, on the same terms; the function itself refuses
     // every caller but an active admin of the claimed organization.
     { name: 'remove_shift_type_override', argumentCount: 1, expected: ['authenticated'] },
@@ -3018,6 +3032,8 @@ describe('the access-control layer runs as the owner and hands that power to nob
     { name: 'live_roster_overrides', argumentCount: 1, expected: [], schema: 'private' },
     { name: 'live_team_loans', argumentCount: 1, expected: [], schema: 'private' },
     { name: 'live_leave_records', argumentCount: 1, expected: [], schema: 'private' },
+    // STORY 21.2 (0077). The fifth "live" helper, on the same terms.
+    { name: 'live_personal_assignments', argumentCount: 1, expected: [], schema: 'private' },
     { name: 'member_schedule_inputs', argumentCount: 3, expected: [], schema: 'private' },
     // STORY 16.3 (0067). A member's own token and state, an admin's revoke and
     // read, all `authenticated`; the lookup is `anon`'s alone (the feed holds
@@ -3142,6 +3158,8 @@ describe('the access-control layer runs as the owner and hands that power to nob
     { name: 'live_roster_overrides', argumentCount: 1, schema: 'private' },
     { name: 'live_team_loans', argumentCount: 1, schema: 'private' },
     { name: 'live_leave_records', argumentCount: 1, schema: 'private' },
+    // STORY 21.2 (0077). The fifth, on the same terms.
+    { name: 'live_personal_assignments', argumentCount: 1, schema: 'private' },
     // STORY 16.3 (0067). The per-member lock and the state shape run as their
     // caller, always a definer owned by the migration role.
     { name: 'lock_calendar_feed_tokens', argumentCount: 1, schema: 'private' },

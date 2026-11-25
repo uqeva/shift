@@ -194,6 +194,10 @@ export const OBAVIJESTI = {
     subject: 'Posudba u timu {teamName} je uklonjena',
     body: '{organizationName}: posudba u timu {teamName} od {startDate} do {endDate} je uklonjena. Pogledaj kalendar: {link}',
   },
+  scheduleAssigned: {
+    subject: 'Raspored ti je izmijenjen od {from} do {to}',
+    body: '{organizationName}: raspored ti je izmijenjen od {from} do {to} (izmijenjenih dana: {days}). Pogledaj kalendar: {link}',
+  },
   footer: 'Obavijesti e-poštom možeš isključiti u aplikaciji, pod Obavijesti: {link}',
 } as const;
 
@@ -213,6 +217,14 @@ export const PODSJETNICI = {
   eveningBefore: {
     subject: 'Sutra radiš: {shiftTypeName} {start}–{end}, {teamName}',
     body: '{organizationName}: sutra, {date}, radiš: {shiftTypeName} {start}–{end}, {teamName}. Pogledaj dan u kalendaru: {link}',
+  },
+  hoursNoTeam: {
+    subject: 'Za {leadHours} h radiš: {shiftTypeName} {start}–{end}',
+    body: '{organizationName}: za {leadHours} h, {date}, radiš: {shiftTypeName} {start}–{end}. Pogledaj dan u kalendaru: {link}',
+  },
+  eveningBeforeNoTeam: {
+    subject: 'Sutra radiš: {shiftTypeName} {start}–{end}',
+    body: '{organizationName}: sutra, {date}, radiš: {shiftTypeName} {start}–{end}. Pogledaj dan u kalendaru: {link}',
   },
   footer: 'Podsjetnike e-poštom možeš isključiti u aplikaciji, pod Obavijesti → Podsjetnici: {link}',
 } as const;
@@ -252,13 +264,23 @@ export const STARTS_AT_SHAPE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
  * `H<n>` lead names its hours through the row's `leadHours`; the evening
  * before names none.
  */
-export const REMINDER_VARIANT_OF: Readonly<Record<ReminderLeadCode, ReminderNoticeKey>> = {
+export const REMINDER_VARIANT_OF: Readonly<Record<ReminderLeadCode, 'hours' | 'eveningBefore'>> = {
   H1: 'hours',
   H2: 'hours',
   H3: 'hours',
   H6: 'hours',
   H12: 'hours',
   EVENING_BEFORE: 'eveningBefore',
+};
+
+/**
+ * Story 21.2 (AD-18 as amended): the variant a reminder of a Personal Shift
+ * counted with no team renders with. Its row carries neither `teamId` nor
+ * `teamName` (0077); the text names no team and the link no `danSmjena`.
+ */
+export const REMINDER_NO_TEAM_VARIANT_OF: Readonly<Record<'hours' | 'eveningBefore', ReminderNoticeKey>> = {
+  hours: 'hoursNoTeam',
+  eveningBefore: 'eveningBeforeNoTeam',
 };
 
 /**
@@ -311,6 +333,8 @@ export const MESSAGE_OF_CODE: Readonly<Record<string, MessageKey>> = {
   // Story 18.4 (0064): one notice for an amend, one for a removal.
   LOAN_CHANGED: 'loanChanged',
   LOAN_REMOVED: 'loanRemoved',
+  // Story 21.2 (0077, E-3): one notice per member per personal-assignment save.
+  SCHEDULE_ASSIGNED: 'scheduleAssigned',
 };
 
 /**
@@ -388,6 +412,7 @@ export function linkPathOf(key: MessageKey, operands: Readonly<Record<string, un
     case 'loanMade':
     case 'loanChanged':
     case 'loanRemoved':
+    case 'scheduleAssigned':
       return '/kalendar';
     case 'swapRequestProposed':
     case 'swapRequestAccepted':
@@ -416,12 +441,15 @@ export function linkPathOf(key: MessageKey, operands: Readonly<Record<string, un
 /**
  * Story 17.3: the day a reminder is about, opened in *Kalendar* on that team
  * (`?mjesec=…&dan=…&danSmjena=…`, as the calendar's own day links), or `null`
- * when the operands do not name a real date and a team id.
+ * when the operands do not name a real date and a team id. Story 21.2: a row
+ * with no `teamId` key at all (a Personal Shift counted with no team) opens
+ * the day alone (`?mjesec=…&dan=…`).
  */
 export function reminderPathOf(operands: Readonly<Record<string, unknown>>): string | null {
   const date = operands['date'];
-  const teamId = operands['teamId'];
   if (typeof date !== 'string' || formatIsoDate(date) === null) return null;
+  if (!Object.hasOwn(operands, 'teamId')) return `/kalendar?mjesec=${date.slice(0, 7)}&dan=${date}`;
+  const teamId = operands['teamId'];
   if (typeof teamId !== 'string' || !UUID.test(teamId)) return null;
   return `/kalendar?mjesec=${date.slice(0, 7)}&dan=${date}&danSmjena=${teamId.toLowerCase()}`;
 }
@@ -467,7 +495,7 @@ const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
  * formatted as dates. A name (a member's, a shift type's) is text, however
  * much it looks like a date.
  */
-const DATE_OPERANDS: ReadonlySet<string> = new Set(['startDate', 'endDate', 'date', 'effectiveFrom', 'returnDate']);
+const DATE_OPERANDS: ReadonlySet<string> = new Set(['startDate', 'endDate', 'date', 'effectiveFrom', 'returnDate', 'from', 'to']);
 
 /**
  * Story 17.3: the operands that are minutes of a shift (AD-6: integer minutes
@@ -650,15 +678,19 @@ function composeReminder(
   if (reminders === undefined) return { ok: false, code: MESSAGE_UNKNOWN };
 
   const lead = operands['lead'];
-  const key = typeof lead === 'string' && Object.hasOwn(REMINDER_VARIANT_OF, lead) ? REMINDER_VARIANT_OF[lead as ReminderLeadCode] : undefined;
-  if (key === undefined) return { ok: false, code: OPERANDS_INVALID };
-  for (const name of ['shiftTypeName', 'teamName']) {
+  const leadKey = typeof lead === 'string' && Object.hasOwn(REMINDER_VARIANT_OF, lead) ? REMINDER_VARIANT_OF[lead as ReminderLeadCode] : undefined;
+  if (leadKey === undefined) return { ok: false, code: OPERANDS_INVALID };
+  // Story 21.2: a row with neither `teamId` nor `teamName` is a teamless Personal Shift's; one without the other is refused.
+  const teamless = !Object.hasOwn(operands, 'teamId') && !Object.hasOwn(operands, 'teamName');
+  if (!teamless && (!Object.hasOwn(operands, 'teamId') || !Object.hasOwn(operands, 'teamName'))) return { ok: false, code: OPERANDS_INVALID };
+  const key: ReminderNoticeKey = teamless ? REMINDER_NO_TEAM_VARIANT_OF[leadKey] : leadKey;
+  for (const name of teamless ? ['shiftTypeName'] : ['shiftTypeName', 'teamName']) {
     const text = operands[name];
     if (typeof text !== 'string' || text.trim() === '') return { ok: false, code: OPERANDS_INVALID };
   }
   // Both ends are needed, and only as minutes: a missing one is never `00:00`.
   if (values['start'] === undefined || values['end'] === undefined) return { ok: false, code: OPERANDS_INVALID };
-  if (key === 'hours') {
+  if (leadKey === 'hours') {
     // The hours the text names are the lead's own: a disagreeing row is refused.
     const hours = operands['leadHours'];
     if (hours !== REMINDER_LEAD_HOURS[lead as Exclude<ReminderLeadCode, 'EVENING_BEFORE'>]) return { ok: false, code: OPERANDS_INVALID };

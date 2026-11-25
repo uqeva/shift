@@ -1003,6 +1003,10 @@ describe('the access-control layer is present, so nothing below passes vacuously
         'notification_settings_update_own',
         'organizations_select_own_organization',
         'organizations_update_by_own_active_admin',
+        // STORY 21.2 (0077): one, an active admin's read (the table holds the
+        // note); the only writer is `save_personal_assignments`, and members
+        // read the live rows through `calendar_personal_assignments` (E-2).
+        'personal_assignments_select_by_own_active_admin',
         // STORY 10.4 (0045): a member's own devices, read and deleted by their
         // member alone; registered only through `register_push_subscription`.
         'push_subscriptions_delete_own',
@@ -27579,13 +27583,13 @@ describe('a loan is amended, ended early or removed (story 18.4, 0064)', () => {
  * backfill block is run again here, DML only, in a rolled-back transaction.
  */
 
-/** The 22 audited tables (AD-11; `team_loans` since story 18.2). */
+/** The 23 audited tables (AD-11; `team_loans` since story 18.2, `personal_assignments` since 21.2). */
 const AUDITED_TABLES = [
   'organizations', 'members', 'member_status_versions', 'team_membership_versions', 'teams', 'hour_bands',
   'shift_types', 'shift_type_versions', 'rotation_patterns', 'rotation_steps', 'rotation_assignments',
   'shift_type_overrides', 'roster_overrides', 'leave_records', 'conflict_resolutions', 'leave_requests',
   'leave_request_decisions', 'swap_requests', 'swap_request_decisions', 'absence_types', 'leave_allowances',
-  'team_loans',
+  'team_loans', 'personal_assignments',
 ] as const;
 
 interface AuditEvent {
@@ -28257,6 +28261,434 @@ describe('every change is recorded in the change history (story 14.1)', () => {
           [baseline, organizations.length],
         );
         expect(last.every((row) => row.operation === 'HISTORY_BEGINS'), 'the markers are not written last').toBe(true);
+      });
+    },
+  );
+});
+
+// ------------------------ story 21.2: a personal assignment is a recorded exception
+
+/**
+ * STORY 21.2 (`0077`, R14, AD-26, AD-2, AD-11, AD-18; E-2, E-3). No session
+ * writes `personal_assignments`: the one writer is the definer
+ * `save_personal_assignments(p_changes)`, which takes the organization lock,
+ * re-reads the caller as an active admin (42501 `PERSONAL_ASSIGNMENTS_REFUSED`),
+ * checks the whole batch first (22023 `PERSONAL_ASSIGNMENTS_INVALID`), replaces
+ * each changed live row by an attributed removal and an insert, and writes one
+ * `SCHEDULE_ASSIGNED` per member whose written dates reach the organization's
+ * today. Only an active admin reads the table (it holds the note); every
+ * active member reads the live rows through `calendar_personal_assignments()`
+ * with no note and no author. Every scene is built as the owner before the
+ * case's first `actAs`; every case runs in a rolled-back transaction.
+ */
+describe('a personal assignment is a recorded exception (story 21.2, 0077)', () => {
+  const INVALID = { code: '22023', message: 'PERSONAL_ASSIGNMENTS_INVALID' } as const;
+  const REFUSED_SAVE = { code: '42501', message: 'PERSONAL_ASSIGNMENTS_REFUSED' } as const;
+
+  /** `from` plus `days`, as `YYYY-MM-DD` (UTC civil arithmetic). */
+  const dateAfter = (from: string, days: number): string =>
+    new Date(Date.parse(`${from}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+
+  /** `save_personal_assignments`, as whoever the connection currently is. */
+  async function save(client: Client, changes: unknown): Promise<{ inserted: number; removed: number; unchanged: number }> {
+    const { rows } = await client.query<{ answer: { inserted: number; removed: number; unchanged: number } }>(
+      'select public.save_personal_assignments(p_changes => $1::jsonb) as answer',
+      [JSON.stringify(changes)],
+    );
+    const answer = rows[0]?.answer;
+    if (answer === undefined) throw new Error('the save answered nothing');
+    return answer;
+  }
+
+  /** Every row of `members`' assignments, live or removed, as the owner reads them. */
+  async function rowsOf(
+    client: Client,
+    members: readonly string[],
+  ): Promise<{ id: string; member: string; date: string; kind: string; type: string | null; team: string | null; note: string | null; live: boolean; createdBy: string; removedBy: string | null }[]> {
+    const { rows } = await client.query(
+      `select id::text as id, member_id::text as member, date::text as date, kind, shift_type_id::text as type,
+              team_id::text as team, note, removed_at is null as live, created_by::text as "createdBy",
+              removed_by::text as "removedBy"
+         from personal_assignments where member_id = any($1::uuid[])
+        order by member_id, date, removed_at nulls last, created_at`,
+      [members],
+    );
+    return rows as never;
+  }
+
+  /** The `SCHEDULE_ASSIGNED` rows to `members`, as `channel:recipient` with their operands, as the owner reads them. */
+  async function noticesOf(client: Client, members: readonly string[]): Promise<{ row: string; operands: Record<string, unknown> }[]> {
+    const { rows } = await client.query<{ row: string; operands: Record<string, unknown> }>(
+      `select channel || ':' || recipient_member_id::text as row, operands
+         from notification_outbox
+        where code = 'SCHEDULE_ASSIGNED' and recipient_member_id = any($1::uuid[])
+        order by recipient_member_id, channel`,
+      [members],
+    );
+    return rows;
+  }
+
+  /** Owner scene: `count` throwaway members with an address, a working and a non-working type, a team and an archived team and type. */
+  async function scene(client: Client, organization: string, by: string, count: number) {
+    await client.query('update organizations set email_notifications = true where id = $1', [organization]);
+    const members: MemberRow[] = [];
+    for (let index = 0; index < count; index += 1) {
+      const member = await addThrowawayMember(client, organization);
+      await client.query('update members set email = $2 where id = $1', [member.id, `${member.id}@example.org`]);
+      members.push(member);
+    }
+    return {
+      members,
+      working: await addThrowawayShiftType(client, organization, by),
+      other: await addThrowawayShiftType(client, organization, by),
+      resting: await addThrowawayShiftType(client, organization, by, { isWorking: false }),
+      archivedType: await addThrowawayShiftType(client, organization, by, { archived: true }),
+      team: (await addThrowawayTeam(client, organization, by)).id,
+      archivedTeam: (await addThrowawayTeam(client, organization, by, true)).id,
+    };
+  }
+
+  it.skipIf(noDatabase).each(FIXTURES)(
+    'saves 40 future cells of 6 $fixture members in one call, beside a past-only and a mixed member: every row attributed and audited, and exactly one SCHEDULE_ASSIGNED per member with a date from today (Q25)',
+    async ({ slug, admin }) => {
+      await inRolledBackTransaction(async (client) => {
+        const caller = await memberByUsername(client, slug, admin);
+        const organization = caller.organizationId;
+        const { members, working, team } = await scene(client, organization, caller.authUserId, 8);
+        const day = (offset: number) => organizationDay(client, organization, offset);
+        const changes: unknown[] = [];
+        // Six members told: four with 7 dates, two with 6, all from tomorrow.
+        for (const [index, member] of members.slice(0, 6).entries()) {
+          const dates = index < 4 ? 7 : 6;
+          for (let offset = 1; offset <= dates; offset += 1) {
+            changes.push({ memberId: member.id, date: await day(offset), set: { kind: 'SHIFT', shiftTypeId: working, teamId: index % 2 === 0 ? team : null } });
+          }
+        }
+        // A seventh whose changes are all past: written, not told.
+        const past = members[6]!;
+        changes.push({ memberId: past.id, date: await day(-3), set: { kind: 'OFF' } });
+        changes.push({ memberId: past.id, date: await day(-1), set: { kind: 'SHIFT', shiftTypeId: working, note: '  Zamjena  ' } });
+        // An eighth with one past and one future date: told of the future one alone.
+        const mixed = members[7]!;
+        changes.push({ memberId: mixed.id, date: await day(-2), set: { kind: 'OFF' } });
+        changes.push({ memberId: mixed.id, date: await day(3), set: { kind: 'OFF', shiftTypeId: null, teamId: null } });
+
+        await actAs(client, caller.authUserId, organization);
+        const answer = await save(client, changes);
+        await actAsOwner(client);
+
+        expect(answer, slug).toEqual({ inserted: 44, removed: 0, unchanged: 0 });
+        const stored = await rowsOf(client, members.map((member) => member.id));
+        expect(stored, slug).toHaveLength(44);
+        expect(stored.every((row) => row.live && row.createdBy === caller.authUserId && row.removedBy === null), slug).toBe(true);
+        expect(stored.find((row) => row.member === past.id && row.kind === 'SHIFT')?.note, 'the note is stored trimmed (0036)').toBe('Zamjena');
+        for (const row of stored) {
+          const events = await auditEventsOf(client, 'personal_assignments', row.id);
+          expect(events.map((event) => [event.operation, event.actor]), slug).toEqual([['INSERT', caller.authUserId]]);
+        }
+
+        const notices = await noticesOf(client, members.map((member) => member.id));
+        const told = members.slice(0, 6).map((member) => `email:${member.id}`);
+        expect(notices.map((notice) => notice.row).sort(), `${slug}: not one notice per affected member`).toEqual(
+          [...told, `email:${mixed.id}`].sort(),
+        );
+        for (const [index, member] of members.slice(0, 6).entries()) {
+          expect(notices.find((notice) => notice.row === `email:${member.id}`)?.operands, slug).toEqual({
+            from: await day(1),
+            to: await day(index < 4 ? 7 : 6),
+            days: index < 4 ? 7 : 6,
+          });
+        }
+        expect(notices.find((notice) => notice.row === `email:${mixed.id}`)?.operands, `${slug}: a past date was reported`).toEqual({
+          from: await day(3),
+          to: await day(3),
+          days: 1,
+        });
+        // One subject for the whole call.
+        const { rows: subjects } = await client.query<{ total: number }>(
+          `select count(distinct subject_id)::int as total from notification_outbox
+            where code = 'SCHEDULE_ASSIGNED' and recipient_member_id = any($1::uuid[])`,
+          [members.map((member) => member.id)],
+        );
+        expect(subjects[0]?.total, slug).toBe(1);
+      });
+    },
+  );
+
+  it.skipIf(noDatabase).each(FIXTURES)(
+    'writes nothing and tells nobody for a $fixture item equal to the live row, replaces a changed one with an attributed removal, and clears',
+    async ({ slug, admin }) => {
+      await inRolledBackTransaction(async (client) => {
+        const caller = await memberByUsername(client, slug, admin);
+        const organization = caller.organizationId;
+        const { members, working, other } = await scene(client, organization, caller.authUserId, 1);
+        const member = members[0]!;
+        const first = await organizationDay(client, organization, 5);
+        const second = await organizationDay(client, organization, 6);
+        const third = await organizationDay(client, organization, 7);
+        const cells = [
+          { memberId: member.id, date: first, set: { kind: 'SHIFT', shiftTypeId: working, note: 'Dežurstvo' } },
+          { memberId: member.id, date: second, set: { kind: 'OFF' } },
+        ];
+
+        await actAs(client, caller.authUserId, organization);
+        expect(await save(client, cells), slug).toEqual({ inserted: 2, removed: 0, unchanged: 0 });
+        await actAsOwner(client);
+        const before = await rowsOf(client, [member.id]);
+        const { rows: outboxBefore } = await client.query<{ total: number }>('select count(*)::int as total from notification_outbox');
+        const { rows: auditBefore } = await client.query<{ id: string }>('select coalesce(max(id), 0)::text as id from audit_events');
+
+        await actAs(client, caller.authUserId, organization);
+        // The same note with white space around it is the same note: it is stored trimmed.
+        const again = await save(client, [
+          { memberId: member.id, date: first, set: { kind: 'SHIFT', shiftTypeId: working, note: ' Dežurstvo\u00a0' } },
+          cells[1],
+          { memberId: member.id, date: third, clear: true },
+        ]);
+        await actAsOwner(client);
+        expect(again, `${slug}: an equal item or an empty clear wrote`).toEqual({ inserted: 0, removed: 0, unchanged: 3 });
+        expect(await rowsOf(client, [member.id]), slug).toEqual(before);
+        const { rows: outboxAfter } = await client.query<{ total: number }>('select count(*)::int as total from notification_outbox');
+        expect(outboxAfter[0]?.total, `${slug}: an unchanged save told someone`).toBe(outboxBefore[0]?.total);
+        const { rows: audited } = await client.query<{ total: number }>(
+          `select count(*)::int as total from audit_events where id > $1::bigint and table_name = 'personal_assignments'`,
+          [auditBefore[0]?.id ?? '0'],
+        );
+        expect(audited[0]?.total, `${slug}: an unchanged save was audited`).toBe(0);
+
+        // A different note is a change too; another type replaces; a clear removes.
+        await actAs(client, caller.authUserId, organization);
+        const changed = await save(client, [
+          { memberId: member.id, date: first, set: { kind: 'SHIFT', shiftTypeId: other, note: 'Dežurstvo' } },
+          { memberId: member.id, date: second, clear: true },
+        ]);
+        await actAsOwner(client);
+        expect(changed, slug).toEqual({ inserted: 1, removed: 2, unchanged: 0 });
+        const after = await rowsOf(client, [member.id]);
+        expect(after.map((row) => [row.date, row.kind, row.type, row.live, row.removedBy]), slug).toEqual([
+          [first, 'SHIFT', working, false, caller.authUserId],
+          [first, 'SHIFT', other, true, null],
+          [second, 'OFF', null, false, caller.authUserId],
+        ]);
+        const removal = await auditEventsOf(client, 'personal_assignments', before[0]!.id);
+        expect(removal.map((event) => event.operation), slug).toEqual(['INSERT', 'UPDATE']);
+      });
+    },
+  );
+
+  it.skipIf(noDatabase).each(FIXTURES)(
+    'refuses a whole $fixture batch with one invalid item, 22023 PERSONAL_ASSIGNMENTS_INVALID, and writes nothing',
+    async ({ slug, admin }) => {
+      await inRolledBackTransaction(async (client) => {
+        const caller = await memberByUsername(client, slug, admin);
+        const organization = caller.organizationId;
+        const { members, working, resting, archivedType, team, archivedTeam } = await scene(client, organization, caller.authUserId, 1);
+        const member = members[0]!;
+        const date = await organizationDay(client, organization, 5);
+        const otherSlug = FIXTURES.find((fixture) => fixture.slug !== slug)!.slug;
+        const foreign = await memberByUsername(client, otherSlug, FIXTURES.find((fixture) => fixture.slug === otherSlug)!.member);
+        const foreignType = await addThrowawayShiftType(client, foreign.organizationId, caller.authUserId);
+        const foreignTeam = (await addThrowawayTeam(client, foreign.organizationId, caller.authUserId)).id;
+        const good = { memberId: member.id, date, set: { kind: 'SHIFT', shiftTypeId: working } };
+        const bad: readonly (readonly [string, unknown])[] = [
+          ['not an array', { items: [good] }],
+          ['an item that is not an object', [good, 7]],
+          ['a stray key', [{ ...good, note: 'x' }]],
+          ['both set and clear', [{ ...good, clear: true }]],
+          ['neither set nor clear', [{ memberId: member.id, date }]],
+          ['a clear that is not true', [{ memberId: member.id, date, clear: false }]],
+          ['a member of another organization', [{ ...good, memberId: foreign.id }]],
+          ['an unknown member', [{ ...good, memberId: '00000000-0000-4000-8000-000000000000' }]],
+          ['a member id that is no uuid', [{ ...good, memberId: 'ana' }]],
+          ['a date that does not exist', [{ ...good, date: '2046-02-30' }]],
+          ['a date with no zero padding', [{ ...good, date: '2046-3-1' }]],
+          ['a kind of neither', [{ ...good, set: { kind: 'LEAVE' } }]],
+          ['a shift with no type', [{ ...good, set: { kind: 'SHIFT' } }]],
+          ['a day off with a type', [{ ...good, set: { kind: 'OFF', shiftTypeId: working } }]],
+          ['a day off with a team', [{ ...good, set: { kind: 'OFF', teamId: team } }]],
+          ['an archived type', [{ ...good, set: { kind: 'SHIFT', shiftTypeId: archivedType } }]],
+          ['a type of another organization', [{ ...good, set: { kind: 'SHIFT', shiftTypeId: foreignType } }]],
+          ['a team of another organization', [{ ...good, set: { kind: 'SHIFT', shiftTypeId: working, teamId: foreignTeam } }]],
+          ['a clear with a stray key', [{ memberId: member.id, date, clear: true, note: 'x' }]],
+          ['an archived team', [{ ...good, set: { kind: 'SHIFT', shiftTypeId: working, teamId: archivedTeam } }]],
+          ['a set key it does not know', [{ ...good, set: { kind: 'SHIFT', shiftTypeId: working, reason: 'x' } }]],
+          ['a blank note', [{ ...good, set: { kind: 'SHIFT', shiftTypeId: working, note: '   ' } }]],
+          ['a 201-code-point note', [{ ...good, set: { kind: 'SHIFT', shiftTypeId: working, note: 'ž'.repeat(201) } }]],
+          ['a note that is not text', [{ ...good, set: { kind: 'SHIFT', shiftTypeId: working, note: 7 } }]],
+          ['one member and date twice', [good, { memberId: member.id, date, clear: true }]],
+          // Distinct dates, so only the cap can refuse it.
+          ['5 001 items', Array.from({ length: 5001 }, (_, index) => ({ memberId: member.id, date: dateAfter('2050-01-01', index), clear: true }))],
+        ];
+
+        await actAs(client, caller.authUserId, organization);
+        const codes: Record<string, { code: string; message: string }> = {};
+        for (const [label, changes] of bad) {
+          const refusal = await refusedThenContinue(client, () => save(client, changes));
+          codes[label] = { code: refusal.code, message: refusal.message };
+        }
+        const longest = await save(client, [
+          { ...good, set: { kind: 'SHIFT', shiftTypeId: working, note: 'ž'.repeat(200) } },
+          // R14.3: a non-working type is allowed, and reads as off.
+          { memberId: member.id, date: await organizationDay(client, organization, 6), set: { kind: 'SHIFT', shiftTypeId: resting } },
+        ]);
+        await actAsOwner(client);
+
+        expect(codes, slug).toEqual(Object.fromEntries(bad.map(([label]) => [label, INVALID])));
+        expect(longest, `${slug}: a 200-code-point note or a non-working type was refused`).toEqual({ inserted: 2, removed: 0, unchanged: 0 });
+        expect(await rowsOf(client, [member.id, foreign.id]), slug).toHaveLength(2);
+      });
+    },
+  );
+
+  it.skipIf(noDatabase).each(FIXTURES)(
+    'refuses the $fixture save to a member-role account, a deactivated admin and a session with no organization claim, and every direct write to an admin (Q2)',
+    async ({ slug, admin, member: memberName }) => {
+      await inRolledBackTransaction(async (client) => {
+        const caller = await memberByUsername(client, slug, admin);
+        const plain = await memberByUsername(client, slug, memberName);
+        const organization = caller.organizationId;
+        const { members, working } = await scene(client, organization, caller.authUserId, 1);
+        const member = members[0]!;
+        const date = await organizationDay(client, organization, 5);
+        const changes = [{ memberId: member.id, date, set: { kind: 'SHIFT', shiftTypeId: working } }];
+        const { rows: existing } = await client.query<{ id: string }>(
+          `insert into personal_assignments (organization_id, member_id, date, kind, shift_type_id, created_by)
+           values ($1, $2, $3::date, 'SHIFT', $4, $5) returning id::text as id`,
+          [organization, member.id, await organizationDay(client, organization, 6), working, caller.authUserId],
+        );
+        const id = existing[0]!.id;
+        // A stale admin: an admin by role whose status turned inactive today, token still valid.
+        const stale = await addThrowawayMember(client, organization);
+        await client.query("update members set role = 'admin' where id = $1", [stale.id]);
+        await ownerVersion(client, { organization, member: stale.id, active: false, from: await organizationDay(client, organization, 0), by: caller.authUserId });
+
+        await actAs(client, plain.authUserId, organization);
+        const asMember = await refusedThenContinue(client, () => save(client, changes));
+        await actAsOwner(client);
+        await actAs(client, stale.authUserId, organization);
+        const asStale = await refusedThenContinue(client, () => save(client, changes));
+        await actAsOwner(client);
+        await actAs(client, caller.authUserId, null);
+        const unclaimed = await refusedThenContinue(client, () => save(client, changes));
+        await actAsOwner(client);
+        await actAs(client, caller.authUserId, organization);
+        const insert = await refusedThenContinue(client, () =>
+          client.query(
+            `insert into personal_assignments (organization_id, member_id, date, kind, shift_type_id) values ($1, $2, $3::date, 'SHIFT', $4)`,
+            [organization, member.id, date, working],
+          ),
+        );
+        const update = await refusedThenContinue(client, () =>
+          client.query('update personal_assignments set note = $2 where id = $1', [id, 'x']),
+        );
+        const remove = await refusedThenContinue(client, () => client.query('delete from personal_assignments where id = $1', [id]));
+        await actAsOwner(client);
+
+        expect({ code: asMember.code, message: asMember.message }, slug).toEqual(REFUSED_SAVE);
+        expect({ code: asStale.code, message: asStale.message }, `${slug}: a deactivated admin saved`).toEqual(REFUSED_SAVE);
+        expect({ code: unclaimed.code, message: unclaimed.message }, slug).toEqual(REFUSED_SAVE);
+        expect([insert.code, update.code, remove.code], `${slug}: a session wrote the table directly`).toEqual(['42501', '42501', '42501']);
+        expect(await rowsOf(client, [member.id]), slug).toHaveLength(1);
+      });
+    },
+  );
+
+  it.skipIf(noDatabase).each(FIXTURES)(
+    'lets a $fixture member read the live assignments through calendar_personal_assignments with no note and no author, and the table not at all (E-2)',
+    async ({ slug, admin, member: memberName }) => {
+      await inRolledBackTransaction(async (client) => {
+        const caller = await memberByUsername(client, slug, admin);
+        const plain = await memberByUsername(client, slug, memberName);
+        const organization = caller.organizationId;
+        const { members, working, team } = await scene(client, organization, caller.authUserId, 1);
+        const member = members[0]!;
+        const first = await organizationDay(client, organization, 5);
+        const second = await organizationDay(client, organization, 6);
+
+        await actAs(client, caller.authUserId, organization);
+        await save(client, [
+          { memberId: member.id, date: first, set: { kind: 'SHIFT', shiftTypeId: working, teamId: team, note: 'Samo za admina' } },
+          { memberId: member.id, date: second, set: { kind: 'OFF' } },
+        ]);
+        await save(client, [{ memberId: member.id, date: second, clear: true }]);
+        const { rows: adminRead } = await client.query<{ total: number }>(
+          'select count(*)::int as total from personal_assignments where member_id = $1',
+          [member.id],
+        );
+        await actAsOwner(client);
+        const { rows: live } = await client.query<{ id: string }>(
+          'select id::text as id from personal_assignments where member_id = $1 and removed_at is null',
+          [member.id],
+        );
+
+        await actAs(client, plain.authUserId, organization);
+        // One jsonb array (0077: never cut by PostgREST's max_rows), each element the six facts.
+        const { rows: read } = await client.query<Record<string, unknown>>(
+          `select e.value as row from pg_catalog.jsonb_array_elements(public.calendar_personal_assignments()) as e
+            where e.value ->> 'member_id' = $1`,
+          [member.id],
+        ).then(({ rows }) => ({ rows: rows.map((one) => one['row'] as Record<string, unknown>) }));
+        const { rows: table } = await client.query<{ total: number }>('select count(*)::int as total from personal_assignments');
+        await actAsOwner(client);
+
+        // Nothing for a member inactive today, nor for a claim naming the other tenant.
+        const gone = await addThrowawayMember(client, organization);
+        await ownerVersion(client, { organization, member: gone.id, active: false, from: await organizationDay(client, organization, 0), by: caller.authUserId });
+        const otherOrganization = await organizationId(client, FIXTURES.find((fixture) => fixture.slug !== slug)!.slug);
+        const readAs = async (authUserId: string, claimed: string): Promise<unknown> => {
+          await actAs(client, authUserId, claimed);
+          const { rows } = await client.query<{ answer: unknown }>('select public.calendar_personal_assignments() as answer');
+          await actAsOwner(client);
+          return rows[0]?.answer;
+        };
+        // NULL, saying nothing, as the catalog sweeps require (19.1, 19.5).
+        expect(await readAs(gone.authUserId, organization), `${slug}: a member inactive today read the assignments`).toBeNull();
+        expect(await readAs(plain.authUserId, otherOrganization), `${slug}: a claim naming the other tenant read`).toBeNull();
+
+        // Two rows: the live shift and the removed day off (a clear only removes).
+        expect(adminRead[0]?.total, `${slug}: the admin does not read the table`).toBe(2);
+        // The six facts and nothing else: no note, no author, nothing of the removed row.
+        expect(read.map((row) => Object.keys(row).sort()), slug).toEqual([['date', 'id', 'kind', 'member_id', 'shift_type_id', 'team_id']]);
+        expect(
+          read.map((row) => [row['id'], row['member_id'], row['kind'], row['shift_type_id'], row['team_id']]),
+          slug,
+        ).toEqual([[live[0]?.id, member.id, 'SHIFT', working, team]]);
+        expect(read.map((row) => row['date']), slug).toEqual([first]);
+        expect(table[0]?.total, `${slug}: a member read the table, notes and authors included`).toBe(0);
+      });
+    },
+  );
+
+  it.skipIf(noDatabase).each(FIXTURES)(
+    'carries every $fixture member\'s live assignments dated in the window in member_schedule_inputs, with no note or author (AD-19)',
+    async ({ slug, admin, member: memberName }) => {
+      await inRolledBackTransaction(async (client) => {
+        const caller = await memberByUsername(client, slug, admin);
+        const plain = await memberByUsername(client, slug, memberName);
+        const organization = caller.organizationId;
+        const { members, working } = await scene(client, organization, caller.authUserId, 1);
+        const member = members[0]!;
+        const day = (offset: number) => organizationDay(client, organization, offset);
+
+        await actAs(client, caller.authUserId, organization);
+        await save(client, [
+          { memberId: member.id, date: await day(9), set: { kind: 'OFF', note: 'Tajna napomena' } },
+          { memberId: member.id, date: await day(3), set: { kind: 'SHIFT', shiftTypeId: working } },
+          { memberId: member.id, date: await day(30), set: { kind: 'OFF' } },
+        ]);
+        await actAsOwner(client);
+
+        const { rows } = await client.query<{ inputs: { members: { id: string; personalAssignments: unknown[] }[] } }>(
+          'select private.member_schedule_inputs($1::uuid, $2::date, $3::date) as inputs',
+          [plain.id, await day(0), await day(10)],
+        );
+        const entries = rows[0]?.inputs.members ?? [];
+        const carried = entries.find((entry) => entry.id === member.id)?.personalAssignments ?? [];
+        expect(carried.map((one) => (one as { date: string }).date), slug).toEqual([await day(3), await day(9)]);
+        expect(carried[0], slug).toEqual({ id: expect.any(String) as string, date: await day(3), kind: 'SHIFT', shiftTypeId: working, teamId: null });
+        expect(carried[1], slug).toMatchObject({ kind: 'OFF', shiftTypeId: null, teamId: null });
+        expect(entries.every((entry) => Array.isArray(entry.personalAssignments)), `${slug}: a member has no list`).toBe(true);
+        expect(JSON.stringify(rows[0]?.inputs)).not.toMatch(/Tajna napomena|createdBy|created_by|note/);
       });
     },
   );

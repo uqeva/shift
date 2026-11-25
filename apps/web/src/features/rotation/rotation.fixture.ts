@@ -5,6 +5,7 @@ import {
   CALENDAR_OVERRIDES_FUNCTION,
   CALENDAR_ROSTER_OVERRIDES_FUNCTION,
   CALENDAR_TEAM_LOANS_FUNCTION,
+  CALENDAR_PERSONAL_ASSIGNMENTS_FUNCTION,
 } from '@/features/calendar/services/snapshot';
 import type { RotationAnswer, RotationTable } from '@/features/rotation/services/list';
 import { ANNUAL_LEAVE_ID } from '@/features/absence-types/services/list';
@@ -454,6 +455,23 @@ export function loansAnswerOf(loans: readonly Row[] = []): { readonly data: unkn
   return { data: loans, error: null };
 }
 
+/** One row of `calendar_personal_assignments()` (0077, story 21.2): no note, no author. */
+export function calendarPersonalAssignmentRow(
+  id: string,
+  memberId: unknown,
+  date: unknown,
+  kind: unknown,
+  shiftTypeId: unknown = null,
+  teamId: unknown = null,
+): Row {
+  return { id, member_id: memberId, date, kind, shift_type_id: shiftTypeId, team_id: teamId };
+}
+
+/** `calendar_personal_assignments()`'s answer: by default none. */
+export function personalAssignmentsAnswerOf(rows: readonly Row[] = []): { readonly data: unknown; readonly error: null } {
+  return { data: rows, error: null };
+}
+
 /** The session the calendar reads as: the viewer's. */
 export function viewerSession(authUserId = VIEWER_AUTH_USER): () => Promise<Session> {
   return () => Promise.resolve({ user: { id: authUserId } } as Session);
@@ -472,6 +490,7 @@ export function calendarTableOf(
   overrides: unknown = overridesAnswerOf(),
   rosterOverrides: unknown = rosterOverridesAnswerOf(),
   loans: unknown = loansAnswerOf(),
+  personalAssignments: unknown = personalAssignmentsAnswerOf(),
 ): {
   readonly seen: unknown[][];
   select(columns: string, options: unknown): { filter(column: string, operator: string, value: string): Promise<never> };
@@ -484,11 +503,12 @@ export function calendarTableOf(
     rpc(fn) {
       seen.push(['rpc', fn]);
 
-      // The four functions the calendar may call (0018, 0019, 0026, 0062).
+      // The five functions the calendar may call (0018, 0019, 0026, 0062, 0077).
       if (fn === CALENDAR_MEMBERS_FUNCTION) return Promise.resolve(members as never);
       if (fn === CALENDAR_OVERRIDES_FUNCTION) return Promise.resolve(overrides as never);
       if (fn === CALENDAR_ROSTER_OVERRIDES_FUNCTION) return Promise.resolve(rosterOverrides as never);
       if (fn === CALENDAR_TEAM_LOANS_FUNCTION) return Promise.resolve(loans as never);
+      if (fn === CALENDAR_PERSONAL_ASSIGNMENTS_FUNCTION) return Promise.resolve(personalAssignments as never);
 
       throw new Error(`unexpected rpc ${fn}`);
     },

@@ -4,7 +4,10 @@
  * reads — a loan, a shift-type override in force and one pending review, a
  * roster override in force and one pending, a full-day and a half-day Leave
  * Record, a team move, a member on no team, and an inactive spell — dated on
- * or around both daylight-saving transitions of 2026 and 2027.
+ * or around both daylight-saving transitions of 2026 and 2027. Since story
+ * 21.2, Personal Assignments too (R14): a teamless shift, a shift counted with
+ * another team, a day off, a non-working type and one on an inactive date,
+ * all in early 2027, outside the ICS golden's window and the reminder clocks.
  *
  * PLAIN DATA, AND IT IMPORTS NOTHING, so the runtime-parity probe
  * (`probe.ts`) loads it unchanged under Node and under the pinned
@@ -36,6 +39,23 @@ const roster = (id: string, teamId: string, date: string, memberOutId: string | 
   memberInId,
   writtenAt,
 });
+
+/** A Personal Assignment as the assembly carries it (story 21.2): no member id, note or author. */
+interface PersonalAssignmentRow {
+  readonly id: string;
+  readonly date: string;
+  readonly kind: 'SHIFT' | 'OFF';
+  readonly shiftTypeId: string | null;
+  readonly teamId: string | null;
+}
+
+const assignment = (
+  id: string,
+  date: string,
+  kind: 'SHIFT' | 'OFF',
+  shiftTypeId: string | null,
+  teamId: string | null,
+): PersonalAssignmentRow => ({ id, date, kind, shiftTypeId, teamId });
 
 /** The token vector: a 43-character unpadded base64url token, canonical (its last character carries no stray bits). */
 export const PARITY_VECTOR = 'shift-parity-vector_0123456789abcdefghijklA';
@@ -85,18 +105,21 @@ const PILOT = {
       statuses: [],
       // Lent to C across the spring transition.
       loans: [{ id: 'pilot-loan-1', teamId: 'pilot-smjena-c', from: '2026-03-28', to: '2026-03-30' }],
+      personalAssignments: [] as PersonalAssignmentRow[],
     },
     {
       id: 'pilot-m2',
       memberships: [{ teamId: 'pilot-smjena-b', position: null, effectiveFrom: SEEDED }],
       statuses: [],
       loans: [],
+      personalAssignments: [assignment('pilot-assignment-1', '2027-01-10', 'OFF', null, null)],
     },
     {
       id: 'pilot-m3',
       memberships: [{ teamId: 'pilot-smjena-c', position: null, effectiveFrom: SEEDED }],
       statuses: [{ active: false, effectiveFrom: '2026-06-01' }],
       loans: [],
+      personalAssignments: [] as PersonalAssignmentRow[],
     },
     {
       // On no team, and lent to D across the 2027 spring transition.
@@ -104,6 +127,10 @@ const PILOT = {
       memberships: [],
       statuses: [],
       loans: [{ id: 'pilot-loan-2', teamId: 'pilot-smjena-d', from: '2027-03-27', to: '2027-03-29' }],
+      personalAssignments: [
+        // No team and no loan that date: a Personal Shift counted with no team.
+        assignment('pilot-assignment-2', '2027-03-26', 'SHIFT', 'pilot-dan', null),
+      ],
     },
     {
       id: 'pilot-m5',
@@ -113,6 +140,7 @@ const PILOT = {
       ],
       statuses: [],
       loans: [],
+      personalAssignments: [] as PersonalAssignmentRow[],
     },
   ],
   overrides: [
@@ -179,6 +207,10 @@ const UJ5 = {
       memberships: [{ teamId: 'uj5-smjena-a', position: null, effectiveFrom: SEEDED }],
       statuses: [],
       loans: [],
+      personalAssignments: [
+        // A non-working type: off that date.
+        assignment('uj5-assignment-1', '2027-02-11', 'SHIFT', 'uj5-slobodno', null),
+      ],
     },
     {
       id: 'uj5-m2',
@@ -186,12 +218,17 @@ const UJ5 = {
       statuses: [],
       // Lent to C across the autumn transition.
       loans: [{ id: 'uj5-loan-1', teamId: 'uj5-smjena-c', from: '2026-10-24', to: '2026-10-25' }],
+      personalAssignments: [] as PersonalAssignmentRow[],
     },
     {
       id: 'uj5-m3',
       memberships: [{ teamId: 'uj5-smjena-c', position: null, effectiveFrom: SEEDED }],
       statuses: [],
       loans: [],
+      personalAssignments: [
+        // Counted with A, not their own C.
+        assignment('uj5-assignment-2', '2027-02-10', 'SHIFT', 'uj5-popodnevna', 'uj5-smjena-a'),
+      ],
     },
     {
       id: 'uj5-m4',
@@ -201,6 +238,10 @@ const UJ5 = {
         { active: true, effectiveFrom: '2027-06-01' },
       ],
       loans: [],
+      personalAssignments: [
+        // On an inactive date: no shift (R14.3).
+        assignment('uj5-assignment-3', '2027-02-12', 'SHIFT', 'uj5-jutarnja', null),
+      ],
     },
   ],
   overrides: [

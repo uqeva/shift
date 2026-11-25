@@ -465,3 +465,26 @@ describe('rosterErasureCheckOf', () => {
     expect(check).toEqual({ kind: CHECK_UNAVAILABLE });
   });
 });
+
+describe('a Personal Assignment in the snapshot (story 21.2)', () => {
+  /** `calendar` with `memberId` given one assignment, as the snapshot carries them after a save. */
+  function withAssignment(calendar: CalendarSnapshot, memberId: string, assignment: CalendarSnapshot['members'][number]['personalAssignments'][number]): CalendarSnapshot {
+    const members = calendar.members.map((member) => (member.id === memberId ? { ...member, personalAssignments: [assignment] } : member));
+    const viewer = memberId === calendar.viewer.memberId ? { ...calendar.viewer, personalAssignments: [assignment] } : calendar.viewer;
+
+    return { ...calendar, members, viewer };
+  }
+
+  it('is seen by the AD-5 erasure check: a day off over a leave conflict erases it', () => {
+    const after = withAssignment(plain, VIEWER_MEMBER, { id: 'pa-1', date: '2026-09-10', kind: 'OFF', shiftTypeId: null, teamId: null });
+    const rows = erasuresOf(plain, after, '2026-09-10', [recordOf('record-1', '2026-09-10', '2026-09-12')], []);
+
+    expect(rows.map((row) => [row.memberId, row.date, row.teamId, row.teamWorks])).toEqual([[VIEWER_MEMBER, '2026-09-10', A, true]]);
+  });
+
+  it('erases nothing when the assignment keeps the member on the team\'s own shift', () => {
+    const after = withAssignment(plain, VIEWER_MEMBER, { id: 'pa-1', date: '2026-09-10', kind: 'SHIFT', shiftTypeId: 'pilot-dan', teamId: A });
+
+    expect(erasuresOf(plain, after, '2026-09-10', [recordOf('record-1', '2026-09-10', '2026-09-12')], [])).toEqual([]);
+  });
+});
