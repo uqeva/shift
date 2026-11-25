@@ -11,6 +11,7 @@ import {
   VIEWER_MEMBER,
   VIEWER_NAME,
   calendarLoanRow,
+  calendarPersonalAssignmentRow,
   calendarMemberRow,
   calendarOrganizationRow,
   calendarOverrideRow,
@@ -21,6 +22,7 @@ import {
   membersAnswerOf,
   membershipRow,
   overridesAnswerOf,
+  personalAssignmentsAnswerOf,
   rosterOverridesAnswerOf,
   statusRow,
   viewerRow,
@@ -41,7 +43,10 @@ const WINDOW = { from: '2026-10-01', to: '2026-10-31' };
 
 type Row = Record<string, unknown>;
 
-async function snapshotOf(rows: FixtureRows, extra: { overrides?: readonly Row[]; rosterOverrides?: readonly Row[]; loans?: readonly Row[] } = {}): Promise<CalendarSnapshot> {
+async function snapshotOf(
+  rows: FixtureRows,
+  extra: { overrides?: readonly Row[]; rosterOverrides?: readonly Row[]; loans?: readonly Row[]; personalAssignments?: readonly Row[] } = {},
+): Promise<CalendarSnapshot> {
   const first = rows.teams[0]?.['id'] as string;
   const second = rows.teams[1]?.['id'] as string;
   const source = calendarTableOf(
@@ -60,6 +65,7 @@ async function snapshotOf(rows: FixtureRows, extra: { overrides?: readonly Row[]
     overridesAnswerOf(extra.overrides ?? []),
     rosterOverridesAnswerOf(extra.rosterOverrides ?? []),
     loansAnswerOf(extra.loans ?? []),
+    personalAssignmentsAnswerOf(extra.personalAssignments ?? []),
   );
   const outcome = await readCalendar(source, source, viewerSession());
 
@@ -104,6 +110,7 @@ describe('scheduleInputsOfCalendar', () => {
       memberships: [{ teamId: 'pilot-smjena-b', position: 'vozač', effectiveFrom: SEEDED }],
       statuses: [{ active: false, effectiveFrom: '2026-12-01' }],
       loans: [],
+      personalAssignments: [],
     });
     expect(JSON.stringify(inputs)).not.toMatch(/Ana Anić|vatrogasac|Lana|Zamjena|reason|author|name":"DVD/);
   });
@@ -155,6 +162,28 @@ describe('scheduleInputsOfCalendar', () => {
       { id: 'leave-half', from: '2026-10-20', to: '2026-10-20', half: 'SECOND', absenceTypeId: 'annual' },
     ]);
     expect(Object.hasOwn(inputs.leave[0]!, 'half')).toBe(false);
+  });
+
+  it('keeps every member\'s Personal Assignments dated in the window, by date, with no note (story 21.2)', async () => {
+    const inputs = scheduleInputsOfCalendar(
+      await snapshotOf(PILOT, {
+        personalAssignments: [
+          { ...calendarPersonalAssignmentRow('pa-last', COLLEAGUE, '2026-10-31', 'OFF'), note: 'never carried' },
+          calendarPersonalAssignmentRow('pa-first', COLLEAGUE, '2026-10-01', 'SHIFT', 'pilot-dan', null),
+          calendarPersonalAssignmentRow('pa-before', COLLEAGUE, '2026-09-30', 'OFF'),
+          calendarPersonalAssignmentRow('pa-after', VIEWER_MEMBER, '2026-11-01', 'SHIFT', 'pilot-noc', 'pilot-smjena-b'),
+        ],
+      }),
+      [],
+      WINDOW,
+    );
+
+    expect(inputs.members.find((member) => member.id === COLLEAGUE)?.personalAssignments).toEqual([
+      { id: 'pa-first', date: '2026-10-01', kind: 'SHIFT', shiftTypeId: 'pilot-dan', teamId: null },
+      { id: 'pa-last', date: '2026-10-31', kind: 'OFF', shiftTypeId: null, teamId: null },
+    ]);
+    expect(inputs.members.find((member) => member.id === VIEWER_MEMBER)?.personalAssignments).toEqual([]);
+    expect(JSON.stringify(inputs)).not.toMatch(/never carried/);
   });
 
   it('is what R12 projects the viewer\'s at-work shifts from', async () => {

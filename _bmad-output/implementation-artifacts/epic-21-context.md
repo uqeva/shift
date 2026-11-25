@@ -96,6 +96,7 @@ Make Shift able to plan the first production pilot's real month without workarou
   - Feed UIDs: `<date>-p-<memberId>@shift` for a personal rotation and `<date>-a-<assignmentId>-<memberId>@shift` for an assignment (also `@shift-download`). The summary adds the team name only when there is a team.
   - Reminder items gain `source` (`TEAM`, `PERSONAL_ROTATION` or `ASSIGNMENT`), with their own subject hashes and a no-team rendering. An `ASSIGNMENT` reminder is skipped unless its row is still live and equal.
   - A shift a holiday removed has no event and no reminder.
+  - As built by 21.2 (`0077`): a team reminder item keeps its 8 keys and has no `source`. Only the `ASSIGNMENT` form is new, and `PERSONAL_ROTATION` and the `-p-` UID are 21.9's. `SCHEDULE_ASSIGNED`'s `{ from, to, days }` counts only the written dates on or after today. An archived type or team in an item refuses the whole save. The history draws the table as a generic record until 21.4.
 - **Landing (AD-28).**
   - `apps/landing` is hand-written HTML and one stylesheet, with no client script. Its tokens are held equal to `apps/web`'s by a test. It uses self-hosted Outfit (Latin Extended).
   - Its build inputs are `LANDING_APP_URL`, `LANDING_CONTACT_EMAIL` (a production build refuses the placeholder) and `LANDING_SIGNUP_URL`.

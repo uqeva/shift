@@ -257,6 +257,7 @@ export {
   REMINDER_WINDOW_AFTER_MS,
   REMINDER_WINDOW_BEFORE_MS,
   shiftRemindersDueOf,
+  SHIFT_REMINDER_SOURCE_ASSIGNMENT,
   type ShiftReminder,
 } from './shift-reminders.js';
 

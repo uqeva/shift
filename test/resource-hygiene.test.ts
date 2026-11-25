@@ -2554,6 +2554,11 @@ const SANCTIONED_SCREEN_KEYS = [
   'reminders.notice.hours.body',
   'reminders.notice.eveningBefore.subject',
   'reminders.notice.eveningBefore.body',
+  // STORY 21.2 (AD-18 as amended): a Personal Shift counted with no team.
+  'reminders.notice.hoursNoTeam.subject',
+  'reminders.notice.hoursNoTeam.body',
+  'reminders.notice.eveningBeforeNoTeam.subject',
+  'reminders.notice.eveningBeforeNoTeam.body',
   'reminders.notice.footer',
   // STORY 12.2. A member proposes a swap: *Predloži zamjenu* in the day
   // detail's footer and the surface's heading, back link and lede; the given
@@ -2835,6 +2840,8 @@ const SANCTIONED_SCREEN_KEYS = [
   'history.field.drawsAllowance',
   'history.field.kind',
   'history.field.reason',
+  // STORY 21.2 (0077): a personal assignment's note, an audited column.
+  'history.field.note',
   'history.field.answer',
   'history.field.outcome',
   'history.field.leaveYear',
@@ -2954,6 +2961,9 @@ const SANCTIONED_SCREEN_KEYS = [
   'obavijesti.loanChanged.body',
   'obavijesti.loanRemoved.subject',
   'obavijesti.loanRemoved.body',
+  // STORY 21.2 (0077, E-3): one notice per member per personal-assignment save.
+  'obavijesti.scheduleAssigned.subject',
+  'obavijesti.scheduleAssigned.body',
   'smjene.error.lentTo',
   // Story 18.5: where a loan is said (UX-DR59) — the mark under the loan team,
   // the member's own notice, the directory's line — the hours source and the

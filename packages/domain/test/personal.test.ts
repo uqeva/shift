@@ -238,10 +238,22 @@ function derivedFiguresOf(organization: Organization) {
   };
 }
 
+/**
+ * Both parity fixtures as they were before story 21.2 gave them Personal
+ * Assignments: every member's list removed, so the digest below is still the
+ * claim R14.7 makes (no assignment anywhere derives as before).
+ */
+function withoutAssignments(organization: (typeof PARITY_FIXTURES)[number]['organization']) {
+  return {
+    ...organization,
+    members: organization.members.map(({ personalAssignments: _dropped, ...member }) => member),
+  };
+}
+
 /** R12 for every member of both parity fixtures, over the whole parity window. */
-function atWorkFiguresOf(organizationOf: (organization: (typeof PARITY_FIXTURES)[number]['organization']) => typeof organization) {
+function atWorkFiguresOf(organizationOf: (organization: ReturnType<typeof withoutAssignments>) => typeof organization) {
   return PARITY_FIXTURES.map(({ fixture, organization }) => {
-    const changed = organizationOf(organization);
+    const changed = organizationOf(withoutAssignments(organization));
     return {
       fixture,
       atWork: changed.members.map((member) => atWorkShiftsOf(inputsOf(changed, member.id), PARITY_WINDOW.from, PARITY_WINDOW.to)),
@@ -833,5 +845,51 @@ describe('R14.1 — the assignments are checked', () => {
     staffingOn(r148Staffing(members), 'D', '2026-03-02');
     collisionsOf({ ...r148Shared(members), leaveRecords: [{ id: 'l', memberId: 'd1', from: '2026-03-02', to: '2026-03-03' }] });
     expect(members).toEqual(copy);
+  });
+});
+
+describe('story 21.2: the parity fixtures carry Personal Assignments, and R12 follows them', () => {
+  const [pilot, uj5] = PARITY_FIXTURES;
+  const r12Of = (organization: (typeof PARITY_FIXTURES)[number]['organization'], memberId: string, date: string) =>
+    atWorkShiftsOf(inputsOf(organization, memberId), date, date);
+
+  it('gives every member a list, as the assembly does', () => {
+    for (const { organization } of PARITY_FIXTURES) {
+      for (const member of organization.members) expect(Array.isArray(member.personalAssignments), member.id).toBe(true);
+    }
+  });
+
+  it('a teamless working assignment is a Personal Shift with no team', () => {
+    expect(r12Of(pilot!.organization, 'pilot-m4', '2027-03-26')).toEqual([
+      {
+        date: '2027-03-26',
+        teamId: null,
+        shiftTypeId: 'pilot-dan',
+        viaOverride: false,
+        personalAssignmentId: 'pilot-assignment-2',
+        startMinute: 420,
+        endMinute: 1140,
+      },
+    ]);
+  });
+
+  it('an assignment counted with another team carries that team', () => {
+    expect(r12Of(uj5!.organization, 'uj5-m3', '2027-02-10')).toEqual([
+      {
+        date: '2027-02-10',
+        teamId: 'uj5-smjena-a',
+        shiftTypeId: 'uj5-popodnevna',
+        viaOverride: false,
+        personalAssignmentId: 'uj5-assignment-2',
+        startMinute: 840,
+        endMinute: 1320,
+      },
+    ]);
+  });
+
+  it('a day off, a non-working type and an inactive date are no shift', () => {
+    expect(r12Of(pilot!.organization, 'pilot-m2', '2027-01-10')).toEqual([]);
+    expect(r12Of(uj5!.organization, 'uj5-m1', '2027-02-11')).toEqual([]);
+    expect(r12Of(uj5!.organization, 'uj5-m4', '2027-02-12')).toEqual([]);
   });
 });

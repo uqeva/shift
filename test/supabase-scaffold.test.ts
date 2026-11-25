@@ -505,7 +505,7 @@ describe('the access-control migration', () => {
     ).toEqual([]);
   });
 
-  it('declares exactly the sixty-six policies stories 1.3a, 1.4a, 1.4b, 1.6, 1.7a, 1.7b, 2.1a, 2.2a, 2.3a, 3.5a, 3.6a, 5.1b, 5.4a, 9.2, 10.3, 10.4, 12.1, 13.1, 13.3, 14.1, 17.1, 18.2, 0025 and 0036 reviewed, and no sixty-seventh', () => {
+  it('declares exactly the sixty-seven policies stories 1.3a, 1.4a, 1.4b, 1.6, 1.7a, 1.7b, 2.1a, 2.2a, 2.3a, 3.5a, 3.6a, 5.1b, 5.4a, 9.2, 10.3, 10.4, 12.1, 13.1, 13.3, 14.1, 17.1, 18.2, 21.2, 0025 and 0036 reviewed, and no sixty-eighth', () => {
     // EXTENDED BY STORY 1.4a, exactly as this comment asked: `0004_organization
     // _settings.sql` adds `organizations_update_by_own_active_admin`, built by
     // copying `members_update_by_own_active_admin`, and its name is added here
@@ -613,6 +613,11 @@ describe('the access-control migration', () => {
       'organization_logos_update_by_own_active_admin',
       'organizations_select_own_organization',
       'organizations_update_by_own_active_admin',
+      // STORY 21.2 (0077), and ONE: an active admin reads the table (it
+      // holds the note). No insert, update or delete policy: the one writer
+      // is `save_personal_assignments`, and members read the live rows
+      // through `calendar_personal_assignments()` (E-2).
+      'personal_assignments_select_by_own_active_admin',
       // STORY 10.4 (0045): a member's own devices, read and deleted; a device
       // is registered only through the definer, so no insert or update.
       'push_subscriptions_delete_own',
@@ -3595,6 +3600,8 @@ describe('the access-control migration', () => {
     leave_allowances: ['organization_id', 'id'],
     // STORY 18.2 (0062), attached in the migration that creates it.
     team_loans: ['organization_id', 'id'],
+    // STORY 21.2 (0077), attached in the migration that creates it.
+    personal_assignments: ['organization_id', 'id'],
   };
 
   /**
@@ -3722,7 +3729,7 @@ describe('the access-control migration', () => {
 
     expect(coverage.tables.length, 'too few organization tables were read for the pin to mean anything').toBeGreaterThanOrEqual(25);
     expect(coverage.uncovered, 'an organization table is neither audited nor named excluded in AD-11').toEqual([]);
-    expect(coverage.audited, 'the audited set is not AD-11\'s 22 tables and the one with its own recorder').toEqual(
+    expect(coverage.audited, 'the audited set is not AD-11\'s 23 tables and the one with its own recorder').toEqual(
       [...Object.keys(AUDITED_TABLES), ...Object.keys(OWN_RECORDER_TRIGGERS)].sort(),
     );
     expect(coverage.attachedElsewhere, 'a table created after 0061 does not attach its audit triggers in its own migration').toEqual([]);
@@ -7395,5 +7402,140 @@ describe('names refuse control characters (0076, epic 17 retro A4)', () => {
     // The guard reads each table's in-use rows the unique index binds.
     expect(text.match(/and not o\.archived/g)).toHaveLength(2);
     expect(text.match(/private\.name_key\(pg_catalog\.regexp_replace\(/g)).toHaveLength(2);
+  });
+});
+
+describe('a personal assignment is a recorded exception (0077, story 21.2)', () => {
+  const MIGRATION = '0077_personal_assignments.sql';
+  const raw = (name: string): string => readFileSync(join(supabaseRoot, 'migrations', name), 'utf8');
+  const sql = (): string => stripLineComments(raw(MIGRATION));
+  const definitionOf = (text: string, name: string): string => {
+    const lines = text.split('\n');
+    const start = lines.findIndex((line) => new RegExp(`^create (or replace )?function ${name.replace('.', '\\.')}\\(`).test(line));
+    if (start < 0) return '';
+    const end = lines.findIndex((line, index) => index > start && line === '$$;');
+    return lines.slice(start, end + 1).join('\n');
+  };
+
+  it('re-creates member_schedule_inputs from 0065 word for word but for every member\'s live assignments in the window', () => {
+    const numbered = migrationNames()
+      .filter((name) => MIGRATION_NAME.test(name))
+      .sort();
+    const name = 'private.member_schedule_inputs';
+    const definedIn = numbered.filter((file) => file <= MIGRATION && definitionOf(raw(file), name) !== '');
+    expect(definedIn.slice(-2)).toEqual(['0065_member_schedule_inputs.sql', MIGRATION]);
+    const anchor = `                    where l.member_id = m.id
+                      and l.during && v_window
+                 ), '[]'::jsonb)
+`;
+    const before = definitionOf(raw('0065_member_schedule_inputs.sql'), name).replace(/^create function /, 'create or replace function ');
+    expect(before.split(anchor).length - 1).toBe(1);
+    const expected = before.replace(
+      anchor,
+      () => `                    where l.member_id = m.id
+                      and l.during && v_window
+                 ), '[]'::jsonb),
+                 -- 0077 (story 21.2): the member's live assignments in the window.
+                 'personalAssignments', coalesce((
+                   select jsonb_agg(
+                            jsonb_build_object(
+                              'id', p.id,
+                              'date', p.date,
+                              'kind', p.kind,
+                              'shiftTypeId', p.shift_type_id,
+                              'teamId', p.team_id
+                            )
+                            order by p.date, p.id
+                          )
+                     from private.live_personal_assignments(v_organization) p
+                    where p.member_id = m.id
+                      and p.date between p_from and p_to
+                 ), '[]'::jsonb)
+`,
+    );
+    expect(definitionOf(raw(MIGRATION), name)).toBe(expected);
+    expect(sql()).toContain('revoke execute on function private.member_schedule_inputs(uuid, date, date) from public, anon, authenticated, service_role;');
+  });
+
+  it('keeps the reminder team form at its eight keys, and adds only the ASSIGNMENT form, keyed by the assignment', () => {
+    const write = stripLineComments(definitionOf(raw(MIGRATION), 'public.enqueue_shift_reminders'));
+    expect(write).toContain(
+      "item ?& array['memberId', 'date', 'teamId', 'shiftTypeId', 'lead', 'start', 'end', 'startsAt']\n",
+    );
+    expect(write).toMatch(/when not \(item \? 'source'\) then\s+\(select pg_catalog\.count\(\*\) from pg_catalog\.jsonb_object_keys\(item\)\) = 8/);
+    expect(write).toMatch(/\(item ->> 'source'\) = 'ASSIGNMENT' then\s+\(select pg_catalog\.count\(\*\) from pg_catalog\.jsonb_object_keys\(item\)\) = 10/);
+    // The team form's subject, unchanged; the assignment's, its own.
+    expect(write).toContain(
+      "'SHIFT_REMINDER:' || v_member::text || ':' || pg_catalog.to_char(v_date, 'YYYY-MM-DD') || ':' || v_team::text || ':' || v_lead",
+    );
+    expect(write).toContain(
+      "'SHIFT_REMINDER:' || v_member::text || ':' || pg_catalog.to_char(v_date, 'YYYY-MM-DD') || ':a:' || v_assignment::text || ':' || v_lead",
+    );
+    // Only while the row is live, the member's, a shift, of that date and type.
+    expect(write).toMatch(
+      /from private\.live_personal_assignments\(v_organization\) p\s+where p\.id = v_assignment\s+and p\.member_id = v_member\s+and p\.date = v_date\s+and p\.kind = 'SHIFT'\s+and p\.shift_type_id = v_shift_type/,
+    );
+    // No team: neither the id nor the name in the operands.
+    expect(write).toMatch(/when v_team is null then '\{\}'::jsonb\s+else pg_catalog\.jsonb_build_object\('teamId', v_team, 'teamName', v_team_name\)/);
+    // 0075's account check, kept.
+    expect(write).toMatch(/u\.deleted_at is null\s+and \(u\.banned_until is null or u\.banned_until <= now\(\)\)/);
+    expect(sql()).toContain('revoke execute on function public.enqueue_shift_reminders(jsonb) from public, anon, authenticated;');
+    expect(sql()).toContain('grant execute on function public.enqueue_shift_reminders(jsonb) to service_role;');
+  });
+
+  it('writes the table no session can write: RLS, one admin read, one live row per member and date, both audit triggers', () => {
+    const text = sql();
+    expect(text).toMatch(/alter table personal_assignments enable row level security;/);
+    expect(text).toMatch(
+      /create unique index personal_assignments_one_live_per_date\s+on personal_assignments \(organization_id, member_id, date\)\s+where removed_at is null;/,
+    );
+    expect(policyDeclarations(text)).toHaveLength(1);
+    expect(text).toMatch(/create policy personal_assignments_select_by_own_active_admin on public\.personal_assignments\s+for select/);
+    expect(text).toMatch(/revoke insert, update, delete, truncate, references, trigger on table public\.personal_assignments\s+from anon, authenticated;/);
+    expect(text).not.toMatch(/grant (insert|update|delete)[^;]*personal_assignments/);
+    for (const check of [
+      "constraint personal_assignments_kind_check\n    check (kind in ('SHIFT', 'OFF'))",
+      "constraint personal_assignments_shift_type_by_kind\n    check ((kind = 'SHIFT') = (shift_type_id is not null))",
+      "constraint personal_assignments_off_has_no_team\n    check (kind = 'SHIFT' or team_id is null)",
+      'constraint personal_assignments_removal_complete\n    check ((removed_by is null) = (removed_at is null))',
+    ]) {
+      expect(text).toContain(check);
+    }
+    expect(text).toMatch(/create trigger personal_assignments_audit after insert or delete on public\.personal_assignments/);
+    expect(text).toMatch(/create trigger personal_assignments_audit_update after update on public\.personal_assignments/);
+  });
+
+  it('saves through one definer: the lock, then the caller, then the whole batch, then one notice per member', () => {
+    const save = stripLineComments(definitionOf(raw(MIGRATION), 'public.save_personal_assignments'));
+    const at = (needle: string): number => {
+      const index = save.indexOf(needle);
+      expect(index, needle).toBeGreaterThan(-1);
+      return index;
+    };
+    const order = [
+      at("'shift.organization_writes:' || claimed::text"),
+      at("message = 'PERSONAL_ASSIGNMENTS_REFUSED'"),
+      at('pg_catalog.jsonb_array_length(p_changes) > 5000'),
+      at("message = 'PERSONAL_ASSIGNMENTS_INVALID'"),
+      at("pg_catalog.set_config('shift.notify_suppress', 'batch', true)"),
+      at('insert into public.personal_assignments'),
+      at("'SCHEDULE_ASSIGNED'"),
+    ];
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(save).toMatch(/where w\.day >= v_today\s+group by w\.member_id/);
+    expect(save).toMatch(/array\[told\.member_id\]/);
+    expect(save).toContain('security definer');
+    expect(sql()).toContain('grant execute on function public.save_personal_assignments(jsonb) to authenticated;');
+    expect(sql()).toContain('revoke execute on function public.save_personal_assignments(jsonb) from service_role;');
+    expect(sql()).toContain('grant execute on function public.calendar_personal_assignments() to authenticated;');
+    // The member read names no note and no author, answers ONE jsonb array (never cut by `max_rows`), and
+    // pins the active caller; the save pins the active admin, and opens no subtransaction per item.
+    const read = stripLineComments(definitionOf(raw(MIGRATION), 'public.calendar_personal_assignments'));
+    expect(read).not.toMatch(/note|created_by|removed_by/);
+    expect(read).toMatch(/^create function public\.calendar_personal_assignments\(\)\nreturns jsonb\n/);
+    expect(read).toMatch(/where access\.is_active/);
+    expect(read, 'the read must say nothing (null) to a caller with no access').toMatch(/then null/);
+    expect(save).toMatch(/and access\.is_active\s+and access\.member_role = 'admin'/);
+    expect(save).not.toMatch(/\bexception\s+when\b/);
   });
 });

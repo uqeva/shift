@@ -51,8 +51,12 @@ describe('R12.1 — the working shifts of the member\'s day', () => {
       '2026-03-29 c noc 1140 1860 pilot-loan-1',
       '2026-03-31 a noc 1140 1860',
     ]);
-    // On no team, and lent: only the loan's working dates.
-    expect(linesOn(pilotOf('pilot-m4'), '2026-03-01', '2027-10-31')).toEqual(['2027-03-27 d noc 1140 1860 pilot-loan-2']);
+    // On no team, and lent: only the loan's working dates, and (story 21.2's
+    // parity fixture) the day before it, their Personal Shift counted with no team.
+    expect(linesOn(pilotOf('pilot-m4'), '2026-03-01', '2027-10-31')).toEqual([
+      '2027-03-26 no-team dan 420 1140',
+      '2027-03-27 d noc 1140 1860 pilot-loan-2',
+    ]);
   });
 
   it('applies a shift-type override in force, and not one pending review', () => {

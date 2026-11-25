@@ -83,9 +83,11 @@ interface SceneIds {
   readonly rosterOverrides: string[];
   readonly overrides: string[];
   readonly leave: string[];
+  /** Story 21.2: the Personal Assignments (0077). */
+  readonly assignments: string[];
 }
 
-const scene: SceneIds = { loans: [], rosterOverrides: [], overrides: [], leave: [] };
+const scene: SceneIds = { loans: [], rosterOverrides: [], overrides: [], leave: [], assignments: [] };
 
 interface Viewer {
   readonly memberId: string;
@@ -105,6 +107,10 @@ interface SceneRows {
   readonly straddling: string;
   /** A loan and a full-day record wholly before the window and wholly after it: never carried. */
   readonly outside: readonly string[];
+  /** Story 21.2: a teamless working assignment of the member and a day off of the bystander, in the window. */
+  readonly assignments: readonly string[];
+  /** Story 21.2: an assignment of the member after the window: never carried. */
+  readonly assignmentOutside: string;
 }
 
 interface FixtureScene {
@@ -231,6 +237,21 @@ async function buildScene(client: Client, fixture: (typeof FIXTURES)[number]): P
   );
   scene.leave.push(fullDay, halfDay, straddling, outside[2]!, outside[3]!);
 
+  // Story 21.2: Personal Assignments as the save writes them (attributed to the admin), inside and after
+  // the window. The member's is a working shift counted with no team, on a date their loan does not cover.
+  const assignmentOf = (memberId: string, date: string, kind: 'SHIFT' | 'OFF', shiftTypeId: string | null) =>
+    inserted(
+      `insert into personal_assignments (organization_id, member_id, date, kind, shift_type_id, note, created_by)
+       values ($1, $2, $3::date, $4, $5, 'Paritet.', $6) returning id`,
+      [organization, memberId, date, kind, shiftTypeId, admin.authUserId],
+    );
+  const assignments = [
+    await assignmentOf(member.id, await at(170), 'SHIFT', working.id),
+    await assignmentOf(bystander.id, await at(20), 'OFF', null),
+  ];
+  const assignmentOutside = await assignmentOf(member.id, await at(190), 'SHIFT', working.id);
+  scene.assignments.push(...assignments, assignmentOutside);
+
   const viewers = (
     await client.query<Viewer>(
       `select m.id as "memberId", u.email
@@ -244,7 +265,7 @@ async function buildScene(client: Client, fixture: (typeof FIXTURES)[number]): P
   ).rows;
 
   return {
-    rows: { member: member.id, loan, lentTo, rosterOverride, override, fullDay, halfDay, straddling, outside },
+    rows: { member: member.id, loan, lentTo, rosterOverride, override, fullDay, halfDay, straddling, outside, assignments, assignmentOutside },
     dates: { override: overrideDate, fullDay: [leaveFrom, leaveTo], halfDay: halfDate, workingType: working.id },
     fixture: fixture.fixture,
     organization,
@@ -274,6 +295,7 @@ afterAll(async () => {
     await client.query('delete from roster_overrides where id = any($1::uuid[])', [scene.rosterOverrides]);
     await client.query('delete from shift_type_overrides where id = any($1::uuid[])', [scene.overrides]);
     await client.query('delete from team_loans where id = any($1::uuid[])', [scene.loans]);
+    await client.query('delete from personal_assignments where id = any($1::uuid[])', [scene.assignments]);
     await client.query('commit');
   } finally {
     await client.query('rollback').catch(() => undefined);
@@ -414,6 +436,7 @@ describe('read parity: the server assembly equals the browser\'s read (AD-19)', 
     expect(scene.rosterOverrides).toHaveLength(4);
     expect(scene.loans).toHaveLength(6);
     expect(scene.leave).toHaveLength(10);
+    expect(scene.assignments).toHaveLength(6);
   });
 
   for (const fixture of FIXTURES) {
@@ -462,6 +485,10 @@ describe('read parity: the server assembly equals the browser\'s read (AD-19)', 
           expect(loans, `${one.fixture}: a loan outside the window`).not.toContain(id);
           expect(leave, `${one.fixture}: a record outside the window`).not.toContain(id);
         }
+        // Story 21.2: every member's live assignments dated in the window, and none after it.
+        const carried = inputs.members.flatMap((entry) => (entry.personalAssignments ?? []).map((one) => one.id));
+        expect(carried, `${one.fixture}: the assignments in the window`).toEqual(expect.arrayContaining([...rows.assignments]));
+        expect(carried, `${one.fixture}: an assignment after the window`).not.toContain(rows.assignmentOutside);
         expect(JSON.stringify(inputs)).not.toMatch(/Paritet/);
 
         // R12 over it, so the parity above is not of empty projections: on the lent team, the
@@ -478,6 +505,11 @@ describe('read parity: the server assembly equals the browser\'s read (AD-19)', 
         for (const shift of shifts.filter((candidate) => candidate.date === dates.halfDay)) {
           expect(shift.workedHalf, `${one.fixture}: the half day`).toBe('SECOND');
         }
+        // Story 21.2: the member's working assignment is a Personal Shift, marked with its id.
+        expect(
+          shifts.filter((shift) => shift.personalAssignmentId === rows.assignments[0]).map((shift) => shift.shiftTypeId),
+          `${one.fixture}: the Personal Shift`,
+        ).toEqual([dates.workingType]);
       }
     } finally {
       await client.end();

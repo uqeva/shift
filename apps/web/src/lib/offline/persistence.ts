@@ -80,12 +80,16 @@ export const DEVICE_SNAPSHOT_KEY = 'shift-query-cache';
  * A shape-2 member has none, and every roster derived from it would ignore a
  * loan the database holds until the next read.
  *
+ * 4 SINCE STORY 21.2: the calendar entry's members and viewer gained
+ * `personalAssignments`. A shape-3 member has none, and every roster derived
+ * from it would ignore an assignment the database holds.
+ *
  * TWO BUNDLES AT ONCE. While an old and a new bundle both run (a waiting
  * service worker under `registerType: 'prompt'`, or an old tab left open),
  * each deletes the other's blob on restore. That costs offline reading until
  * the next save, never correctness: neither hydrates the other's shape.
  */
-export const DEVICE_SNAPSHOT_SHAPE = 3;
+export const DEVICE_SNAPSHOT_SHAPE = 4;
 
 /**
  * The `buster` a snapshot of `userId`'s cache is saved and restored under:

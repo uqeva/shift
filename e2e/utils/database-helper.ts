@@ -243,6 +243,21 @@ export async function removeFormerMemberInSql(slug: string, memberId: string): P
         where o.slug = $1 and l.organization_id = o.id and l.member_id = $2`,
       [slug, memberId],
     );
+    // Story 21.2: the member's Personal Assignments (0077), whose member key
+    // does not cascade, and the `SCHEDULE_ASSIGNED` notices to them (a save's
+    // subject is per call, not per row, so they go by recipient).
+    await client.query(
+      `delete from notification_outbox n
+        using organizations o
+        where o.slug = $1 and n.organization_id = o.id and n.recipient_member_id = $2 and n.code = 'SCHEDULE_ASSIGNED'`,
+      [slug, memberId],
+    );
+    await client.query(
+      `delete from personal_assignments p
+        using organizations o
+        where o.slug = $1 and p.organization_id = o.id and p.member_id = $2`,
+      [slug, memberId],
+    );
     await client.query(
       `delete from auth.users u
         using members m join organizations o on o.id = m.organization_id
@@ -447,6 +462,8 @@ export async function removeLeaveMemberInSql(slug: string, memberId: string): Pr
       scope,
     );
     await client.query('delete from team_loans where organization_id = $1 and member_id = $2', scope);
+    // Story 21.2: the member's Personal Assignments (0077), whose member key does not cascade.
+    await client.query('delete from personal_assignments where organization_id = $1 and member_id = $2', scope);
     // Story 10.2: the notifications their requests and leave wrote to OTHER
     // members (the admins' new-request rows), which no recipient key removes.
     await client.query(
@@ -732,6 +749,20 @@ export async function removeOfflineMemberInSql(slug: string, username: string): 
     await client.query(
       `delete from team_loans l using members m, organizations o
         where l.organization_id = m.organization_id and l.member_id = m.id
+          and o.id = m.organization_id and o.slug = $1 and m.username = $2`,
+      [slug, username],
+    );
+    // Story 21.2: the member's Personal Assignments (0077), whose member key
+    // does not cascade, and the `SCHEDULE_ASSIGNED` notices to them, by recipient.
+    await client.query(
+      `delete from notification_outbox n using members m, organizations o
+        where n.organization_id = m.organization_id and n.recipient_member_id = m.id and n.code = 'SCHEDULE_ASSIGNED'
+          and o.id = m.organization_id and o.slug = $1 and m.username = $2`,
+      [slug, username],
+    );
+    await client.query(
+      `delete from personal_assignments p using members m, organizations o
+        where p.organization_id = m.organization_id and p.member_id = m.id
           and o.id = m.organization_id and o.slug = $1 and m.username = $2`,
       [slug, username],
     );
@@ -1803,6 +1834,12 @@ export async function removeTeamInSql(slug: string, teamId: string): Promise<voi
                       where o.slug = $1 and l.team_id = $2`;
     await client.query(`delete from notification_outbox where subject_id in (${lending})`, scope);
     await client.query(`delete from team_loans where id in (${lending})`, scope);
+    // Story 21.2: an assignment counted with the team keys to it (0077), with no cascade.
+    await client.query(
+      `delete from personal_assignments p using organizations o
+        where o.slug = $1 and p.organization_id = o.id and p.team_id = $2`,
+      scope,
+    );
     await client.query(
       `delete from teams where id = $2 and organization_id = (select id from organizations where slug = $1)`,
       scope,
@@ -2257,6 +2294,11 @@ export async function removeSeededRotation(seeded: SeededRotation): Promise<void
     // Before the types: an override keys to its type (0019).
     await client.query(
       'delete from shift_type_overrides where organization_id = $1 and shift_type_id = any($2::uuid[])',
+      types,
+    );
+    // Story 21.2: so does a Personal Assignment (0077).
+    await client.query(
+      'delete from personal_assignments where organization_id = $1 and shift_type_id = any($2::uuid[])',
       types,
     );
     await client.query(

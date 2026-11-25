@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   REMINDER_WINDOW_AFTER_MS,
   REMINDER_WINDOW_BEFORE_MS,
+  SHIFT_REMINDER_SOURCE_ASSIGNMENT,
   atWorkShiftsOf,
   reminderDueAt,
   shiftRemindersDueOf,
@@ -184,5 +185,36 @@ describe('shiftRemindersDueOf', () => {
     expect(() => shiftRemindersDueOf(m2, ['H1', 'H1'], january, 0)).toThrow(RangeError);
     expect(() => shiftRemindersDueOf(m2, ['H1'], january, 1.5)).toThrow(RangeError);
     expect(() => shiftRemindersDueOf(m2, ['H1'], { from: '2026-01-05', to: '2026-01-03' }, 0)).toThrow(RangeError);
+  });
+});
+
+describe('story 21.2: the ASSIGNMENT item form (AD-18 as amended)', () => {
+  const m4 = pilotOf('pilot-m4');
+
+  it('reminds of a teamless Personal Shift with the assignment form, its team null', () => {
+    // 2027-03-26 Dan from 07:00 local (CET, UTC+1), 06:00Z; H2 is due 04:00Z.
+    const due = shiftRemindersDueOf(m4, ['H2'], { from: '2027-03-25', to: '2027-03-27' }, at('2027-03-26T04:00:00Z'));
+    expect(due).toEqual([
+      {
+        memberId: 'pilot-m4',
+        date: '2027-03-26',
+        teamId: null,
+        shiftTypeId: 'pilot-dan',
+        lead: 'H2',
+        start: 420,
+        end: 1140,
+        startsAt: '2027-03-26T06:00:00Z',
+        source: 'ASSIGNMENT',
+        personalAssignmentId: 'pilot-assignment-2',
+      },
+    ]);
+    expect(SHIFT_REMINDER_SOURCE_ASSIGNMENT).toBe('ASSIGNMENT');
+  });
+
+  it('keeps the team form at its eight keys: no `source` key on a team shift, not even undefined', () => {
+    const due = shiftRemindersDueOf(pilotOf('pilot-m2'), ['H2'], { from: '2026-01-03', to: '2026-01-05' }, at('2026-01-04T04:00:00Z'));
+    expect(due).toHaveLength(1);
+    expect(Object.hasOwn(due[0] ?? {}, 'source')).toBe(false);
+    expect(Object.hasOwn(due[0] ?? {}, 'personalAssignmentId')).toBe(false);
   });
 });

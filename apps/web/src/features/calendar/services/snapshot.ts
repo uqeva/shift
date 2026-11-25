@@ -1,8 +1,12 @@
 import {
+  PERSONAL_ASSIGNMENT_OFF,
+  PERSONAL_ASSIGNMENT_SHIFT,
   checkLoans,
+  checkPersonalAssignments,
   checkRosterOverrides,
   type Loan,
   type MembershipVersion,
+  type PersonalAssignment,
   type RosterOverride,
   type RotationAssignment,
   type RotationStep,
@@ -127,7 +131,17 @@ import {
  * rule (`effectiveTeamOn`, R11). No loan anywhere is `loans: []` on every
  * member, which derives exactly as before (R11.4).
  *
- * `select` AND FOUR `rpc`s, AND NOTHING ELSE.
+ * THE PERSONAL ASSIGNMENTS (story 21.2). The table is an admin's alone (0077:
+ * it holds the note), so every member reads the LIVE assignments of the
+ * organization through `calendar_personal_assignments()`: each one's member,
+ * date, kind, shift type and team, and nothing else (E-2). A fifth rpc beside
+ * the select, under the same key; it answers ONE array (0077), so PostgREST's
+ * `max_rows` never cuts it. They ride on each member's entry and on the
+ * viewer, as loans do, so every figure follows them through the domain's one
+ * rule (R14). None anywhere is `personalAssignments: []`, which derives
+ * exactly as before (R14.7).
+ *
+ * `select` AND FIVE `rpc`s, AND NOTHING ELSE.
  */
 
 /** The relation the read starts from: the caller's own organization. */
@@ -164,6 +178,9 @@ export const CALENDAR_ROSTER_OVERRIDES_FUNCTION = 'calendar_roster_overrides';
 
 /** The function the live loans are read through (0062, story 18.2): no reason, no author. */
 export const CALENDAR_TEAM_LOANS_FUNCTION = 'calendar_team_loans';
+
+/** The function the live Personal Assignments are read through (0077, story 21.2): no note, no author. */
+export const CALENDAR_PERSONAL_ASSIGNMENTS_FUNCTION = 'calendar_personal_assignments';
 
 /** The embedded column the members embed is filtered by: the viewer's own row alone. */
 export const CALENDAR_VIEWER_COLUMN = 'members.auth_user_id';
@@ -283,6 +300,11 @@ export interface CalendarMember {
    * never lent. The domain reads it as `RosterMember.loans` (R11).
    */
   readonly loans: readonly Loan[];
+  /**
+   * Every live Personal Assignment of this member (story 21.2), by date; none
+   * is `[]`. The domain reads it as `RosterMember.personalAssignments` (R14).
+   */
+  readonly personalAssignments: readonly PersonalAssignment[];
 }
 
 /** The signed-in member reading the calendar. */
@@ -303,6 +325,8 @@ export interface CalendarViewer {
   readonly statuses: readonly StatusVersion[];
   /** Every live Loan of the viewer (story 18.2), the same as their entry in `members`. */
   readonly loans: readonly Loan[];
+  /** Every live Personal Assignment of the viewer (story 21.2), the same as their entry in `members`. */
+  readonly personalAssignments: readonly PersonalAssignment[];
 }
 
 /** The one answer the calendar draws from. */
@@ -419,7 +443,8 @@ type CalendarRefusal =
   | 'statuses'
   | 'override'
   | 'rosterOverride'
-  | 'loan';
+  | 'loan'
+  | 'personalAssignment';
 
 function unavailable(reason: CalendarRefusal, detail?: unknown): CalendarOutcome {
   if (detail === undefined) console.error(CALENDAR_UNAVAILABLE, reason);
@@ -529,13 +554,14 @@ export async function readCalendar(
   let overridesAnswered: CalendarRpcAnswer;
   let rosterOverridesAnswered: CalendarRpcAnswer;
   let loansAnswered: CalendarRpcAnswer;
+  let assignmentsAnswered: CalendarRpcAnswer;
 
   try {
     const current = await session();
 
     if (current === null) return unavailable('session');
 
-    [answered, membersAnswered, overridesAnswered, rosterOverridesAnswered, loansAnswered] = await Promise.all([
+    [answered, membersAnswered, overridesAnswered, rosterOverridesAnswered, loansAnswered, assignmentsAnswered] = await Promise.all([
       table
         .select(CALENDAR_COLUMNS, CALENDAR_COUNT)
         .filter(CALENDAR_VIEWER_COLUMN, CALENDAR_VIEWER_OPERATOR, current.user.id),
@@ -543,6 +569,7 @@ export async function readCalendar(
       membersRead.rpc(CALENDAR_OVERRIDES_FUNCTION),
       membersRead.rpc(CALENDAR_ROSTER_OVERRIDES_FUNCTION),
       membersRead.rpc(CALENDAR_TEAM_LOANS_FUNCTION),
+      membersRead.rpc(CALENDAR_PERSONAL_ASSIGNMENTS_FUNCTION),
     ]);
   } catch (cause) {
     return unavailable('rejected', cause);
@@ -701,7 +728,11 @@ export async function readCalendar(
 
   if (loans === null) return unavailable('loan');
 
-  const viewer = viewerOf(memberRows[0], organizationId, teamIds, memberIds, memberships, statuses, loans);
+  const personalAssignments = personalAssignmentsOf(assignmentsAnswered, teamIds, typeIds, memberIds);
+
+  if (personalAssignments === null) return unavailable('personalAssignment');
+
+  const viewer = viewerOf(memberRows[0], organizationId, teamIds, memberIds, memberships, statuses, loans, personalAssignments);
 
   if (viewer === null) return unavailable('viewer');
 
@@ -711,6 +742,7 @@ export async function readCalendar(
       memberships: memberships.get(identity.id) ?? [],
       statuses: statuses.get(identity.id) ?? [],
       loans: loans.get(identity.id) ?? [],
+      personalAssignments: personalAssignments.get(identity.id) ?? [],
     }))
     .sort(compareMembers);
 
@@ -806,6 +838,78 @@ function loansOf(
   }
 
   return known;
+}
+
+/**
+ * The live Personal Assignments `calendar_personal_assignments()` answered,
+ * by member, each member's by date, or `null`: a malformed answer, an error,
+ * data that is not an array, a row that does not validate — no text id or
+ * member, a date that is not a calendar date, a kind neither `SHIFT` nor
+ * `OFF`, a type or team the answer lacks (a shift naming no type, a day off
+ * naming one or a team) — one id twice, or a member's list that
+ * `checkPersonalAssignments` refuses (two on one date: 0077's live key). A
+ * valid one of a member the members read does not name is checked and left
+ * out, as a loan is. Only the six columns are carried off a row.
+ */
+function personalAssignmentsOf(
+  answered: unknown,
+  teamIds: ReadonlySet<string>,
+  typeIds: ReadonlySet<string>,
+  memberIds: ReadonlySet<string>,
+): ReadonlyMap<string, readonly PersonalAssignment[]> | null {
+  if (!isRecord(answered) || answered['error'] !== null) return null;
+
+  const rows = answered['data'];
+
+  if (!Array.isArray(rows)) return null;
+
+  const ids = new Set<string>();
+  const byMember = new Map<string, PersonalAssignment[]>();
+
+  for (const row of rows as readonly unknown[]) {
+    if (!isRecord(row)) return null;
+
+    const id = textAt(row, 'id');
+    const memberId = textAt(row, 'member_id');
+    const date = textAt(row, 'date');
+    const kind = row['kind'];
+    const shiftTypeId = row['shift_type_id'] === null ? null : textAt(row, 'shift_type_id');
+    const teamId = row['team_id'] === null ? null : textAt(row, 'team_id');
+
+    if (id === null || memberId === null || date === null || !isIsoDate(date) || ids.has(id)) return null;
+    if (kind !== PERSONAL_ASSIGNMENT_SHIFT && kind !== PERSONAL_ASSIGNMENT_OFF) return null;
+    if (row['shift_type_id'] !== null && (shiftTypeId === null || !typeIds.has(shiftTypeId))) return null;
+    if (row['team_id'] !== null && (teamId === null || !teamIds.has(teamId))) return null;
+
+    ids.add(id);
+
+    const assignments = byMember.get(memberId) ?? [];
+
+    assignments.push({ id, date, kind, shiftTypeId, teamId });
+    byMember.set(memberId, assignments);
+  }
+
+  const known = new Map<string, PersonalAssignment[]>();
+
+  for (const [memberId, assignments] of byMember) {
+    try {
+      checkPersonalAssignments(assignments);
+    } catch {
+      return null;
+    }
+
+    if (memberIds.has(memberId)) known.set(memberId, assignments.sort(compareAssignments));
+  }
+
+  return known;
+}
+
+/** By date, then id. */
+function compareAssignments(left: PersonalAssignment, right: PersonalAssignment): number {
+  if (left.date !== right.date) return left.date < right.date ? -1 : 1;
+  if (left.id !== right.id) return left.id < right.id ? -1 : 1;
+
+  return 0;
 }
 
 /** By first date, then id: a total order, so equal loans never compare as unequal. */
@@ -1120,6 +1224,7 @@ function viewerOf(
   memberships: ReadonlyMap<string, readonly MembershipVersion[]>,
   statuses: ReadonlyMap<string, readonly StatusVersion[]>,
   loans: ReadonlyMap<string, readonly Loan[]>,
+  personalAssignments: ReadonlyMap<string, readonly PersonalAssignment[]>,
 ): CalendarViewer | null {
   if (!isRecord(row) || textAt(row, 'organization_id') !== organizationId) return null;
 
@@ -1147,6 +1252,7 @@ function viewerOf(
     memberships: memberships.get(memberId) ?? [],
     statuses: statuses.get(memberId) ?? [],
     loans: loans.get(memberId) ?? [],
+    personalAssignments: personalAssignments.get(memberId) ?? [],
   };
 }
 

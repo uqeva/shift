@@ -48,8 +48,8 @@ export interface ShiftReminder {
   readonly memberId: string;
   readonly date: string;
   /**
-   * `null` for a Personal Shift counted with no team (story 21.1, R14.3). The
-   * item's `ASSIGNMENT` form (AD-18 as amended) is story 21.2's.
+   * `null` for a Personal Shift counted with no team (story 21.1, R14.3),
+   * which only the `ASSIGNMENT` form carries.
    */
   readonly teamId: string | null;
   readonly shiftTypeId: string;
@@ -57,7 +57,19 @@ export interface ShiftReminder {
   readonly start: number;
   readonly end: number;
   readonly startsAt: string;
+  /**
+   * Story 21.2 (AD-18 as amended): `ASSIGNMENT` for the shift of a Personal
+   * Assignment, which `enqueue_shift_reminders` writes only while that row is
+   * live and keys by its id. ABSENT for a team shift, the item's original
+   * eight keys (R14.7). 21.9 adds `PERSONAL_ROTATION`.
+   */
+  readonly source?: typeof SHIFT_REMINDER_SOURCE_ASSIGNMENT;
+  /** The assignment's id, with `source` only. */
+  readonly personalAssignmentId?: string;
 }
+
+/** The reminder item's form for a Personal Assignment's shift (AD-18 as amended, story 21.2). */
+export const SHIFT_REMINDER_SOURCE_ASSIGNMENT = 'ASSIGNMENT';
 
 /**
  * The (shift, lead) pairs of `inputs.memberId` due in
@@ -100,6 +112,9 @@ export function shiftRemindersDueOf(
         start: shift.startMinute,
         end: shift.endMinute,
         startsAt: utcIsoOf(startsAt),
+        ...(shift.personalAssignmentId === undefined
+          ? {}
+          : { source: SHIFT_REMINDER_SOURCE_ASSIGNMENT, personalAssignmentId: shift.personalAssignmentId }),
       });
     }
   }

@@ -212,6 +212,8 @@ export const HISTORY_FIELDS = [
   'rosterOverride',
   'returnRosterOverride',
   'reason',
+  // Story 21.2 (0077): a personal assignment's note, shown to admins only.
+  'note',
   'answer',
   'outcome',
   'leaveYear',
@@ -423,6 +425,7 @@ const FIELD_OF_COLUMN: Readonly<Record<string, readonly [HistoryField, FieldType
   draws_allowance: ['drawsAllowance', 'boolean'],
   kind: ['kind', 'enum'],
   reason: ['reason', 'text'],
+  note: ['note', 'text'],
   answer: ['answer', 'enum'],
   outcome: ['outcome', 'enum'],
   leave_year: ['leaveYear', 'number'],

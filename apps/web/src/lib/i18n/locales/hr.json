@@ -479,6 +479,7 @@
       "rosterOverride": "Zamjena osobe",
       "returnRosterOverride": "Zamjena osobe za povrat",
       "reason": "Razlog",
+      "note": "Napomena",
       "answer": "Odgovor",
       "outcome": "Ishod",
       "leaveYear": "Godina godišnjeg",
@@ -2296,6 +2297,10 @@
       "subject": "Posudba u timu {teamName} je uklonjena",
       "body": "{organizationName}: posudba u timu {teamName} od {startDate} do {endDate} je uklonjena. Pogledaj kalendar: {link}"
     },
+    "scheduleAssigned": {
+      "subject": "Raspored ti je izmijenjen od {from} do {to}",
+      "body": "{organizationName}: raspored ti je izmijenjen od {from} do {to} (izmijenjenih dana: {days}). Pogledaj kalendar: {link}"
+    },
     "footer": "Obavijesti e-poštom možeš isključiti u aplikaciji, pod Obavijesti: {link}"
   },
   "popunjenost": {
@@ -2664,6 +2669,14 @@
       "eveningBefore": {
         "subject": "Sutra radiš: {shiftTypeName} {start}–{end}, {teamName}",
         "body": "{organizationName}: sutra, {date}, radiš: {shiftTypeName} {start}–{end}, {teamName}. Pogledaj dan u kalendaru: {link}"
+      },
+      "hoursNoTeam": {
+        "subject": "Za {leadHours} h radiš: {shiftTypeName} {start}–{end}",
+        "body": "{organizationName}: za {leadHours} h, {date}, radiš: {shiftTypeName} {start}–{end}. Pogledaj dan u kalendaru: {link}"
+      },
+      "eveningBeforeNoTeam": {
+        "subject": "Sutra radiš: {shiftTypeName} {start}–{end}",
+        "body": "{organizationName}: sutra, {date}, radiš: {shiftTypeName} {start}–{end}. Pogledaj dan u kalendaru: {link}"
       },
       "footer": "Podsjetnike e-poštom možeš isključiti u aplikaciji, pod Obavijesti → Podsjetnici: {link}"
     }
