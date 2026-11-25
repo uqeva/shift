@@ -110,7 +110,7 @@ Same shift records, same nominal durations, different split. **The pilot exercis
 ## 4. Leave accounting
 
 - **R4.1** A Leave Record is a date range for one Member, entered by an Admin. Recording it modifies no Rotation Pattern, no Rotation Assignment, and no Scheduled Shift.
-- **R4.2** **Cost** = the count of dates in the range on which the Member had a **working** Scheduled Shift. Non-working dates inside the range cost nothing. *This rule is inferred, not confirmed by the pilot organization — see SPEC open questions.*
+- **R4.2** **Cost** = the count of dates in the range on which the Member had a **working** Scheduled Shift. *(Amended 2026-11-25, R14.5, R15.3: a working Personal Shift, from a Personal Assignment or a personal rotation, is such a shift; a date a Holiday leaves without one costs nothing, R13.4.)* Non-working dates inside the range cost nothing. *This rule is inferred, not confirmed by the pilot organization — see SPEC open questions.*
 - **R4.3** Cost is shown before saving, and is recomputed if an Override later changes whether a date in the range is working.
 - **R4.4** A range overlapping an existing Leave Record for the same Member is refused, so no date is charged twice.
 - **R4.5** `Leave Balance = Leave Allowance − Leave Days consumed in the Leave Year`. The three figures are internally consistent at every observable moment.
@@ -201,8 +201,8 @@ Leave Requests (CAP-19) and Swap Requests (CAP-22) are stored assertions by a Me
 
 ## 10. Staffing (added 2026-10-10, sprint-change-proposal-2026-10-10-v1-scope-expansion)
 
-- **R10.1** The people at work on a working Scheduled Shift are its Shift Roster after Roster Overrides, minus every Member covered on that date by a Leave Record of any Absence Type. A Member on a Half-day Record counts as at work. A replacement placed by an Override counts.
-- **R10.2** A Scheduled Shift is short-staffed when it is working **and** its people at work number fewer than the Organization's Minimum Members. Non-working shifts are never short-staffed. When Minimum Members is empty, nothing is short-staffed.
+- **R10.1** *(Amended 2026-11-25: a Team's shifts and their people at work include Personal Shifts counted with it, R14.6.)* The people at work on a working Scheduled Shift are its Shift Roster after Roster Overrides, minus every Member covered on that date by a Leave Record of any Absence Type. A Member on a Half-day Record counts as at work. A replacement placed by an Override counts.
+- **R10.2** A Scheduled Shift is short-staffed when it is working **and** its people at work number fewer than the Organization's Minimum Members. *(Amended 2026-11-25, sprint-change-proposal-2026-11-25-pilot-readiness, story 21.20: the minimum of a Team's shift is that Team's own Minimum Members when set, else the Organization's. A Team's minimum overrides the Organization's for that Team only; with neither set, nothing of that Team is short-staffed.)* Non-working shifts are never short-staffed. When Minimum Members is empty, nothing is short-staffed.
 - **R10.3** Short-staffed is derived on read (AD-1), never stored, and never resolved: it ends only when the roster, the absence or the setting changes.
 - **R10.4** Short-staffed never blocks a save. Every write that can change it reports the shifts it would newly make short-staffed before saving, as `{ code: 'SHORT_STAFFED', date, team, atWork, minimum }` (AD-8). Minimum Members is current-state (AD-2), so changing it changes the report for past dates too.
 - **R10.5** Worked example. A team of four on a working shift, Minimum Members 3. One Member on leave: 3 at work, not short-staffed. Two Members on leave: 2 at work, short-staffed. One of those two replaced by an Override: 3 at work, not short-staffed. The same team with Minimum Members empty: never short-staffed.
@@ -222,3 +222,76 @@ Leave Requests (CAP-19) and Swap Requests (CAP-22) are stored assertions by a Me
 - **R12.2** A Half-day Record keeps the date's one working shift with the worked half's interval, split at the nominal midpoint as hours split it (R4.12): absent the first half, the second is worked, and the reverse. The second half of a midnight-crossing shift may start after midnight; it still belongs to the start date. On a date holding more than one working shift the half splits none, as in hours. A worked half of no minutes leaves no at-work shift.
 - **R12.3** The calendar feed, the reminders and the browser's month download read R12 only, through the domain's one function (`atWorkShiftsOf`, AD-7), never a rule of their own.
 - **R12.4** Worked example on the pilot fixture. A Member of Team A, which works Dan 07:00–19:00 on the 31st, holds a Half-day Record of the first half that date: their at-work shift is Dan from 13:00 to 19:00. A Member of Team B, which works Noć 19:00–07:00 that date, holds one of the second half: theirs is Noć from 19:00 to 01:00 the next day. A Member lent to Team C works C's shift, not A's. A full-day Leave Record leaves the date with none.
+
+## 13. Holidays (added 2026-11-25, sprint-change-proposal-2026-11-25-pilot-readiness; implemented by story 21.15)
+
+- **R13.1** A Holiday is a civil date of the Organization with a name. At most one per date. It is Organization data entered by an Admin; the engine never decides on its own that a date is a holiday (DI-8). A proposed national list (R13.6) is only a suggestion an Admin accepts.
+- **R13.2** A Team is either *off on holidays* or not (a current-state Team setting, off by default). On a Holiday, a Team off on holidays works no shift: its Scheduled Shift that date has no Shift Type, and the projected type is kept beside it as R2.7 keeps an overridden one. A Team not off on holidays works its projection as on any other date. The same holds for a personal rotation's projected shift counted with a Team off on holidays (R15.4). A Personal Assignment on a Holiday is never removed: it is the Admin's explicit plan (R14.4).
+- **R13.3** Layering: `scheduledShift(team, date) = shiftTypeOverride(team, date) ?? (holiday(date) ∧ offOnHolidays(team) ? none : projectedShiftType(team, date))`. A Shift Type Override still wins on a Holiday, so an Admin can make a day Team work it. The holiday changes no Rotation Pattern, no Rotation Assignment and no phase: the rotation continues the next date as if the date had been worked.
+- **R13.4** Everything that reads the Scheduled Shift follows: Shift Rosters, Roster Overrides (which apply only on a working shift, R2.4), hours, at-work shifts (R12), Conflicts, staffing and Leave cost (R4.2: a date with no working shift costs nothing).
+- **R13.5** With no Holiday in an Organization, or no Team off on holidays, every derivation is byte-identical to what it was before Holidays existed.
+- **R13.6** The proposed list for Croatia and a year is the fixed list in force (1 January, 6 January, 1 May, 30 May, 22 June, 5 August, 15 August, 1 November, 18 November, 25 December, 26 December) plus Easter Sunday, Easter Monday and Corpus Christi (Easter + 60 days), Easter by the Gregorian computus. The engine returns codes and dates (AD-8); names are the locale's.
+- **R13.7** *Holiday hours* (story 21.19) are the minutes of a working shift's nominal interval that fall within a Holiday's civil date, from 00:00 to 24:00, intersected as Band Hours are (DI-5, DI-6). They are a view over Total Hours, not a partition of them: they are counted inside Total Hours and Band Hours as before.
+- **R13.8** Worked example on the pilot fixture's shape. Day Team D, off on holidays, would work 06:00–14:00 on a Wednesday Holiday; it works nothing, its roster is empty, and a Leave Record of a D member over that week costs four days, not five. A 24-hour Team on Dan 07:00–19:00 that date works it, and with R13.7 all 12 hours are holiday hours; the Team on Noć 19:00–07:00 the evening before has 7 holiday hours.
+
+## 14. Personal assignments (added 2026-11-25, sprint-change-proposal-2026-11-25-pilot-readiness; implemented by story 21.1)
+
+- **R14.1** A Personal Assignment gives one Member, on one date, one of three things: a working Shift Type, a non-working Shift Type, or a plain day off. A working one may name the Team it counts with. A Member has at most one live Personal Assignment per date. It is an Exception: attributable (DI-11), never versioned, removed rather than edited. Replacing one is a removal and an insert in the same save. An Admin enters it in the manual schedule grid or, for one date, from the Member's page. Members with no Team and Members whose Team has no Rotation are scheduled this way alone.
+- **R14.2** **Precedence.** On a date with a Personal Assignment, the Member is on no base Shift Roster (R11.2): neither their own Team's rotation roster nor a loan Team's. The assignment is their day. Roster Overrides still apply on top. One that puts them on a Team's shift still applies (a double booking, which warns). One that takes them off a base roster they are no longer on does not apply, as R11.6 already reads.
+- **R14.3** A working assignment is a **Personal Shift** of its Shift Type, with that type's times in effect on the date. A Member inactive on the date has no Personal Shift, as they are on no roster (R7). An assignment kept on such a date derives nothing, and the grid shows it as inactive. A working Shift Type with no version of its times in effect yields no shift (R12.1). The shift counts with the Team the assignment names; if it names none, with the Member's effective Team that date (R11.1); otherwise with no Team. A non-working assignment and a day off are no shift: the Member is off that date.
+- **R14.4** **Composition.** A Team's Scheduled Shift (projection, then holidays R13, then Shift Type Overrides) is unchanged by Personal Assignments. It decides only the base roster of Members who have no assignment that date. So, for its Member and date alone, a Personal Assignment beats the Rotation, a Holiday, a Shift Type Override of their Team and a Loan. Rotation Patterns, Rotation Assignments and Team membership are byte-identical before and after (R2.1).
+- **R14.5** Everything that reads a Member's shifts includes their Personal Shifts:
+  - at-work shifts (R12);
+  - hours (R3), with the source `PERSONAL` in the hours explanation;
+  - Leave cost (R4.2, as amended: a date on which the Member has a working Personal Shift costs a day);
+  - Conflicts (R6.1: a Leave Record over a working Personal Shift collides, keyed by the Member, the date and the counted Team, which may be none);
+  - swaps (R9: a Personal Shift can be given or taken);
+  - double booking and rest gap (R5), which warn and never block.
+- **R14.6** **Staffing** (amends R10.1). The shifts of Team T on date d are T's working Scheduled Shift, if there is one, and one group for each other working Shift Type among the Personal Shifts counted with T that date.
+  - The people at work on T's Scheduled Shift are its roster after Roster Overrides, plus the Personal Shifts counted with T of the same Shift Type, minus everyone absent.
+  - The people at work in a group are its Personal Shifts minus everyone absent.
+  - Each is short-staffed under R10.2.
+- **R14.7** With no Personal Assignment in an Organization, every schedule, roster, hour, Conflict, staffing and feed figure is byte-identical to what it was before Personal Assignments existed.
+- **R14.8** Worked example. Day Team D has no Rotation. Its two Members and a Member with no Team (a student) are planned in the grid:
+  - D1 has 06:00–14:00 on Monday to Friday of week one and 14:00–22:00 in week two;
+  - the student has 06:00–14:00 on Saturday, counted with no Team;
+  - D2 has a day off on Wednesday.
+
+  Their months, hours, feeds and reminders carry exactly those shifts. D's Monday staffing is one group, 06:00–14:00, with D1 and D2 at work. A 24-hour Team's Member with a Personal Assignment of the day off on their Dan date leaves that Team's roster for that date only. The Team's Scheduled Shift is unchanged, and its staffing drops by one. A Leave Record over the student's Saturday costs one day and raises one Conflict with no Team.
+
+## 15. A Member's schedule source (added 2026-11-25, sprint-change-proposal-2026-11-25-pilot-readiness; implemented by story 21.9)
+
+- **R15.1** Each Member has, on each date, exactly one **schedule source**:
+  - *team rotation*, the default and what every Member has today: the Member is on their effective Team's base roster (R11.2);
+  - *personal rotation*: a Rotation Pattern and an offset step, attached to the Member and projected from its effective date exactly as a Team's rotation is (R1);
+  - *manual only*: no rotation at all.
+- **R15.2** The schedule source is **versioned** (AD-2): each version has an effective date and is selected by the date being derived. A version is never edited in place. A Member with no version has team rotation on every date, so every existing Member derives exactly as before.
+- **R15.3** **Precedence** for Member m on date d, highest first:
+  1. m's Personal Assignment on d (R14.2);
+  2. m's schedule source on d:
+     - team rotation: m is on the effective Team's base roster, whose Scheduled Shift is the projection, then holidays (R13), then Shift Type Overrides;
+     - personal rotation: m's own projected Shift Type, a working one being a **Personal Shift** that counts with m's effective Team (R14.3, R14.6);
+     - manual only: nothing;
+  3. Roster Overrides on top (R14.2).
+
+  A Member on a personal rotation or manual only is on no Team's base roster. They stay in their Team for grouping, the directory, Loans and staffing groups.
+- **R15.4** A Team's Shift Type Override does not change a personal rotation's shift. A Holiday removes a personal rotation's projected shift when it counts with a Team off on holidays (R13.2), as it removes that Team's own. A Personal Assignment wins over both.
+- **R15.5** A Rotation Pattern may be used by Teams and by Members alike. Editing a pattern follows R1 and AD-2 for every user of it.
+- **R15.6** With no schedule-source version in an Organization, every derivation is byte-identical to what it was before.
+- **R15.7** Worked example. Day worker W is in Team D, which has no Rotation. From the 2nd, W has a personal rotation on the pattern [1. smjena ×5, Slobodno ×2, 2. smjena ×5, Slobodno ×2] at step 1. W works mornings in weeks one and three and afternoons in weeks two and four, all counted with D. A Personal Assignment of a day off on the 10th makes that date free, and the 11th follows the pattern again. A 24-hour Team's Member set to manual only leaves that Team's base roster from their effective date, and has only what is assigned to them.
+
+## 16. Job roles and floaters (added 2026-11-25, sprint-change-proposal-2026-11-25-pilot-readiness; implemented by stories 21.12, 21.13 and 21.14)
+
+- **R16.0** A **Job Role** is Organization data, a name such as a cleaner, a dispatcher or a seasonal worker. A Member has at most one, as a current-state setting. Like Fire Rank (FR-18a) it is descriptive. It changes no derivation, and is shown and filtered on. How a Member's work alternates is their schedule source (R15), chosen per person, never by their role.
+
+- **R16.1** A Member is a **floater** or not. This is a current-state Member setting, off by default, and it holds the Job Roles the floater may cover. It changes no derivation: it only decides who is suggested. A floater is **eligible** for an absent Member when the absent Member has no Job Role, or when the floater lists the absent Member's role. So a role no floater lists, cleaners for example, gets no suggestion.
+- **R16.2** For an unresolved Conflict on date d (R6.1), the suggested floaters are the floaters eligible for the absent Member (R16.1), other than that Member, who on d:
+  - are active;
+  - have no at-work shift (R12, Personal Shifts included);
+  - have no Leave Record of any Absence Type;
+  - have no shift on d−1 or d+1 whose interval leaves a Rest Gap of zero with the uncovered shift (R5).
+
+  They are ordered by fewest at-work shifts in the month so far, then by name. The domain returns ids and counts (AD-8).
+- **R16.3** Picking a floater resolves the Conflict as Replace Member through a Personal Assignment. The floater gets the uncovered shift's Shift Type on d, counted with the Conflict's Team. The resolution references that assignment, and it matches only while the assignment is live (as a Roster Override's does, AD-4).
+- **R16.4** Covering a whole Leave Record is the same resolution, made once for each of its unresolved Conflicts, in one save. A date on which the chosen floater is not free is listed and left unresolved, never forced.
+- **R16.5** **Seasonal Members** are ordinary Members whose active status (R7, versioned) covers only their season. They are scheduled within it through the grid or a personal rotation (R15). Outside it they are on no roster, have no Personal Shift and are never suggested. Story 21.11 lets an Admin set a season's start and end in one step: today a Member's status allows only one scheduled change at a time.

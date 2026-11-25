@@ -23,6 +23,8 @@ Epics 16–19 were added on 2026-11-20 by `sprint-change-proposal-2026-11-20-v2-
 
 Epic 20 was added on 2026-11-20 by `sprint-change-proposal-2026-11-20-self-hosting.md`: Shift is hosted on our own server through Coolify, with no Supabase cloud and no Cloudflare Pages. It changes no product behaviour. Its later stories wait for the founder decisions H-1 to H-15 and the inputs that proposal lists.
 
+Epic 21 was added on 2026-11-25 by `sprint-change-proposal-2026-11-25-pilot-readiness.md`, on the founder's approval of the first production pilot's scope and the founder's additions the same day. It covers personal scheduling (a manual grid, a pattern fill, personal rotations, seasons), job roles and floater cover, organization holidays, a minimum per team, a public product page and a label rename. Its requirements are CAP-29 to CAP-32, CAP-21 as amended, Q31 and UX-DR71 to UX-DR80 below, from PRD FR-102 to FR-116 and NFR-35, and engine rules R13 to R16. Production (20.9) stays after it.
+
 **Requirements basis:** the SPEC package is canonical. `prd.md` is a fully-absorbed source and is deliberately not an input — it retains a retired rotation table, a pre-narrowing FR-16, and pre-architecture conflict framing. The PRD **addendum** is an adopted companion and is an input, for the pilot seed configuration and the epic seed.
 
 ## Requirements Inventory
@@ -51,7 +53,7 @@ Capabilities from `SPEC.md`. Each is an independently reviewable slice; `engine-
 - **CAP-18** — An installable app that reads offline (added 2026-10-10, `sprint-change-proposal-2026-10-10-v1-scope-expansion.md`). Installs on Android and iOS. Offline, every surface already read shows its last snapshot with "as of {date time}" and refuses every write with a stated reason; a cached figure never sits beside a fresh one; signing out removes every cached snapshot from the device.
 - **CAP-19** — Leave requests (added 2026-10-10). A member requests a range and sees its cost before sending; a pending request creates no conflict, charges no balance and alters no shift; the admin sees, before deciding, its cost, the balance after it, its conflicts and any short-staffed shift; approval creates a Leave Record attributed to the approving admin, rejection creates nothing; a member withdraws a pending request; each decision is attributable.
 - **CAP-20** — Notifications (added 2026-10-10). Email reaches a member with an email address, push a member who installed the app and allowed it, and a member with neither is told so in their settings. A notification names facts and links to the surface; each member can turn each channel off; nothing about another member's leave or absence type reaches a member-role account.
-- **CAP-21** — Minimum members per shift (added 2026-10-10). A working shift whose people at work (roster after overrides, minus everyone absent that date, plus replacements) number fewer than the organization's setting is short-staffed. It is shown before every save that would cause it, marked on the calendar day and counted on admin Danas; nothing is blocked; with the setting empty nothing is reported.
+- **CAP-21** — Minimum members per shift (added 2026-10-10; amended 2026-11-25, PRD FR-115: a team may set its own minimum, which overrides the organization's for that team). A working shift whose people at work (roster after overrides, minus everyone absent that date, plus replacements) number fewer than the organization's setting is short-staffed. It is shown before every save that would cause it, marked on the calendar day and counted on admin Danas; nothing is blocked; with the setting empty nothing is reported.
 - **CAP-22** — Shift swaps (added 2026-10-10). A member proposes their shift and, optionally, a colleague's shift in return; the colleague accepts; an admin approves. Until approval the schedule is unchanged; approval writes Roster Overrides attributed to the admin; the admin first sees each member's hour delta, any leave or double booking and any short-staffed result, which warn and never block; either member can withdraw before the decision.
 - **CAP-23** — Absence types, carry-over and part-day absence (added 2026-10-10). An Absence Type is organization data with a name and whether it draws down the allowance; every type raises a conflict against a rostered working shift and only drawing types change the balance; carried-over days are derived from the previous leave year's unused balance, capped by the organization's setting, and expire on its date; a half-day record costs 0.5; no record carries a reason.
 - **CAP-24** — Change history (added 2026-10-10). Every write to a rule, an exception, a decision, a request, a member or an organization setting (amended 2026-11-16, epic 14 retro A6, founder decision: a member's own notification preference is not recorded) appears with its author, time and before/after values, deletions included; filterable by date range, member, team and kind; the PDF holds exactly the filtered rows; member-role accounts reach none of it. History begins at the migration that introduces it, earlier entries reconstructed from existing attribution columns.
@@ -59,6 +61,10 @@ Capabilities from `SPEC.md`. Each is an independently reviewable slice; `engine-
 - **CAP-26** — Shift reminders (added 2026-11-20; PRD FR-85 to FR-87). Opt-in, at most two lead times from a fixed list, delivered on the member's existing channels, computed by the canonical projection at most 15 minutes before due, sent at most once per shift, lead and channel, never about anyone else.
 - **CAP-27** — Temporary loan to another team (added 2026-11-20; PRD FR-88 to FR-92). On loan dates the member is on the loan team's rosters and off the home team's; overrides still apply; the rotation is untouched; loans never overlap per member, are attributable and removable, and show before saving their double booking, rest gap, short-staffed and override consequences (warn, never block); with no loan every derivation is byte-identical to before.
 - **CAP-28** — Self-service organization signup (added 2026-11-20; PRD FR-93 to FR-101). Email verification precedes any organization; one account founds at most one organization; the new organization is isolated exactly as an operator-provisioned one and the wizard pre-fills nothing; signup, verification and recovery answer identically whether or not an address is known; signup is rate-limited and has a global circuit breaker.
+- **CAP-29** — Personal scheduling (added 2026-11-25, `sprint-change-proposal-2026-11-25-pilot-readiness.md`; PRD FR-102 to FR-107). An admin plans any member per date in a people-by-dates grid (a shift type, a day off or nothing), fills a range from a pattern or copies one, and sets from a date whether a member follows their team's rotation, a personal rotation or is manual only. A per-date assignment beats the member's source, roster overrides apply on top, and every downstream figure treats personal shifts as real shifts. One notice per member per save; with none of it recorded, every derivation is byte-identical. Seasonal members are an active range.
+- **CAP-30** — Job roles and floater cover (added 2026-11-25; PRD FR-108 to FR-110). Job roles are organization data shown and filtered on, and read by no derivation. Floaters list the roles they may cover. An uncovered shift suggests the eligible floaters free that date, and a pick, or a whole leave at once, is Replace Member by assignment.
+- **CAP-31** — Organization holidays (added 2026-11-25; PRD FR-111 to FR-114). Holidays are organization data, entered or imported from the official Croatian list. Teams marked off on holidays work no shift on one, overrides and assignments still win, and holiday hours are reported as their own figure.
+- **CAP-32** — Public product page (added 2026-11-25; PRD FR-116, NFR-35). A static Croatian page at the domain's root, with no third party, cookie or tracker.
 
 ### NonFunctional Requirements
 
@@ -94,6 +100,7 @@ From `quality-requirements.md`.
 - **Q28** No signup, verification, recovery or organization-creation response reveals whether an address, account or organization exists (added 2026-11-20; NFR-29).
 - **Q29** A self-provisioned organization passes the same isolation suite as an operator-provisioned one; an authenticated account with no organization reads and writes nothing (added 2026-11-20; NFR-30).
 - **Q30** Signup is rate-limited per address and per network, and the number of organizations created per day has a configured ceiling (added 2026-11-20; NFR-29).
+- **Q31** The public page loads no third-party resource, sets no cookie, runs no script and weighs under 150 kB in its first view (added 2026-11-25; NFR-35).
 
 **Localization contract** (`localization.md`) applies to every surface: no hard-coded user-facing string (L1, merge-blocking per L2); adding a language changes no component and no business logic (L3); domain returns keys, codes and values only (L4); a missing key degrades visibly and safely (L5); one centralized locale-aware formatting layer (L6); Croatian's three plural forms — an `count === 1` check is a defect (L7); every date and time in the organization timezone (L8). Terminology is settled: `Smjena` = Team, `Tip smjene` = Shift Type, `Sve smjene (N)` carries a count.
 
@@ -222,6 +229,19 @@ From `DESIGN.md` (visual) and `EXPERIENCE.md` (behavioural). Both are binding an
 - **UX-DR69** The *Postavljanje* card on admin *Danas* (story 19.4, AD-24). It is drawn under AD-24's conditions and is the first card, above *Treba tebe*. Its title is `Postavljanje: još {n} koraka` (`1 korak`, `2 koraka`, `5 koraka`), followed by `Postavljeno {5−n} od 5.`. While the rotation is one of the steps left, it adds `Dok rotacija nije spremljena, raspored ne nastaje.`. The steps not done follow, each a link to its step, then *Nastavi: {prvi}* (ink) and *Sakrij* (ghost). *Sakrij* asks one neutral question, *Sakriti postavljanje?*: `Kartica se više neće prikazivati nijednom administratoru.` and where the rest is set (*Postavke rotacije*, *Ljudi*). It has *Odustani* and *Sakrij postavljanje*, neutral and never `destructive`, and writes `onboarding_dismissed`. No other entry point to `/postavljanje` is added. It is never the skeleton, and while its reads are missing it is absent. **As built by 19.4 (2026-11-22):** the card's five reads run only once the organization says founded by signup and not dismissed; the history names a dismissal `Postavljanje sakriveno`. "No other entry point" is read as no entry point added after dismissal: *Kalendar*'s *Nastavi postavljanje* (UX-DR70) shows only while the card itself would be drawn, so a dismissal removes both. *Sakrij*'s question names *Organizacija* too, where the hour bands are set.
 - **UX-DR70** A fresh organization's empty states (story 19.4, FR-97, DI-8). Every destination an admin opens before setup is done says what is true and why, never "no results". *Danas*'s *Pokrivenost danas* with no team reads `Još nema nijedne smjene.`, `Kad postaviš smjene i rotaciju, ovdje piše tko danas radi.`, and keeps `Danas nijedna smjena ne radi.` for teams that exist and do not work. *Kalendar* keeps `Nijedna smjena nije u upotrebi, pa kalendar nema što prikazati.`, adds `Raspored nastaje iz smjena, tipova smjena i rotacije.` and, for an admin while the card would be drawn, *Nastavi postavljanje*. Organization *Sati* with people but no rotation reads `U ovom mjesecu nitko nema nijednu smjenu.`, `Sati se računaju iz rasporeda; raspored još nije postavljen.`. *Ljudi* with only the Founding Admin reads `Za sada si jedina osoba u organizaciji.`. *Postavke rotacije* keeps `Za rotaciju je potrebna barem jedna smjena u upotrebi.`. 19.4's literal sweep covers the `signup` and `onboarding` namespaces and these keys. It matches `Dan`, `Noć` and `Slobodno` as words used as shift names, so the shipped `Dan od 24 sata` and `Dan {day}` are not false hits. **As built by 19.4 (2026-11-22):** every line above but *Sati*'s, which is deferred (deferred-work: *Sati* draws a zero row per active person, so the line needs a new derivation); the hour band, team and shift type lists' empty states; the sweep is `test/resource-hygiene.test.ts`.
 
+**Added 2026-11-25** (`sprint-change-proposal-2026-11-25-pilot-readiness.md`). Each line binds from the story that ships it, and Croatian copy is final in that story's `hr.json` namespace.
+
+- **UX-DR71** Page scroll (story 21.3). *Kalendar* and *Ručni raspored* have no vertical scroll container inside the page: the page scrolls, and the day header row sticks under the shell's chrome. On a phone the day list needs no horizontal overflow. A wide grid scrolls only horizontally, with a sticky first column and a header row kept in step with it.
+- **UX-DR72** *Ručni raspored* (story 21.4). Admin only, under *Raspored*. People in rows grouped by team (no team last), dates in columns, today and weekends marked by glyph and tint. Clicking a cell opens a picker of the shift types, *Slobodno*, *Očisti* and *Računaj u tim…*. Selection by click, shift-click, drag and the arrow keys with Space. A sticky save bar with the change count, *Spremi* and *Odbaci*. A phone edits one member's month at a time.
+- **UX-DR73** Source marks (stories 21.4, 21.6, 21.10). Each grid row names its source: *rotacija tima*, *osobna rotacija* or *ručno*. Rotation-derived cells are muted with a rotation glyph; assigned cells are solid with a pencil mark and `dodijeljeno ručno` in their accessible name. A personal shift in the day detail reads `{smjena} · ručno` or `· osobna rotacija`, with `bez tima` when it counts with none.
+- **UX-DR74** *Popuni uzorkom* and *Kopiraj* (story 21.5). A dialog with step rows (type or *Slobodno* × count), *Počni od koraka* and the range, previewed into the grid's draft. *Kopiraj tjedan* and *Kopiraj mjesec* take a source and a target start, also into the draft.
+- **UX-DR75** *Raspored osobe* (story 21.10). The member page's card: three options, *Rotacija tima*, *Osobna rotacija* (pattern, start step, *Vrijedi od*) and *Samo ručno*, with the scheduled change and *Povuci*. The cycle preview reuses the rotation builder's.
+- **UX-DR76** *Poslovi* (stories 21.12, 21.11). *Organizacija → Poslovi* lists the roles with add, rename and archive. The member page has *Posao*; the grid, the day detail and the directory show it and filter by it. *Sezona od–do* sits in the member's status card.
+- **UX-DR77** Floaters (stories 21.13, 21.14). The member page has *Zamjena* with role checkboxes (*Može mijenjati: …*). The resolution panel in *Za odluku* has *Predložene zamjene*, each with their shifts this month, and `Nema slobodne zamjene za posao {posao}.` when there is none. *Pokrij cijelo odsustvo* previews the dates covered and not free.
+- **UX-DR78** Holidays (stories 21.17, 21.18). *Organizacija → Blagdani*: a year picker, the list, *Dodaj blagdan* and *Uvezi državne blagdane za {godina}* with a preview. The team dialog has *Ne radi na blagdane*. Everywhere a date is read, a holiday shows a glyph plus its name, and an emptied team cell reads *blagdan*.
+- **UX-DR79** A team's minimum (story 21.20). The team dialog has *Najmanje ljudi*, with the hint `Prazno: vrijedi za organizaciju ({n})`.
+- **UX-DR80** The public page (story 21.21). One page in the app's visual language (direction G): hero with *Smjenko*, what it does, who it is for, *Javi se* and *Prijava* (and *Registriraj se* only once production signup opens), and a footer `Bez kolačića i praćenja.`, all in both themes and at phone width first.
+
 ### FR Coverage Map
 
 Capabilities are the functional requirements (see basis note above). Every capability maps to exactly one epic.
@@ -256,6 +276,10 @@ Capabilities are the functional requirements (see basis note above). Every capab
 | CAP-26 Shift reminders | Epic 17 | reminder settings, `remind` job, push and email delivery |
 | CAP-27 Temporary loan to another team | Epic 18 | loan rule in `domain/roster`, `team_loans`, loan dialog, loan marks |
 | CAP-28 Self-service organization signup | Epic 19 | signup door, account, `create_organization`, onboarding wizard, housekeeping |
+| CAP-29 Personal scheduling | Epic 21 | assignment rule, `personal_assignments`, *Ručni raspored*, fill and copy, personal rotation, seasons |
+| CAP-30 Job roles and floater cover | Epic 21 | `job_roles`, floaters by role, cover by assignment |
+| CAP-31 Organization holidays | Epic 21 | holiday rule, `organization_holidays`, team flag, import, marks, holiday hours |
+| CAP-32 Public product page | Epic 21 | `apps/landing`, `shift-landing` |
 
 **Non-functional allocation.** Q1–Q3 and Q6 land in Epic 1 and are re-asserted by every epic that adds a table. Q7–Q10 land in Epic 2 with the domain package and both fixtures, and each later epic extends the suite. Q11–Q12 land in Epic 3 with the first attributable writes. Q13–Q16 and Q21–Q23 are definition-of-done on every epic with a surface. Q17–Q18 are proven in Epic 3, Q19 in Epic 6, Q20 in Epic 1. The localization contract L1–L8 is definition-of-done everywhere. Added 2026-10-10: Q24 lands in Epic 8; Q25 in Epic 10; the amended Q5 in Epic 13 and the amended Q12 in Epic 14; Q2 is re-asserted by Epics 9 and 12, which add the first member-role domain writes (own requests only, never an administrative write). Added 2026-11-20: Q26 and Q27 land in Epic 16 (Q27 re-asserted by Epic 17); Q25 is re-asserted by Epic 17; Q28–Q30 land in Epic 19; Q2 is re-asserted by Epic 18 (loans are admin-only).
 
@@ -425,6 +449,14 @@ Both environments run on our own server through Coolify, with only HTTPS public,
 **Standalone:** no product behaviour changes; every gate of the pipeline stays.
 **Implementation notes:** the source is `sprint-change-proposal-2026-11-20-self-hosting.md`. 20.1–20.3 and 20.4's scripts are code that can be built now. Applying 20.4, and 20.5–20.9, wait for founder decisions H-1 to H-15 and the inputs in proposal §7 (domain and DNS, Resend, a Coolify API token, a Tailscale CI credential, a GHCR read token, a backup target). The pilot's production go-live waits for 20.9.
 
+
+### Epic 21: Plan people like the paper, and the pilot's month is real (added 2026-11-25, sprint change)
+
+An admin plans day workers, cleaners, students and seasonal workers per person in a grid or on their own rotation, while crews keep their team turnus. A gap is covered by an eligible floater in one choice. Holidays stop day work, each team has its own minimum, and a public page presents the product.
+
+**Capabilities covered:** CAP-29, CAP-30, CAP-31, CAP-32, CAP-21 (amended)
+**Standalone:** with no assignment, schedule version, holiday, team minimum or floater recorded, every derivation is byte-identical to before. Each story ships alone in the order given.
+**Implementation notes:** the source is `sprint-change-proposal-2026-11-25-pilot-readiness.md`; the spine's AD-26 to AD-28 and the amendments of AD-2, AD-4, AD-5, AD-11, AD-18, AD-19 and AD-20 are applied with it, as are engine rules R13 to R16. Founder decisions E-1 to E-7 have recommended defaults; only 21.22 waits on one. Production (20.9) stays after this epic.
 
 ---
 
@@ -3555,3 +3587,466 @@ So that the pilot can start.
 **Given** `DEPLOY.md`
 **When** this story ships
 **Then** it contains no instruction for Supabase cloud or Cloudflare, and `DEPLOY_ENABLED` is `true`
+
+---
+
+## Epic 21: Plan people like the paper, and the pilot's month is real
+
+The admin of a fire department with mixed teams opens *Ručni raspored*. The four 24-hour crews show their turnus as always. The dispatchers alternate mornings and afternoons on their own rotations. The cleaners work mornings. The students are filled in by hand, or with *Popuni uzorkom*. When a dispatcher is on leave, *Za odluku* offers the students who may cover dispatch and are free that day. The 18 November holiday empties the day teams and not the crews. Nobody needs a team that exists only to carry a shift.
+
+Added 2026-11-25 by `sprint-change-proposal-2026-11-25-pilot-readiness.md`, on the founder's approval of the first production pilot's scope. That approval covers two organizations, a fire department on 24-hour duty and a department that mixes 24-hour crews with day workers, floater students and leave, and it was widened the same day by the founder's additions recorded in the proposal (§1). The source is modelling a real month on staging with the operator script `supabase/operator/demo-mladost.sql` (DEPLOY §7.6), whose workarounds this epic retires. **Production (20.9) stays after this epic.**
+
+**Capabilities:** CAP-29, CAP-30, CAP-31, CAP-32, CAP-21 (amended) · **Governed by:** AD-2, AD-4, AD-5, AD-7, AD-11, AD-13, AD-18, AD-19, AD-20, and AD-26 to AD-28 (added 2026-11-25) · **Engine rules:** R14, R15, R16, R13, R10.2 (amended) · **Proves:** Q2, Q9, Q11, Q12, Q21, Q22, Q25, Q27, Q31 · **UX:** UX-DR71–UX-DR80 · **Decisions:** E-1 to E-7 (proposal §6; each story names its own, recommended defaults stand for planning)
+
+**Planning status (2026-11-25):** every story is `ready-for-dev` in `sprint-status.yaml`. Each story's spec is written by `bmad-create-story` when it starts. 21.22 waits on the founder's choice of word (E-6). 21.21 waits for the founder's contact address only to publish (E-4), not to build. The order below is the build order. 21.3, 21.12, 21.20, 21.21 and 21.22 touch no other story's files and may run in parallel worktrees.
+
+**Rules for every story:**
+- Migrations are forward-only, numbered from the next free number at build time.
+- Every new organization table has RLS, `organization_id` first and both audit triggers (AD-11).
+- `packages/domain` holds every rule (AD-7) and returns codes (AD-8).
+- A new input to the projection reaches the browser's read, `member_schedule_inputs` and both parity fixtures in the same story (AD-19).
+- With the new data absent, every derivation is byte-identical over both fixtures.
+- Copy lives in `hr.json`, and nothing pilot-specific is seeded or pre-filled (DI-8).
+- The DESIGN.md, EXPERIENCE.md and UX-DR lines a story changes are updated in the same change.
+
+### Story 21.1: The personal-assignment rule in the domain
+
+As the product,
+I want a member's day decided by one rule when an admin assigns it by hand,
+So that every figure follows a personal plan without a second implementation.
+
+**Depends on:** none. **Blocked on:** nothing.
+
+**Acceptance Criteria:**
+
+**Given** `domain/personal` and the inputs of the schedule, staffing, collisions, hours and R12
+**When** a member has a Personal Assignment on a date
+**Then** they are on no base roster that date, a working assignment is a Personal Shift of its type counted with its team or their effective team or none, and a day off or a non-working type is no shift (R14.1–R14.3)
+**And** roster overrides still apply on top (R14.2), and team Scheduled Shifts are unchanged (R14.4)
+
+**Given** the readers of a member's shifts
+**When** a Personal Shift exists
+**Then** at-work shifts, hours (source `PERSONAL`), leave cost, collisions (team possibly none), double booking and rest gap include it, and staffing builds R14.6's groups
+
+**Given** no Personal Assignment anywhere
+**When** every derivation runs over both fixtures
+**Then** the output is byte-identical to before (R14.7), and R14.8's worked example passes as a test
+
+### Story 21.2: A personal assignment is a recorded exception
+
+As an admin,
+I want each personal assignment stored, attributed and saved in one batch,
+So that a month's plan is one write, readable by everyone and told to each person once.
+
+**Depends on:** 21.1. Applies AD-26's `personal_assignments` and the AD-2 row. **Blocked on:** nothing (E-2's default applies).
+
+**Acceptance Criteria:**
+
+**Given** `personal_assignments`
+**When** it is migrated
+**Then** it has RLS, the audit triggers and one live row per member and date, and only `save_personal_assignments(p_changes)` writes it
+**And** that function re-reads the caller as an active admin, takes the organization lock and refuses an invalid batch whole (22023 `PERSONAL_ASSIGNMENTS_INVALID`)
+
+**Given** a member-role account
+**When** it calls the save or writes the table directly
+**Then** it is refused (Q2), and it reads live assignments through `calendar_personal_assignments()` with no note and no author
+
+**Given** a save that changes 40 cells of 6 members
+**When** it commits
+**Then** exactly 6 `SCHEDULE_ASSIGNED` outbox rows exist, one per affected member, `{ from, to, days }`, under `notify_members`' rule, and none for a member whose changes are all in the past (Q25)
+
+**Given** the browser's calendar snapshot and `member_schedule_inputs`
+**When** assignments exist
+**Then** both carry them, read parity and runtime parity hold with an assignment in both fixtures, the feed's UID and summary follow AD-20 as amended, and `remind` writes an `ASSIGNMENT` reminder under AD-18 as amended
+
+### Story 21.3: The calendar scrolls with the page (*Kalendar bez unutarnjeg scrolla*)
+
+As anyone reading the month,
+I want the calendar to scroll with the page, with its headers sticking,
+So that there is one scroll, not a box inside the page.
+
+**Depends on:** none. Precedes 21.4, which uses the same layout. **Blocked on:** nothing.
+
+**Acceptance Criteria:**
+
+**Given** *Kalendar* in both modes, at desktop and phone widths
+**When** the month is longer than the viewport
+**Then** the page scrolls vertically, there is no vertical scroll container inside it, and the day header row sticks under the shell's chrome (UX-DR71)
+
+**Given** a month wider than the viewport
+**When** it renders
+**Then** the phone uses the day list with no horizontal overflow. Where the wide grid must overflow, only its horizontal axis scrolls, its first column sticks, and the header row is a separate sticky element kept in step with the horizontal scroll, because a scroll container would otherwise capture the sticky top
+
+**Given** keyboard navigation (UX-DR33), print (16.1) and the glass budget (NFR-22, `pnpm test:perf`)
+**When** this ships
+**Then** each still holds, and the e2e month snapshots are unchanged apart from layout
+
+### Story 21.4: An admin plans the month in *Ručni raspored*
+
+As an admin,
+I want a grid of people by dates where I click a cell to set a shift, a day off or nothing,
+So that I plan day workers and students the way the paper does.
+
+**Depends on:** 21.2, 21.3. **Blocked on:** nothing.
+
+**Acceptance Criteria:**
+
+**Given** *Ručni raspored* for a month (admin only)
+**When** it renders
+**Then** rows are active members grouped by their team as at the month's first date (no team last), columns are dates, and it scrolls with the page with a sticky header row and a sticky name column (UX-DR72)
+**And** each row names its source (*rotacija tima*, *osobna rotacija*, *ručno*), rotation-derived cells are muted with a glyph, assigned cells are solid with a mark, and manual-only rows show only what is assigned (UX-DR73)
+
+**Given** a cell, or several selected by click, shift-click or keyboard
+**When** the admin picks a shift type, *Slobodno* or *Očisti*, optionally with another team to count with
+**Then** the cells change in the draft, and editing a rotation-derived cell makes it an assignment
+
+**Given** a draft with changes
+**When** the admin presses *Spremi*
+**Then** *Što se mijenja* shows each member's shifts lost and gained, double bookings, rest gaps, newly short-staffed shifts and erased collisions (AD-5, as amended). Only an erasure blocks, then one `save_personal_assignments` call writes everything
+
+**Given** a phone
+**When** the admin opens it
+**Then** one member's month at a time is editable with the same picker (desktop-first is acceptable)
+
+### Story 21.5: *Popuni uzorkom* and *Kopiraj* fill a range
+
+As an admin,
+I want to fill people over a range from a pattern, or copy last week or month,
+So that alternating weeks are entered once and then edited.
+
+**Depends on:** 21.4. **Blocked on:** nothing.
+
+**Acceptance Criteria:**
+
+**Given** selected members and a date range
+**When** the admin enters steps (shift type or *Slobodno*, times a count), for example `1. smjena ×5, Slobodno ×2, 2. smjena ×5, Slobodno ×2`, and a start offset
+**Then** `filledAssignmentsOf` puts the items into the draft (UX-DR74), they are saved like any grid change, nothing is stored as a rule, and every cell stays editable
+
+**Given** a source week or month and a target start
+**When** the admin copies
+**Then** assignments only are copied, a source date with none clears its target, and the result is previewed and saved like any change
+
+### Story 21.6: Personal shifts are read wherever shifts are read
+
+As anyone reading the schedule,
+I want a personal shift to look and count like any shift,
+So that a student's Saturday is not a second-class fact.
+
+**Depends on:** 21.2. **Blocked on:** nothing.
+
+**Acceptance Criteria:**
+
+**Given** the calendar's day detail and team grid, the member's own schedule and Danas
+**When** a personal shift applies
+**Then** it shows with its type, time and counted team (or *bez tima*), marked as assigned (UX-DR73). Members of a team counted on its date show under that team, and the person filter shows it
+
+**Given** the member page
+**When** the admin uses *Dodaj smjenu* for one date
+**Then** the same picker and save as the grid write one assignment (the founder's item 2)
+
+**Given** *Sati*, the hours explanation and the Excel export
+**When** a personal shift is worked
+**Then** it counts in bands and totals with the source *osobni raspored*, the export columns are unchanged, and the change history words assignment events from codes, grouped per member and save (AD-11, as amended)
+
+### Story 21.7: A leave over a personal shift is a conflict, and a replacement is an assignment
+
+As an admin,
+I want leave over a personal shift raised and resolved like any other,
+So that a dispatcher's leave is never silently uncovered.
+
+**Depends on:** 21.6. Applies AD-4's amendment. **Blocked on:** nothing.
+
+**Acceptance Criteria:**
+
+**Given** a leave record over a working personal shift
+**When** *Za odluku* is read
+**Then** the collision appears keyed by member, date and counted team (possibly none). `conflict_resolutions.team_id` is nullable, with a `NULLS NOT DISTINCT` key
+
+**Given** Replace Member on such a collision
+**When** the admin picks a member
+**Then** `resolve_with_personal_assignment` writes the replacement's assignment and the resolution in one transaction. The resolution matches only while that assignment is live and equal, and removing it ends the resolution
+
+**Given** accept-uncovered and amend-leave
+**When** used on such a collision
+**Then** they behave as for a team shift. Existing collisions and resolutions over both fixtures are unchanged
+
+### Story 21.8: Swaps give and take personal shifts
+
+As a member,
+I want to propose a swap of a shift I was assigned by hand,
+So that personal shifts are as swappable as team ones.
+
+**Depends on:** 21.6. **Blocked on:** nothing.
+
+**Acceptance Criteria:**
+
+**Given** a member with a personal shift
+**When** they propose a swap from its day detail
+**Then** the request names it by member and date (team null when none), and 12.2's validity rules apply
+
+**Given** an admin's approval
+**When** it is decided
+**Then** the taker gets an assignment of the shift's type and counted team and the giver an `OFF` assignment, through the one save (one notice each), and 12.4's preview shows the hour deltas, leave, double booking and short-staffed results
+
+### Story 21.9: The schedule-source rule in the domain
+
+As the product,
+I want each member to follow their team's rotation, their own rotation, or nothing,
+So that dispatchers and cleaners need no team of their own.
+
+**Depends on:** 21.1. **Blocked on:** nothing.
+
+**Acceptance Criteria:**
+
+**Given** `domain/personal` with schedule versions
+**When** a member's source on a date is team rotation, personal rotation or manual only
+**Then** R15.3's precedence holds: assignment, then source, then roster overrides. A personal rotation projects like a team's (R1) and its working shifts are Personal Shifts counted with the effective team. A Shift Type Override of the team does not change it (R15.4)
+
+**Given** no schedule version anywhere
+**When** every derivation runs over both fixtures
+**Then** it is byte-identical (R15.6), and R15.7's worked example passes as a test
+
+### Story 21.10: An admin gives a member their own rotation, or makes them manual only
+
+As an admin,
+I want to set from a date how a member is scheduled,
+So that a dispatcher alternates weekly and a cleaner works mornings without a team of their own.
+
+**Depends on:** 21.9, 21.4. Applies AD-26's `member_schedule_versions` and the AD-2 row. **Blocked on:** nothing.
+
+**Acceptance Criteria:**
+
+**Given** the member page's *Raspored osobe* card
+**When** the admin chooses *Rotacija tima*, *Osobna rotacija* (an existing rotation pattern, a start step and *Vrijedi od*) or *Samo ručno*
+**Then** a version is inserted from the organization's today on, a scheduled one can be cancelled, the save shows *Što se mijenja* and AD-5's diff, and the member is notified `SCHEDULE_SOURCE_CHANGED` (UX-DR75)
+
+**Given** the table
+**When** it is migrated
+**Then** the offset is a foreign key to a step of that pattern (AD-3), only an active admin writes, both audit triggers are attached, and the assembly and parity fixtures carry versions (AD-19)
+
+**Given** *Ručni raspored* and the directory
+**When** a member has a source other than team rotation
+**Then** the row's source label and cells follow it
+
+### Story 21.11: A seasonal member's season is set in one step
+
+As an admin,
+I want to make a member active from a season's start to its end at once,
+So that seasonal workers are planned ahead without returning on the day.
+
+**Depends on:** none (the status rules of 0008). **Blocked on:** nothing.
+
+**Acceptance Criteria:**
+
+**Given** the member page's status card or *Nova osoba*
+**When** the admin sets *Sezona od–do*
+**Then** the status versions are written in one request (inactive until the start, when needed; active from the start; inactive from the day after the end), with the insert rule relaxed as AD-26 *Seasons* states, keeping alternation, Q6 and "only the latest is cancellable"
+
+**Given** a season
+**When** derived
+**Then** the member is on no roster and has no personal shift outside it (R14.3, R16.5), and deactivation's consequences apply at its end
+**And** EXPERIENCE.md documents a seasonal member as an ordinary member with a season and a personal rotation or grid plan
+
+### Story 21.12: Job roles are organization data
+
+As an admin,
+I want to name the jobs people do and give each member one,
+So that the grid and calendar say who is a dispatcher, a cleaner or seasonal.
+
+**Depends on:** none. **Blocked on:** nothing.
+
+**Acceptance Criteria:**
+
+**Given** *Organizacija → Poslovi*
+**When** the admin creates, renames or archives a role
+**Then** `job_roles` stores it (RLS, audit, a unique name key, no delete), nothing is seeded (DI-8), and a member's *Posao* is set on the member page (UX-DR76)
+
+**Given** *Ručni raspored*, the calendar's day detail and the directory
+**When** members have roles
+**Then** the role shows beside the name and is a filter chip, and no derivation reads it
+
+### Story 21.13: Floaters are suggested for an uncovered shift, by role
+
+As an admin,
+I want *Za odluku* to offer the floaters who may cover the absent person's job and are free,
+So that a gap is filled in one choice.
+
+**Depends on:** 21.7, 21.12. **Blocked on:** nothing.
+
+**Acceptance Criteria:**
+
+**Given** the member page
+**When** the admin marks a member *Zamjena (floater)* and ticks the roles they may cover
+**Then** `members.is_floater` and `floater_roles` store it (audited, admin-only read)
+
+**Given** an unresolved collision
+**When** its resolution panel opens
+**Then** `domain/floaters` lists the eligible, active floaters free that date (R16.2), fewest shifts this month first, with a line when none is eligible (for example cleaners) (UX-DR77)
+
+**Given** a suggestion picked
+**When** saved
+**Then** it is 21.7's Replace Member by assignment, and the floater gets one notice
+
+### Story 21.14: A floater covers a whole leave in one action
+
+As an admin,
+I want to cover every day of a week's leave with one floater at once,
+So that a week is not seven decisions.
+
+**Depends on:** 21.13. **Blocked on:** nothing.
+
+**Acceptance Criteria:**
+
+**Given** a leave record with unresolved collisions
+**When** the admin chooses *Pokrij cijelo odsustvo* and a floater
+**Then** a preview lists each date as covered or as not free (and why), and one `resolve_with_personal_assignment` call resolves the covered dates and leaves the rest (R16.4)
+**And** the floater is notified once, and AD-5's diff and the short-staffed block run over the range
+
+### Story 21.15: The holiday rule in the domain
+
+As the product,
+I want a holiday to empty the shifts of teams off on holidays, in one rule,
+So that day work stops on holidays and 24-hour crews keep working.
+
+**Depends on:** 21.9. **Blocked on:** nothing.
+
+**Acceptance Criteria:**
+
+**Given** holidays and teams off on holidays in the inputs
+**When** a team's scheduled type is layered
+**Then** it is override, else holiday-off (none), else projection (R13.3). Cells carry `holiday` and `offForHoliday`. A personal rotation counted with an off team is emptied, and a Personal Assignment is never emptied (R13.2, R15.4)
+
+**Given** `nationalHolidaysOf('HR', year)`
+**When** asked for 2026 and 2027
+**Then** it returns the fixed eleven dates plus Easter Sunday, Easter Monday and Corpus Christi (2026-04-05, 2026-04-06, 2026-06-04; 2027-03-28, 2027-03-29, 2027-05-27), as codes (R13.6)
+
+**Given** no holiday or no team off
+**When** every derivation runs over both fixtures
+**Then** it is byte-identical (R13.5), and R13.8's worked example passes
+
+### Story 21.16: Holidays are organization data
+
+As an admin,
+I want holidays and the team flag stored,
+So that the calendar, hours, feed and reminders all read them.
+
+**Depends on:** 21.15. Applies AD-27 and its AD-2 rows. **Blocked on:** nothing.
+
+**Acceptance Criteria:**
+
+**Given** `organization_holidays` and `teams.off_on_holidays`
+**When** migrated
+**Then** they have one holiday per date, RLS (all active members read, an active admin writes, rename by `name` only), audit triggers and the column grant, and the flag defaults to false
+
+**Given** the calendar snapshot and `member_schedule_inputs`
+**When** holidays exist
+**Then** both carry the dates and the flag, parity holds with a holiday and an off team in both fixtures, and the feed and reminders drop holiday-off shifts with no code of their own
+
+### Story 21.17: An admin enters holidays and imports the official list
+
+As an admin,
+I want to enter a year's holidays once, or import them,
+So that I never mark a holiday team by team again.
+
+**Depends on:** 21.16. **Blocked on:** nothing.
+
+**Acceptance Criteria:**
+
+**Given** *Organizacija → Blagdani* for a year
+**When** the admin adds, renames or removes a holiday
+**Then** it saves through the AD-5 guard (as amended), warns for a past date, and lists the shifts each off team loses (UX-DR78)
+
+**Given** *Uvezi državne blagdane za {godina}*
+**When** the admin confirms the previewed list
+**Then** one insert with ignore-duplicates adds the missing dates, keeping existing names
+
+**Given** the team dialog on *Smjene*
+**When** the admin switches *Ne radi na blagdane*
+**Then** the flag saves through the same guard
+
+### Story 21.18: Holidays show on the calendar, the schedule and the grid
+
+As anyone reading the schedule,
+I want a holiday named where I look,
+So that an empty day team reads as a holiday, not a gap.
+
+**Depends on:** 21.16, 21.4. **Blocked on:** nothing.
+
+**Acceptance Criteria:**
+
+**Given** *Kalendar*, the day detail, the member's schedule, Danas, *Ručni raspored* and print
+**When** a date is a holiday
+**Then** it carries a glyph plus the holiday's name (never colour alone), and a team cell the holiday emptied reads *blagdan* with the projected type available in the detail (UX-DR78)
+
+### Story 21.19: Worked holiday hours are their own figure
+
+As an admin,
+I want hours worked on a holiday reported separately,
+So that the hour report can show them as their own category.
+
+**Depends on:** 21.16. **Blocked on:** nothing. **Cuttable:** may move to a follow-up without affecting any other story (proposal §3).
+
+**Acceptance Criteria:**
+
+**Given** a worked shift intersecting a holiday's date
+**When** hours derive
+**Then** `memberHoursOfMonth` reports holiday minutes by R13.7 (DI-5, DI-6), inside Total Hours, never altering Band Hours, and the explanation lists them
+
+**Given** *Sati* and the Excel export
+**When** the period contains a worked holiday
+**Then** a *Sati na blagdan* column appears, and is absent otherwise
+
+### Story 21.20: Each team has its own minimum
+
+As an admin,
+I want to set a minimum per team,
+So that a one-person team is not always flagged short.
+
+**Depends on:** none. Applies AD-27's column and R10.2 as amended. **Blocked on:** nothing.
+
+**Acceptance Criteria:**
+
+**Given** the team dialog
+**When** the admin sets *Najmanje ljudi* (empty means the organization's, shown as the hint)
+**Then** `teams.minimum_members` saves (`>= 1`, audited), and `minimumOf` gives each team's effective minimum (UX-DR79)
+
+**Given** the short-staffed reads (11.2–11.4)
+**When** teams have their own minimums
+**Then** every save block, calendar mark and the Danas card uses each team's minimum. With no team minimum set, the output is byte-identical
+
+### Story 21.21: *Smjenko*, the public page
+
+As a visitor,
+I want to see what the product does and how to get in touch,
+So that a department, a security company or any shift workplace can ask for it.
+
+**Depends on:** none. Applies AD-28. **Blocked on:** the founder's contact address to publish (E-4), and the apex DNS record to serve production (founder). Building it is not blocked.
+
+**Acceptance Criteria:**
+
+**Given** `apps/landing`
+**When** built with its three inputs
+**Then** it is one Croatian static page naming *Smjenko*, with sections on what it does (rotations, swaps, leave, hours, the calendar on the phone, reminders) and who it is for (volunteer fire departments, security companies, any shift work). It offers *Javi se* (`mailto:`), *Prijava*, a register link only when `LANDING_SIGNUP_URL` is set, and a footer saying it uses no cookies and no tracking (UX-DR80)
+
+**Given** CI
+**When** the page is checked
+**Then** it holds AD-28's checks: no third-party origin and no script, `lang="hr"`, the heading order, the 150 kB budget, and axe at both widths and themes. Its tokens equal `apps/web`'s, and its image carries AD-28's headers
+
+**Given** `deploy/landing` and DEPLOY.md
+**When** this ships
+**Then** the image builds in CI and DEPLOY.md says how `shift-landing` is added in Coolify for staging and, after 20.9, the apex. No real name, host or address is committed
+
+### Story 21.22: Teams are called *Timovi*
+
+As a user,
+I want teams not to be called *Smjene*,
+So that they are never confused with *Tipovi smjena*.
+
+**Depends on:** none. **Blocked on:** the founder's choice (E-6: *Timovi*, recommended, or *Ekipe*). It reverses the 2026-11-23 terminology decision (epic 18 retro A2).
+
+**Acceptance Criteria:**
+
+**Given** `hr.json`
+**When** the rename ships
+**Then** every label that names a team says *Tim*/*Timovi* (navigation, page titles, dialogs, filters, history fields, print, the wizard's step), the route `/smjene` stays with *Timovi* as its title, and a literal sweep test finds no team-meaning *Smjena* left
+**And** `Smjena A`-style team names the organization chose are data and unchanged, and DESIGN.md, EXPERIENCE.md and the UX-DRs that quote the label are updated

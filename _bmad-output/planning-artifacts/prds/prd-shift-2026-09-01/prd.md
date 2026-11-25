@@ -2,7 +2,7 @@
 title: Shift Management Platform
 status: draft
 created: 2026-09-01
-updated: 2026-11-20
+updated: 2026-11-25
 ---
 
 # PRD: Shift Management Platform
@@ -645,7 +645,7 @@ An Admin can change a Leave Record's dates or delete it.
 - Deleting clears Conflicts arising from that record and leaves unrelated Conflicts intact.
 - A Conflict already resolved by Replace Member does not have its Override silently reverted; the situation is surfaced to the Admin.
 
-**Out of Scope for MVP:** public-holiday calendars; accrual over time; differing leave policies per Member group. Leave requests, absence types, carry-over and half days moved into v1 on 2026-10-10 (§5.15, §5.19).
+**Out of Scope for MVP:** public-holiday calendars (Organization Holidays moved into scope on 2026-11-25, §5.26); accrual over time; differing leave policies per Member group. Leave requests, absence types, carry-over and half days moved into v1 on 2026-10-10 (§5.15, §5.19).
 
 ### 5.12 Conflict Detection and Resolution
 
@@ -1219,13 +1219,144 @@ The platform operator can still provision Organizations (FR-2), and can suspend 
 - The operator can list Organizations created through signup, with their creation time, for abuse review.
 - Suspension is an operator action, not a user-facing surface.
 
+### 5.25 Personal Scheduling (added 2026-11-25, sprint-change-proposal-2026-11-25-pilot-readiness)
+
+**Description:** A Team Rotation fits crews on a fixed turnus. It does not fit day workers who alternate mornings and afternoons, cleaners who only work mornings, students who fill gaps, or seasonal workers. Modelling the pilot's real month showed that each of them needed workarounds: Teams with no Members kept only to carry a shift, and two Roster Overrides per person per date. Personal scheduling plans people the way the paper does. Each Member either follows their Team's Rotation (today's behaviour), follows a personal Rotation, or is planned by hand. A per-date Personal Assignment overrides any of these for that Member and date. Everything downstream treats the result as a real shift. Realizes UJ-3.
+
+**Functional Requirements:**
+
+#### FR-102: Personal Assignment
+An Admin can give one Member, on one date, a Shift Type, a day off, or nothing (clearing an earlier assignment).
+
+**Consequences (testable):**
+- At most one live Personal Assignment per Member and date. It is attributable and removable (DI-11). Replacing it records both the removal and the insert.
+- On that date the Member's assignment decides their day. Their Team's Rotation, a personal Rotation, a Holiday and a Loan do not apply to them that date. Roster Overrides still apply on top (engine-rules R14.2).
+- A working assignment counts with the Team it names, else with the Member's effective Team, else with no Team. A Member with no Team can be assigned.
+- No Rotation Pattern, Rotation Assignment or Team membership changes (DI-2).
+
+#### FR-103: Manual schedule grid (*Ručni raspored*)
+An Admin plans a month in a grid of people (rows, grouped by Team) by dates (columns).
+
+**Consequences (testable):**
+- A cell is chosen from the Shift Types, *Slobodno*, or *Očisti*. Several selected cells are set in one action.
+- Each row says where its schedule comes from: Team Rotation, personal Rotation or manual. Rotation-derived cells are drawn distinctly from assigned ones, by glyph and words and not by colour alone. Editing a rotation-derived cell creates a Personal Assignment.
+- One save writes every changed cell. Before saving it shows *Što se mijenja*, the erased Conflicts (AD-5) and newly short-staffed shifts (FR-72), and it blocks nothing but an erasure.
+- Each affected Member is notified once per save, never once per cell.
+- It is usable on a phone; desktop is the primary layout. The grid and the calendar scroll with the page, with sticky headers, and have no scroll box inside the page.
+
+#### FR-104: Fill with a pattern, and copy
+An Admin fills selected people over a date range from a step pattern with a start offset (*Popuni uzorkom*), or copies a week or a month of assignments into a range (*Kopiraj*).
+
+**Consequences (testable):**
+- Both write ordinary Personal Assignments once. Neither is a rule that continues, and every cell stays editable afterwards.
+- Copy copies assignments only: a source date with none clears the target date.
+- Both are previewed and saved like any grid change.
+
+#### FR-105: Personal shifts are real shifts
+A working Personal Assignment, and a personal Rotation's working shift, is read everywhere a shift is read.
+
+**Consequences (testable):**
+- It appears in the calendar's day detail, in the Member's own schedule, on Danas, in hours and the Excel export (source *osobni raspored* in the hours explanation), in the calendar feed and in reminders.
+- It counts toward its Team's staffing.
+- Leave over it is a Conflict, resolvable as any other: replacement by a Personal Assignment for another Member. It can be given or taken in a swap.
+- It is recorded in the change history.
+- With no Personal Assignment and no personal Rotation, every figure is identical to before.
+
+#### FR-106: A Member's schedule source
+An Admin sets, from a date, whether a Member follows their Team's Rotation, a personal Rotation (a Rotation Pattern and an offset), or is manual only.
+
+**Consequences (testable):**
+- The setting is versioned: dates before its effective date are unchanged (DI-2).
+- A Member on a personal Rotation or manual only stays in their Team for grouping, the directory and staffing, but is not on the Team Rotation's roster.
+- How a role alternates is chosen per person, for example a weekly alternation for a dispatcher or mornings only for a cleaner, never by the role.
+
+#### FR-107: Seasonal Members
+An Admin can make a Member active for a season only, setting its start and end in one step.
+
+**Consequences (testable):**
+- Outside the season the Member is on no roster and has no shift, and their requests close as on deactivation.
+
+#### FR-108: Job roles
+Job Roles are Organization data (for example a cleaner or a dispatcher). A Member has at most one.
+
+**Consequences (testable):**
+- An Admin creates, renames and archives roles.
+- The role shows in the grid, the calendar's day detail and the directory, and filters them.
+- A role changes no derivation (DI-8: names are the Organization's).
+
+#### FR-109: Floaters are suggested
+An Admin marks Members as floaters and lists the roles each may cover.
+
+**Consequences (testable):**
+- For an unresolved Conflict, *Za odluku* suggests the active floaters eligible for the absent Member's role who are free that date. Free means no shift, no leave, and no zero rest gap with a neighbouring shift.
+- A role no floater covers gets no suggestion.
+- Picking one creates a Personal Assignment and resolves the Conflict as Replace Member, and the floater is notified.
+
+#### FR-110: Cover a whole leave
+An Admin can cover every unresolved Conflict of one Leave Record with one floater in one action.
+
+**Consequences (testable):**
+- Dates on which the floater is not free are listed and left unresolved.
+- The floater is notified once.
+
+### 5.26 Organization Holidays (added 2026-11-25, sprint-change-proposal-2026-11-25-pilot-readiness)
+
+**Description:** Day work stops on public holidays, while 24-hour crews keep working. Holidays are Organization data, never a built-in calendar (DI-8). The shipped locale offers its country's official list as a suggestion an Admin accepts.
+
+#### FR-111: Enter holidays
+An Admin enters, renames and removes Holidays (a date and a name), at most one per date.
+
+**Consequences (testable):**
+- A past date is allowed with a warning, because its hours re-derive.
+- An entry or removal that would erase a Conflict is guarded (AD-5).
+
+#### FR-112: Teams off on holidays
+An Admin marks a Team as off on holidays.
+
+**Consequences (testable):**
+- On a Holiday such a Team works no shift, and neither does a personal Rotation counted with it. Leave over that date costs nothing.
+- A Shift Type Override or a Personal Assignment still makes someone work it.
+- Teams not marked work as before.
+
+#### FR-113: Import the official list
+An Admin imports a year's official Croatian holidays in one action: the fixed list plus Easter Sunday, Easter Monday and Corpus Christi, computed.
+
+**Consequences (testable):**
+- Dates already entered keep their names.
+- The import is idempotent.
+
+#### FR-114: Holidays are visible, and holiday hours can be reported
+The calendar, the Member's schedule, the grid and the hours surfaces show the Holiday.
+
+**Consequences (testable):**
+- The hours surfaces and the export report *Sati na blagdan* (hours worked within a Holiday's date) as their own figure, within Total Hours and never instead of Band Hours.
+
+### 5.27 Minimum Members per Team (added 2026-11-25, sprint-change-proposal-2026-11-25-pilot-readiness)
+
+#### FR-115: A Team's own minimum
+An Admin can set a Minimum Members on a Team, which overrides the Organization's for that Team (amends FR-70).
+
+**Consequences (testable):**
+- A Team with none uses the Organization's.
+- With neither set, nothing of that Team is short-staffed.
+
+### 5.28 Public Product Page (added 2026-11-25, sprint-change-proposal-2026-11-25-pilot-readiness)
+
+#### FR-116: A public page at the domain's root
+A static Croatian page presents the product, *Smjenko*.
+
+**Consequences (testable):**
+- It says what the product does (rotations, swaps, leave, hours, the calendar on the phone, reminders) and who it is for (volunteer fire departments, security companies, any shift work).
+- It offers *Javi se* (a contact address the founder supplies) and a link to sign in. A register link shows only once production signup is open (D-S5).
+- It loads nothing from a third party, sets no cookie and runs no tracker (NFR-35).
+
 ## 6. Non-Goals
 
 - **This is not a fire-department management system.** No interventions, incident reporting, equipment, vehicles, readiness, or training. Those are candidate industry modules layered on a validated core, never part of it.
 - **This is not a payroll or time-and-attendance system.** Hours are what was *scheduled*, not what was *attended*. No rates, no pay, no government reporting.
 - **This is not a workforce-optimization tool.** No demand forecasting, no auto-assignment, no optimization of coverage against predicted load.
 - **This is not a communication tool.** Notifications tell a Member about their own schedule and their own requests, remind a Member who asks of their own upcoming shifts (§5.22), and tell an Admin what waits for a decision (§5.16). No messaging, chat, broadcast, announcements, or SMS (changed 2026-10-10; changed 2026-11-20, sprint-change-proposal-2026-11-20-v2-scope)
-- **This does not become a staffing optimizer.** One Minimum Members number warns. It never assigns anyone, never blocks a save, and never reads Fire Rank or Team Position, which stay inert (FR-18a) (added 2026-10-10).
+- **This does not become a staffing optimizer.** One Minimum Members number per Team (or the Organization's) warns (changed 2026-11-25, sprint-change-proposal-2026-11-25-pilot-readiness). Floater suggestions (§5.25) only list who is free; they never assign. It never assigns anyone, never blocks a save, and never reads Fire Rank or Team Position, which stay inert (FR-18a) (added 2026-10-10).
 - **This does not become a general permission system.** Two Roles. Not a role builder, not per-resource ACLs. A Founding Admin is an Admin like any other (§5.24).
 - **This does not become a calendar platform.** A Member's feed is read-only and their own (§5.21). No two-way sync, no import from external calendars, no shared or team feeds, no weekly or daily views (added 2026-11-20, sprint-change-proposal-2026-11-20-v2-scope).
 - **This does not become a self-serve commerce product.** Signup creates an Organization and nothing else (§5.24): no billing, plans, trials, payment, marketplace, or onboarding templates. Onboarding pre-fills nothing, because configuration speed bought with pilot-shaped defaults destroys SM-5 (SM-C3) (added 2026-11-20, sprint-change-proposal-2026-11-20-v2-scope).
@@ -1240,6 +1371,8 @@ Authentication with Organization and Role resolution · operator-provisioned mul
 
 **v2** (added 2026-11-20, sprint-change-proposal-2026-11-20-v2-scope), built after or alongside the pilot, in this recommended order: a Member's own read-only Calendar Feed and a printable month (§5.21) · opt-in Shift Reminders of the Member's own shifts (§5.22) · temporary Loans of a Member to another Team (§5.23) · self-service signup with email verification, a Founding Admin, and an onboarding wizard that pre-fills nothing (§5.24). Each is shippable on its own. Production signup opens only on a separate founder decision.
 
+**Pilot readiness** (added 2026-11-25, sprint-change-proposal-2026-11-25-pilot-readiness), before production (story 20.9): personal scheduling with a manual grid, personal Rotations, seasons, Job Roles and floater cover (§5.25) · Organization Holidays (§5.26) · Minimum Members per Team (§5.27) · a public product page (§5.28).
+
 ### 7.2 Out of Scope for MVP
 
 Grouped with reasons where the reason matters.
@@ -1249,10 +1382,10 @@ Grouped with reasons where the reason matters.
 *On 2026-10-10 leave requests, shift swaps, Absence Types, carry-over, part-day leave, minimum staffing, the change-history interface, PDF export of that history, notifications and PWA installation moved into v1 (`sprint-change-proposal-2026-10-10-v1-scope-expansion.md`). What remains below is re-confirmed out.*
 
 **Deferred because MVP has no need:**
-- Public-holiday calendars; accrual over time; leave policies per Member group.
+- Accrual over time; leave policies per Member group. (Organization Holidays moved into scope on 2026-11-25, §5.26.)
 - Breaks within a shift; overtime; actual attendance distinct from scheduled.
 - Export beyond FR-42a's Excel file of Organization hours and FR-79's change-history PDF (CSV, payroll formats, other surfaces); advanced reporting; analytics; team statistics.
-- Staffing rules beyond one Minimum Members warning (§5.18); qualification constraints; statutory rest-period enforcement.
+- Staffing rules beyond a Minimum Members warning per Team (§5.18, §5.27); qualification constraints; statutory rest-period enforcement.
 - Weekly and daily Calendar views; drag-and-drop editing (re-confirmed 2026-10-10 and 2026-11-20). Two-way calendar sync, import from external calendars, and shared or team feeds (2026-11-20).
 - Multiple Teams per Member (a Loan is not one, §5.23); multiple Organizations per user; Loans between Organizations.
 
@@ -1280,6 +1413,7 @@ Grouped with reasons where the reason matters.
 - **NFR-27.** A bearer secret in a URL — a Feed Token — is at least 256 bits of randomness, stored only as a hash, revocable by its Member and by an Admin, revoked on deactivation, never written to a log in full, and indistinguishable when invalid from when never issued (added 2026-11-20, sprint-change-proposal-2026-11-20-v2-scope).
 - **NFR-29.** Signup is rate-limited per address and per network origin, creation of Organizations has a daily ceiling, and no signup, verification, sign-in, recovery, organization-creation or feed response reveals whether an address, account, Organization or token exists. No paid or third-party anti-abuse service is required (added 2026-11-20, sprint-change-proposal-2026-11-20-v2-scope).
 - **NFR-30.** An authenticated account with no Organization reads and writes nothing except creating its Organization, and a self-provisioned Organization passes the same isolation tests as an operator-provisioned one (DI-9, NFR-1) (added 2026-11-20, sprint-change-proposal-2026-11-20-v2-scope).
+- **NFR-35.** The public product page loads no third-party resource, sets no cookie, runs no script or tracker, and its first view weighs under 150 kB (added 2026-11-25, sprint-change-proposal-2026-11-25-pilot-readiness; NFR-31–34 are reserved by the self-hosting proposal).
 
 ### 8.2 Internationalization and Localization
 
