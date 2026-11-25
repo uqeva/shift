@@ -23,11 +23,15 @@ export function ManualSaveBar({ screen }: { readonly screen: ManualScreen }): Re
     <div className="sticky bottom-[calc(4.75rem+2px+env(safe-area-inset-bottom,0px))] z-30 grid gap-2 border-t bg-card px-4 py-3 sm:bottom-0">
       <div className="flex flex-wrap items-center gap-3">
         <p aria-live="polite" className="min-w-0 flex-1 text-sm">
-          {count > 0
-            ? t('rucniRaspored.bar.count', { count })
-            : screen.saved === null
-              ? t('rucniRaspored.bar.none')
-              : t('rucniRaspored.bar.saved', { count: screen.saved })}
+          {/* EACH LINE ITS OWN ELEMENT (CI, 21.5): with a fill's line beside it,
+              the count read as one run of text with it, and was no line of its own. */}
+          <span className="block">
+            {count > 0
+              ? t('rucniRaspored.bar.count', { count })
+              : screen.saved === null
+                ? t('rucniRaspored.bar.none')
+                : t('rucniRaspored.bar.saved', { count: screen.saved })}
+          </span>
           {/* WHAT A FILL OR COPY DID (story 21.5): the days drafted, and those left out as archived. */}
           {screen.planned === null ? null : (
             <span className="block">{t('rucniRaspored.plan.placed', { count: screen.planned.placed })}</span>

@@ -33,6 +33,13 @@ describe("Popuni uzorkom's step fields are named as the e2e finds them", () => {
     expect(dialog).toMatch(/<Label htmlFor=\{fillStepChoiceIdOf\(position\)\}[^>]*>\s*\{t\('rucniRaspored\.fill\.choice', \{ position \}\)\}/);
   });
 
+  it("draws the save bar's count as a line of its own, apart from a fill's lines", () => {
+    const bar = readFileSync(fileURLToPath(new URL('./manual-save-bar.tsx', import.meta.url)), 'utf8');
+
+    // The e2e finds `6 nespremljenih promjena` by its exact text, so the count is one element's whole text.
+    expect(bar).toMatch(/<span className="block">\s*\{count > 0\s*\? t\('rucniRaspored\.bar\.count', \{ count \}\)/);
+  });
+
   it('is what the e2e page object asks for', () => {
     expect(pageObject).toContain("getByLabel(fill(words.fill.count, { position: String(position) }), { exact: true })");
     expect(pageObject).toContain("getByLabel(fill(words.fill.choice, { position: String(position) }), { exact: true })");
