@@ -84,12 +84,12 @@ describe('the chips and the summary', () => {
     ]);
     expect(model.summary).toEqual({ kind: 'all', teams: 4, people: 17 });
     expect(hasActiveFilter(model)).toBe(false);
-    expect(t('filter.summary.all', { teams: 4, people: 17 })).toBe('Prikazano: sve smjene (4) · 17 osoba');
+    expect(t('filter.summary.all', { teams: 4, people: 17 })).toBe('Prikazano: svi timovi (4) · 17 osoba');
     // Story 15.7: an unset chip is never drawn, so its key is the active form only.
     expect(model.chips.map((chip) => filterChipMessageKey(chip))).toEqual(['filter.chip.team', 'filter.chip.person']);
     expect(t('filter.teamReplaced')).toBe('Zamijenjeno osobom');
     expect(t(filterSummaryMessageKey(model.summary), filterSummaryValuesOf(model.summary))).toBe(
-      'Prikazano: sve smjene (4) · 17 osoba',
+      'Prikazano: svi timovi (4) · 17 osoba',
     );
     expect(t('filter.open')).toBe('Filtri');
     // Story 15.7: no chip is drawn and `Filtri` carries no Badge.
@@ -114,8 +114,8 @@ describe('the chips and the summary', () => {
     );
     const [team] = model.chips;
 
-    expect(t(filterChipMessageKey(team!), { value: team!.value })).toBe('Smjena: Smjena B');
-    expect(t(filterRemoveMessageKey(team!), { value: team!.value })).toBe('Ukloni filtar smjena: Smjena B');
+    expect(t(filterChipMessageKey(team!), { value: team!.value })).toBe('Tim: Smjena B');
+    expect(t(filterRemoveMessageKey(team!), { value: team!.value })).toBe('Ukloni filtar timova: Smjena B');
     expect(t('filter.openActive', { count: model.activeCount })).toBe('Filtri, aktivno: 1');
     expect(filterBadgeCountOf(model.activeCount)).toBe(1);
     expect(activeChipsOf(model)).toEqual([{ key: FILTER_TEAM, value: 'Smjena B' }]);
@@ -152,14 +152,14 @@ describe('the chips and the summary', () => {
     );
   });
 
-  it('a person on no team reads `Bez smjene` as their team', () => {
+  it('a person on no team reads `Bez tima` as their team', () => {
     const { summary } = kalendar({ person: 'toni', shownCount: 1 });
 
     expect(summary).toEqual({ kind: 'person', person: 'Toni Bezsmjene', team: null });
     expect(t(filterSummaryMessageKey(summary), filterSummaryValuesOf(summary))).toBe(
-      'Prikazano: Toni Bezsmjene · Bez smjene',
+      'Prikazano: Toni Bezsmjene · Bez tima',
     );
-    expect(t('filter.noTeam')).toBe('Bez smjene');
+    expect(t('filter.noTeam')).toBe('Bez tima');
   });
 
   it('an unknown id is no filter: the chip reads `sve`', () => {
@@ -179,7 +179,7 @@ describe('the chips and the summary', () => {
     expect(t('filter.sheetShow', { count: 4 })).toBe('Prikaži 4 osobe');
     expect(t('filter.sheetShow', { count: 17 })).toBe('Prikaži 17 osoba');
     expect(t('filter.sheetShow', { count: 1 })).toBe('Prikaži 1 osobu');
-    expect(t('filter.allTeams', { count: 4 })).toBe('Sve smjene (4)');
+    expect(t('filter.allTeams', { count: 4 })).toBe('Svi timovi (4)');
     expect(t('filter.matches', { shown: 1, total: 17 })).toBe('1 od 17');
     expect(t('filter.clear')).toBe('Poništi filtre');
   });
@@ -274,7 +274,7 @@ describe('the Osoba picker', () => {
     expect(optionsMatching(levels, 'zzz', nameOf)).toEqual([]);
   });
 
-  it('groups by team in the Smjena order, an archived team after them, Bez smjene last', () => {
+  it('groups by team in the Smjena order, an archived team after them, Bez tima last', () => {
     const groups = peopleGroupsOf([TONI, OLD, ANA, LUKA], TEAMS);
 
     expect(groups.map((group) => group.teamName)).toEqual(['Smjena A', 'Smjena B', 'Stara smjena', null]);

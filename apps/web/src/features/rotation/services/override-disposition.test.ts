@@ -406,7 +406,7 @@ describe('the words', () => {
     ).toEqual([
       'Ne možeš mijenjati izmjene. Za to trebaš ovlasti administratora.',
       'Izmjena je već pregledana ili uklonjena. Prikaz je osvježen.',
-      'Smjena ili tip smjene je arhiviran. Osvježi prikaz.',
+      'Tim ili tip smjene je arhiviran. Osvježi prikaz.',
       'Rotacija je u međuvremenu promijenjena. Prikaz je osvježen, pregledaj izmjenu ponovno.',
       'Upiši razlog, 1–200 znakova.',
       'To je već tip smjene prema rotaciji.',

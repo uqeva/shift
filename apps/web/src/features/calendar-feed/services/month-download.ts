@@ -53,9 +53,9 @@ export function monthWindowOf(month: string): ScheduleWindow {
   return { from: `${month}-01`, to: `${month}-${String(days).padStart(2, '0')}` };
 }
 
-/** `shift-2026-11.ics`: the product's name and the month, nothing personal. */
+/** `smjenko-2026-11.ics`: the product's name and the month, nothing personal (the name since story 21.24). */
 export function monthFileNameOf(month: string): string {
-  return `shift-${month}.ics`;
+  return `smjenko-${month}.ics`;
 }
 
 /**

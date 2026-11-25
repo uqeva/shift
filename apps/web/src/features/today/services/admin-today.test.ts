@@ -1120,7 +1120,7 @@ describe('the subtitle', () => {
     const today = todayViewOf(pilot, [], AT_1420);
 
     expect(adminStatusOf(today)).toEqual({ kind: STATUS_UNSCHEDULED });
-    expect(t(adminStatusMessageKey(STATUS_UNSCHEDULED))).toBe('Nisi raspoređen ni u jednu smjenu.');
+    expect(t(adminStatusMessageKey(STATUS_UNSCHEDULED))).toBe('Nisi raspoređen ni u jedan tim.');
   });
 
   it('Admin working: on A, Noć today — once per shift, with its range', async () => {

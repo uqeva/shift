@@ -83,7 +83,7 @@ function row(overrides: Partial<HistoryRow> & Pick<HistoryRow, 'id'>): HistoryRo
   return {
     time: '16.11.2026 09:05',
     author: 'Đurđa Šoštarić',
-    kind: 'Smjena · promijenjeno',
+    kind: 'Tim · promijenjeno',
     subject: 'Ćiril Žužić, Smjena Č',
     reconstructed: false,
     marker: false,
@@ -201,7 +201,7 @@ function exportRow(changes: number, overrides: Partial<HistoryExportRow> = {}): 
   return {
     time: '16.11.2026 09:05',
     author: 'Ana Anić',
-    kind: 'Smjena · promijenjeno',
+    kind: 'Tim · promijenjeno',
     badge: null,
     subject: 'Smjena A',
     changes: Array.from({ length: changes }, (_, index) => ({ before: `Dan ${index}: A`, after: `Dan ${index}: B` })),
@@ -290,7 +290,7 @@ describe('a row taller than a page', () => {
         '16.11.2026 09:05',
         ...(index === 0 ? [] : ['(nastavak)']),
         'Ana Anić',
-        'Smjena · promijenjeno',
+        'Tim · promijenjeno',
         'Rekonstruirano',
         'Ljiljana Kovačević',
       ]);
@@ -337,6 +337,12 @@ describe('the document', () => {
 
     expect(sides.every((width) => typeof width === 'number')).toBe(true);
     expect(sides.reduce((sum, width) => sum + width, 0) + 8).toBe(before + 8 + 1 + after);
+  });
+
+  it('names the document by its title and Smjenko as its creator (story 21.24)', () => {
+    const document = historyDocumentOf(fixture());
+
+    expect(document.info).toEqual({ title: t('history.caption'), creator: 'Smjenko' });
   });
 
   it('draws every character in the face it uses', () => {

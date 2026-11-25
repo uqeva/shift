@@ -386,7 +386,7 @@ services:
       - GOTRUE_SMTP_USER=resend
       - GOTRUE_SMTP_PASS=${GOTRUE_SMTP_PASS:-}
       - GOTRUE_SMTP_ADMIN_EMAIL=${SHIFT_AUTH_EMAIL_FROM:-}
-      - GOTRUE_SMTP_SENDER_NAME=Shift
+      - GOTRUE_SMTP_SENDER_NAME=Smjenko
       - GOTRUE_SMTP_MAX_FREQUENCY=60s
       # The Croatian templates, built from hr.json's `signup.email` keys into
       # the SPA's `dist/auth-email/` (`apps/web/src/lib/auth-email.ts`), fetched
@@ -395,9 +395,9 @@ services:
       - GOTRUE_MAILER_TEMPLATES_CONFIRMATION=${SHIFT_APP_URL:?}/auth-email/confirmation.html
       - GOTRUE_MAILER_TEMPLATES_RECOVERY=${SHIFT_APP_URL:?}/auth-email/recovery.html
       - GOTRUE_MAILER_TEMPLATES_EMAIL_CHANGE=${SHIFT_APP_URL:?}/auth-email/email-change.html
-      - GOTRUE_MAILER_SUBJECTS_CONFIRMATION=Potvrdi adresu e-pošte za Shift
-      - GOTRUE_MAILER_SUBJECTS_RECOVERY=Nova lozinka za Shift
-      - GOTRUE_MAILER_SUBJECTS_EMAIL_CHANGE=Potvrdi novu adresu e-pošte za Shift
+      - GOTRUE_MAILER_SUBJECTS_CONFIRMATION=Potvrdi adresu e-pošte za Smjenko
+      - GOTRUE_MAILER_SUBJECTS_RECOVERY=Nova lozinka za Smjenko
+      - GOTRUE_MAILER_SUBJECTS_EMAIL_CHANGE=Potvrdi novu adresu e-pošte za Smjenko
       # GoTrue's own limits (AD-21). Its per-IP ones read the client's address
       # from Kong's `X-Real-IP`, and are off without this header. Email sent is
       # per hour for the whole stack: Resend's daily budget is shared with

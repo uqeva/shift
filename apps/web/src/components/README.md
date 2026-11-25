@@ -7,7 +7,10 @@ never overrides its colour, radius, border, shadow or type. If a screen needs a
 primitive to look different, the primitive changes for every screen, or a new
 primitive is added here.
 
-`layout/auth-layout.tsx` is the shared frame of the sign-in screens. shadcn's
+`layout/auth-layout.tsx` is the shared frame of the sign-in screens. `brand-mark.tsx` is Smjenko's mark (story 21.24), the one drawing the
+sign-in panel and the setup header show beside the product's name, and the
+source of `public/favicon.svg` and the icons rendered from it; it carries no
+text, so the wordmark is always `auth.brand.name` in the heading face. shadcn's
 `cn` merger lives in `lib/utils.ts`, and `components.json` points the `utils`,
 `lib` and `hooks` aliases at `@/lib/utils`, `@/lib` and `@/hooks`, shadcn's own
 defaults. Its `iconLibrary` is Phosphor (story 15.2), but a component the

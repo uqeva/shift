@@ -134,16 +134,21 @@ export default defineConfig({
     // second script on the built page. No `devOptions`: e2e runs on the dev
     // server, which must stay worker-free.
     //
-    // The name is "Shift" (the human's decision, 2026-10-19), with no
-    // organization's name or logo: a per-organization manifest is deferred.
+    // The name is "Smjenko" (the founder's decision, 2026-11-25, story 21.24;
+    // "Shift" before it, 2026-10-19), with no organization's name or logo: a
+    // per-organization manifest is deferred.
     // The colour is `--background` in the light theme; the dark one stays in
     // `index.html`'s `theme-color` pair, which the manifest format cannot hold.
     //
-    // The PNG icons in `public/` are rendered from `favicon.svg` (the rotation
-    // ring on ink, 2026-10-30) and committed rather than generated on each
-    // build: 192 and 512 keep the rounded corners on transparency; the
-    // maskable 512 and the 180 Apple touch icon are the same drawing full
-    // bleed (no corner radius), because the platform applies its own mask.
+    // The PNG icons and `favicon.ico` in `public/` are rendered from
+    // `favicon.svg` (Smjenko's mark, concept C, the handover S; story 21.24,
+    // the same drawing as `components/brand-mark.tsx`) with sharp, and
+    // committed rather than generated on each build: 192 and 512 keep the
+    // rounded corners (rx 112 of 512) on transparency; the maskable 512 and
+    // the 180 Apple touch icon are the same drawing full bleed (rx 0, flattened
+    // onto the tile's #0F172A), because the platform applies its own mask; the
+    // S stays inside the maskable safe circle (radius 205 of 512).
+    // `favicon.ico` holds 16, 32 and 48 as PNG entries.
     //
     // The worker precaches the app shell only. It has no runtime caching, so
     // a Supabase request (or any other cross-origin one) always goes to the
@@ -160,8 +165,8 @@ export default defineConfig({
         // A stable identity, so a later change to `start_url` does not make
         // the browser treat the installed app as a different one.
         id: '/',
-        name: 'Shift',
-        short_name: 'Shift',
+        name: 'Smjenko',
+        short_name: 'Smjenko',
         lang: 'hr',
         start_url: '/',
         display: 'standalone',
@@ -179,7 +184,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,woff2,svg,png}'],
+        globPatterns: ['**/*.{js,css,html,woff2,svg,png,ico}'],
         // STORY 10.4. The push handlers (`public/push-sw.js`) are imported
         // by the worker, never precached: the browser checks an imported
         // script for updates with the worker itself.

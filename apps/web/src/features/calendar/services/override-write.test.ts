@@ -192,7 +192,7 @@ describe('the refusals, as the dialog says them', () => {
     type: 'Odaberi tip smjene.',
     taken: 'Za taj dan već postoji izmjena. Osvježi prikaz.',
     gone: 'Izmjena je već uklonjena.',
-    archived: 'Smjena ili tip smjene je u međuvremenu arhiviran. Osvježi prikaz.',
+    archived: 'Tim ili tip smjene je u međuvremenu arhiviran. Osvježi prikaz.',
     denied: 'Ne možeš mijenjati izmjene. Za to trebaš ovlasti administratora.',
     failed: 'Promjena nije uspjela. Pokušaj ponovno.',
   };

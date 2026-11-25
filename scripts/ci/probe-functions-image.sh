@@ -88,7 +88,7 @@ docker run -d --name "$name" --network "$network" \
   -e SHIFT_APP_URL=https://app.example.test \
   -e NOTIFY_INVOKE_SECRET="$invoke_secret" \
   -e REMIND_INVOKE_SECRET="$remind_secret" \
-  -e 'NOTIFY_EMAIL_FROM=Shift <probe@example.test>' \
+  -e 'NOTIFY_EMAIL_FROM=Smjenko <probe@example.test>' \
   -e RESEND_API_KEY=re_probe \
   -e VAPID_PUBLIC_KEY= -e VAPID_PRIVATE_KEY= \
   -e VAPID_SUBJECT=mailto:probe@example.test \

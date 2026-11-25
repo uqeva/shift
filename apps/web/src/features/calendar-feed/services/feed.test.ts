@@ -276,7 +276,7 @@ describe('the view and its lines', () => {
     expect(t('feed.google.add')).toBe('Dodaj u Google kalendar');
     expect(t('feed.apple.add')).toBe('Dodaj u Apple kalendar');
     // The fixed note, verbatim from the v2 proposal.
-    expect(t('feed.googleLag')).toBe('Google kalendar osvježava pretplate rjeđe — promjene se mogu pojaviti i do dan kasnije. Shift je uvijek točan.');
+    expect(t('feed.googleLag')).toBe('Google kalendar osvježava pretplate rjeđe — promjene se mogu pojaviti i do dan kasnije. Smjenko je uvijek točan.');
     // A fault asks to try again; a refusal does not, another try is refused the same.
     expect(t(feedFailureMessageKey(CALENDAR_FEED_UNAVAILABLE))).toContain('Pokušaj ponovno');
     expect(t(feedFailureMessageKey(CALENDAR_FEED_REFUSED))).not.toContain('Pokušaj ponovno');

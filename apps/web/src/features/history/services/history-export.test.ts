@@ -35,7 +35,7 @@ function row(overrides: Partial<HistoryRow> & Pick<HistoryRow, 'id'>): HistoryRo
   return {
     time: '10.11.2026 09:05',
     author: 'Ana Anić',
-    kind: 'Smjena · promijenjeno',
+    kind: 'Tim · promijenjeno',
     subject: 'Smjena A',
     reconstructed: false,
     marker: false,
@@ -50,12 +50,12 @@ const RENAME = row({
 });
 const ADDITION = row({
   id: '2',
-  kind: 'Smjena · dodano',
+  kind: 'Tim · dodano',
   changes: [{ column: 'name', field: 'Naziv', before: null, after: 'Smjena Đ' }],
 });
 const DELETION = row({
   id: '1',
-  kind: 'Smjena · obrisano',
+  kind: 'Tim · obrisano',
   reconstructed: true,
   changes: [
     { column: 'name', field: 'Naziv', before: 'Smjena Ž', after: null },
@@ -144,7 +144,7 @@ describe('the header', () => {
       'Organizacija: JVP Grad',
       'Razdoblje: zadnjih 30 dana (18.10.2026 – 16.11.2026)',
       'Osoba: sve',
-      'Smjena: sve',
+      'Tim: svi',
       'Vrsta: sve',
       'Prikazano: 3 promjene od 7',
       'Izrađeno: 16.11.2026 u 14:42',
@@ -165,7 +165,7 @@ describe('the header', () => {
     expect(model.lines.slice(1, 5)).toEqual([
       `Razdoblje: ${t('history.period.month', { month: 'listopad', year: '2026' })} (01.10.2026 – 31.10.2026)`,
       'Osoba: Ana Anić',
-      'Smjena: Smjena A',
+      'Tim: Smjena A',
       `Vrsta: ${historyKindText(kind)}`,
     ]);
   });
@@ -191,6 +191,8 @@ describe('the header', () => {
     );
     // The note is added by the writer, only when it replaced something.
     expect(model.lines).not.toContain(model.glyphNote);
+    // Story 21.24: the PDF's creator is the product's name.
+    expect(model.creator).toBe('Smjenko');
   });
 });
 

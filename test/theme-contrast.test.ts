@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -1402,6 +1402,15 @@ describe('the glass chrome reads against its worst backdrop (story 15.1)', () =>
  * muted text (DESIGN rule 2), no navy token, and a tile in the ink pair, whose
  * icon is `ink-foreground` on `ink` (measured in the ink block) and whose
  * fill stands off the glass at 3:1.
+ *
+ * STORY 21.24: the tile is Smjenko's mark (`components/brand-mark.tsx`), whose
+ * colours are the brand's own and fixed in both themes, not tokens. Its S
+ * reads on its own tile (both arcs at 3:1, a graphic), and the tile stands off
+ * the light glass at 3:1. On the dark glass the navy tile does not, by design
+ * of the mark (notes: "the hairline ring keeps the tile edge visible"): the
+ * dark theme draws a white hairline at 16% around it, the glass border's
+ * treatment. That shortfall is pinned exactly below, so a change to the glass
+ * or the mark is seen.
  */
 describe('the sign-in brand panel reads on the chrome glass (story 15.3)', () => {
   const layout = (): string =>
@@ -1416,11 +1425,7 @@ describe('the sign-in brand panel reads on the chrome glass (story 15.3)', () =>
 
     expect(panel, 'the sign-in panel names no glass-chrome class').toBeDefined();
     expect((panel ?? '').split(/\s+/)).toEqual(expect.arrayContaining(['glass-chrome', 'text-foreground', 'rounded-3xl']));
-    expect(source).toContain('bg-ink text-ink-foreground');
-    const tile = /<span className="([^"]*\bbg-ink\b[^"]*)"/.exec(source)?.[1];
-
-    expect(tile, 'the sign-in panel has no ink tile').toBeDefined();
-    expect(tile ?? '', 'the tile draws muted text').not.toMatch(/muted/);
+    expect(source, 'the sign-in panel does not draw the Smjenko mark').toMatch(/<BrandMark className="size-10" \/>/);
     expect(source, 'the panel draws muted text on .58 glass').not.toMatch(/text-muted-foreground/);
     expect(source, 'the panel still paints with the navy set').not.toMatch(/sidebar/);
     expect(source, 'the panel names a glass utility other than the chrome').not.toMatch(/glass-(?:over-content|panel|reading)/);
@@ -1447,6 +1452,84 @@ describe('the sign-in brand panel reads on the chrome glass (story 15.3)', () =>
       expect(ratio(colour(theme, 'ink'), ground)).toBeGreaterThanOrEqual(AA_LARGE);
     }
     expect(ratio(colour(theme, 'ink-foreground'), colour(theme, 'ink'))).toBeGreaterThanOrEqual(AA_BODY);
+  });
+});
+
+/** STORY 21.24: the mark's three fixed colours, read from the component itself. */
+describe('the Smjenko mark reads on its tile and stands off the glass (story 21.24)', () => {
+  const mark = (): string =>
+    readFileSync(join(fileURLToPath(new URL('..', import.meta.url)), 'apps', 'web', 'src', 'components', 'brand-mark.tsx'), 'utf8');
+  const TILE = '#0F172A';
+  const UPPER = '#3FA0FA';
+  const LOWER = '#FFFFFF';
+
+  it('draws exactly the brand colours, the hairline only in the dark theme', () => {
+    const source = mark();
+
+    expect(source).toContain(`fill="${TILE}"`);
+    expect(source).toContain(`stroke="${UPPER}"`);
+    expect(source).toContain('stroke="#FFF"');
+    expect(source).toMatch(/strokeOpacity="\.16"[\s\S]*className="hidden dark:inline"/);
+    expect(source).toContain('forced-color-adjust-none');
+  });
+
+  it('is the same drawing as public/favicon.svg, and both headers draw it', () => {
+    const web = join(fileURLToPath(new URL('..', import.meta.url)), 'apps', 'web');
+    const favicon = readFileSync(join(web, 'public', 'favicon.svg'), 'utf8');
+    const paths = [...mark().matchAll(/\bd="([^"]+)"/g)].map(([, d]) => d);
+
+    expect(paths).toHaveLength(2);
+    for (const d of paths) expect(favicon, `favicon.svg lacks the path ${d}`).toContain(`d="${d}"`);
+    expect(favicon).toContain(`fill="${TILE}"`);
+    expect(favicon).toContain('rx="112"');
+    // The tab icon draws its own edge on a dark browser chrome, as the component does on dark glass.
+    expect(favicon).toMatch(/prefers-color-scheme:\s*dark/);
+    for (const file of [
+      ['src', 'components', 'layout', 'auth-layout.tsx'],
+      ['src', 'pages', 'postavljanje.tsx'],
+    ]) {
+      expect(readFileSync(join(web, ...file), 'utf8'), file.join('/')).toMatch(/<BrandMark className="size-10" \/>/);
+    }
+  });
+
+  it('ships the dark hairline rule after the hidden one, so the dark theme shows it (built CSS)', () => {
+    const assets = join(fileURLToPath(new URL('..', import.meta.url)), 'apps', 'web', 'dist', 'assets');
+    if (!existsSync(assets)) return;
+    const css = readdirSync(assets)
+      .filter((name) => name.endsWith('.css'))
+      .map((name) => readFileSync(join(assets, name), 'utf8'))
+      .join('\n');
+    const hidden = css.indexOf('.hidden{display:none}');
+    const dark = css.search(/\.dark\\:inline:where\(\[data-theme=dark\],\[data-theme=dark\] \*\)\{display:inline\}/);
+
+    expect(hidden, 'no .hidden rule in the built CSS').toBeGreaterThanOrEqual(0);
+    expect(dark, 'no dark:inline rule under data-theme=dark in the built CSS').toBeGreaterThan(hidden);
+    expect(css).toContain('.forced-color-adjust-none{forced-color-adjust:none}');
+  });
+
+  it('draws both arcs of the S at 3:1 on the tile', () => {
+    expect(ratio(rgb(UPPER) as Color, rgb(TILE) as Color)).toBeGreaterThanOrEqual(AA_LARGE);
+    expect(ratio(rgb(LOWER) as Color, rgb(TILE) as Color)).toBeGreaterThanOrEqual(AA_LARGE);
+  });
+
+  it('stands off the light glass at 3:1 over the page and every blob', () => {
+    for (const { colour: ground } of chromeGrounds('light', 'glass')) {
+      expect(ratio(rgb(TILE) as Color, ground)).toBeGreaterThanOrEqual(AA_LARGE);
+    }
+  });
+
+  it('meets the dark glass below 3:1, the known shortfall the hairline answers', () => {
+    const worst = chromeWorst((ground) => ratio(rgb(TILE) as Color, ground), 'dark', 'glass');
+
+    expect(worst.ratio).toBeLessThan(AA_LARGE);
+    expect(worst.ratio.toFixed(2)).toBe('1.03');
+  });
+
+  it('draws its dark hairline at 1.5:1 or more off the dark glass, as the glass border draws it', () => {
+    const hairline = composite({ mode: 'rgb', r: 1, g: 1, b: 1, alpha: 0.16 }, rgb(TILE) as Color);
+    const worst = chromeWorst((ground) => ratio(hairline, ground), 'dark', 'glass');
+
+    expect(worst.ratio.toFixed(2)).toBe('1.53');
   });
 });
 

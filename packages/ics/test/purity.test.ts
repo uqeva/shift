@@ -20,7 +20,7 @@ const sources = readdirSync(sourceRoot)
   .filter((name) => name.endsWith('.ts'))
   .map((name) => ({ name, text: readFileSync(join(sourceRoot, name), 'utf8') }));
 
-// A line comment starts a line or follows a space: `'-//Shift//…'` is a string.
+// A line comment starts a line or follows a space: `'-//Smjenko//…'` is a string.
 const code = (text: string): string => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|\s)\/\/.*$/gm, '$1');
 
 describe('@shift/ics is pure (AD-20)', () => {

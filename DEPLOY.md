@@ -307,7 +307,8 @@ answers by stopping email for that run and giving the email rows back
 (`PROVIDER_UNAUTHORIZED`): no email is sent and none is lost until the domain
 verifies. Push is not held by it. Use one domain per
 environment, or one domain for both; `NOTIFY_EMAIL_FROM` names an address on it
-(`Shift <obavijesti@obavijesti.example.org>`).
+(`Smjenko <obavijesti@obavijesti.example.org>`; the product's name is
+*Smjenko* since story 21.24).
 
 **2. The Resend key.** Create an API key with *Sending access* only, limited to
 that domain. It is the Environment secret `RESEND_API_KEY` (§8.2), and for a
@@ -3349,9 +3350,9 @@ configured nowhere yet.
 | --- | --- | --- |
 | `SHIFT_DISABLE_SIGNUP`, `SHIFT_MAILER_AUTOCONFIRM` | `false`, `false` (the door OPEN, since 2026-11-25) | `staging.env.example`'s values; GoTrue's wrapper started with every guard met (§9.9) |
 | `GOTRUE_SMTP_PASS` | a sending-only Resend key restricted to the sending domain | Auth email (§9.9) |
-| `SHIFT_AUTH_EMAIL_FROM` | `noreply@mail.<domain>` (Resend's verified sending subdomain, EU region) | GoTrue's display name stays the compose's `Shift` (`GOTRUE_SMTP_SENDER_NAME`) |
+| `SHIFT_AUTH_EMAIL_FROM` | `noreply@mail.<domain>` (Resend's verified sending subdomain, EU region) | GoTrue's display name is the compose's `Smjenko` (`GOTRUE_SMTP_SENDER_NAME`, story 21.24; `Shift` before it) |
 | `RESEND_API_KEY` | **the same** sending-only key as `GOTRUE_SMTP_PASS` | the founder issued one staging key; §9.9's "never notify's key" (revoking one leaves the other path working) is not met on staging, and production needs two (`deferred-work.md`) |
-| `NOTIFY_EMAIL_FROM` | `<the founder's product name> <noreply@mail.<domain>>` | on the verified sending domain |
+| `NOTIFY_EMAIL_FROM` | `Smjenko <noreply@mail.<domain>>` (the product's name since story 21.24) | on the verified sending domain |
 | `VAPID_*` | a pair generated for staging; the subject is the app's `https` origin | push works |
 | `SHIFT_FUNCTIONS_IMAGE` | `127.0.0.1:<registry-port>/shift-functions:staging` | see the registry below |
 | `SHIFT_PROXY_CIDR` | the stack's own network's subnet (`docker network inspect <service uuid>`; IPv4 only, as Coolify creates it) | §9.9: Traefik reaches Kong there. Kong logs each client's own IPv4 and IPv6 address, and a client's own `X-Forwarded-For` is not believed |

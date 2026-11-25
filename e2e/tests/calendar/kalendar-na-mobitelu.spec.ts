@@ -152,7 +152,7 @@ test.describe('a member on a phone', () => {
       try {
         await calendarFeedPage.goto();
         const download = await calendarFeedPage.downloadMonth();
-        expect(download.suggestedFilename()).toMatch(/^shift-\d{4}-\d{2}\.ics$/);
+        expect(download.suggestedFilename()).toMatch(/^smjenko-\d{4}-\d{2}\.ics$/);
         const text = readFileSync(await download.path(), 'utf8');
         expect(text.startsWith('BEGIN:VCALENDAR\r\n')).toBe(true);
         expect(text).not.toContain('REFRESH-INTERVAL');

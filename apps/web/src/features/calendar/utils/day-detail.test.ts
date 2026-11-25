@@ -1159,8 +1159,8 @@ describe('an admin adds, removes or replaces someone on a shift (story 3.6b)', (
 
     expect(out(true, true)).toEqual(['Ana · vatrogasac · vozač', 'Boris']);
     expect(out(false, false)).toEqual(['Ana', 'Boris']);
-    expect(put(true)).toEqual(['Dora · bez smjene', `${VIEWER_NAME} · Smjena A`]);
-    expect(put(false)).toEqual(['Dora · bez smjene', `${VIEWER_NAME} · Smjena A`]);
+    expect(put(true)).toEqual(['Dora · bez tima', `${VIEWER_NAME} · Smjena A`]);
+    expect(put(false)).toEqual(['Dora · bez tima', `${VIEWER_NAME} · Smjena A`]);
     expect(outOptionOf(offers.out[0]!, true, true, words).id).toBe(ANA);
     // A member put on with a rank: Ime · čin · smjena, and the rank alone is gated.
     const ranked = { id: DORA, name: 'Dora', fireRank: 'nco', teamName: 'Smjena C', continuousMinutes: null };

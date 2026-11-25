@@ -117,7 +117,7 @@ describe('the calendar (AD-20, D-S2)', () => {
     expect(unfolded.slice(0, 11)).toEqual([
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
-      'PRODID:-//Shift//calendar-feed//HR',
+      'PRODID:-//Smjenko//calendar-feed//HR',
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
       `NAME:${CALENDAR_NAME}`,

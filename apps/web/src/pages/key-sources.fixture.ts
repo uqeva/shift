@@ -1222,10 +1222,11 @@ export const KEY_SOURCES = [
     // two labels, off `historyExportMessageKey`.
     // 28 SINCE EPIC 14 RETRO A9 (PDF): a continuation's *(nastavak)* and the
     // note on replaced characters.
+    // 29 SINCE STORY 21.24: the product's name, *Smjenko*, as the PDF's creator.
     name: 'the change history export rules',
     file: HISTORY_EXPORT_KEYS,
     keys: (text: string) => [...translationKeys(text), ...messageKeyUnions(text)],
-    strings: 28,
+    strings: 29,
   },
   {
     // E884: the Stanje chip's five options and the five values its text says,

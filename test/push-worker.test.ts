@@ -74,7 +74,7 @@ describe('the push handler shows what notify sends', () => {
     await waited;
     await scope.push(null);
 
-    expect(scope.showNotification).toHaveBeenNthCalledWith(1, 'Shift', { body: '', icon: '/pwa-192x192.png', data: { url: '/' } });
+    expect(scope.showNotification).toHaveBeenNthCalledWith(1, 'Smjenko', { body: '', icon: '/pwa-192x192.png', data: { url: '/' } });
     expect(scope.showNotification).toHaveBeenCalledTimes(2);
   });
 });

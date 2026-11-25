@@ -88,14 +88,14 @@ describe('rotationWarningLinesOf — the pilot', () => {
 
     expect(textsOf(lines)).toEqual([
       [
-        '2 dana u sljedećem ciklusu s radnim tipom na kojem nije nijedna smjena:',
+        '2 dana u sljedećem ciklusu s radnim tipom na kojem nije nijedan tim:',
         '26.09.2026: Noć',
         '29.09.2026: Dan',
       ],
       [
-        '2 dana u sljedećem ciklusu s dvije ili više smjena na istom tipu:',
-        '26.09.2026: Dan (2 smjene: Smjena A, Smjena B)',
-        '27.09.2026: Noć (2 smjene: Smjena A, Smjena B)',
+        '2 dana u sljedećem ciklusu s dva ili više timova na istom tipu:',
+        '26.09.2026: Dan (2 tima: Smjena A, Smjena B)',
+        '27.09.2026: Noć (2 tima: Smjena A, Smjena B)',
       ],
       ['24 h rada bez slobodnog dana između (Dan → Noć)'],
     ]);
@@ -140,7 +140,7 @@ describe('rotationWarningLinesOf — UJ-5', () => {
 
     expect(textsOf(lines)).toEqual([
       [
-        '4 dana u sljedećem ciklusu s radnim tipom na kojem nije nijedna smjena:',
+        '4 dana u sljedećem ciklusu s radnim tipom na kojem nije nijedan tim:',
         '27.09.2026: Jutarnja',
         '28.09.2026: Jutarnja, Popodnevna',
         '29.09.2026: Popodnevna, Noćna',
@@ -152,7 +152,7 @@ describe('rotationWarningLinesOf — UJ-5', () => {
 });
 
 describe('the counts use all three plural forms', () => {
-  const GAP = 'u sljedećem ciklusu s radnim tipom na kojem nije nijedna smjena:';
+  const GAP = 'u sljedećem ciklusu s radnim tipom na kojem nije nijedan tim:';
   const SUMMARY = 'za sljedeći ciklus:';
 
   it.each([
@@ -169,10 +169,10 @@ describe('the counts use all three plural forms', () => {
   });
 
   it.each([
-    [1, 'Dan (1 smjena: A)'],
-    [2, 'Dan (2 smjene: A)'],
-    [5, 'Dan (5 smjena: A)'],
-    [21, 'Dan (21 smjena: A)'],
+    [1, 'Dan (1 tim: A)'],
+    [2, 'Dan (2 tima: A)'],
+    [5, 'Dan (5 timova: A)'],
+    [21, 'Dan (21 tim: A)'],
   ])('a doubled type counts its teams: %i', (count, text) => {
     const doubled = {
       key: 'rotation.builder.warnings.doubledType',
@@ -223,7 +223,7 @@ describe('shownSaveOutcomeOf', () => {
     const shown = shownSaveOutcomeOf({ ok: true }, snapshot, draft, draft.effectiveFrom);
     const [gap] = shown.ok ? textsOf(shown.warnings) : [];
 
-    expect(gap?.[0]).toBe('2 dana u sljedećem ciklusu s radnim tipom na kojem nije nijedna smjena:');
+    expect(gap?.[0]).toBe('2 dana u sljedećem ciklusu s radnim tipom na kojem nije nijedan tim:');
     expect(gap?.[1]).toMatch(/^03\.10\.2026: /);
     expect(gap?.join(' ')).not.toContain('26.09.2026');
   });

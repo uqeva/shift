@@ -3,9 +3,10 @@
 - **Date:** 2026-11-25
 - **Author:** Developer (correct-course, headless), for the founder
 - **Mode:** batch, unattended. The founder approved the scope and asked for no questions, so each product choice below is recorded as a decision with its rationale. The ones the founder may want to change are listed in §6 (E-1 to E-8), each with a recommended default that stands for planning.
-- **Scope classification:** Moderate to major. It adds one epic (21, 22 stories), FR-102 to FR-116 and NFR-35 to the PRD, engine rules R13 to R16 (R4.2, R10.1 and R10.2 amended), AD-26 to AD-28 to the spine, and amends AD-2, AD-4, AD-5, AD-11, AD-18, AD-19 and AD-20. No shipped behaviour changes until its story ships. With none of the new data recorded, every derivation stays byte-identical.
+- **Scope classification:** Moderate to major. It adds one epic (21, 22 stories; 21.24 was added later the same day by the founder, see Decisions), FR-102 to FR-116 and NFR-35 to the PRD, engine rules R13 to R16 (R4.2, R10.1 and R10.2 amended), AD-26 to AD-28 to the spine, and amends AD-2, AD-4, AD-5, AD-11, AD-18, AD-19 and AD-20. No shipped behaviour changes until its story ships. With none of the new data recorded, every derivation stays byte-identical.
 - **Status:** scope approved by the founder on 2026-11-25. The planning changes are applied on branch `docs/correct-course-pilot-readiness`. **Production (20.9) stays after this epic.**
 - **Decisions:** E-1 to E-8 (§6) were ACCEPTED by the founder on 2026-11-25 at the recommended defaults, E-6 included: teams are labelled *Timovi*, so story 21.22 is unblocked. Source: the founder's instruction to the orchestrated build of story 21.1, which handed down the decisions and asked that they be recorded here, in the spine and in `sprint-status.yaml`. Recorded on branch `feat/21-1-personal-assignment-rule`.
+- **Later decisions (2026-11-25, the founder):** E-5's default is **reversed**: the app itself is named *Smjenko* now, not only the landing page, and the founder chose logo **concept C** (*Predaja smjene*, the handover S). Both are story 21.24, added to epic 21 and built on branch `feat/smjenko-brand` together with 21.22 (both rewrite `hr.json`'s copy). Internal identifiers (`@shift/*`, the repository, env var names, databases, URLs) keep *shift*. See §6.
 
 ---
 
@@ -52,7 +53,7 @@ Modelling the real November schedule of the second one on staging (operator scri
 | 2.5 Order | [x] | 21 before 20.9 (founder) |
 | 3.1 PRD | [!] → done | §5.25–§5.28 added (FR-102–FR-116), NFR-35, out-of-scope and non-goal lines amended |
 | 3.2 Architecture | [!] → done | AD-26–AD-28 added; AD-2, 4, 5, 11, 18, 19, 20 amended; containers, entities, map, Deferred |
-| 3.3 UX | [!] → done | UX-DR71–UX-DR80 in `epics.md`. DESIGN.md and EXPERIENCE.md are updated by each story, as usual |
+| 3.3 UX | [!] → done | UX-DR71–UX-DR80 in `epics.md` (UX-DR81, the brand, added with 21.24). DESIGN.md and EXPERIENCE.md are updated by each story, as usual |
 | 3.4 Other artifacts | [x] | `engine-rules.md` R13–R16 (R4.2, R10.1, R10.2 amended), `sprint-status.yaml`, `deferred-work.md` |
 | 4.1 Direct adjustment | [x] | Viable: additive layers, byte-identical when absent |
 | 4.2 Rollback | [N/A] | Nothing to revert |
@@ -85,7 +86,7 @@ The design rests on one rule. **For a member on a date: their Personal Assignmen
 - **Notifications** are one per member per save (`SCHEDULE_ASSIGNED`), never one per cell (AD-18 as amended).
 - **The landing page** is a separate static image with no script, cookie or third party (AD-28). `shift-web` is unchanged.
 
-**Effort and risk.** There are 22 stories, most of them the size of an epic-18 story. The riskiest are 21.1 and 21.9 (the roster rule under every figure), each guarded by "absent ⇒ byte-identical" over both fixtures and the parity suites. 21.7 is the other, because it changes `conflict_resolutions`' key: it is forward-only and keeps every existing row's meaning. The risk to timeline is that production (20.9) moves behind this epic, by the founder's decision.
+**Effort and risk.** There are 22 stories (23 with 21.24, the brand, added later that day), most of them the size of an epic-18 story. The riskiest are 21.1 and 21.9 (the roster rule under every figure), each guarded by "absent ⇒ byte-identical" over both fixtures and the parity suites. 21.7 is the other, because it changes `conflict_resolutions`' key: it is forward-only and keeps every existing row's meaning. The risk to timeline is that production (20.9) moves behind this epic, by the founder's decision.
 
 **Order (build order, from the founder's sequence).** 1) the assignment layer, the page scroll, the grid and the fill (21.1–21.8); 2) the personal rotation and seasons (21.9–21.11); 3) roles, then floaters (21.12–21.14); 4) holidays (21.15–21.19); 5) the per-team minimum (21.20); 6) the landing page (21.21); 7) the rename (21.22). 21.3, 21.11, 21.12, 21.20, 21.21 and 21.22 share no files with their neighbours and may run in parallel worktrees.
 
@@ -116,7 +117,8 @@ The design rests on one rule. **For a member on a date: their Personal Assignmen
 | 21.19 | Worked holiday hours are their own figure (cuttable) | R13.7; *Sati na blagdan* column |
 | 21.20 | Each team has its own minimum | `teams.minimum_members`, overriding the organization's |
 | 21.21 | *Smjenko*, the public page | static page, own image, apex; no tracker |
-| 21.22 | Teams are called *Timovi* | label rename, after E-6 |
+| 21.22 | Teams are called *Timovi* | label rename, after E-6; built with 21.24 on `feat/smjenko-brand` |
+| 21.24 | *Smjenko* brand: name, logo and icons | added 2026-11-25 by the founder (E-5 reversed, logo concept C) |
 
 Each story's ACs are in `epics.md`, Epic 21. `epics.md` also gains CAP-29 to CAP-32 (and CAP-21 as amended), Q31, UX-DR71 to UX-DR80, the coverage rows and the Epic List entry.
 
@@ -175,7 +177,7 @@ New sections: §13 Holidays (R13.1–R13.8), §14 Personal assignments (R14.1–
 | E-2 | Who reads others' personal assignments | Every active member reads member, date, shift type and team, never a note or an author | Same ground as the loan read ratified on 2026-11-23: the calendar already shows who works |
 | E-3 | Notifications | One `SCHEDULE_ASSIGNED` per member per save and one on a schedule-source change; none for holidays, minimums, roles or floater flags | Batched as asked. A holiday is visible to all and entered ahead |
 | E-4 | The landing page's contact address and register link | The founder supplies the address as a build input, never committed. The register link appears only after D-S5. The page is its own static image at the apex | A public repo, and production signup is not open |
-| E-5 | *Smjenko* as the app's name too | The landing page only for now; renaming the app is a later one-story decision | Rename touches Auth mail, the manifest and tests together |
+| E-5 | *Smjenko* as the app's name too | The landing page only for now; renaming the app is a later one-story decision | Rename touches Auth mail, the manifest and tests together. **REVERSED by the founder later on 2026-11-25:** the app is *Smjenko* too, everywhere a user sees the name (title, manifest, sign-in and setup header, Auth mail and its sender name, notify sender, push, the feed's name and PRODID, exports), as story 21.24, which also ships the founder's logo pick, concept C (*Predaja smjene*). Internal identifiers keep *shift* |
 | E-6 | The *Smjene* label for teams | ***Timovi***, labels only, with the URL `/smjene` kept. It reverses the 2026-11-23 terminology decision (epic 18 retro A2) | Loan copy already says *tim*. *Ekipe* reads as fire jargon, against DI-8's spirit |
 | E-7 | Holiday hours, and leave on a holiday | In scope as 21.19 (cuttable), shown whenever a worked holiday falls in the period, with no setting. Leave over a date a holiday emptied costs nothing (R4.2 unchanged), while leave on a 24-hour crew's worked holiday costs a day | Smallest version that serves the hour report. Holiday-free leave follows the existing rule |
 | E-8 | Floater eligibility when the absent member has no role | Any floater is eligible. With a role, only floaters listing it are, so a cleaner with no eligible floater gets none | Matches the founder's example and needs no default role |

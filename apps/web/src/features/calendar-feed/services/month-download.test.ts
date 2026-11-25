@@ -121,7 +121,7 @@ describe('the month', () => {
   });
 
   it('names the file by the product and the month, nothing personal, as text/calendar', () => {
-    expect(monthFileNameOf('2026-11')).toBe('shift-2026-11.ics');
+    expect(monthFileNameOf('2026-11')).toBe('smjenko-2026-11.ics');
     expect(ICS_MIME).toBe('text/calendar;charset=utf-8');
   });
 });
@@ -137,7 +137,7 @@ describe('the download (R12, D-S2)', () => {
     const shifts = atWorkShiftsOf(scheduleInputsOfCalendar(snapshot(), [], monthWindowOf('2026-10')), '2026-10-01', '2026-10-31');
     expect(shifts.length).toBeGreaterThan(0);
     expect(file.events).toBe(shifts.length);
-    expect(file.fileName).toBe('shift-2026-10.ics');
+    expect(file.fileName).toBe('smjenko-2026-10.ics');
 
     const events = eventsOf(file.text);
     expect(events).toHaveLength(shifts.length);
