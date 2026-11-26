@@ -59,7 +59,7 @@ Make Smjenko plan the first production pilot's real month without workarounds. T
   - One live row per member and date, where live means `removed_at is null`.
   - Sessions have no write. The only writer is `save_personal_assignments(p_changes jsonb)`. It takes the lock, re-checks the caller as an active admin (42501 `PERSONAL_ASSIGNMENTS_REFUSED`) and accepts at most 5 000 `set`/`clear` items. It validates the whole batch first, and any breach refuses all of it (22023 `PERSONAL_ASSIGNMENTS_INVALID`; an archived type or team counts as a breach). It answers `{ inserted, removed, unchanged }`.
   - Members read through `calendar_personal_assignments()`, which returns one jsonb array (not a row set, so `max_rows` cannot cut it). The live helper is `private.live_personal_assignments`.
-- **`member_schedule_versions`** (21.10) is versioned like `rotation_assignments`. `source` is `TEAM`, `PERSONAL` or `MANUAL`. A `PERSONAL` offset is a composite foreign key to a step of that pattern. No version means team rotation. An active admin inserts from the organization's today on and deletes only a version not yet in effect.
+- **`member_schedule_versions`** (21.10, shipped in `0079`) is versioned like `rotation_assignments`, with its column names (`pattern_id`, `offset_step_id`). `source` is `TEAM`, `PERSONAL` or `MANUAL`. A `PERSONAL` offset is a composite foreign key to a step of that pattern. No version means team rotation. An active admin inserts from the organization's today on (after the latest, one scheduled at a time, never a repeat of the source in force) and deletes only the latest version not yet in effect. Every active member reads them; the snapshot (shape 6) and `member_schedule_inputs` carry every member's, whole. An insert or a cancel notifies `SCHEDULE_SOURCE_CHANGED { effectiveFrom, source }`. *Raspored osobe* names an existing pattern or defines one from step rows.
 - **Roles, floaters and seasons.**
   - `job_roles` has a unique name key, archive and no delete. `members.job_role_id` is nullable.
   - `members.is_floater` defaults to false. `floater_roles` is read by admins only. Neither feeds any derivation except eligibility.
@@ -83,7 +83,7 @@ Make Smjenko plan the first production pilot's real month without workarounds. T
 - **Assembly, feed and reminders (AD-19, AD-20, AD-18).**
   - `member_schedule_inputs` and the device snapshot carry every member's live assignments (done in 21.2, snapshot shape 4), schedule versions (21.10), and holiday dates with `offOnHolidays` (21.16). Both parity fixtures gain each one in that story.
   - Roles, floaters, holiday names and minimums are never carried.
-  - Feed UIDs: an assignment's is `<date>-a-<assignmentId>-<memberId>@shift`. A personal rotation's is `<date>-p-<memberId>@shift`. It ships with 21.10's assembly, together with the `PERSONAL_ROTATION` reminder form and its `:p:` subject, in the same change. 21.9 built the domain marker (`AtWorkShift.personalRotation`), and `remind` skips such a shift until then.
+  - Feed UIDs: an assignment's is `<date>-a-<assignmentId>-<memberId>@shift`. A personal rotation's is `<date>-p-<memberId>@shift`. Both shipped (21.2, 21.10), with the `PERSONAL_ROTATION` reminder form and its `:p:` subject (21.10, `0079`), read off 21.9's marker `AtWorkShift.personalRotation`.
   - A team reminder item keeps its eight keys and has no `source`.
   - A holiday-removed shift has no event and no reminder.
   - The feed's fixed lines say *Smjenko*. UIDs are unchanged.

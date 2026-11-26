@@ -38,7 +38,14 @@ describe('the parity fixture', () => {
     expect(pilot.organization.teams.map(({ id, name }) => ({ id, name }))).toEqual(PILOT_TEAMS);
     expect(pilot.organization.shiftTypes.map((entry) => entry.type)).toEqual(PILOT_SHIFT_TYPES);
     expect(pilot.organization.shiftTypes.flatMap((entry) => entry.versions)).toEqual(PILOT_SHIFT_TYPE_VERSIONS);
-    expect(pilot.organization.steps).toEqual(PILOT_ROTATION_STEPS);
+    // Story 21.10: the team rotation's steps, and beside them only the steps of a pattern no team uses
+    // and some member's schedule version names (the assembly carries every step).
+    const pilotTeamPatterns = new Set(pilot.organization.assignments.map((one) => one.patternId));
+    expect(pilot.organization.steps.filter((step) => pilotTeamPatterns.has(step.patternId))).toEqual(PILOT_ROTATION_STEPS);
+    const pilotVersionPatterns = new Set(pilot.organization.members.flatMap((member) => member.scheduleVersions.map((one) => one.patternId)));
+    for (const step of pilot.organization.steps.filter((one) => !pilotTeamPatterns.has(one.patternId))) {
+      expect(pilotVersionPatterns.has(step.patternId), step.id).toBe(true);
+    }
     expect(pilot.organization.assignments).toEqual(PILOT_ROTATION_ASSIGNMENTS);
   });
 
@@ -46,7 +53,14 @@ describe('the parity fixture', () => {
     expect(uj5.organization.teams.map(({ id, name }) => ({ id, name }))).toEqual(UJ5_TEAMS);
     expect(uj5.organization.shiftTypes.map((entry) => entry.type)).toEqual(UJ5_SHIFT_TYPES);
     expect(uj5.organization.shiftTypes.flatMap((entry) => entry.versions)).toEqual(UJ5_SHIFT_TYPE_VERSIONS);
-    expect(uj5.organization.steps).toEqual(UJ5_ROTATION_STEPS);
+    // Story 21.10: the team rotation's steps, and beside them only the steps of a pattern no team uses
+    // and some member's schedule version names (the assembly carries every step).
+    const uj5TeamPatterns = new Set(uj5.organization.assignments.map((one) => one.patternId));
+    expect(uj5.organization.steps.filter((step) => uj5TeamPatterns.has(step.patternId))).toEqual(UJ5_ROTATION_STEPS);
+    const uj5VersionPatterns = new Set(uj5.organization.members.flatMap((member) => member.scheduleVersions.map((one) => one.patternId)));
+    for (const step of uj5.organization.steps.filter((one) => !uj5TeamPatterns.has(one.patternId))) {
+      expect(uj5VersionPatterns.has(step.patternId), step.id).toBe(true);
+    }
     expect(uj5.organization.assignments).toEqual(UJ5_ROTATION_ASSIGNMENTS);
   });
 
@@ -59,6 +73,14 @@ describe('the parity fixture', () => {
     expect(all.flatMap((organization) => organization.rosterOverrides).length).toBeGreaterThan(0);
     expect(leave.some((record) => record.half === undefined)).toBe(true);
     expect(leave.some((record) => record.half !== undefined)).toBe(true);
+    // Story 21.10: a schedule version of each source, and a personal rotation with and without a team.
+    const versions = all.flatMap((organization) => organization.members.flatMap((member) => member.scheduleVersions));
+    expect(new Set(versions.map((one) => one.source))).toEqual(new Set(['TEAM', 'PERSONAL', 'MANUAL']));
+    const personal = all.flatMap((organization) =>
+      organization.members.filter((member) => member.scheduleVersions.some((one) => one.source === 'PERSONAL')),
+    );
+    expect(personal.some((member) => member.memberships.length === 0)).toBe(true);
+    expect(personal.some((member) => member.memberships.length > 0)).toBe(true);
   });
 
   it('spans both transitions of both years', () => {

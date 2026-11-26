@@ -630,6 +630,23 @@ export class PeoplePage extends BasePage {
 
   // ------------------------------------------------------------ the leave
 
+  // ------------------------------------------------- the schedule source
+
+  /** *Raspored osobe* (story 21.10): the card, by its heading. */
+  get scheduleSourceCard(): Locator {
+    return this.page.getByRole('region', { name: hr.rasporedOsobe.title, exact: true });
+  }
+
+  /** The card's form dialog, titled as the card. */
+  get scheduleSourceDialog(): Locator {
+    return this.page.getByRole('dialog', { name: hr.rasporedOsobe.title, exact: true });
+  }
+
+  /** The card's *Što se mijenja*, for a version or its cancel. */
+  get scheduleSourcePreview(): Locator {
+    return this.page.getByRole('dialog', { name: hr.rasporedOsobe.preview.title, exact: true });
+  }
+
   /** Opens a member's edit screen by id. */
   async gotoMember(id: string): Promise<void> {
     await this.page.goto(`${this.path}/${id}`);

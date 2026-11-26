@@ -470,6 +470,10 @@ export const MEMBER_EDIT: readonly string[] = [
   join(MEMBERS_FEATURE, 'components', 'member-loan-dialog.tsx'),
   // STORY 21.6: *Dodaj smjenu*, the planning feature's card the page composes.
   join(srcRoot, 'features', 'planning', 'components', 'member-add-shift-card.tsx'),
+  // STORY 21.10: *Raspored osobe*, its hook and its card. Its rules are
+  // `MEMBER_SCHEDULE_SOURCE_KEYS`, a key source of its own.
+  join(MEMBERS_FEATURE, 'hooks', 'use-member-schedule-source.ts'),
+  join(MEMBERS_FEATURE, 'components', 'member-schedule-source-card.tsx'),
 ];
 
 /** The two team pages, which only compose (source structure B6), and their hooks. */
@@ -831,6 +835,9 @@ export const MEMBER_MOVE_PREVIEW_KEYS = join(srcRoot, 'features', 'members', 'se
 /** Story 18.3: the loan dialog's refusals, shift lines and inert-override lines, off `\w*MessageKey` unions. */
 export const MEMBER_LOAN_KEYS = join(srcRoot, 'features', 'members', 'services', 'loan.ts');
 
+/** Story 21.10: *Raspored osobe*'s rules — a source's name and each refusal's words. */
+export const MEMBER_SCHEDULE_SOURCE_KEYS = join(srcRoot, 'features', 'members', 'services', 'schedule-source.ts');
+
 /** Story 11.2: the short-staffed block, drawn in every *Što se mijenja* a save that can cause one has. */
 export const STAFFING_BLOCK = join(srcRoot, 'features', 'staffing', 'components', 'short-staffed-block.tsx');
 
@@ -1106,7 +1113,8 @@ export const SCREENS = [
   // FORTY-THREE BUTTONS SINCE STORY 18.4: a loan row's *Izmijeni posudbu* and
   // the amend dialog's *Završi danas*. *Ukloni posudbu* is the shared Switch.
   // EIGHTEEN FIELDS AND FORTY-SIX BUTTONS SINCE STORY 21.6: *Dodaj smjenu*'s card opener and its dialog's date, *Odustani* and *Odaberi smjenu*.
-  { name: 'the member edit form', file: MEMBER_EDIT, expectedFields: 18, expectedButtons: 46 },
+  // TWENTY-THREE FIELDS AND FIFTY-FOUR BUTTONS SINCE STORY 21.10: *Raspored osobe*'s *Vrijedi od*, *Uzorak*, a step's type and count, and *Početni korak*; its card's *Promijeni raspored* and *Povuci*, its form's *Ukloni korak*, *Dodaj korak*, *Odustani* and *Dalje*, and its preview's *Natrag na uređivanje* and *Spremi*.
+  { name: 'the member edit form', file: MEMBER_EDIT, expectedFields: 23, expectedButtons: 54 },
   // STORY 1.7a. FOUR on the team list: the link back to `Ljudi`, the one name
   // `<Input>`, the add `<Button>`, and ONE row link written once inside the map
   // over the teams — the same count at zero teams as at nine. SIX on one team:

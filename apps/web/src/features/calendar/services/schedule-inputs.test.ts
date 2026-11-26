@@ -111,6 +111,7 @@ describe('scheduleInputsOfCalendar', () => {
       statuses: [{ active: false, effectiveFrom: '2026-12-01' }],
       loans: [],
       personalAssignments: [],
+      scheduleVersions: [],
     });
     expect(JSON.stringify(inputs)).not.toMatch(/Ana Anić|vatrogasac|Lana|Zamjena|reason|author|name":"DVD/);
   });

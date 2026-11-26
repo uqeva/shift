@@ -162,7 +162,27 @@ describe('the calendar (AD-20, D-S2)', () => {
     }
   });
 
-  it('leaves out a teamless shift that is no assignment\'s until 21.9, and refuses an unknown team, as before', () => {
+  it("gives a personal rotation's shift the member's `-p-` UID, teamed or teamless (AD-20 as amended, story 21.10)", () => {
+    const window = { from: '2026-11-01', to: '2026-11-30' };
+    const team = shift('2026-11-03', TEAM_A, DAN, 420, 1140);
+    const teamed = shift('2026-11-04', TEAM_B, NOC, 1140, 1860, { personalRotation: true });
+    const teamless: AtWorkShift = { ...shift('2026-11-05', TEAM_A, DAN, 420, 1140), teamId: null, personalRotation: true };
+    for (const uidDomain of [FEED_UID_DOMAIN, DOWNLOAD_UID_DOMAIN] as const) {
+      const unfolded = lines(calendarOf({ inputs: NAMED, window, stamp: STAMP, uidDomain, shifts: [team, teamed, teamless] }));
+      expect(unfolded.filter((line) => line.startsWith('UID:'))).toEqual([
+        `UID:2026-11-03-${TEAM_A}-${MEMBER}@${uidDomain}`,
+        `UID:2026-11-04-p-${MEMBER}@${uidDomain}`,
+        `UID:2026-11-05-p-${MEMBER}@${uidDomain}`,
+      ]);
+      expect(unfolded.filter((line) => line.startsWith('SUMMARY:'))).toEqual([
+        `SUMMARY:Dan${SUMMARY_SEPARATOR}Smjena A`,
+        expect.stringMatching(/^SUMMARY:Noć · Smjena B\\, Split/) as string,
+        'SUMMARY:Dan',
+      ]);
+    }
+  });
+
+  it('leaves out a teamless shift that is neither an assignment\'s nor a personal rotation\'s, and refuses an unknown team, as before', () => {
     const window = { from: '2026-11-01', to: '2026-11-30' };
     const kept = shift('2026-11-03', TEAM_A, DAN, 420, 1140);
     const teamless: AtWorkShift = { ...shift('2026-11-05', TEAM_A, DAN, 420, 1140), teamId: null };

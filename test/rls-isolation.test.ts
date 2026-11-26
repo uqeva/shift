@@ -942,7 +942,7 @@ describe('the access-control layer is present, so nothing below passes vacuously
       );
       expect(
         policies.map((row) => row.policyname),
-        'stories 1.3a, 1.4a, 1.6, 1.7a, 1.7b, 2.1a, 2.2a, 2.3a, 3.5a, 3.6a, 5.1b, 5.4a, 9.2, 10.3, 10.4, 12.1, 13.1, 13.2, 13.3, 14.1, 17.1, 18.2, 21.12 and 0025 own exactly these policies; a missing one refuses silently and looks like a working refusal',
+        'stories 1.3a, 1.4a, 1.6, 1.7a, 1.7b, 2.1a, 2.2a, 2.3a, 3.5a, 3.6a, 5.1b, 5.4a, 9.2, 10.3, 10.4, 12.1, 13.1, 13.2, 13.3, 14.1, 17.1, 18.2, 21.10, 21.12 and 0025 own exactly these policies; a missing one refuses silently and looks like a working refusal',
       ).toEqual([
         // STORY 13.1 (0052): an active admin defines and renames a type or
         // sets its drawing flag. No delete. STORY 13.2 (0053, PO Q2): every
@@ -991,6 +991,12 @@ describe('the access-control layer is present, so nothing below passes vacuously
         // the close is `withdraw_leave_request`'s and `decide_leave_request`'s.
         'leave_requests_insert_own_by_active_member',
         'leave_requests_select_own_organization',
+        // STORY 21.10 (0079): as 0016's rotation versions — every active
+        // member reads; an active admin inserts from today on and cancels only
+        // the member's latest version still ahead. Never update (AD-2).
+        'member_schedule_versions_delete_scheduled_by_own_active_admin',
+        'member_schedule_versions_insert_by_own_active_admin',
+        'member_schedule_versions_select_own_organization',
         // STORY 1.6: select, insert, and a delete that reaches only a version
         // not yet in effect — and never update: a status version is appended,
         // and cancelled only before it has decided any day.
@@ -27795,13 +27801,13 @@ describe('a loan is amended, ended early or removed (story 18.4, 0064)', () => {
  * backfill block is run again here, DML only, in a rolled-back transaction.
  */
 
-/** The 24 audited tables (AD-11; `team_loans` since story 18.2, `personal_assignments` since 21.2, `job_roles` since 21.12). */
+/** The 25 audited tables (AD-11; `team_loans` since story 18.2, `personal_assignments` since 21.2, `job_roles` since 21.12, `member_schedule_versions` since 21.10). */
 const AUDITED_TABLES = [
   'organizations', 'members', 'member_status_versions', 'team_membership_versions', 'teams', 'hour_bands',
   'shift_types', 'shift_type_versions', 'rotation_patterns', 'rotation_steps', 'rotation_assignments',
   'shift_type_overrides', 'roster_overrides', 'leave_records', 'conflict_resolutions', 'leave_requests',
   'leave_request_decisions', 'swap_requests', 'swap_request_decisions', 'absence_types', 'leave_allowances',
-  'team_loans', 'personal_assignments', 'job_roles',
+  'team_loans', 'personal_assignments', 'job_roles', 'member_schedule_versions',
 ] as const;
 
 interface AuditEvent {
@@ -28901,6 +28907,201 @@ describe('a personal assignment is a recorded exception (story 21.2, 0077)', () 
         expect(carried[1], slug).toMatchObject({ kind: 'OFF', shiftTypeId: null, teamId: null });
         expect(entries.every((entry) => Array.isArray(entry.personalAssignments)), `${slug}: a member has no list`).toBe(true);
         expect(JSON.stringify(rows[0]?.inputs)).not.toMatch(/Tajna napomena|createdBy|created_by|note/);
+      });
+    },
+  );
+});
+
+describe("a member's schedule source is versioned (story 21.10, 0079)", () => {
+  const POLICY_REFUSED = '42501';
+
+  /** One version, as whoever the connection currently is: the six columns a session may name. */
+  async function insertScheduleVersion(
+    client: Client,
+    facts: { organization: string; member: string; from: string; source: string; pattern?: string | null; step?: string | null },
+  ): Promise<string> {
+    const { rows } = await client.query<{ id: string }>(
+      `insert into member_schedule_versions (organization_id, member_id, effective_from, source, pattern_id, offset_step_id)
+       values ($1, $2, $3::date, $4, $5, $6) returning id`,
+      [facts.organization, facts.member, facts.from, facts.source, facts.pattern ?? null, facts.step ?? null],
+    );
+    const id = rows[0]?.id;
+    if (id === undefined) throw new Error('member_schedule_versions insert returned no row');
+    return id;
+  }
+
+  /** The `SCHEDULE_SOURCE_CHANGED` rows to `member`, as `subject` and operands, as the owner reads them. */
+  async function sourceNoticesOf(client: Client, member: string): Promise<{ subject: string; operands: Record<string, unknown> }[]> {
+    const { rows } = await client.query<{ subject: string; operands: Record<string, unknown> }>(
+      `select subject_id::text as subject, operands
+         from notification_outbox
+        where code = 'SCHEDULE_SOURCE_CHANGED' and recipient_member_id = $1 and channel = 'email'
+        order by subject_id`,
+      [member],
+    );
+    return rows;
+  }
+
+  /** Owner scene: a throwaway member with an address, a working and a resting type, and a pattern no team uses. */
+  async function scene(client: Client, organization: string, by: string) {
+    await client.query('update organizations set email_notifications = true where id = $1', [organization]);
+    const member = await addThrowawayMember(client, organization);
+    await client.query('update members set email = $2 where id = $1', [member.id, `${member.id}@example.org`]);
+    const working = await addThrowawayShiftType(client, organization, by);
+    const resting = await addThrowawayShiftType(client, organization, by, { isWorking: false });
+    const pattern = await ownerPattern(client, organization, by, [working, working, resting]);
+    const other = await ownerPattern(client, organization, by, [working, resting]);
+    return { member, working, resting, pattern, other };
+  }
+
+  it.skipIf(noDatabase).each(FIXTURES)(
+    'lets the $fixture admin give a member their own rotation from today, attributed, audited and told once, and cancel only a later version still ahead',
+    async ({ slug, admin }) => {
+      await inRolledBackTransaction(async (client) => {
+        const caller = await memberByUsername(client, slug, admin);
+        const organization = caller.organizationId;
+        const { member, pattern } = await scene(client, organization, caller.authUserId);
+        const today = await organizationDay(client, organization);
+        const later = await organizationDay(client, organization, 5);
+
+        await actAs(client, caller.authUserId, organization);
+        const personal = await insertScheduleVersion(client, {
+          organization,
+          member: member.id,
+          from: today,
+          source: 'PERSONAL',
+          pattern: pattern.id,
+          step: pattern.steps[1]!,
+        });
+        const manual = await insertScheduleVersion(client, { organization, member: member.id, from: later, source: 'MANUAL' });
+        // The version in force today is no cancel's: its delete matches no row.
+        const { rowCount: inForce } = await client.query('delete from member_schedule_versions where id = $1', [personal]);
+        const { rowCount: cancelled } = await client.query('delete from member_schedule_versions where id = $1', [manual]);
+        await actAsOwner(client);
+
+        expect(inForce, slug).toBe(0);
+        expect(cancelled, slug).toBe(1);
+        const { rows } = await client.query<{ id: string; createdBy: string; source: string }>(
+          `select id::text as id, created_by::text as "createdBy", source from member_schedule_versions where member_id = $1`,
+          [member.id],
+        );
+        expect(rows, slug).toEqual([{ id: personal, createdBy: caller.authUserId, source: 'PERSONAL' }]);
+        expect((await auditEventsOf(client, 'member_schedule_versions', personal)).map((event) => [event.operation, event.actor]), slug).toEqual([
+          ['INSERT', caller.authUserId],
+        ]);
+        expect((await auditEventsOf(client, 'member_schedule_versions', manual)).map((event) => event.operation), slug).toEqual(['INSERT', 'DELETE']);
+
+        // E-3: once per version, and the cancel says the source in force from its date, under a subject of its own.
+        const notices = await sourceNoticesOf(client, member.id);
+        const bySubject = new Map(notices.map((notice) => [notice.subject, notice.operands]));
+        expect(notices, `${slug}: not one notice per version and one per cancel`).toHaveLength(3);
+        expect(bySubject.get(personal), slug).toEqual({ effectiveFrom: today, source: 'PERSONAL' });
+        expect(bySubject.get(manual), slug).toEqual({ effectiveFrom: later, source: 'MANUAL' });
+        // The cancel's own subject, so the outbox's once-key never swallows it.
+        const cancel = notices.filter((notice) => notice.subject !== personal && notice.subject !== manual);
+        expect(cancel.map((notice) => notice.operands), slug).toEqual([{ effectiveFrom: later, source: 'PERSONAL' }]);
+      });
+    },
+  );
+
+  it.skipIf(noDatabase).each(FIXTURES)(
+    "refuses the $fixture admin a past date, a second scheduled version, a repeat, another pattern's step, a pattern on MANUAL and an archived type",
+    async ({ slug, admin }) => {
+      await inRolledBackTransaction(async (client) => {
+        const caller = await memberByUsername(client, slug, admin);
+        const organization = caller.organizationId;
+        const { member, pattern, other, working } = await scene(client, organization, caller.authUserId);
+        const second = await addThrowawayMember(client, organization);
+        const archivedType = await addThrowawayShiftType(client, organization, caller.authUserId);
+        const archivedPattern = await ownerPattern(client, organization, caller.authUserId, [archivedType, working]);
+        // Archived as the owner, past 0036's in-rotation refusal (no session holds the gate).
+        await client.query('update shift_types set archived = true where id = $1', [archivedType]);
+        const yesterday = await organizationDay(client, organization, -1);
+        const today = await organizationDay(client, organization);
+        const tomorrow = await organizationDay(client, organization, 1);
+        const later = await organizationDay(client, organization, 9);
+
+        await actAs(client, caller.authUserId, organization);
+        const past = await refusedThenContinue(client, () =>
+          insertScheduleVersion(client, { organization, member: member.id, from: yesterday, source: 'MANUAL' }),
+        );
+        // No version is TEAM (R15.2): a TEAM version over none repeats it.
+        const repeat = await refusedThenContinue(client, () =>
+          insertScheduleVersion(client, { organization, member: member.id, from: today, source: 'TEAM' }),
+        );
+        await insertScheduleVersion(client, { organization, member: member.id, from: tomorrow, source: 'MANUAL' });
+        const scheduled = await refusedThenContinue(client, () =>
+          insertScheduleVersion(client, { organization, member: member.id, from: later, source: 'TEAM' }),
+        );
+        const foreignStep = await refusedThenContinue(client, () =>
+          insertScheduleVersion(client, { organization, member: second.id, from: today, source: 'PERSONAL', pattern: pattern.id, step: other.steps[0]! }),
+        );
+        const manualPattern = await refusedThenContinue(client, () =>
+          insertScheduleVersion(client, { organization, member: second.id, from: today, source: 'MANUAL', pattern: pattern.id, step: pattern.steps[0]! }),
+        );
+        const archived = await refusedThenContinue(client, () =>
+          insertScheduleVersion(client, {
+            organization,
+            member: second.id,
+            from: today,
+            source: 'PERSONAL',
+            pattern: archivedPattern.id,
+            step: archivedPattern.steps[0]!,
+          }),
+        );
+        await actAsOwner(client);
+
+        expect(past.code, `${slug}: a past date`).toBe(POLICY_REFUSED);
+        expect(repeat.code, `${slug}: a repeat of the source in force`).toBe(POLICY_REFUSED);
+        expect(scheduled.code, `${slug}: a second scheduled version`).toBe(POLICY_REFUSED);
+        expect(foreignStep, `${slug}: a step of another pattern (AD-3)`).toMatchObject({ code: '23503' });
+        expect(foreignStep.message).toContain('member_schedule_versions_offset_step_fkey');
+        expect(manualPattern, `${slug}: a pattern on a MANUAL version`).toMatchObject({ code: '23514' });
+        expect(manualPattern.message).toContain('member_schedule_versions_pattern_by_source');
+        expect(archived, `${slug}: a pattern with an archived type (0039)`).toEqual(expect.objectContaining({ code: '23514', message: 'ROTATION_PATTERN_ARCHIVED_TYPE' }));
+      });
+    },
+  );
+
+  it.skipIf(noDatabase).each(FIXTURES)(
+    "keeps a $fixture pattern a member stands on fixed and its types unarchived, lets every active member read the versions and refuses a member's write",
+    async ({ slug, admin, member: memberName }) => {
+      await inRolledBackTransaction(async (client) => {
+        const caller = await memberByUsername(client, slug, admin);
+        const reader = await memberByUsername(client, slug, memberName);
+        const organization = caller.organizationId;
+        const { member, pattern, working, resting } = await scene(client, organization, caller.authUserId);
+        const today = await organizationDay(client, organization);
+        const soon = await organizationDay(client, organization, 2);
+        // The scene's version, written as the owner (attributed to the admin) before any `actAs`.
+        await client.query(
+          `insert into member_schedule_versions (organization_id, member_id, effective_from, source, pattern_id, offset_step_id, created_by)
+           values ($1, $2, $3::date, 'PERSONAL', $4, $5, $6)`,
+          [organization, member.id, today, pattern.id, pattern.steps[0], caller.authUserId],
+        );
+
+        await actAs(client, caller.authUserId, organization);
+        const newStep = await refusedThenContinue(client, () => insertSteps(client, organization, pattern.id, [resting], [3]));
+        const archive = await refusedThenContinue(client, () => client.query('update shift_types set archived = true where id = $1', [working]));
+        await actAsOwner(client);
+        await actAs(client, reader.authUserId, organization);
+        const { rows: seen } = await client.query<{ total: number }>(
+          'select count(*)::int as total from member_schedule_versions where member_id = $1',
+          [member.id],
+        );
+        const write = await refusedThenContinue(client, () =>
+          insertScheduleVersion(client, { organization, member: member.id, from: soon, source: 'MANUAL' }),
+        );
+        await actAsOwner(client);
+        await client.query('set local role anon');
+        const anonRead = await refusedThenContinue(client, () => client.query('select count(*) from member_schedule_versions'));
+        await actAsOwner(client);
+
+        expect(newStep.code, `${slug}: a step added to a pattern a member stands on`).toBe(POLICY_REFUSED);
+        expect(archive, `${slug}: a type a member's rotation steps through archived`).toEqual(expect.objectContaining({ code: '23514', message: 'SHIFT_TYPE_IN_ROTATION' }));
+        expect(seen[0]?.total, `${slug}: an active member reads the versions`).toBe(1);
+        expect(write.code, `${slug}: a member wrote a version`).toBe(POLICY_REFUSED);
+        expect(anonRead.code, `${slug}: anon read the versions`).toBe(POLICY_REFUSED);
       });
     },
   );

@@ -17,6 +17,8 @@ import {
   overridesAnswerOf,
   personalAssignmentsAnswerOf,
   rosterOverridesAnswerOf,
+  scheduleVersionRow,
+  stepRow,
   statusRow,
   teamRow,
   typeRow,
@@ -50,7 +52,7 @@ export const ARCHIVED_TYPE = 'pilot-staro';
 export const MONTH = '2026-10';
 export const TODAY = '2026-10-01';
 
-export { VIEWER_MEMBER, assignmentRow, calendarPersonalAssignmentRow, calendarRosterOverrideRow, memberMembershipRow, statusRow };
+export { VIEWER_MEMBER, assignmentRow, calendarPersonalAssignmentRow, calendarRosterOverrideRow, memberMembershipRow, scheduleVersionRow, statusRow, stepRow };
 
 type Row = Record<string, unknown>;
 
@@ -63,6 +65,10 @@ export interface PlanningSetup {
   readonly memberships?: readonly Row[];
   /** More rotation versions (`assignmentRow`), beside the pilot's. */
   readonly rotations?: readonly Row[];
+  /** STORY 21.10: members' schedule versions (`scheduleVersionRow`). */
+  readonly scheduleVersions?: readonly Row[];
+  /** STORY 21.10: more rotation steps (`stepRow`), beside the pilot's. */
+  readonly steps?: readonly Row[];
 }
 
 /** The calendar as `readCalendar` reads it from the fixture's rows. */
@@ -73,11 +79,14 @@ export async function planningSnapshotOf({
   minimumMembers,
   memberships = [],
   rotations = [],
+  scheduleVersions = [],
+  steps = [],
 }: PlanningSetup = {}): Promise<CalendarSnapshot> {
   const rows = {
     ...PILOT,
     teams: [...PILOT.teams, teamRow(DAY_TEAM, 'Dnevni'), teamRow(LATE_TEAM, 'Kasni'), teamRow(ARCHIVED_TEAM, 'Stari', { archived: true })],
     assignments: [...PILOT.assignments, ...rotations],
+    steps: [...PILOT.steps, ...steps],
     types: [...PILOT.types, typeRow(ARCHIVED_TYPE, 'Staro', '2026-09-25T20:07:49.339741+00:00', { archived: true, times: ['08:00:00', '16:00:00'] })],
   };
   const source = calendarTableOf(
@@ -93,6 +102,7 @@ export async function planningSnapshotOf({
           ],
           statuses,
           minimumMembers,
+          scheduleVersions,
         }),
       ],
       error: null,

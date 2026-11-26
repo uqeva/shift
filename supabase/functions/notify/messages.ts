@@ -198,6 +198,18 @@ export const OBAVIJESTI = {
     subject: 'Raspored ti je izmijenjen od {from} do {to}',
     body: '{organizationName}: raspored ti je izmijenjen od {from} do {to} (izmijenjenih dana: {days}). Pogledaj kalendar: {link}',
   },
+  scheduleSourceTeam: {
+    subject: 'Od {effectiveFrom} radiš po rotaciji tima',
+    body: '{organizationName}: od {effectiveFrom} tvoj raspored opet slijedi rotaciju tvog tima. Pogledaj kalendar: {link}',
+  },
+  scheduleSourcePersonal: {
+    subject: 'Od {effectiveFrom} radiš po osobnoj rotaciji',
+    body: '{organizationName}: od {effectiveFrom} radiš po svojoj osobnoj rotaciji, neovisno o rotaciji tima. Pogledaj kalendar: {link}',
+  },
+  scheduleSourceManual: {
+    subject: 'Od {effectiveFrom} raspored ti se slaže ručno',
+    body: '{organizationName}: od {effectiveFrom} radiš samo dane koje ti administrator dodijeli u rasporedu. Pogledaj kalendar: {link}',
+  },
   footer: 'Obavijesti e-poštom možeš isključiti u aplikaciji, pod Obavijesti: {link}',
 } as const;
 
@@ -335,6 +347,20 @@ export const MESSAGE_OF_CODE: Readonly<Record<string, MessageKey>> = {
   LOAN_REMOVED: 'loanRemoved',
   // Story 21.2 (0077, E-3): one notice per member per personal-assignment save.
   SCHEDULE_ASSIGNED: 'scheduleAssigned',
+  // Story 21.10 (0079, E-3): a member's schedule source from a date; the
+  // message is the one {@link SOURCE_VARIANT_OF} picks by the row's `source`.
+  SCHEDULE_SOURCE_CHANGED: 'scheduleSourceTeam',
+};
+
+/**
+ * Story 21.10 (0079): the message a `SCHEDULE_SOURCE_CHANGED` row renders
+ * with, by its `source` operand — `TEAM`, `PERSONAL` or `MANUAL`, the source
+ * in force from `effectiveFrom` (an insert's own, or after a cancel the one it
+ * restores). A row with any other `source`, or none, is refused: the renderer
+ * has no ICU to word a code. A code with no entry here ignores `source`.
+ */
+export const SOURCE_VARIANT_OF: Readonly<Partial<Record<MessageKey, { readonly TEAM: MessageKey; readonly PERSONAL: MessageKey; readonly MANUAL: MessageKey }>>> = {
+  scheduleSourceTeam: { TEAM: 'scheduleSourceTeam', PERSONAL: 'scheduleSourcePersonal', MANUAL: 'scheduleSourceManual' },
 };
 
 /**
@@ -413,6 +439,9 @@ export function linkPathOf(key: MessageKey, operands: Readonly<Record<string, un
     case 'loanChanged':
     case 'loanRemoved':
     case 'scheduleAssigned':
+    case 'scheduleSourceTeam':
+    case 'scheduleSourcePersonal':
+    case 'scheduleSourceManual':
       return '/kalendar';
     case 'swapRequestProposed':
     case 'swapRequestAccepted':
@@ -641,6 +670,14 @@ function compose(code: string, locale: string | null, operands: unknown, target:
     const halfVariant = HALF_VARIANT_OF[codeKey];
     if (halfVariant === undefined) return { ok: false, code: OPERANDS_INVALID };
     key = halfVariant[half];
+  }
+
+  // 0079: a schedule source's notice says which source, by its own message.
+  const sourceVariant = SOURCE_VARIANT_OF[codeKey];
+  if (sourceVariant !== undefined) {
+    const source = (operands as Record<string, unknown>)['source'];
+    if (source !== 'TEAM' && source !== 'PERSONAL' && source !== 'MANUAL') return { ok: false, code: OPERANDS_INVALID };
+    key = sourceVariant[source];
   }
 
   const path = linkPathOf(key, operands as Record<string, unknown>);

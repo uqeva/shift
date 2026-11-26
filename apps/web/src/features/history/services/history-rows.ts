@@ -303,6 +303,7 @@ const RECORD_KEYS: Readonly<Record<HistoryRecord, ReturnType<typeof historyRecor
   'calendar-feed': 'history.record.calendarFeed',
   'personal-assignment': 'history.record.personalAssignment',
   'job-role': 'history.record.jobRole',
+  'schedule-version': 'history.record.scheduleVersion',
   other: 'history.record.other',
 };
 
@@ -335,6 +336,7 @@ export function historyRecordMessageKey(
   | 'history.record.calendarFeed'
   | 'history.record.personalAssignment'
   | 'history.record.jobRole'
+  | 'history.record.scheduleVersion'
   | 'history.record.other' {
   return RECORD_KEYS[record];
 }
@@ -429,6 +431,7 @@ const FIELD_KEYS: Readonly<Record<HistoryField, ReturnType<typeof historyFieldMe
   absenceType: 'history.field.absenceType',
   drawsAllowance: 'history.field.drawsAllowance',
   kind: 'history.field.kind',
+  scheduleSource: 'history.field.scheduleSource',
   rosterOverride: 'history.field.rosterOverride',
   returnRosterOverride: 'history.field.returnRosterOverride',
   reason: 'history.field.reason',
@@ -496,6 +499,7 @@ export function historyFieldMessageKey(
   | 'history.field.absenceType'
   | 'history.field.drawsAllowance'
   | 'history.field.kind'
+  | 'history.field.scheduleSource'
   | 'history.field.rosterOverride'
   | 'history.field.returnRosterOverride'
   | 'history.field.reason'
@@ -523,6 +527,11 @@ const ENUM_KEYS: Readonly<Record<HistoryEnumField, Readonly<Record<string, Retur
     OFF: 'history.enum.kindOff',
   },
   half: { FIRST: 'history.enum.halfFirst', SECOND: 'history.enum.halfSecond' },
+  scheduleSource: {
+    TEAM: 'history.enum.scheduleSourceTeam',
+    PERSONAL: 'history.enum.scheduleSourcePersonal',
+    MANUAL: 'history.enum.scheduleSourceManual',
+  },
   status: {
     current: 'history.enum.statusCurrent',
     open: 'history.enum.statusOpen',
@@ -552,6 +561,9 @@ export function historyEnumMessageKey(
   | 'history.enum.kindOff'
   | 'history.enum.halfFirst'
   | 'history.enum.halfSecond'
+  | 'history.enum.scheduleSourceTeam'
+  | 'history.enum.scheduleSourcePersonal'
+  | 'history.enum.scheduleSourceManual'
   | 'history.enum.statusCurrent'
   | 'history.enum.statusOpen'
   | 'history.enum.statusConfirmed'

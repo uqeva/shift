@@ -116,6 +116,15 @@ export function scheduleInputsOfCalendar(
             teamId: assignment.teamId,
           }))
           .sort((left, right) => byText(left.date, right.date) || byText(left.id, right.id)),
+        // Story 21.10 (AD-19 as amended): every member's versions, whole, as 0079's assembly.
+        scheduleVersions: member.scheduleVersions
+          .map((version) => ({
+            effectiveFrom: version.effectiveFrom,
+            source: version.source,
+            patternId: version.patternId,
+            offsetStepId: version.offsetStepId,
+          }))
+          .sort((left, right) => byText(left.effectiveFrom, right.effectiveFrom)),
       }))
       .sort((left, right) => byText(left.id, right.id)),
     overrides: snapshot.overrides

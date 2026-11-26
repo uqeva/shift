@@ -288,6 +288,7 @@ export {
   REMINDER_WINDOW_BEFORE_MS,
   shiftRemindersDueOf,
   SHIFT_REMINDER_SOURCE_ASSIGNMENT,
+  SHIFT_REMINDER_SOURCE_PERSONAL_ROTATION,
   type ShiftReminder,
 } from './shift-reminders.js';
 

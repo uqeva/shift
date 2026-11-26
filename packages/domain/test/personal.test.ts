@@ -60,13 +60,14 @@ import { SEEDED_EFFECTIVE_FROM } from './fixtures.js';
 
 /**
  * Both parity fixtures as they were before story 21.2 gave them Personal
- * Assignments: every member's list removed, so the digest below is still the
+ * Assignments (and story 21.10 schedule versions): every member's lists removed, so the digest below is still the
  * claim R14.7 makes (no assignment anywhere derives as before).
  */
 function withoutAssignments(organization: (typeof PARITY_FIXTURES)[number]['organization']) {
   return {
     ...organization,
-    members: organization.members.map(({ personalAssignments: _dropped, ...member }) => member),
+    // Story 21.10: and no schedule version, which the fixtures gained after both.
+    members: organization.members.map(({ personalAssignments: _dropped, scheduleVersions: _versions, ...member }) => member),
   };
 }
 

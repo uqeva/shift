@@ -285,8 +285,8 @@ describe('notify renders from a pinned copy of the obavijesti namespace', () => 
       const rendered = render(
         code,
         'hr',
-        // Story 21.2: `from`, `to` and `days` fill SCHEDULE_ASSIGNED.
-        { startDate: '2046-03-02', endDate: '2046-03-06', date: '2046-03-02', effectiveFrom: '2046-03-02', shiftTypeName: 'Dnevna', memberName: 'Ana Kovač', proposerName: 'Ana Kovač', addresseeName: 'Ivo Babić', requestId: REQUEST_ID, teamName: 'Smjena C', from: '2046-03-02', to: '2046-03-31', days: 12 },
+        // Story 21.2: `from`, `to` and `days` fill SCHEDULE_ASSIGNED. Story 21.10: `source` picks SCHEDULE_SOURCE_CHANGED's message.
+        { startDate: '2046-03-02', endDate: '2046-03-06', date: '2046-03-02', effectiveFrom: '2046-03-02', shiftTypeName: 'Dnevna', memberName: 'Ana Kovač', proposerName: 'Ana Kovač', addresseeName: 'Ivo Babić', requestId: REQUEST_ID, teamName: 'Smjena C', from: '2046-03-02', to: '2046-03-31', days: 12, source: 'PERSONAL' },
         TARGET,
       );
       if (!rendered.ok) throw new Error(`${code} did not render`);
@@ -531,6 +531,14 @@ const EVERY_CODE: readonly {
     path: '/kalendar',
     subject: 'Raspored ti je izmijenjen od 02.03.2046 do 31.03.2046',
     text: `${ORGANIZATION_NAME}: raspored ti je izmijenjen od 02.03.2046 do 31.03.2046 (izmijenjenih dana: 12). Pogledaj kalendar: {link}`,
+  },
+  // Story 21.10 (0079, E-3): the member's schedule source from a date, worded by `source`.
+  {
+    code: 'SCHEDULE_SOURCE_CHANGED',
+    operands: { effectiveFrom: '2046-03-02', source: 'PERSONAL' },
+    path: '/kalendar',
+    subject: 'Od 02.03.2046 radiš po osobnoj rotaciji',
+    text: `${ORGANIZATION_NAME}: od 02.03.2046 radiš po svojoj osobnoj rotaciji, neovisno o rotaciji tima. Pogledaj kalendar: {link}`,
   },
 ];
 

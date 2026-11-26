@@ -505,7 +505,7 @@ describe('the access-control migration', () => {
     ).toEqual([]);
   });
 
-  it('declares exactly the seventy policies stories 1.3a, 1.4a, 1.4b, 1.6, 1.7a, 1.7b, 2.1a, 2.2a, 2.3a, 3.5a, 3.6a, 5.1b, 5.4a, 9.2, 10.3, 10.4, 12.1, 13.1, 13.3, 14.1, 17.1, 18.2, 21.2, 21.12, 0025 and 0036 reviewed, and no seventy-first', () => {
+  it('declares exactly the seventy-three policies stories 1.3a, 1.4a, 1.4b, 1.6, 1.7a, 1.7b, 2.1a, 2.2a, 2.3a, 3.5a, 3.6a, 5.1b, 5.4a, 9.2, 10.3, 10.4, 12.1, 13.1, 13.3, 14.1, 17.1, 18.2, 21.2, 21.10, 21.12, 0025 and 0036 reviewed, and no seventy-fourth', () => {
     // EXTENDED BY STORY 1.4a, exactly as this comment asked: `0004_organization
     // _settings.sql` adds `organizations_update_by_own_active_admin`, built by
     // copying `members_update_by_own_active_admin`, and its name is added here
@@ -585,6 +585,13 @@ describe('the access-control migration', () => {
       'leave_request_decisions_select_own_organization',
       'leave_requests_insert_own_by_active_member',
       'leave_requests_select_own_organization',
+      // STORY 21.10 (0079), and THREE, as 0016's rotation versions: every
+      // active member reads a member's schedule versions; an active admin
+      // inserts one from today on and cancels only the latest still ahead.
+      // No update policy: a version is never changed (AD-2).
+      'member_schedule_versions_delete_scheduled_by_own_active_admin',
+      'member_schedule_versions_insert_by_own_active_admin',
+      'member_schedule_versions_select_own_organization',
       // STORY 1.6, and THREE rather than four: a status version is appended,
       // cancelled only while it is not yet in effect, and never changed, so
       // there is no update policy and that verb matches no row. A fourth name
@@ -3656,6 +3663,8 @@ describe('the access-control migration', () => {
     personal_assignments: ['organization_id', 'id'],
     // STORY 21.12 (0078), attached in the migration that creates it.
     job_roles: ['organization_id', 'id'],
+    // STORY 21.10 (0079), attached in the migration that creates it.
+    member_schedule_versions: ['organization_id', 'id'],
   };
 
   /**
@@ -7591,5 +7600,116 @@ describe('a personal assignment is a recorded exception (0077, story 21.2)', () 
     expect(read, 'the read must say nothing (null) to a caller with no access').toMatch(/then null/);
     expect(save).toMatch(/and access\.is_active\s+and access\.member_role = 'admin'/);
     expect(save).not.toMatch(/\bexception\s+when\b/);
+  });
+});
+
+describe("a member's schedule source is versioned (0079, story 21.10)", () => {
+  const MIGRATION = '0079_member_schedule_versions.sql';
+  const raw = (name: string): string => readFileSync(join(supabaseRoot, 'migrations', name), 'utf8');
+  const sql = (): string => stripLineComments(raw(MIGRATION));
+  const definitionOf = (text: string, name: string): string => {
+    const lines = text.split('\n');
+    const start = lines.findIndex((line) => new RegExp(`^create (or replace )?function ${name.replace('.', '\\.')}\\(`).test(line));
+    if (start < 0) return '';
+    const end = lines.findIndex((line, index) => index > start && line === '$$;');
+    return lines.slice(start, end + 1).join('\n');
+  };
+  /** The lines of `earlier`'s definition of `name` that 0079's drops. */
+  const dropped = (earlier: string, name: string): readonly string[] => {
+    const before = definitionOf(raw(earlier), name).split('\n');
+    const after = new Set(definitionOf(raw(MIGRATION), name).split('\n'));
+    return before.filter((line) => !after.has(line));
+  };
+
+  it('keys a version by member and date, its step a step of its pattern (AD-3), pattern and step only for PERSONAL', () => {
+    const text = sql();
+    expect(text).toMatch(/create table member_schedule_versions \(\n\s+organization_id uuid not null references organizations \(id\) on delete cascade,/);
+    expect(text).toMatch(/constraint member_schedule_versions_member_fkey\s+foreign key \(organization_id, member_id\)\s+references members \(organization_id, id\),/);
+    expect(text).toMatch(
+      /constraint member_schedule_versions_offset_step_fkey\s+foreign key \(organization_id, pattern_id, offset_step_id\)\s+references rotation_steps \(organization_id, pattern_id, id\),/,
+    );
+    expect(text).toContain("check (source in ('TEAM', 'PERSONAL', 'MANUAL'))");
+    expect(text).toContain("check ((source = 'PERSONAL') = (pattern_id is not null))");
+    expect(text).toContain('check ((pattern_id is null) = (offset_step_id is null))');
+    expect(text).toMatch(/constraint member_schedule_versions_member_id_effective_from_key\s+unique \(organization_id, member_id, effective_from\)/);
+    // The version is its own anchor (21.9 Design Note 1): no anchor column.
+    expect(/create table member_schedule_versions \([\s\S]*?\n\);/.exec(text)?.[0]).not.toMatch(/anchor_date/);
+  });
+
+  it('holds RLS, three policies, no update, TRUNCATE taken back, and both audit triggers', () => {
+    const text = sql();
+    expect(text).toContain('alter table member_schedule_versions enable row level security;');
+    expect(text).toMatch(/revoke insert, update, delete, truncate, references, trigger on table public\.member_schedule_versions\s+from anon, authenticated;/);
+    expect(text).toContain('revoke truncate on table public.member_schedule_versions from anon, authenticated, service_role;');
+    expect(text).toContain('grant delete on table public.member_schedule_versions to authenticated;');
+    expect(text).not.toMatch(/grant update[^;]*member_schedule_versions/);
+    expect(text).not.toMatch(/for update/);
+    expect(text).toMatch(/create trigger member_schedule_versions_audit after insert or delete on public\.member_schedule_versions/);
+    expect(text).toMatch(/create trigger member_schedule_versions_audit_update after update on public\.member_schedule_versions/);
+  });
+
+  it("writes as 0016's rotation versions do: from today, after the latest, one scheduled, no repeat; cancel only the latest still ahead", () => {
+    const text = sql();
+    const insert = /create policy member_schedule_versions_insert_by_own_active_admin[\s\S]*?\n {2}\);/.exec(text)?.[0] ?? '';
+    const remove = /create policy member_schedule_versions_delete_scheduled_by_own_active_admin[\s\S]*?\n {2}\);/.exec(text)?.[0] ?? '';
+    expect(insert).toMatch(/access\.member_role = 'admin'/);
+    expect(insert).toMatch(/created_by = \(select auth\.uid\(\)\)/);
+    expect(insert).toMatch(/effective_from >= public\.organization_today\(organization_id\)/);
+    expect(insert).toMatch(
+      /later\.effective_from >= member_schedule_versions\.effective_from\s+or later\.effective_from > public\.organization_today\(later\.organization_id\)/,
+    );
+    expect(insert).toMatch(/source = 'PERSONAL'\s+or source <> coalesce\(/);
+    expect(remove).toMatch(/effective_from > public\.organization_today\(organization_id\)/);
+    expect(remove).toMatch(/later\.effective_from > member_schedule_versions\.effective_from/);
+    // 0023's lock, 0035's re-check and 0039's archived-type refusal, each attached unchanged.
+    expect(text).toMatch(
+      /create trigger member_schedule_versions_serialize_organization_writes\s+before insert or delete on public\.member_schedule_versions\s+for each statement\s+execute function public\.serialize_organization_writes\(\);/,
+    );
+    expect(text).toMatch(
+      /create trigger member_schedule_versions_refuse_write_by_stale_admin\s+before insert or delete on public\.member_schedule_versions\s+for each row\s+execute function public\.refuse_write_by_stale_admin\(\);/,
+    );
+    expect(text).toMatch(
+      /create trigger member_schedule_versions_refuse_write_while_archived_type\s+before insert on public\.member_schedule_versions\s+for each row\s+execute function public\.refuse_assignment_on_archived_type\(\);/,
+    );
+  });
+
+  it('tells the member once per version, SCHEDULE_SOURCE_CHANGED { effectiveFrom, source }, a cancel under its own subject (E-3)', () => {
+    const notify = stripLineComments(definitionOf(raw(MIGRATION), 'private.notify_schedule_version'));
+    expect(notify).toMatch(/security definer/);
+    expect(notify).toMatch(/set search_path = ''/);
+    expect(notify.match(/'SCHEDULE_SOURCE_CHANGED'/g)).toHaveLength(2);
+    expect(notify.match(/'effectiveFrom', pg_catalog\.to_char\((new|old)\.effective_from, 'YYYY-MM-DD'\)/g)).toHaveLength(2);
+    expect(notify).toMatch(/pg_catalog\.md5\('SCHEDULE_SOURCE_CANCELLED:' \|\| old\.id::text\)::uuid/);
+    expect(notify).toMatch(/pg_catalog\.pg_trigger_depth\(\) > 1/);
+    expect(sql()).toContain('revoke execute on function private.notify_schedule_version() from public, anon, authenticated, service_role;');
+  });
+
+  it("re-creates the pattern-in-use predicate and the archive refusal from their latest definitions, only adding a member's version", () => {
+    // Only the `create` became `create or replace`; every line of 0016's body stays.
+    expect(dropped('0016_rotation.sql', 'public.rotation_pattern_in_use')).toEqual([
+      'create function public.rotation_pattern_in_use(pattern uuid) returns boolean',
+    ]);
+    expect(definitionOf(raw(MIGRATION), 'public.rotation_pattern_in_use')).toMatch(/from public\.member_schedule_versions v\s+where v\.pattern_id = pattern/);
+    expect(dropped('0037_team_archive_without_rotation_refusal.sql', 'public.refuse_archive_in_rotation')).toEqual([]);
+    expect(definitionOf(raw(MIGRATION), 'public.refuse_archive_in_rotation')).toMatch(/join public\.member_schedule_versions v/);
+  });
+
+  it("re-creates the assembly and the reminder write from 0077, only adding every member's versions and the PERSONAL_ROTATION form", () => {
+    expect(dropped('0077_personal_assignments.sql', 'private.member_schedule_inputs')).toEqual([]);
+    const inputs = definitionOf(raw(MIGRATION), 'private.member_schedule_inputs');
+    expect(inputs).toMatch(/'scheduleVersions', coalesce\(\(/);
+    expect(inputs).toMatch(
+      /order by v\.effective_from\s+\)\s+from public\.member_schedule_versions v\s+where v\.organization_id = v_organization\s+and v\.member_id = m\.id\s+\), '\[\]'::jsonb\)/,
+    );
+    expect(dropped('0077_personal_assignments.sql', 'public.enqueue_shift_reminders')).toEqual([]);
+    const enqueue = stripLineComments(definitionOf(raw(MIGRATION), 'public.enqueue_shift_reminders'));
+    expect(enqueue).toMatch(
+      /\(item ->> 'source'\) = 'PERSONAL_ROTATION' then\s+\(select pg_catalog\.count\(\*\) from pg_catalog\.jsonb_object_keys\(item\)\) = 9/,
+    );
+    expect(enqueue).toMatch(/':p:' \|\| v_lead/);
+    expect(enqueue).toMatch(
+      /from public\.member_schedule_versions v\s+where v\.organization_id = v_organization\s+and v\.member_id = v_member\s+and v\.effective_from <= v_date/,
+    );
+    expect(enqueue).toMatch(/\), 'TEAM'\) <> 'PERSONAL'/);
   });
 });

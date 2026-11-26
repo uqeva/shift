@@ -79,8 +79,18 @@ const CONFLICT_TREATMENT = modifierTreatmentOf([MODIFIER_CONFLICT]);
 /**
  * STORY 21.6 (UX-DR73): a member on the day through a Personal Assignment —
  * the pencil and `ručno`, named `dodijeljeno ručno` for a screen reader.
+ * STORY 21.10: one there through their own rotation reads `osobna rotacija`,
+ * with no pencil: a rotation, not an assignment.
  */
 function renderAssigned(member: DayDetailMember): ReactNode {
+  if (member.personalRotation === true) {
+    return (
+      <>
+        <span className="sr-only">{t('ljudi.status.separator')}</span>
+        <span className="ml-2 text-sm text-muted-foreground">{t('kalendar.cell.personalRotation')}</span>
+      </>
+    );
+  }
   if (member.assigned !== true) return null;
 
   return (

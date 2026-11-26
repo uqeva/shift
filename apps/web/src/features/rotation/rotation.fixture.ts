@@ -326,7 +326,9 @@ export const FIXTURE_ORGANIZATION_NAME = 'DVD Fixture';
  * default every viewer row's own versions, stamped with its member id and a
  * `null` position. The `member_status_versions` embed is `statuses`, by
  * default none (story 3.4a). Its `name` is `name`, by default
- * {@link FIXTURE_ORGANIZATION_NAME} (story 4.3).
+ * {@link FIXTURE_ORGANIZATION_NAME} (story 4.3). The
+ * `member_schedule_versions` embed is `scheduleVersions`, by default none
+ * (story 21.10).
  */
 export function calendarOrganizationRow(
   rows: FixtureRows,
@@ -342,6 +344,8 @@ export function calendarOrganizationRow(
     minimumMembers = undefined as unknown,
     // STORY 13.2: the absence types embed; by default annual leave alone.
     absenceTypes = null as readonly Row[] | null,
+    // STORY 21.10: the schedule versions embed; by default none.
+    scheduleVersions = [] as readonly Row[],
   } = {},
 ): Row {
   const first = rows.teams[0]?.['id'];
@@ -366,6 +370,26 @@ export function calendarOrganizationRow(
     members,
     team_membership_versions: versions ?? stamped,
     member_status_versions: statuses,
+    member_schedule_versions: scheduleVersions,
+  };
+}
+
+/** One row of the `member_schedule_versions` embed (0079, story 21.10). */
+export function scheduleVersionRow(
+  memberId: string,
+  effectiveFrom: string,
+  source: 'TEAM' | 'PERSONAL' | 'MANUAL',
+  patternId: string | null = null,
+  offsetStepId: string | null = null,
+  organizationId: string = ORGANIZATION,
+): Row {
+  return {
+    organization_id: organizationId,
+    member_id: memberId,
+    effective_from: effectiveFrom,
+    source,
+    pattern_id: patternId,
+    offset_step_id: offsetStepId,
   };
 }
 

@@ -424,6 +424,7 @@
       "calendarFeed": "Kalendar na mobitelu",
       "personalAssignment": "Ručni raspored",
       "jobRole": "Posao",
+      "scheduleVersion": "Raspored osobe",
       "other": "Zapis"
     },
     "action": {
@@ -497,6 +498,7 @@
       "absenceType": "Vrsta odsutnosti",
       "drawsAllowance": "Troši pravo",
       "kind": "Odluka",
+      "scheduleSource": "Raspoređivanje",
       "rosterOverride": "Zamjena osobe",
       "returnRosterOverride": "Zamjena osobe za povrat",
       "reason": "Razlog",
@@ -521,6 +523,9 @@
       "kindOff": "slobodan dan",
       "halfFirst": "prva polovica",
       "halfSecond": "druga polovica",
+      "scheduleSourceTeam": "rotacija tima",
+      "scheduleSourcePersonal": "osobna rotacija",
+      "scheduleSourceManual": "samo ručno",
       "statusCurrent": "važeće",
       "statusOpen": "otvoreno",
       "statusConfirmed": "potvrđeno",
@@ -752,6 +757,7 @@
     "cell": {
       "assigned": "dodijeljeno ručno",
       "assignedShort": "ručno",
+      "personalRotation": "osobna rotacija",
       "noTeam": "bez tima",
       "noTeamShown": "· bez tima"
     },
@@ -2399,6 +2405,18 @@
       "subject": "Raspored ti je izmijenjen od {from} do {to}",
       "body": "{organizationName}: raspored ti je izmijenjen od {from} do {to} (izmijenjenih dana: {days}). Pogledaj kalendar: {link}"
     },
+    "scheduleSourceTeam": {
+      "subject": "Od {effectiveFrom} radiš po rotaciji tima",
+      "body": "{organizationName}: od {effectiveFrom} tvoj raspored opet slijedi rotaciju tvog tima. Pogledaj kalendar: {link}"
+    },
+    "scheduleSourcePersonal": {
+      "subject": "Od {effectiveFrom} radiš po osobnoj rotaciji",
+      "body": "{organizationName}: od {effectiveFrom} radiš po svojoj osobnoj rotaciji, neovisno o rotaciji tima. Pogledaj kalendar: {link}"
+    },
+    "scheduleSourceManual": {
+      "subject": "Od {effectiveFrom} raspored ti se slaže ručno",
+      "body": "{organizationName}: od {effectiveFrom} radiš samo dane koje ti administrator dodijeli u rasporedu. Pogledaj kalendar: {link}"
+    },
     "footer": "Obavijesti e-poštom možeš isključiti u aplikaciji, pod Obavijesti: {link}"
   },
   "popunjenost": {
@@ -2909,6 +2927,7 @@
     },
     "source": {
       "team": "rotacija tima",
+      "personal": "osobna rotacija",
       "manual": "ručno"
     },
     "cell": {
@@ -3054,5 +3073,71 @@
       }
     },
     "rowLine": "{role} · {source}"
+  },
+  "rasporedOsobe": {
+    "title": "Raspored osobe",
+    "change": "Promijeni raspored",
+    "unknown": "Raspored osobe se učitava.",
+    "now": "Sada: {fact}",
+    "scheduled": "Zakazano: {fact}",
+    "since": "{source}, od {date}",
+    "withPattern": "{base} · uzorak {pattern}, početni korak {step}",
+    "run": "{type} ×{count}",
+    "runSeparator": ", ",
+    "cancel": "Povuci",
+    "cancelNamed": "Povuci promjenu od {date}",
+    "savedSet": "Raspored osobe je spremljen.",
+    "savedCancel": "Zakazana promjena je povučena.",
+    "source": {
+      "team": "Rotacija tima",
+      "personal": "Osobna rotacija",
+      "manual": "Samo ručno"
+    },
+    "hint": {
+      "team": "Radi po rotaciji svog tima.",
+      "personal": "Radi po svom uzorku koji se ponavlja, neovisno o rotaciji tima.",
+      "manual": "Radi samo ono što mu dodijeliš u Ručnom rasporedu."
+    },
+    "sourceHeading": "Kako se raspoređuje",
+    "from": "Vrijedi od",
+    "fromHint": "Najranije danas. Do tada vrijedi dosadašnji raspored.",
+    "pattern": "Uzorak",
+    "choose": "Odaberi",
+    "newPattern": "Novi uzorak",
+    "steps": "Koraci uzorka",
+    "stepType": "Korak {position}",
+    "stepCount": "Broj dana u koraku {position}",
+    "removeStep": "Ukloni korak {position}",
+    "addStep": "Dodaj korak",
+    "start": "Početni korak",
+    "startOption": "{day}. dan uzorka · {name}",
+    "startHint": "Dan uzorka na kojem je osoba na dan Vrijedi od.",
+    "close": "Zatvori",
+    "dismiss": "Odustani",
+    "next": "Dalje",
+    "preview": {
+      "title": "Što se mijenja",
+      "ledeSet": "Od {date}: {source}. Upozorenja ne sprječavaju spremanje.",
+      "ledeCancel": "Povlači se promjena od {date}. Upozorenja ne sprječavaju spremanje.",
+      "window": "Prikazano za razdoblje od {from} do {to}.",
+      "back": "Natrag na uređivanje",
+      "save": "Spremi",
+      "cancelSave": "Povuci promjenu"
+    },
+    "error": {
+      "unchosen": "Odaberi datum Vrijedi od.",
+      "past": "Vrijedi od ne može biti prije današnjeg dana.",
+      "scheduled": "Promjena je već zakazana. Povuci je prije nove.",
+      "taken": "Od tog datuma promjena već postoji. Odaberi kasniji datum.",
+      "unchanged": "Od tog datuma osoba se već tako raspoređuje.",
+      "noPattern": "Odaberi uzorak ili dodaj korake novog uzorka.",
+      "badRow": "Svaki korak treba vrstu i broj dana, najmanje 1.",
+      "tooLong": "Uzorak može imati najviše 56 dana.",
+      "archived": "Uzorak sadrži arhiviranu vrstu. Odaberi drugi uzorak.",
+      "badStart": "Odaberi početni korak.",
+      "stale": "Podaci su se u međuvremenu promijenili. Provjeri i pokušaj ponovno.",
+      "failed": "Raspored osobe trenutačno nije moguće spremiti. Pokušaj ponovno.",
+      "unchecked": "Promjenu trenutačno nije moguće provjeriti. Pokušaj ponovno."
+    }
   }
 }

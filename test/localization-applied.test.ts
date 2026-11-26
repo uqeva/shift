@@ -497,6 +497,8 @@ const SOURCES = [
   join(webRoot, 'src', 'features', 'planning', 'services', 'manual-grid.ts'),
   join(webRoot, 'src', 'components', 'date-grid.tsx'),
   join(webRoot, 'src', 'utils', 'grid-dates.ts'),
+  // Story 21.10: *Raspored osobe*'s rules module, which words its sources and refusals (its card and hook are member screen parts).
+  join(webRoot, 'src', 'features', 'members', 'services', 'schedule-source.ts'),
   join(webRoot, 'src', 'features', 'history', 'hooks', 'use-change-history.ts'),
   join(webRoot, 'src', 'features', 'history', 'components', 'history-body.tsx'),
   join(webRoot, 'src', 'features', 'history', 'components', 'history-filters.tsx'),

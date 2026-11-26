@@ -453,4 +453,25 @@ describe('story 21.2: a reminder of a Personal Shift with no team, and the batch
     expect(render('SCHEDULE_ASSIGNED', 'hr', { from: '2046-02-30', to: '2046-03-31', days: 1 }, TARGET)).toEqual({ ok: false, code: OPERANDS_INVALID });
     expect(render('SCHEDULE_ASSIGNED', 'hr', { from: '2046-03-02', to: '2046-03-31' }, TARGET)).toEqual({ ok: false, code: OPERANDS_INVALID });
   });
+
+  it('renders SCHEDULE_SOURCE_CHANGED by its source, linking to Kalendar, and refuses any other source (story 21.10)', () => {
+    const footer = `\n\nObavijesti e-poštom možeš isključiti u aplikaciji, pod Obavijesti: ${linkTo('/obavijesti')}`;
+    expect(render('SCHEDULE_SOURCE_CHANGED', 'hr', { effectiveFrom: '2046-03-02', source: 'TEAM' }, TARGET)).toEqual({
+      ok: true,
+      subject: 'Od 02.03.2046 radiš po rotaciji tima',
+      text: `${ORGANIZATION_NAME}: od 02.03.2046 tvoj raspored opet slijedi rotaciju tvog tima. Pogledaj kalendar: ${linkTo('/kalendar')}${footer}`,
+    });
+    expect(render('SCHEDULE_SOURCE_CHANGED', 'hr', { effectiveFrom: '2046-03-02', source: 'PERSONAL' }, TARGET)).toMatchObject({
+      ok: true,
+      subject: 'Od 02.03.2046 radiš po osobnoj rotaciji',
+    });
+    expect(render('SCHEDULE_SOURCE_CHANGED', 'hr', { effectiveFrom: '2046-03-02', source: 'MANUAL' }, TARGET)).toEqual({
+      ok: true,
+      subject: 'Od 02.03.2046 raspored ti se slaže ručno',
+      text: `${ORGANIZATION_NAME}: od 02.03.2046 radiš samo dane koje ti administrator dodijeli u rasporedu. Pogledaj kalendar: ${linkTo('/kalendar')}${footer}`,
+    });
+    for (const operands of [{ effectiveFrom: '2046-03-02' }, { effectiveFrom: '2046-03-02', source: 'ROTATION' }, { effectiveFrom: '2046-02-30', source: 'TEAM' }]) {
+      expect(render('SCHEDULE_SOURCE_CHANGED', 'hr', operands, TARGET), JSON.stringify(operands)).toEqual({ ok: false, code: OPERANDS_INVALID });
+    }
+  });
 });

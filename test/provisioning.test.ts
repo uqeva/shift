@@ -702,7 +702,7 @@ describe('every organization table carries row level security, and only its revi
               'push_subscriptions', 'swap_requests', 'swap_request_decisions',
               'absence_types', 'leave_allowances', 'audit_events', 'team_loans',
               'calendar_feed_tokens', 'reminder_settings', 'personal_assignments',
-              'job_roles'
+              'job_roles', 'member_schedule_versions'
             )
           order by relname`,
       );
@@ -733,6 +733,8 @@ describe('every organization table carries row level security, and only its revi
         'leave_records',
         'leave_request_decisions',
         'leave_requests',
+        // STORY 21.10 (0079): a member's schedule source from a date.
+        'member_schedule_versions',
         'member_status_versions',
         'members',
         'notification_outbox',
@@ -1976,6 +1978,66 @@ describe('every organization table carries row level security, and only its revi
     }
   });
 
+  it.skipIf(noDatabase)('holds no privilege on member_schedule_versions but read, a six-column insert and delete, never update, and attaches the lock, the re-check, the archived-type refusal and the notices (story 21.10)', async () => {
+    // As 0016's rotation versions: `authenticated` reads (an active member, by
+    // the policy), inserts the six facts and deletes (the scheduled one, by the
+    // policy); no session updates a version, names its id, `created_by` or
+    // `created_at`, or holds anything as `anon`.
+    const client = await connect();
+    try {
+      const held = await heldPrivileges(client, 'member_schedule_versions', [
+        'organization_id',
+        'id',
+        'member_id',
+        'effective_from',
+        'source',
+        'pattern_id',
+        'offset_step_id',
+        'created_by',
+        'created_at',
+      ]);
+      expect(held.tables).toEqual(['authenticated:DELETE', 'authenticated:SELECT']);
+      expect(held.columns, 'the writable schedule version columns changed, or anon holds one').toEqual([
+        'authenticated:INSERT:effective_from',
+        'authenticated:INSERT:member_id',
+        'authenticated:INSERT:offset_step_id',
+        'authenticated:INSERT:organization_id',
+        'authenticated:INSERT:pattern_id',
+        'authenticated:INSERT:source',
+      ]);
+
+      const { rows: keys } = await client.query<{ definition: string }>(
+        `select pg_get_constraintdef(oid) as definition
+           from pg_constraint
+          where contype in ('p', 'f', 'u') and conrelid = 'public.member_schedule_versions'::regclass`,
+      );
+      expect(keys.map((row) => row.definition).sort()).toEqual([
+        'FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE',
+        'FOREIGN KEY (organization_id, member_id) REFERENCES members(organization_id, id)',
+        'FOREIGN KEY (organization_id, pattern_id) REFERENCES rotation_patterns(organization_id, id)',
+        'FOREIGN KEY (organization_id, pattern_id, offset_step_id) REFERENCES rotation_steps(organization_id, pattern_id, id)',
+        'PRIMARY KEY (id)',
+        'UNIQUE (organization_id, member_id, effective_from)',
+      ]);
+
+      const { rows: triggers } = await client.query<{ definition: string }>(
+        `select pg_get_triggerdef(oid) as definition from pg_trigger
+          where tgrelid = 'public.member_schedule_versions'::regclass and not tgisinternal
+            and tgfoid <> 'private.record_audit_event()'::regprocedure
+          order by 1`,
+      );
+      expect(triggers.map((row) => row.definition)).toEqual([
+        'CREATE TRIGGER member_schedule_versions_notify_delete AFTER DELETE ON public.member_schedule_versions FOR EACH ROW EXECUTE FUNCTION private.notify_schedule_version()',
+        'CREATE TRIGGER member_schedule_versions_notify_insert AFTER INSERT ON public.member_schedule_versions FOR EACH ROW EXECUTE FUNCTION private.notify_schedule_version()',
+        'CREATE TRIGGER member_schedule_versions_refuse_write_by_stale_admin BEFORE INSERT OR DELETE ON public.member_schedule_versions FOR EACH ROW EXECUTE FUNCTION refuse_write_by_stale_admin()',
+        'CREATE TRIGGER member_schedule_versions_refuse_write_while_archived_type BEFORE INSERT ON public.member_schedule_versions FOR EACH ROW EXECUTE FUNCTION refuse_assignment_on_archived_type()',
+        'CREATE TRIGGER member_schedule_versions_serialize_organization_writes BEFORE INSERT OR DELETE ON public.member_schedule_versions FOR EACH STATEMENT EXECUTE FUNCTION serialize_organization_writes()',
+      ]);
+    } finally {
+      await client.end();
+    }
+  });
+
   it.skipIf(noDatabase)('keys absence types per organization, seeds annual leave in every one, and defaults every leave record to it (story 13.1)', async () => {
     const client = await connect();
     try {
@@ -2477,7 +2539,8 @@ describe('every organization table carries row level security, and only its revi
   // STORY 14.1 (0061, AD-3 and AD-11 as amended 2026-11-16): the audited
   // tables and the two `tg_argv` each one's triggers pass the recorder — 21
   // in 0061, 22 since story 18.2's `team_loans` (0062), 23 since story 21.2's
-  // `personal_assignments` (0077), 24 since story 21.12's `job_roles` (0078).
+  // `personal_assignments` (0077), 24 since story 21.12's `job_roles` (0078),
+  // 25 since story 21.10's `member_schedule_versions` (0079).
   const AUDITED: Readonly<Record<string, readonly [string, string]>> = {
     organizations: ['id', 'id'],
     members: ['organization_id', 'id'],
@@ -2505,9 +2568,11 @@ describe('every organization table carries row level security, and only its revi
     personal_assignments: ['organization_id', 'id'],
     // STORY 21.12 (0078), attached in the migration that creates it.
     job_roles: ['organization_id', 'id'],
+    // STORY 21.10 (0079), attached in the migration that creates it.
+    member_schedule_versions: ['organization_id', 'id'],
   };
 
-  it.skipIf(noDatabase)('keeps the change history append-only, read by authenticated alone, and records each of the 24 audited tables through exactly its two triggers (story 14.1; personal_assignments since 21.2, job_roles since 21.12)', async () => {
+  it.skipIf(noDatabase)('keeps the change history append-only, read by authenticated alone, and records each of the 25 audited tables through exactly its two triggers (story 14.1; personal_assignments since 21.2, job_roles since 21.12, member_schedule_versions since 21.10)', async () => {
     const client = await connect();
     try {
       // APPEND-ONLY BY PRIVILEGE: `authenticated` SELECT, and nothing else for
@@ -3108,6 +3173,8 @@ describe('the access-control layer runs as the owner and hands that power to nob
     { name: 'record_calendar_feed_token_event', argumentCount: 0, expected: [], schema: 'private' },
     // STORY 18.3 (0063). The loan notification trigger, on 0043's terms.
     { name: 'notify_team_loan', argumentCount: 0, expected: [], schema: 'private' },
+    // STORY 21.10 (0079). The schedule-source notice's trigger function, on 0043's terms.
+    { name: 'notify_schedule_version', argumentCount: 0, expected: [], schema: 'private' },
     // STORY 18.4 (0064). The loan team rule its definers and re-check call,
     // and the archive refusal's trigger function, on 0043's terms.
     { name: 'team_loan_team_refused', argumentCount: 4, expected: [], schema: 'private' },

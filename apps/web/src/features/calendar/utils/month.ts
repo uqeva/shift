@@ -12,6 +12,7 @@ import {
   overrideStandingOf,
   overridesByTeamAndDate,
   rosterOn,
+  SCHEDULE_SOURCE_PERSONAL,
   scheduleOfMonth,
   shiftTypeVersionOn,
   shortStaffedShiftsOf,
@@ -1702,7 +1703,9 @@ export function calendarMonthOf(
  * other than its working Scheduled Shift, in `staffingOn`'s order — as type
  * ids. Read with no leave (`staffingInputOf(snapshot, [])`): the cell names
  * the types and never counts people. Only a date some member holds an
- * assignment on is asked, so a month with none asks nothing.
+ * assignment on is asked, so a month with none asks nothing. STORY 21.10: a
+ * personal rotation can make a group on any date from its version, so once a
+ * member has one every date is asked.
  *
  * @throws RangeError on any precondition of `staffingOn`.
  */
@@ -1710,14 +1713,17 @@ function staffingGroupsOf(
   snapshot: CalendarSnapshot,
 ): (teamId: string, date: string, scheduled: string | null) => readonly string[] {
   const assignedDates = new Set(snapshot.members.flatMap((member) => member.personalAssignments.map((one) => one.date)));
+  const rotating = snapshot.members.some((member) =>
+    member.scheduleVersions.some((version) => version.source === SCHEDULE_SOURCE_PERSONAL),
+  );
 
-  if (assignedDates.size === 0) return () => [];
+  if (assignedDates.size === 0 && !rotating) return () => [];
 
   const input = staffingInputOf(snapshot, []);
   const working = new Set(input.workingShiftTypeIds);
 
   return (teamId, date, scheduled) => {
-    if (!assignedDates.has(date)) return [];
+    if (!rotating && !assignedDates.has(date)) return [];
 
     const scheduledWorking = scheduled !== null && working.has(scheduled) ? scheduled : null;
 

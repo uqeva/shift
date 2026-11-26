@@ -2110,6 +2110,12 @@ describe('every write verb 0023, 0035 and 0036 name waits on the lock', () => {
         // the member before the exclusion does; and the lock, as 0023's.
         { table: 'leave_requests', trigger: 'leave_requests_refuse_over_leave', type: 1 | 2 | 4, columns: null },
         { table: 'leave_requests', trigger: 'leave_requests_serialize_organization_writes', type: 2 | 4 | 8 | 16, columns: null },
+        // 0079 (story 21.10): a member's schedule version takes 0016's
+        // rotation-version triggers: the lock, the caller's re-check and the
+        // archived-type refusal, on insert and (but the refusal) delete.
+        { table: 'member_schedule_versions', trigger: 'member_schedule_versions_refuse_write_by_stale_admin', type: 1 | 2 | 4 | 8, columns: null },
+        { table: 'member_schedule_versions', trigger: 'member_schedule_versions_refuse_write_while_archived_type', type: 1 | 2 | 4, columns: null },
+        { table: 'member_schedule_versions', trigger: 'member_schedule_versions_serialize_organization_writes', type: 2 | 4 | 8, columns: null },
         { table: 'member_status_versions', trigger: 'member_status_versions_keeps_an_admin', type: 1 | 4 | 8, columns: null },
         { table: 'member_status_versions', trigger: 'member_status_versions_refuse_truncate', type: 2 | 32, columns: null },
         { table: 'member_status_versions', trigger: 'member_status_versions_serialize_organization_writes', type: 2 | 4 | 8 | 16, columns: null },

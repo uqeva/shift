@@ -64,7 +64,15 @@ function renderMember(block: ManualMemberPreview): ReactNode {
   );
 }
 
-/** *Što se mijenja*'s body: a block per member, the roster changes left inapplicable, or the one line that nothing moves. */
+/**
+ * *Što se mijenja*'s body: a block per member, the roster changes left
+ * inapplicable, or the one line that nothing moves. Shared since story 21.10
+ * with *Raspored osobe*'s preview, which derives the same `ManualPreview`.
+ */
+export function ManualPreviewBody({ preview }: { readonly preview: ManualPreview }): ReactNode {
+  return renderPreview(preview);
+}
+
 function renderPreview(preview: ManualPreview): ReactNode {
   return (
     <div className="grid gap-4">

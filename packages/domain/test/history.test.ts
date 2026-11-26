@@ -102,9 +102,11 @@ describe('the kind of an event', () => {
     ['personal_assignments', 'personal-assignment'],
     // Story 21.12: a job role (0078).
     ['job_roles', 'job-role'],
+    // Story 21.10: a member's schedule source from a date (0079).
+    ['member_schedule_versions', 'schedule-version'],
   ];
 
-  it('names one record per audited table, all 25, and nothing else', () => {
+  it('names one record per audited table, all 26, and nothing else', () => {
     expect(TABLES.map(([table]) => historyRecordOf(table))).toEqual(TABLES.map(([, record]) => record));
     expect(new Set([...TABLES.map(([, record]) => record), 'other'])).toEqual(new Set(HISTORY_RECORDS));
     expect(historyRecordOf('audit_events')).toBeNull();
@@ -1145,7 +1147,7 @@ describe('every real change names a field (retro A4)', () => {
     );
   });
 
-  /** Every column of the 25 audited tables as 0002–0078 leave them (0067's recorder drops `token_hash` and `last_fetched_at`), with a value of its type. */
+  /** Every column of the 26 audited tables as 0002–0079 leave them (0067's recorder drops `token_hash` and `last_fetched_at`), with a value of its type. */
   const AT = '2026-11-10T08:00:00+00:00';
   const BOOKKEEPING = { organization_id: ORG, created_by: ANA_AUTH, created_at: AT };
   const LIVE = { removed_by: null, removed_at: null };
@@ -1332,6 +1334,16 @@ describe('every real change names a field (retro A4)', () => {
     },
     // Story 21.12 (0078): a job role, archived and restored in place.
     job_roles: { ...BOOKKEEPING, id: 'jr', name: 'Dispečer', archived: false },
+    // Story 21.10 (0079): a member's own rotation from a date.
+    member_schedule_versions: {
+      ...BOOKKEEPING,
+      id: 'msv',
+      member_id: ANA,
+      effective_from: '2026-11-12',
+      source: 'PERSONAL',
+      pattern_id: 'pattern-1',
+      offset_step_id: 'step-1',
+    },
   };
 
   /** A different value of the same type. */
@@ -1348,7 +1360,7 @@ describe('every real change names a field (retro A4)', () => {
 
   const LIFECYCLE_AT = new Set(['removed_at', 'confirmed_at', 'closed_at', 'answered_at']);
 
-  it('covers the 25 audited tables', () => {
+  it('covers the 26 audited tables', () => {
     expect(Object.keys(AUDITED).map((table) => historyRecordOf(table))).not.toContain(null);
     expect(new Set(Object.keys(AUDITED).map((table) => historyRecordOf(table)))).toEqual(
       new Set(HISTORY_RECORDS.filter((record) => record !== 'other')),

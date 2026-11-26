@@ -9,6 +9,8 @@ import {
   monthOf,
   personalShiftOn,
   rosterOn,
+  scheduleSourceOn,
+  SCHEDULE_SOURCE_PERSONAL,
   scheduledShiftTypeOn,
   shiftRoster,
   shiftTypeVersionOn,
@@ -162,6 +164,12 @@ export interface DayDetailMember {
    * with the team — marked `ručno`. ABSENT for everyone else.
    */
   readonly assigned?: true;
+  /**
+   * STORY 21.10 (UX-DR73): on this shift through their own rotation counted
+   * with the team — marked `osobna rotacija`, never `ručno`. ABSENT for
+   * everyone else; never beside {@link assigned}.
+   */
+  readonly personalRotation?: true;
 }
 
 /**
@@ -303,39 +311,53 @@ function compareMembers(left: DayDetailMember, right: DayDetailMember): number {
 interface PersonalShiftWith {
   readonly member: CalendarSnapshot['members'][number];
   readonly shiftTypeId: string;
+  /** STORY 21.10: the shift is their personal rotation's, not an assignment's. */
+  readonly rotation: boolean;
+}
+
+/**
+ * STORY 21.10: whether `member` can hold a Personal Shift on any date — an
+ * assignment, or a version of their own rotation (R15.3). Only these are
+ * asked for one.
+ */
+export function holdsPersonalShifts(member: Pick<CalendarSnapshot['members'][number], 'personalAssignments' | 'scheduleVersions'>): boolean {
+  return member.personalAssignments.length > 0 || member.scheduleVersions.some((version) => version.source === SCHEDULE_SOURCE_PERSONAL);
 }
 
 /**
  * STORY 21.6 (R14.3): every Personal Shift counted with `teamId` on `date` —
  * `personalShiftOn` over the snapshot's members, in their order, so an
  * inactive member, a non-working type and a day off count nothing. Only the
- * members holding an assignment are asked.
+ * members holding an assignment or a personal rotation (story 21.10) are asked.
  *
  * @throws RangeError on any precondition of `personalShiftOn`.
  */
 function personalShiftsWithOf(snapshot: CalendarSnapshot, teamId: string, date: string): readonly PersonalShiftWith[] {
-  const assigned = snapshot.members.filter((member) => member.personalAssignments.length > 0);
+  const holding = snapshot.members.filter(holdsPersonalShifts);
 
-  if (assigned.length === 0) return [];
+  if (holding.length === 0) return [];
 
   const working = new Set(workingShiftTypeIdsOf(snapshot));
 
-  return assigned.flatMap((member) => {
+  return holding.flatMap((member) => {
     const shift = personalShiftOn(member, date, working, snapshot.steps);
 
-    return shift === null || shift.teamId !== teamId ? [] : [{ member, shiftTypeId: shift.shiftTypeId }];
+    return shift === null || shift.teamId !== teamId
+      ? []
+      : [{ member, shiftTypeId: shift.shiftTypeId, rotation: 'personalRotation' in shift }];
   });
 }
 
 /**
- * A member on the day through their Personal Shift, marked assigned, as a
+ * A member on the day through their Personal Shift, marked assigned (or, for
+ * a personal rotation's, story 21.10, `osobna rotacija`), as a
  * rotation member of that team would show: their position where the team is
  * their own (`effectiveTeamOn`; a loan holds no position), and a lent
  * member's `posudba iz tima {tim}` (story 18.5) when the team is their loan team.
  */
 function assignedMemberOf(
   snapshot: CalendarSnapshot,
-  member: CalendarSnapshot['members'][number],
+  { member, rotation }: PersonalShiftWith,
   teamId: string,
   date: string,
 ): DayDetailMember {
@@ -346,7 +368,7 @@ function assignedMemberOf(
     name: member.name,
     fireRank: member.fireRank,
     position: effective?.teamId === teamId ? effective.position : null,
-    assigned: true,
+    ...(rotation ? { personalRotation: true as const } : { assigned: true as const }),
   };
 
   return lentFrom === null ? listed : { ...listed, lentFrom };
@@ -387,7 +409,7 @@ function groupsFieldOf(
       shiftTypeId,
       typeName: type.name,
       range: typeRangeOn(type, date),
-      roster: members.map((one) => assignedMemberOf(snapshot, one.member, teamId, date)).sort(compareMembers),
+      roster: members.map((one) => assignedMemberOf(snapshot, one, teamId, date)).sort(compareMembers),
     };
   });
 
@@ -505,7 +527,7 @@ export function dayDetailOf(snapshot: CalendarSnapshot, teamId: string, date: st
   // Each member once: one a roster override also put on is listed as that.
   const assigned = personal
     .filter((one) => one.shiftTypeId === scheduled.shiftTypeId && !roster.some((listed) => listed.id === one.member.id))
-    .map((one) => assignedMemberOf(snapshot, one.member, teamId, date));
+    .map((one) => assignedMemberOf(snapshot, one, teamId, date));
 
   return {
     ...groups,
@@ -922,6 +944,9 @@ export function rosterOffersOf(
   // STORY 21.6: a member on *Sastav* through a Personal Assignment (`ručno`) is
   // the assignment's, never a roster override's: neither taken off nor put on.
   for (const member of detail.roster) if (member.assigned === true) named.add(member.id);
+  // STORY 21.10 (R15.8): one there through their own rotation is the rotation's
+  // — an override putting them on or taking them off would change nothing.
+  for (const member of detail.roster) if (member.personalRotation === true) named.add(member.id);
 
   const onDefault = shiftRoster(snapshot.members, teamId, isoDate);
   const onDefaultIds = new Set(onDefault.map((entry) => entry.memberId));
@@ -944,6 +969,11 @@ export function rosterOffersOf(
 
     // STORY 18.5: the team they are WITH that day — a loan team on a loan.
     const own = effectiveTeamOn(member, isoDate);
+
+    // STORY 21.10 (R15.8): a member whose own rotation counts with this team
+    // that date is never offered: putting them on would be inert. The admin
+    // changes their day with a Personal Assignment (*Ručni raspored*).
+    if (own?.teamId === teamId && scheduleSourceOn(member.scheduleVersions, isoDate).source === SCHEDULE_SOURCE_PERSONAL) continue;
 
     put.push({
       id: member.id,

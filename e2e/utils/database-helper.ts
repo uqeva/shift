@@ -258,6 +258,21 @@ export async function removeFormerMemberInSql(slug: string, memberId: string): P
         where o.slug = $1 and p.organization_id = o.id and p.member_id = $2`,
       [slug, memberId],
     );
+    // Story 21.10: the member's schedule versions (0079), whose member key does
+    // not cascade, and the `SCHEDULE_SOURCE_CHANGED` notices to them (an
+    // insert's and a cancel's), by recipient.
+    await client.query(
+      `delete from notification_outbox n
+        using organizations o
+        where o.slug = $1 and n.organization_id = o.id and n.recipient_member_id = $2 and n.code = 'SCHEDULE_SOURCE_CHANGED'`,
+      [slug, memberId],
+    );
+    await client.query(
+      `delete from member_schedule_versions v
+        using organizations o
+        where o.slug = $1 and v.organization_id = o.id and v.member_id = $2`,
+      [slug, memberId],
+    );
     await client.query(
       `delete from auth.users u
         using members m join organizations o on o.id = m.organization_id
@@ -464,6 +479,8 @@ export async function removeLeaveMemberInSql(slug: string, memberId: string): Pr
     await client.query('delete from team_loans where organization_id = $1 and member_id = $2', scope);
     // Story 21.2: the member's Personal Assignments (0077), whose member key does not cascade.
     await client.query('delete from personal_assignments where organization_id = $1 and member_id = $2', scope);
+    // Story 21.10: the member's schedule versions (0079), whose member key does not cascade.
+    await client.query('delete from member_schedule_versions where organization_id = $1 and member_id = $2', scope);
     // Story 10.2: the notifications their requests and leave wrote to OTHER
     // members (the admins' new-request rows), which no recipient key removes.
     await client.query(
@@ -766,6 +783,14 @@ export async function removeOfflineMemberInSql(slug: string, username: string): 
           and o.id = m.organization_id and o.slug = $1 and m.username = $2`,
       [slug, username],
     );
+    // Story 21.10: the member's schedule versions (0079), whose member key does
+    // not cascade; their notices go with the member (the recipient key cascades).
+    await client.query(
+      `delete from member_schedule_versions v using members m, organizations o
+        where v.organization_id = m.organization_id and v.member_id = m.id
+          and o.id = m.organization_id and o.slug = $1 and m.username = $2`,
+      [slug, username],
+    );
     await client.query(
       `delete from auth.users u using members m, organizations o
         where m.auth_user_id = u.id and o.id = m.organization_id and o.slug = $1 and m.username = $2`,
@@ -880,6 +905,33 @@ export async function personalAssignmentsOfInSql(slug: string, memberId: string)
          from personal_assignments p join organizations o on o.id = p.organization_id
         where o.slug = $1 and p.member_id = $2 and p.removed_at is null
         order by p.date`,
+      [slug, memberId],
+    );
+
+    return rows;
+  } finally {
+    await client.end();
+  }
+}
+
+/** One stored schedule version (0079, story 21.10), as the assertions read it. */
+export interface StoredScheduleVersion {
+  readonly effectiveFrom: string;
+  readonly source: string;
+  readonly patternId: string | null;
+  readonly offsetStepId: string | null;
+}
+
+/** Every schedule version of `memberId`, by date, in SQL (story 21.10). */
+export async function scheduleVersionsOfInSql(slug: string, memberId: string): Promise<StoredScheduleVersion[]> {
+  const client = await connect();
+  try {
+    const { rows } = await client.query<StoredScheduleVersion>(
+      `select v.effective_from::text as "effectiveFrom", v.source, v.pattern_id::text as "patternId",
+              v.offset_step_id::text as "offsetStepId"
+         from member_schedule_versions v join organizations o on o.id = v.organization_id
+        where o.slug = $1 and v.member_id = $2
+        order by v.effective_from`,
       [slug, memberId],
     );
 
@@ -2296,6 +2348,9 @@ export async function removeRotationChangesOver(seeded: SeededRotation, since: s
         where p.organization_id = $1 and p.id <> $2 and p.created_at >= $4::timestamptz
           and not exists (select 1 from rotation_assignments a
                            where a.organization_id = p.organization_id and a.pattern_id = p.id)
+          -- Story 21.10: nor one a member's schedule version names (0079).
+          and not exists (select 1 from member_schedule_versions v
+                           where v.organization_id = p.organization_id and v.pattern_id = p.id)
           and exists (select 1 from rotation_steps s
                        where s.organization_id = p.organization_id and s.pattern_id = p.id
                          and s.shift_type_id = any($3::uuid[]))`,
@@ -2361,6 +2416,18 @@ export async function removeSeededRotation(seeded: SeededRotation): Promise<void
     ]);
     await client.query('delete from roster_overrides where organization_id = $1', [seeded.organizationId]);
     await client.query('delete from rotation_assignments where organization_id = $1 and pattern_id = $2', scope);
+    // Story 21.10: a member's schedule version naming the pattern keys to it and its step (0079),
+    // with no cascade; its notices first, by subject (an insert's id, a cancel's md5 of it).
+    await client.query(
+      `delete from notification_outbox
+        where organization_id = $1 and code = 'SCHEDULE_SOURCE_CHANGED'
+          and subject_id in (select v.id from member_schedule_versions v where v.organization_id = $1 and v.pattern_id = $2
+                             union all
+                             select pg_catalog.md5('SCHEDULE_SOURCE_CANCELLED:' || v.id::text)::uuid
+                               from member_schedule_versions v where v.organization_id = $1 and v.pattern_id = $2)`,
+      scope,
+    );
+    await client.query('delete from member_schedule_versions where organization_id = $1 and pattern_id = $2', scope);
     await client.query('delete from rotation_steps where organization_id = $1 and pattern_id = $2', scope);
     await client.query('delete from rotation_patterns where organization_id = $1 and id = $2', scope);
     const types = [seeded.organizationId, seeded.shiftTypeIds];
