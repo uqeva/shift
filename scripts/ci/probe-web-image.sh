@@ -132,8 +132,10 @@ expect /favicon.svg 200 image/svg+xml no-cache
 # (nginx names it image/x-icon or image/vnd.microsoft.icon), never the shell.
 expect /favicon.ico 200 image/ no-cache
 expect /pwa-192x192.png 200 image/png no-cache
-# Story 21.27: the mark every email loads from the app origin, an image, never the shell.
-expect /email-mark.png 200 image/png no-cache
+# Story 21.27: the mark every email loads from the app origin, an image, never
+# the shell; cached a year, immutable, so a mail client does not ask on every
+# open (and never logged: checked below).
+expect /email-mark.png 200 image/png 'public, max-age=31536000, immutable'
 # A missing asset is a plain 404, never index.html, and never immutable.
 expect /assets/nope.js 404 text/plain no-cache
 expect /assets/ 404 text/plain no-cache
@@ -160,7 +162,7 @@ grep -qix 'Vary: Accept-Encoding' <<< "$last_head" || fail "/$asset: no Vary: Ac
 
 # Revalidation (what no-cache causes): a 304 carries every header too, and the
 # same Cache-Control as the 200.
-for path in / "/$asset"; do
+for path in / "/$asset" /email-mark.png; do
   modified="$( (request GET "$path" || true) | tr -d '\r' | sed -n 's/^Last-Modified: //p' | head -n 1)"
   if [ -z "$modified" ]; then fail "$path: no Last-Modified"; continue; fi
   if [ "$path" = / ]; then cache=no-cache; else cache='public, max-age=31536000, immutable'; fi
@@ -170,6 +172,12 @@ done
 # A request nginx refuses before choosing a location (a header over
 # large_client_header_buffers): the server-level include still applies.
 EXTRA="X-Oversized: $(printf '%*s' 9000 '' | tr ' ' a)\r\n" expect / 400 - none
+
+# The access log records requests, but never the email mark's (story 21.27:
+# a logged fetch would record each open of an email).
+log="$(docker logs "$name" 2>&1 || true)"
+grep -q '"GET / HTTP/1.0" 200 ' <<< "$log" || fail "the access log recorded no 'GET /'"
+if grep -q 'email-mark' <<< "$log"; then fail "the access log recorded the email mark"; else echo "ok    the email mark is not in the access log"; fi
 
 # A missing asset's body must not be the shell.
 if [[ "$(request GET /assets/nope.js || true)" == *"$shell_marker"* ]]; then fail '/assets/nope.js answered the shell'; fi

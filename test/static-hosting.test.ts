@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { CSP_HEADER, inlineScriptsOf, supabaseOriginOf } from '../apps/web/src/lib/content-security-policy.ts';
+import { EMAIL_MARK_FILE } from '../apps/web/src/lib/email-layout.ts';
 
 /**
  * AD-14 — a static SPA with no server. A deep link therefore cannot be routed
@@ -419,6 +420,18 @@ describe('the build is an installable PWA', () => {
     expect([mark.readUInt32BE(16), mark.readUInt32BE(20)]).toEqual([96, 96]);
     expect(mark.length).toBeLessThan(8 * 1024);
     expect(read('sw.js')).not.toContain('email-mark.png');
+  });
+
+  it('serves the mark the emails name immutable and unlogged, so a changed mark is a new name (story 21.27)', () => {
+    // The emails' file is the one public/ holds and the one the image's exact
+    // location serves for a year, immutable: new bytes under the same name would
+    // never reach a client that cached the old ones.
+    expect(EMAIL_MARK_FILE).toBe('email-mark.png');
+    expect(existsSync(join(repoRoot, 'apps', 'web', 'public', EMAIL_MARK_FILE))).toBe(true);
+    const nginx = readFileSync(join(repoRoot, 'deploy', 'web', 'default.conf'), 'utf8');
+    const location = new RegExp(`location = /${EMAIL_MARK_FILE.replace('.', '\\.')} \\{([^}]*)\\}`).exec(nginx)?.[1] ?? '';
+    expect(location).toContain('add_header Cache-Control "public, max-age=31536000, immutable";');
+    expect(location).toContain('access_log off;');
   });
 
   it.skipIf(notBuilt)('never precaches the PDF writer or its fonts: the export is online only (story 14.3)', () => {

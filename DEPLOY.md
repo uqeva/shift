@@ -2736,6 +2736,7 @@ attribute, and React writes `style` attributes.
 | `/`, a deep link (`/kalendar/2026-09`), any unknown path outside `/assets/` | `200 index.html`, `Cache-Control: no-cache` |
 | `/sw.js`, `/push-sw.js`, `/site.webmanifest` (`application/manifest+json`), the icons | `200`, `no-cache`: revalidated on every use, so a deploy is seen at once |
 | `/assets/<hashed>` | `200`, `public, max-age=31536000, immutable` (on a success only) |
+| `/email-mark.png` (the mark every email loads) | `200`, `public, max-age=31536000, immutable` (on a success only), and **not written to the access log**: a mail client that fetches images itself asks once, not on every open, and the log records no opens. A changed mark ships under a **new file name** (`EMAIL_MARK_FILE` in both `email-layout.ts` copies, and this location), never as new bytes under the old one |
 | a missing `/assets/…` file, and `/assets/` itself | a plain-text `404`, never `index.html`, never immutable |
 | any `*.map` | `404` |
 

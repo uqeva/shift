@@ -37,7 +37,11 @@ export function escapeHtml(text: string): string {
     .replaceAll("'", '&#39;');
 }
 
-/** The file the mark is served as, at the app origin's root (`apps/web/public/`). */
+/**
+ * The file the mark is served as, at the app origin's root (`apps/web/public/`).
+ * The web image serves it immutable for a year (`deploy/web/default.conf`), so a
+ * changed mark is a new file name here, never new bytes under this one.
+ */
 export const EMAIL_MARK_FILE = 'email-mark.png';
 
 /** The mark's drawn size in CSS pixels; the PNG is 96 px square, sharp on dense screens. */

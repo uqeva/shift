@@ -177,7 +177,12 @@ describe('the shift-web image (story 20.3): the nginx config', () => {
     );
     expect(directives.filter((line) => line.startsWith('access_log '))).toEqual([
       'access_log /var/log/nginx/access.log shift_web_redacted;',
+      'access_log off;',
     ]);
+    // The one unlogged request is the email mark's (below); every other location logs.
+    for (const block of locations) {
+      expect(block.body.includes('access_log'), block.head).toBe(block.head === '= /email-mark.png');
+    }
     expect(config).not.toMatch(/\$request[^_]|\$args|\$query_string/);
   });
 
@@ -194,7 +199,17 @@ describe('the shift-web image (story 20.3): the nginx config', () => {
 
     expect(serverLevel).toContain(HEADERS_INCLUDE);
     expect(locations.map((block) => block.head).sort()).toEqual(
-      ['/', '/assets/', '= /assets/', '= /site.webmanifest', '~ \\.map$', '@missing', '/auth-email/', '~ ^/auth-email/[a-z-]+\\.html$'].sort(),
+      [
+        '/',
+        '/assets/',
+        '= /assets/',
+        '= /site.webmanifest',
+        '= /email-mark.png',
+        '~ \\.map$',
+        '@missing',
+        '/auth-email/',
+        '~ ^/auth-email/[a-z-]+\\.html$',
+      ].sort(),
     );
     for (const block of locations) expect(block.body, block.head).toContain(HEADERS_INCLUDE);
   });
@@ -231,9 +246,22 @@ describe('the shift-web image (story 20.3): the nginx config', () => {
 
     expect(root).toMatch(/try_files \$uri \/index\.html;/);
     expect(root).toContain('add_header Cache-Control "no-cache" always;');
+    // Immutable in two places only: /assets/ and the email mark.
     expect(directives.filter((line) => line.includes('immutable'))).toEqual([
       `add_header Cache-Control "${IMMUTABLE}";`,
+      `add_header Cache-Control "${IMMUTABLE}";`,
     ]);
+  });
+
+  it('serves the email mark immutable for a year on success only, and never logs it (story 21.27, founder decision)', () => {
+    const mark = location('= /email-mark.png').body;
+
+    expect(mark).toContain(`add_header Cache-Control "${IMMUTABLE}";`);
+    expect(mark).not.toMatch(/immutable"\s+always/);
+    expect(mark).toMatch(/^\s*access_log off;$/m);
+    // A missing mark is the plain 404 (no-cache), never index.html.
+    expect(mark).toMatch(/try_files \$uri @missing;/);
+    expect(mark).not.toContain('index.html');
   });
 
   it('serves an Auth email template as itself, and anything else under /auth-email/ as the plain 404, never index.html (story 19.1)', () => {
@@ -417,7 +445,7 @@ describe('the shift-web image (story 20.3): CI builds and probes it, never pushe
       'expect /auth-email/nope.html 404 text/plain no-cache',
       'expect /auth-email/ 404 text/plain no-cache',
       // Story 21.27: the mark every email loads, served as an image with the headers.
-      'expect /email-mark.png 200 image/png no-cache',
+      `expect /email-mark.png 200 image/png '${IMMUTABLE}'`,
     ]) {
       expect(probe, line).toContain(line);
     }
@@ -430,6 +458,8 @@ describe('the shift-web image (story 20.3): CI builds and probes it, never pushe
   it('probes revalidation, a refusal made before any location, the HEALTHCHECK and busybox refusals', () => {
     for (const line of [
       'EXTRA="If-Modified-Since: $modified\\r\\n" expect "$path" 304 - "$cache"',
+      'for path in / "/$asset" /email-mark.png; do',
+      "if grep -q 'email-mark' <<< \"$log\"; then fail \"the access log recorded the email mark\"",
       'expect / 400 - none',
       "docker inspect --format '{{index .Config.Healthcheck.Test 1}}'",
       'docker run --rm --network none --read-only --entrypoint sh',
