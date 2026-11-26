@@ -3354,6 +3354,30 @@ CSP sweep now also visits `/rucni-raspored` and opens (never saves) a member's
 request. Both demo organizations sign in; `dvd-mladost`'s verifier reports the
 one known mismatch (a test member the founder added by hand, kept).
 `shift-ops jobs-check staging` passed.
+**Refreshed again 2026-11-26** to `main` (personal swaps, 21.8; *Timovi i
+raspored*, 21.26, the app's first lazy route; floaters, 21.13 and 21.14):
+staging stood at `0082`. A `pre-migration` backup (§9.12); `main`'s compose
+unchanged since the 2026-11-25 `PATCH` and every `content:` file matching the
+one Coolify wrote, so no `PATCH` and no storage update; migrations `0083` and
+`0084` pushed over the loopback and `check-migrations` clean (84 agree); a new
+functions image (probed with `probe-functions-image.sh`) and a new `shift-web`
+(same inputs, signup on). The web build now emits several chunks (the lazy
+*Timovi i raspored* route, pdfmake); `check-bundle.mjs` reads every file
+under `dist` (27, none secret-shaped) and `probe-web-image.sh` passed. The web
+application was deployed first and the service restarted after it
+(`?latest=true`), so GoTrue fetched the templates from the live `shift-web`;
+GoTrue logged no `auth-entrypoint:` line. The checks below passed, unchanged
+from the last refresh. The CSP sweep now also visits `/timovi-i-raspored`
+(its lazy chunk loads under the CSP); no violation, no failed request.
+`dvd-mladost`'s admin and a dispatcher sign in. The verifier reports 0
+mismatches as the dispatcher, and as the admin one: S4-VOD's leave on
+1 November, which a `dvd-mladost` account replaced in the app earlier that day
+(1 to 4 November became 2 to 4 November, before this refresh), kept.
+`shift-ops jobs-check staging` first failed `calls`: two `pg_net` calls at
+the restart's minute could not connect (the functions container was not up
+yet). The timer alerted once, to the journal only. The next run, once those
+two calls had left the 20-minute window, passed every check (`RECOVERED`).
+Run the jobs check at least 20 minutes after a service restart.
 
 **What exists in Coolify.** A project `shift` with an environment `staging`
 (the founder's choice; the epic had named a project `shift-staging`), holding:
