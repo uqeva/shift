@@ -44,7 +44,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const row = (memberId: string, date: string, teamId: string, kind: unknown = 'accept_uncovered') => ({
+const row = (memberId: string, date: string, teamId: string | null, kind: unknown = 'accept_uncovered') => ({
   member_id: memberId,
   date,
   team_id: teamId,
@@ -120,7 +120,9 @@ describe("the organization's read", () => {
       ['order', 'id', { ascending: true }],
       ['range', 0, LAST],
     ]);
-    expect(CONFLICT_RESOLUTIONS_COLUMNS).toBe('member_id,date,team_id,kind,roster_override_id,shift_type_id,created_by,created_at');
+    expect(CONFLICT_RESOLUTIONS_COLUMNS).toBe(
+      'member_id,date,team_id,kind,roster_override_id,shift_type_id,personal_assignment_id,created_by,created_at',
+    );
     expect(CONFLICT_RESOLUTIONS_COLUMNS).not.toMatch(/removed_by|removed_at/);
     expect(CONFLICT_RESOLUTIONS_TABLE).toBe('conflict_resolutions');
   });
@@ -239,8 +241,8 @@ describe("the viewer's own read", () => {
 describe('the parser', () => {
   it('parses every row into its key and kind, in the order given', () => {
     expect(conflictResolutionsOf([A, B], [MEMBER, OTHER], [TEAM, TEAM_B])).toEqual([
-      { memberId: MEMBER, date: '2026-09-12', teamId: TEAM, kind: 'accept_uncovered', rosterOverrideId: null, shiftTypeId: null },
-      { memberId: OTHER, date: '2026-09-10', teamId: TEAM_B, kind: 'replace_member', rosterOverrideId: 'override-b', shiftTypeId: null },
+      { memberId: MEMBER, date: '2026-09-12', teamId: TEAM, kind: 'accept_uncovered', rosterOverrideId: null, shiftTypeId: null, personalAssignmentId: null },
+      { memberId: OTHER, date: '2026-09-10', teamId: TEAM_B, kind: 'replace_member', rosterOverrideId: 'override-b', shiftTypeId: null, personalAssignmentId: null },
     ]);
     expect(conflictResolutionsOf([], [MEMBER], [TEAM])).toEqual([]);
   });
@@ -249,7 +251,7 @@ describe('the parser', () => {
     const linkless = row(OTHER, '2026-09-10', TEAM_B, 'replace_member');
 
     expect(conflictResolutionsOf([linkless], [OTHER], [TEAM_B], { linkOptional: true })).toEqual([
-      { memberId: OTHER, date: '2026-09-10', teamId: TEAM_B, kind: 'replace_member', rosterOverrideId: null, shiftTypeId: null },
+      { memberId: OTHER, date: '2026-09-10', teamId: TEAM_B, kind: 'replace_member', rosterOverrideId: null, shiftTypeId: null, personalAssignmentId: null },
     ]);
     expect(conflictResolutionsOf([linkless], [OTHER], [TEAM_B])).toBeNull();
     // A link on another kind is refused on either read.
@@ -267,9 +269,32 @@ describe('the parser', () => {
         [TEAM, TEAM_B],
       ),
     ).toEqual([
-      { memberId: OTHER, date: '2026-09-10', teamId: TEAM_B, kind: 'replace_member', rosterOverrideId: 'override-1', shiftTypeId: null },
-      { memberId: MEMBER, date: '2026-09-12', teamId: TEAM, kind: 'accept_uncovered', rosterOverrideId: null, shiftTypeId: null },
+      { memberId: OTHER, date: '2026-09-10', teamId: TEAM_B, kind: 'replace_member', rosterOverrideId: 'override-1', shiftTypeId: null, personalAssignmentId: null },
+      { memberId: MEMBER, date: '2026-09-12', teamId: TEAM, kind: 'accept_uncovered', rosterOverrideId: null, shiftTypeId: null, personalAssignmentId: null },
     ]);
+  });
+
+  it('story 21.7 (0081): reads a teamless key, and a replacement naming an assignment in place of an override', () => {
+    const teamless = { ...row(MEMBER, '2026-09-12', TEAM, 'accept_uncovered'), team_id: null };
+    const byAssignment = { ...row(OTHER, '2026-09-10', null, 'replace_member'), personal_assignment_id: 'assignment-1' };
+
+    expect(conflictResolutionsOf([teamless, byAssignment], [MEMBER, OTHER], [TEAM])).toEqual([
+      { memberId: MEMBER, date: '2026-09-12', teamId: null, kind: 'accept_uncovered', rosterOverrideId: null, shiftTypeId: null, personalAssignmentId: null },
+      { memberId: OTHER, date: '2026-09-10', teamId: null, kind: 'replace_member', rosterOverrideId: null, shiftTypeId: null, personalAssignmentId: 'assignment-1' },
+    ]);
+    // 0081's check: a replacement names exactly one link, and no other kind names one.
+    expect(conflictResolutionsOf([{ ...byAssignment, roster_override_id: 'override-1' }], [OTHER], [TEAM])).toBeNull();
+    expect(conflictResolutionsOf([{ ...teamless, personal_assignment_id: 'assignment-1' }], [MEMBER], [TEAM])).toBeNull();
+    // One live decision per key, a teamless one too (NULLS NOT DISTINCT).
+    expect(conflictResolutionsOf([teamless, teamless], [MEMBER], [TEAM])).toBeNull();
+    // A team id still has to be one of the snapshot's.
+    expect(conflictResolutionsOf([{ ...teamless, team_id: 'elsewhere' }], [MEMBER], [TEAM])).toBeNull();
+  });
+
+  it('story 21.7: a replacement by assignment is no override link of the leave guard', () => {
+    const byAssignment = { ...row(MEMBER, '2026-09-10', null, 'replace_member'), personal_assignment_id: 'assignment-1' };
+
+    expect(replacementLinksOf([byAssignment], MEMBER)).toEqual([]);
   });
 
   it('carries the shift type a decision was made on (0038), and reads a missing or null type as none', () => {
@@ -324,10 +349,10 @@ describe('the role-gated answer', () => {
 describe('the split by kind (story 5.4b)', () => {
   it('keeps the keys accepted as uncovered, in order, and no other kind', () => {
     const resolutions: readonly ConflictResolution[] = [
-      { memberId: 'm1', date: '2026-09-12', teamId: 't1', kind: ACCEPT_UNCOVERED, rosterOverrideId: null, shiftTypeId: null },
-      { memberId: 'm1', date: '2026-09-13', teamId: 't1', kind: 'replace_member' as const, rosterOverrideId: null, shiftTypeId: null },
-      { memberId: 'm2', date: '2026-09-11', teamId: 't2', kind: ACCEPT_UNCOVERED, rosterOverrideId: null, shiftTypeId: null },
-      { memberId: 'm2', date: '2026-09-14', teamId: 't2', kind: 'amend_leave' as const, rosterOverrideId: null, shiftTypeId: null },
+      { memberId: 'm1', date: '2026-09-12', teamId: 't1', kind: ACCEPT_UNCOVERED, rosterOverrideId: null, shiftTypeId: null, personalAssignmentId: null },
+      { memberId: 'm1', date: '2026-09-13', teamId: 't1', kind: 'replace_member' as const, rosterOverrideId: null, shiftTypeId: null, personalAssignmentId: null },
+      { memberId: 'm2', date: '2026-09-11', teamId: 't2', kind: ACCEPT_UNCOVERED, rosterOverrideId: null, shiftTypeId: null, personalAssignmentId: null },
+      { memberId: 'm2', date: '2026-09-14', teamId: 't2', kind: 'amend_leave' as const, rosterOverrideId: null, shiftTypeId: null, personalAssignmentId: null },
     ];
 
     expect(acceptedUncoveredOf(resolutions)).toEqual([
@@ -339,9 +364,9 @@ describe('the split by kind (story 5.4b)', () => {
 
   it('feeds the leave hours from the accepted and, since story 5.4c, the replaced, in order, never the amend kind', () => {
     const resolutions: readonly ConflictResolution[] = [
-      { memberId: 'm1', date: '2026-09-12', teamId: 't1', kind: ACCEPT_UNCOVERED, rosterOverrideId: null, shiftTypeId: null },
-      { memberId: 'm1', date: '2026-09-13', teamId: 't1', kind: REPLACE_MEMBER, rosterOverrideId: null, shiftTypeId: null },
-      { memberId: 'm2', date: '2026-09-14', teamId: 't2', kind: 'amend_leave' as const, rosterOverrideId: null, shiftTypeId: null },
+      { memberId: 'm1', date: '2026-09-12', teamId: 't1', kind: ACCEPT_UNCOVERED, rosterOverrideId: null, shiftTypeId: null, personalAssignmentId: null },
+      { memberId: 'm1', date: '2026-09-13', teamId: 't1', kind: REPLACE_MEMBER, rosterOverrideId: null, shiftTypeId: null, personalAssignmentId: null },
+      { memberId: 'm2', date: '2026-09-14', teamId: 't2', kind: 'amend_leave' as const, rosterOverrideId: null, shiftTypeId: null, personalAssignmentId: null },
     ];
 
     expect(leaveHoursKeysOf(resolutions)).toEqual([

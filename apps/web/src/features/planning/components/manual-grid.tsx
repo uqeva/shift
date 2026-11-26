@@ -9,6 +9,7 @@ import {
 } from '@/components/date-grid';
 import { PencilSimple, Repeat, Star } from '@/components/ui/icon';
 import { TableBody, TableCell, TableRow } from '@/components/ui/table';
+import { HATCH_LEAVE_CLASS } from '@/features/calendar/utils/modifiers';
 import { MANUAL_HEADING_ID, manualCellIdOf, type ManualScreen } from '@/features/planning/hooks/use-manual-schedule';
 import {
   CELL_ASSIGNED,
@@ -83,6 +84,8 @@ export function cellLabelOf(
   if (cell.source === CELL_ROTATION) parts.push(t('rucniRaspored.cell.rotation'));
   if (cell.countedTeamId !== null) parts.push(t('rucniRaspored.cell.counted', { team: teamName(cell.countedTeamId) }));
   if (cell.more) parts.push(t('rucniRaspored.cell.more'));
+  // STORY 21.7: the absence the paper shows, named, never colour alone.
+  if (cell.onLeave) parts.push(t('rucniRaspored.cell.leave'));
   if (cell.changed) parts.push(t('rucniRaspored.cell.changed'));
   if (!cell.active) parts.push(t('rucniRaspored.cell.inactive'));
 
@@ -93,7 +96,8 @@ export function cellLabelOf(
  * The drawing of a cell, `aria-hidden` beside its name: the type's letter, or
  * the off mark, solid with a pencil when assigned (UX-DR73), muted with the
  * rotation glyph when the rotation gives it; a dashed edge while unsaved, a
- * hatch on a date the member is inactive, and `+` when it counts with another team.
+ * hatch on a date the member is inactive, the calendar's leave hatch on a date
+ * the member is on leave (story 21.7), and `+` when it counts with another team.
  */
 export function CellMark({ cell }: { readonly cell: ManualCell }): ReactNode {
   return (
@@ -106,6 +110,9 @@ export function CellMark({ cell }: { readonly cell: ManualCell }): ReactNode {
         !cell.active && 'opacity-50 [background-image:repeating-linear-gradient(135deg,transparent_0_4px,var(--border)_4px_5px)]',
         cell.changed && 'outline-2 outline-offset-1 outline-dashed outline-foreground',
         cell.more && 'underline decoration-2 underline-offset-2',
+        // STORY 21.7: the calendar's own leave hatch, drawn in the cell's foreground.
+        // An inactive date keeps its own hatch (both are named in the label).
+        cell.onLeave && cell.active && HATCH_LEAVE_CLASS,
       )}
     >
       {cell.off ? t('rucniRaspored.offMark') : cell.holiday === true ? <Star data-holiday-off className="size-3.5" /> : cell.letter}

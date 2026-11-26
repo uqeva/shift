@@ -1,7 +1,6 @@
 import {
   collisionKeyOf,
   collisionsOf,
-  hasTeam,
   unresolvedCollisionsOf,
   type Collision,
   type CollisionInput,
@@ -102,8 +101,8 @@ export interface ConflictRow {
   readonly memberId: string;
   /** `YYYY-MM-DD`, as the domain answered it. */
   readonly date: string;
-  /** The team whose working shift collides. */
-  readonly teamId: string;
+  /** The team whose working shift collides; `null` for a Personal Shift counted with no team (story 21.7). */
+  readonly teamId: string | null;
   /** The shift type that shift works. */
   readonly shiftTypeId: string;
   /** The leave record that covers the date. */
@@ -113,7 +112,8 @@ export interface ConflictRow {
   /** Before the organization's today: drawn dashed and muted, with its own words. */
   readonly past: boolean;
   readonly memberName: string;
-  readonly teamName: string;
+  /** `null` with no team (story 21.7): the row says *bez tima*. */
+  readonly teamName: string | null;
   readonly shiftTypeName: string;
   /** `19:00–07:00`, or `null` for a working type with no times in effect on the date. */
   readonly times: string | null;
@@ -196,6 +196,23 @@ export type ConflictsQueue =
   | { readonly kind: typeof CONFLICTS_LOADING }
   | { readonly kind: typeof CONFLICTS_UNAVAILABLE }
   | { readonly kind: typeof CONFLICTS_READY; readonly view: ConflictsQueueView };
+
+/**
+ * STORY 21.7: the route segment a collision with NO team is opened by
+ * (`/za-odluku/$memberId/$date/bez-tima`). A team id is a uuid, so it never
+ * reads as this word.
+ */
+export const NO_TEAM_PARAM = 'bez-tima';
+
+/** The resolution route's `$teamId` segment for a collision's team: its id, or {@link NO_TEAM_PARAM} for none. */
+export function teamParamOf(teamId: string | null): string {
+  return teamId ?? NO_TEAM_PARAM;
+}
+
+/** The collision's team a `$teamId` segment names: `null` for {@link NO_TEAM_PARAM}. */
+export function teamIdOfParam(param: string): string | null {
+  return param === NO_TEAM_PARAM ? null : param;
+}
 
 /** Two collisions by date alone, ascending; 0 within one date. */
 function byDate(first: Collision, second: Collision): number {
@@ -399,10 +416,8 @@ export function resolutionsOf(snapshot: CalendarSnapshot, rows: readonly unknown
  * THE ONE DERIVATION every unresolved surface stands on (story 5.4a): the
  * collisions of `records`, without those the resolution rows resolve.
  *
- * Story 21.1: only collisions WITH a team. One over a Personal Shift counted
- * with no team cannot be resolved until story 21.7 stores its key, and *Za
- * odluku* shows it from then; nothing produces one before story 21.2 feeds
- * Personal Assignments.
+ * Story 21.7 (0081): every collision, one over a Personal Shift counted with
+ * no team included (`teamId: null`), whose key is stored like any other.
  *
  * @throws RangeError when a resolution row cannot be trusted, or on any
  *   precondition of `collisionsOf`.
@@ -411,12 +426,9 @@ export function unresolvedOf(
   snapshot: CalendarSnapshot,
   records: readonly OrganizationLeaveRecord[],
   resolutionRows: readonly unknown[],
-): readonly TeamCollision[] {
-  return unresolvedCollisionsOf(collisionsOf(collisionInputOf(snapshot, records)), resolutionsOf(snapshot, resolutionRows)).filter(hasTeam);
+): readonly Collision[] {
+  return unresolvedCollisionsOf(collisionsOf(collisionInputOf(snapshot, records)), resolutionsOf(snapshot, resolutionRows));
 }
-
-/** A collision on a team's shift: every one before Personal Shifts counted with no team (story 21.1). */
-export type TeamCollision = Collision & { readonly teamId: string };
 
 /**
  * The queue from the snapshot, the organization's record, resolution,
@@ -450,7 +462,7 @@ export function conflictsQueueViewOf(
 
   const shown = queueOrderOf(unresolvedOf(snapshot, records, resolutionRows), today).map((collision) => {
     const memberName = members.get(collision.memberId);
-    const teamName = teams.get(collision.teamId);
+    const teamName = collision.teamId === null ? null : teams.get(collision.teamId);
     const type = types.get(collision.shiftTypeId);
     const record = byId.get(collision.leaveRecordId);
     const dateShown = formatIsoDate(collision.date);

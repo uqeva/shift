@@ -51,7 +51,8 @@ export const CONFLICT_RESOLUTIONS_UNAVAILABLE = 'CONFLICT_RESOLUTIONS_UNAVAILABL
  * {@link conflictResolutionsOf} ignores both. The member's own read has no
  * author.
  */
-export const CONFLICT_RESOLUTIONS_COLUMNS = 'member_id,date,team_id,kind,roster_override_id,shift_type_id,created_by,created_at';
+export const CONFLICT_RESOLUTIONS_COLUMNS =
+  'member_id,date,team_id,kind,roster_override_id,shift_type_id,personal_assignment_id,created_by,created_at';
 
 /** Five minutes, the bound the leave reads set; every leave write re-reads it. */
 export const CONFLICT_RESOLUTIONS_READ_STALE_MS = 300000;
@@ -77,7 +78,9 @@ export const ACCEPT_UNCOVERED = 'accept_uncovered' satisfies ConflictResolutionK
  * The kind story 5.4c writes, through 0032's function alone: someone else is
  * put on the shift, and the absent member — still rostered, on leave — has
  * the shift out of their worked hours, counting only as their leave day, as
- * for {@link ACCEPT_UNCOVERED}.
+ * for {@link ACCEPT_UNCOVERED}. STORY 21.7 (0081): its second form names the
+ * replacement's Personal Assignment instead of a roster override, written by
+ * `resolve_with_personal_assignment` alone.
  */
 export const REPLACE_MEMBER = 'replace_member' satisfies ConflictResolutionKind;
 
@@ -89,6 +92,7 @@ const KIND_COLUMN = 'kind';
 const REMOVED_COLUMN = 'removed_at';
 const ROSTER_OVERRIDE_COLUMN = 'roster_override_id';
 const SHIFT_TYPE_COLUMN = 'shift_type_id';
+const PERSONAL_ASSIGNMENT_COLUMN = 'personal_assignment_id';
 
 /**
  * One live resolution: the key it matches a collision on, its kind, for a
@@ -106,6 +110,12 @@ export interface ConflictResolution extends CollisionResolution {
    * has today decides nothing (`effectiveResolutionsOf`).
    */
   readonly shiftTypeId: string | null;
+  /**
+   * STORY 21.7 (0081): the replacement's Personal Assignment a `replace_member`
+   * of the second form names, in place of {@link rosterOverrideId}; `null` for
+   * every other row, and on a read from before 0081 (absent reads as null).
+   */
+  readonly personalAssignmentId: string | null;
 }
 
 export interface ConflictResolutionsReadError {
@@ -274,14 +284,16 @@ export interface ConflictResolutionsParse {
 
 /**
  * The rows as resolutions, in the order given, or null when any row is not a
- * record, carries a member outside `memberIds` or a team outside `teamIds`, a
+ * record, carries a member outside `memberIds` or a team outside `teamIds`
+ * (story 21.7: a null team is a teamless key, never outside), a
  * date that is no calendar `YYYY-MM-DD`, a kind 0031 does not admit, a
  * link or a shift type (0038; absent reads as null) that is neither a
  * non-empty text nor null, or when two rows share a
  * key — which 0031's live key refuses. THE LINK MATCHES THE KIND (0032's
- * check): a `replace_member` row with no link — unless `linkOptional`, for a
- * member's read from before 0033 — or any other kind with one is an
- * integrity break, and refuses the answer. Whether a replacement still
+ * check, as 0081 re-states it): a `replace_member` row names exactly one of
+ * the override and the assignment — none only when `linkOptional`, for a
+ * member's read from before 0033 — and any other kind names neither; any
+ * other row is an integrity break, and refuses the answer. Whether a replacement still
  * applies is `./replacement-effect`'s question, not the parse's.
  */
 export function conflictResolutionsOf(
@@ -304,23 +316,30 @@ export function conflictResolutionsOf(
     const kind = row[KIND_COLUMN];
 
     if (typeof memberId !== 'string' || !members.has(memberId)) return null;
-    if (typeof teamId !== 'string' || !teams.has(teamId)) return null;
+    if (teamId !== null && (typeof teamId !== 'string' || !teams.has(teamId))) return null;
     if (typeof date !== 'string' || !isIsoDate(date)) return null;
     if (!isKind(kind)) return null;
 
     const link = row[ROSTER_OVERRIDE_COLUMN];
     const rosterOverrideId = link === undefined ? null : link;
+    const assignmentLink = row[PERSONAL_ASSIGNMENT_COLUMN];
+    const personalAssignmentId = assignmentLink === undefined ? null : assignmentLink;
 
     if (rosterOverrideId !== null && (typeof rosterOverrideId !== 'string' || rosterOverrideId === '')) return null;
-    if (kind !== REPLACE_MEMBER && rosterOverrideId !== null) return null;
-    if (kind === REPLACE_MEMBER && rosterOverrideId === null && !linkOptional) return null;
+    if (personalAssignmentId !== null && (typeof personalAssignmentId !== 'string' || personalAssignmentId === '')) return null;
+
+    const links = (rosterOverrideId === null ? 0 : 1) + (personalAssignmentId === null ? 0 : 1);
+
+    if (kind !== REPLACE_MEMBER && links !== 0) return null;
+    if (kind === REPLACE_MEMBER && links > 1) return null;
+    if (kind === REPLACE_MEMBER && links === 0 && !linkOptional) return null;
 
     const type = row[SHIFT_TYPE_COLUMN];
     const shiftTypeId = type === undefined ? null : type;
 
     if (shiftTypeId !== null && (typeof shiftTypeId !== 'string' || shiftTypeId === '')) return null;
 
-    const resolution: ConflictResolution = { memberId, date, teamId, kind, rosterOverrideId, shiftTypeId };
+    const resolution: ConflictResolution = { memberId, date, teamId, kind, rosterOverrideId, shiftTypeId, personalAssignmentId };
     const key = collisionKeyOf(resolution);
 
     if (keys.has(key)) return null;
@@ -387,9 +406,12 @@ export function leaveHoursKeysOf(resolutions: readonly ConflictResolution[]): re
 
 /**
  * One live `replace_member` resolution and the roster override it put in
- * place (0032's `roster_override_id`; story 5.4e).
+ * place (0032's `roster_override_id`; story 5.4e). Always a team's: an
+ * override is a team's (story 21.7's second form, by assignment, is no link
+ * of this kind).
  */
 export interface ReplacementLink extends CollisionResolution {
+  readonly teamId: string;
   readonly rosterOverrideId: string;
 }
 
@@ -402,7 +424,9 @@ export interface ReplacementLink extends CollisionResolution {
  * organization never blinds every member's guard. Null — never a guess — when
  * a row is not a record or its member cannot be read (it might be this
  * member's), or a replacement row of this member carries no team or override
- * id, or a date that is no calendar `YYYY-MM-DD`. Kept apart from
+ * id, or a date that is no calendar `YYYY-MM-DD`. STORY 21.7: a replacement
+ * of the second form (it names a Personal Assignment, 0081) links no override
+ * and is skipped. Kept apart from
  * {@link conflictResolutionsOf}, whose shape the queue, the member path and
  * *Sati* consume.
  */
@@ -416,6 +440,10 @@ export function replacementLinksOf(rows: readonly unknown[], memberId: string): 
 
     if (typeof rowMember !== 'string' || rowMember === '') return null;
     if (rowMember !== memberId || row[KIND_COLUMN] !== REPLACE_MEMBER) continue;
+
+    const assignmentLink = row[PERSONAL_ASSIGNMENT_COLUMN];
+
+    if (typeof assignmentLink === 'string' && assignmentLink !== '') continue;
 
     const date = row[DATE_COLUMN];
     const teamId = row[TEAM_COLUMN];

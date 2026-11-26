@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { CaretRight, CheckCircle, Warning } from '@/components/ui/icon';
 import { SwapShifts } from '@/features/conflicts/components/swap-shifts';
-import { ITEM_REQUEST, ITEM_SWAP } from '@/features/conflicts/services/conflicts-queue';
+import { ITEM_REQUEST, ITEM_SWAP, teamParamOf } from '@/features/conflicts/services/conflicts-queue';
 import { leaveHalfNamedOf } from '@/features/leave/services/leave-section';
 import {
   needsYouBadgeMessageKey,
@@ -86,13 +86,13 @@ function renderRow(row: NeedsYouRow): ReactNode {
     <li key={row.key} className="min-w-0">
       <Link
         to="/za-odluku/$memberId/$date/$teamId"
-        params={{ memberId: row.memberId, date: row.date, teamId: row.teamId }}
+        params={{ memberId: row.memberId, date: row.date, teamId: teamParamOf(row.teamId) }}
         className="flex min-h-11 min-w-0 items-center gap-3 rounded-md border bg-card p-3 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <span className="grid min-w-0 flex-1 gap-0.5">
           {dateLineOf(row, t('zaOdluku.kind.collision'))}
           <span className="min-w-0 break-words font-medium tabular-nums">
-            {t(needsYouShiftMessageKey(row), { type: row.shiftTypeName, times: row.times, team: row.teamName })}
+            {t(needsYouShiftMessageKey(row), { type: row.shiftTypeName, times: row.times, team: row.teamName ?? t('kalendar.cell.noTeam') })}
           </span>
           <span className="min-w-0 break-words text-sm text-muted-foreground">{row.memberName}</span>
         </span>

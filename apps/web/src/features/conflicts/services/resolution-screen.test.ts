@@ -100,6 +100,9 @@ const ANTE = '00000000-0000-4000-8000-0000000000d1';
 const FRANE = '00000000-0000-4000-8000-0000000000d2';
 const KARLO = '00000000-0000-4000-8000-0000000000d3';
 
+/** Story 21.7: what a teamless saved line names as its team. */
+const NO_TEAM_WORD = 'bez tima';
+
 /** The 1st of September in the organization's zone: the 10th to the 14th are upcoming. */
 const NOW = new Date('2026-09-01T08:00:00Z');
 
@@ -853,8 +856,8 @@ describe("a leave request's decision rides the same status line (story 9.4)", ()
     expect(resolutionSavedMessageKey(approved.kind)).toBe('zaOdluku.savedRequestApproved');
     expect(resolutionSavedMessageKey(rejected.kind)).toBe('zaOdluku.savedRequestRejected');
 
-    const approvedLine = resolutionSavedLineOf(approved);
-    const rejectedLine = resolutionSavedLineOf(rejected);
+    const approvedLine = resolutionSavedLineOf(approved, NO_TEAM_WORD);
+    const rejectedLine = resolutionSavedLineOf(rejected, NO_TEAM_WORD);
 
     if (!approvedLine.request || !rejectedLine.request) throw new Error('not a request line');
 
@@ -882,7 +885,7 @@ describe("a leave request's decision rides the same status line (story 9.4)", ()
       teamName: 'Smjena A',
       dateShown: 'četvrtak 10.09.2026',
       memberName: VIEWER_NAME,
-    });
+    }, NO_TEAM_WORD);
 
     if (line.request || line.swap) throw new Error('a request or swap line');
 
@@ -1141,8 +1144,8 @@ describe("a swap's decision rides the same status line (story 12.4)", () => {
     expect(resolutionSavedMessageKey(approved.kind)).toBe('zaOdluku.savedSwapApproved');
     expect(resolutionSavedMessageKey(rejected.kind)).toBe('zaOdluku.savedSwapRejected');
 
-    const approvedLine = resolutionSavedLineOf(approved);
-    const rejectedLine = resolutionSavedLineOf(rejected);
+    const approvedLine = resolutionSavedLineOf(approved, NO_TEAM_WORD);
+    const rejectedLine = resolutionSavedLineOf(rejected, NO_TEAM_WORD);
 
     if (!approvedLine.swap || !rejectedLine.swap) throw new Error('not a swap line');
 

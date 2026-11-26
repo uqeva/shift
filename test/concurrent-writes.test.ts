@@ -1188,6 +1188,14 @@ describe('the remaining definers take the organization lock before their admin c
       sql: `select public.replace_conflict_member($1::uuid, current_date, $1::uuid, gen_random_uuid(), 'x')`,
       message: 'CONFLICT_REPLACEMENT_REFUSED',
     },
+    // STORY 21.7 (0081): the replacement by assignment, behind the same lock.
+    // A malformed batch is its first refusal after the admin check (22023), so
+    // unlocked it answers that, and locked it waits for the demotion (42501).
+    {
+      fn: 'resolve_with_personal_assignment',
+      sql: `select public.resolve_with_personal_assignment(jsonb_build_array($1::text))`,
+      message: 'CONFLICT_REPLACEMENT_REFUSED',
+    },
     // 0039: the roster override's confirmation and amend, behind the same lock.
     {
       fn: 'confirm_roster_override',

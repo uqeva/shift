@@ -395,6 +395,10 @@ export const HISTORY_HIDDEN_COLUMNS: ReadonlySet<string> = new Set([
   // Story 19.5 (0073, AD-10, AD-11): the operator's suspension, recorded and
   // never shown. Suspension is not a user-facing surface (FR-101).
   'suspended',
+  // Story 21.7 (0081): the replacement's assignment a decision names. The
+  // same save writes that assignment, which the history shows as its own
+  // entry (*Ručni raspored*), so the link itself is bookkeeping.
+  'personal_assignment_id',
 ]);
 
 type FieldType =

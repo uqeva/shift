@@ -1145,6 +1145,8 @@ describe('every real change names a field (retro A4)', () => {
         'leave_record_id',
         'founded_by',
         'suspended',
+        // Story 21.7 (0081): a replacement's link to the assignment the same save writes.
+        'personal_assignment_id',
       ]),
     );
   });

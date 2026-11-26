@@ -123,7 +123,7 @@ function ResolutionFacts({ view }: { readonly view: ResolutionView }): ReactNode
           {t(shiftFactsMessageKey(view.times), {
             type: view.shiftTypeName,
             times: view.times ?? undefined,
-            team: view.teamName,
+            team: view.teamName ?? t('kalendar.cell.noTeam'),
             date: view.dateShown,
           })}
         </span>
@@ -138,7 +138,7 @@ function ResolutionFacts({ view }: { readonly view: ResolutionView }): ReactNode
         </div>
       </div>
       <p className="min-w-0 break-words border-t pt-3 text-sm text-muted-foreground">
-        {t(coworkersMessageKey(view.coworkers), { team: view.teamName, names: formatList(view.coworkers) })}
+        {t(coworkersMessageKey(view.coworkers, view.teamName === null), { team: view.teamName ?? t('kalendar.cell.noTeam'), names: formatList(view.coworkers) })}
       </p>
     </Card>
   );

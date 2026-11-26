@@ -7,6 +7,7 @@ import {
   CONFLICTS_COUNT_HEADING_ID,
   ITEM_COLLISION,
   ITEM_REQUEST,
+  teamParamOf,
   type ConflictRow,
   type ConflictsQueueView,
   type QueueRow,
@@ -45,7 +46,7 @@ function ConflictItem({ row }: { readonly row: ConflictRow }): ReactNode {
     <li className="min-w-0">
       <Link
         to="/za-odluku/$memberId/$date/$teamId"
-        params={{ memberId: row.memberId, date: row.date, teamId: row.teamId }}
+        params={{ memberId: row.memberId, date: row.date, teamId: teamParamOf(row.teamId) }}
         className={cn(
           'flex min-h-11 min-w-0 items-center gap-3 rounded-md border bg-card p-3 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
           row.past && 'border-dashed bg-transparent text-muted-foreground',
@@ -54,7 +55,7 @@ function ConflictItem({ row }: { readonly row: ConflictRow }): ReactNode {
         <span className="grid min-w-0 flex-1 gap-1">
           <DateLine dateShown={row.dateShown} past={row.past} kind={t('zaOdluku.kind.collision')} />
           <span className={cn('min-w-0 break-words', !row.past && 'font-medium')}>
-            {t('zaOdluku.who', { member: row.memberName, team: row.teamName })}
+            {t('zaOdluku.who', { member: row.memberName, team: row.teamName ?? t('kalendar.cell.noTeam') })}
           </span>
           <span className="min-w-0 break-words text-sm text-muted-foreground">
             {row.times === null

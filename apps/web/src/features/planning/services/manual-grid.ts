@@ -8,6 +8,7 @@ import {
   memberScheduleOfMonth,
   membershipOn,
   scheduleSourceOn,
+  type LeaveRange,
   type MemberScheduleDay,
   type PersonalAssignment,
 } from '@shift/domain';
@@ -22,6 +23,7 @@ import {
   type MonthHoliday,
 } from '@/features/calendar/utils/month';
 import { ALL_ROLES, NO_ROLE, chooseRole, type RoleFilter, type RoleFilterOption } from '@/features/members/services/list';
+import { organizationLeaveRecordsOf } from '@/features/leave/services/leave-list';
 import { compareText } from '@/lib/i18n/format';
 import { gridDatesOf, isWeekend, weekdayOf, type GridDate } from '@/utils/grid-dates';
 
@@ -325,6 +327,51 @@ export interface ManualCell extends ManualCellRef {
    * ABSENT otherwise; an assignment on the holiday draws as before.
    */
   readonly holiday?: true;
+  /**
+   * STORY 21.7 (deferred from 21.4's review): a live leave record of the
+   * member covers the date, so the paper's absence shows before *Spremi*. A
+   * shift drafted here is a conflict *Za odluku* lists. `false` while the
+   * leave is not known.
+   */
+  readonly onLeave: boolean;
+}
+
+/** The organization's live leave, by member, as the grid draws it (story 21.7). */
+export type ManualLeave = ReadonlyMap<string, readonly LeaveRange[]>;
+
+/** No leave known: the grid draws none (the read is pending, failed, or a member's). */
+export const NO_MANUAL_LEAVE: ManualLeave = new Map();
+
+/**
+ * The leave the grid draws (story 21.7): the organization's live records as
+ * read (`leave_records`), by member, every range inclusive; none when the
+ * rows cannot be trusted (logged by the parse), so the grid never draws a
+ * guess and still stands.
+ */
+export function manualLeaveOf(calendar: CalendarSnapshot, rows: readonly unknown[] | undefined): ManualLeave {
+  if (rows === undefined) return NO_MANUAL_LEAVE;
+
+  const records = organizationLeaveRecordsOf(
+    rows,
+    calendar.members.map((member) => member.id),
+  );
+
+  if (records === null) return NO_MANUAL_LEAVE;
+
+  const byMember = new Map<string, LeaveRange[]>();
+
+  for (const { memberId, from, to } of records) {
+    const list = byMember.get(memberId);
+
+    if (list === undefined) byMember.set(memberId, [{ from, to }]);
+    else list.push({ from, to });
+  }
+
+  return byMember;
+}
+
+function onLeaveOn(leave: ManualLeave, memberId: string, date: string): boolean {
+  return (leave.get(memberId) ?? []).some((range) => range.from <= date && date <= range.to);
 }
 
 export interface ManualRow {
@@ -402,9 +449,11 @@ function cellOf(
   ownTeamId: string | null,
   letters: ReadonlyMap<string, string>,
   draft: ManualDraft,
+  leave: ManualLeave,
 ): ManualCell {
   const ref = { memberId, date: day.date };
   const changed = draft.has(draftKeyOf(ref));
+  const onLeave = onLeaveOn(leave, memberId, day.date);
   const assignment = day.personalAssignment;
   const typeOf = (id: string | null) => (id === null ? undefined : calendar.types.find((type) => type.id === id));
 
@@ -422,6 +471,7 @@ function cellOf(
       active: day.active,
       changed,
       more: day.shifts.filter((candidate) => typeOf(candidate.shiftTypeId)?.isWorking === true).length > 1,
+      onLeave,
     };
   }
 
@@ -441,6 +491,7 @@ function cellOf(
       more: false,
       // STORY 21.18: the holiday emptied their team's shift.
       ...(day.shifts.some((candidate) => candidate.offForHoliday === true) ? { holiday: true as const } : {}),
+      onLeave,
     };
   }
 
@@ -455,6 +506,7 @@ function cellOf(
     active: day.active,
     changed,
     more: day.shifts.filter((candidate) => typeOf(candidate.shiftTypeId)?.isWorking === true).length > 1,
+    onLeave,
   };
 }
 
@@ -468,11 +520,18 @@ function cellOf(
  * - a row names its source ({@link rowSourceOf}): the member's own on the
  *   month's last date, *osobna rotacija* or *ručno*, else *rotacija tima*
  *   when its team has a rotation version in effect by then, else *ručno*;
- * - each cell is the member's day of the "after" (`memberScheduleOfMonth`).
+ * - each cell is the member's day of the "after" (`memberScheduleOfMonth`),
+ *   marked when `leave` covers it (story 21.7).
  *
  * @throws RangeError on any precondition of the domain's derivations, or a month that is not `YYYY-MM`.
  */
-export function manualMonthOf(calendar: CalendarSnapshot, month: string, today: string, draft: ManualDraft): ManualMonth {
+export function manualMonthOf(
+  calendar: CalendarSnapshot,
+  month: string,
+  today: string,
+  draft: ManualDraft,
+  leave: ManualLeave = NO_MANUAL_LEAVE,
+): ManualMonth {
   const after = draftAppliedOf(calendar, draft);
   const dates = datesOfMonth(month);
   const first = dates[0] as string;
@@ -490,7 +549,9 @@ export function manualMonthOf(calendar: CalendarSnapshot, month: string, today: 
       memberScheduleInputOf(after, { memberId: member.id, memberships: member.memberships, statuses: member.statuses }, shared),
       month,
     );
-    const cells = days.map((day) => cellOf(after, day, member.id, membershipOn(member.memberships, day.date)?.teamId ?? null, letters, draft));
+    const cells = days.map((day) =>
+      cellOf(after, day, member.id, membershipOn(member.memberships, day.date)?.teamId ?? null, letters, draft, leave),
+    );
 
     for (const cell of cells) if (cell.shiftTypeId !== null) used.add(cell.shiftTypeId);
 

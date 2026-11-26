@@ -2,6 +2,7 @@ import { createRoute } from '@tanstack/react-router';
 
 import { ConflictResolutionBody } from '@/features/conflicts/components/conflict-resolution-body';
 import { useConflictResolution } from '@/features/conflicts/hooks/use-conflict-resolution';
+import { teamIdOfParam } from '@/features/conflicts/services/conflicts-queue';
 import { requireAdmin } from '@/features/navigation/services/admin-guard';
 import { appLayoutRoute } from '@/pages/_app';
 
@@ -45,7 +46,8 @@ function ResolutionScreen({ params }: { readonly params: Parameters<typeof useCo
 export function ZaOdlukuCollisionScreen() {
   const { memberId, date, teamId } = zaOdlukuCollisionRoute.useParams();
 
-  return <ResolutionScreen key={JSON.stringify([memberId, date, teamId])} params={{ memberId, date, teamId }} />;
+  // STORY 21.7: `bez-tima` opens a collision with no team.
+  return <ResolutionScreen key={JSON.stringify([memberId, date, teamId])} params={{ memberId, date, teamId: teamIdOfParam(teamId) }} />;
 }
 
 export const zaOdlukuCollisionRoute = createRoute({

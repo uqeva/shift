@@ -57,8 +57,8 @@ function renderMember(block: ManualMemberPreview): ReactNode {
           })}
         </p>
       ))}
-      {block.teamless.map((line) => (
-        <p key={line.key}>{t('rucniRaspored.preview.unlistedLeave', manualDateValuesOf(line.date))}</p>
+      {block.newConflicts.map((line) => (
+        <p key={line.key}>{t('rucniRaspored.preview.newConflict', manualDateValuesOf(line.date))}</p>
       ))}
     </section>
   );

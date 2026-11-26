@@ -67,7 +67,7 @@ Make Smjenko plan the first production pilot's real month without workarounds. T
 - **Collisions and swaps (AD-4 amended).**
   - `conflict_resolutions.team_id` becomes nullable, under a `NULLS NOT DISTINCT` key.
   - Replace Member gains a `personal_assignment_id` form. It matches only while that assignment is live, of the same date and type, and counted with the collision's team.
-  - `resolve_with_personal_assignment(p_items)` writes the assignments and the resolutions in one transaction.
+  - `resolve_with_personal_assignment(p_items)` writes the assignments and the resolutions in one transaction. As built by 21.7 (`0081`): 1–366 items `{ memberId, date, teamId|null, shiftTypeId, replacementId, note? }`, the assignments through 0077's save (one notice per replacement per call), an equal live `SHIFT` reused, an `OFF` replaced, another `SHIFT` 23505 `CONFLICT_REPLACEMENT_TAKEN`; a trigger ends the resolution when its assignment is removed. A Personal Shift (team or none) is replaced by assignment, a rotation shift by override; a teamless one only by a member with no team that date.
   - A swap approval writes assignments through the same save: the taker gets the shift, the giver gets `OFF`.
 - **Holidays and minimums (AD-27).**
   - `organization_holidays` holds one row per date, with a `name` of 1–100 code points. Every member reads it. An admin inserts, renames (`name` only) and deletes.
@@ -123,7 +123,7 @@ Make Smjenko plan the first production pilot's real month without workarounds. T
   - No e2e opens `/rucni-raspored` yet. One is owed with 21.5.
 - **Schedule source.** 21.9 needs 21.1. 21.10 needs 21.9 and 21.4. 21.10 replaces the grid's interim row-source rule with `scheduleSourceOn`. 21.11 is independent.
 - **Roles and floaters.** 21.12 is independent. 21.13 needs 21.7 and 21.12. 21.14 needs 21.13.
-  - Until 21.7 lands, the grid only warns about a teamless shift saved over existing leave.
+  - As built by 21.7 (`0081`): a teamless collision is listed, resolved, marked on the member's cell and guarded; the grid draws leave and says each new conflict a save makes. 21.13 narrows `assignmentCandidatesOf` and writes `resolveWithPersonalAssignment` (one item); 21.14 passes one item per covered date to the same call.
 - **Holidays.** 21.15 needs 21.9. 21.16 needs 21.15. 21.17 and 21.19 need 21.16. 21.18 needs 21.16 and 21.4.
 - **Hot files.** Stories touching `index.css`, `components/ui/*`, `chrome.tsx`, `hr.json` or the theme tests start from the previous one's merge. CSS changes run the theme root files.
 - **CI-only database cases.** 21.2, 21.7, 21.10, 21.11, 21.13 and 21.16 have database cases that only CI runs, so they get the unrun-DB-test review layer.

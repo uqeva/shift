@@ -1553,6 +1553,9 @@ describe('every organization table carries row level security, and only its revi
         // 0038: the shift type the decision was made on, which the direct
         // `accept_uncovered` insert names.
         'shift_type_id',
+        // STORY 21.7 (0081): the link to the replacement's assignment has NO
+        // grant, so `resolve_with_personal_assignment` is the only writer.
+        'personal_assignment_id',
       ]);
       expect(held.tables).toEqual(['authenticated:SELECT']);
       expect(held.columns, 'the writable conflict resolution columns changed, or anon holds one').toEqual([
@@ -1579,6 +1582,8 @@ describe('every organization table carries row level security, and only its revi
       expect(keys.map((row) => row.definition).sort()).toEqual([
         'FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE',
         'FOREIGN KEY (organization_id, member_id) REFERENCES members(organization_id, id)',
+        // STORY 21.7 (0081): a replacement by assignment names its tenant's assignment, never cascading.
+        'FOREIGN KEY (organization_id, personal_assignment_id) REFERENCES personal_assignments(organization_id, id)',
         // STORY 5.4c: a `replace_member` row names its tenant's override, never cascading.
         'FOREIGN KEY (organization_id, roster_override_id) REFERENCES roster_overrides(organization_id, id)',
         // 0038: the shift type a decision was made on, its tenant's, never cascading.
@@ -1590,9 +1595,11 @@ describe('every organization table carries row level security, and only its revi
            from pg_constraint
           where contype = 'c' and conname = 'conflict_resolutions_replacement_linked'`,
       );
-      expect(checks.map((row) => row.definition), 'a replacement and only a replacement names its override').toEqual([
-        "CHECK (((kind = 'replace_member'::text) = (roster_override_id IS NOT NULL)))",
-      ]);
+      // STORY 21.7 (0081): a replacement names exactly one of its override and its assignment; no other kind names either.
+      expect(checks, 'a replacement and only a replacement names one link').toHaveLength(1);
+      expect(checks[0]?.definition.replace(/\s+/g, ' ')).toMatch(
+        /^CHECK \(\(num_nonnulls\(roster_override_id, personal_assignment_id\) = CASE WHEN \(kind = 'replace_member'::text\) THEN 1 ELSE 0 END\)\)$/,
+      );
       const { rows: indexes } = await client.query<{ indexdef: string }>(
         `select indexdef from pg_indexes where schemaname = 'public' and tablename = 'conflict_resolutions'`,
       );
@@ -1602,7 +1609,8 @@ describe('every organization table carries row level security, and only its revi
       ).toBe(true);
       expect(
         indexes.some((row) =>
-          /^CREATE UNIQUE INDEX \w+ ON public\.conflict_resolutions USING btree \(organization_id, member_id, date, team_id\) WHERE \(removed_at IS NULL\)$/.test(
+          // STORY 21.7 (0081): a teamless key is one key (NULLS NOT DISTINCT).
+          /^CREATE UNIQUE INDEX \w+ ON public\.conflict_resolutions USING btree \(organization_id, member_id, date, team_id\) NULLS NOT DISTINCT WHERE \(removed_at IS NULL\)$/.test(
             row.indexdef,
           ),
         ),
@@ -1612,6 +1620,11 @@ describe('every organization table carries row level security, and only its revi
       expect(
         indexes.some((row) => /^CREATE INDEX \w+ ON public\.conflict_resolutions USING btree \(organization_id, roster_override_id\)$/.test(row.indexdef)),
         'no index backs the link to the replacement\'s override',
+      ).toBe(true);
+      // STORY 21.7 (0081): the lifetime trigger reaches a resolution by its assignment through an index.
+      expect(
+        indexes.some((row) => /^CREATE INDEX \w+ ON public\.conflict_resolutions USING btree \(organization_id, personal_assignment_id\)$/.test(row.indexdef)),
+        'no index backs the link to the replacement\'s assignment',
       ).toBe(true);
       const { rows: triggers } = await client.query<{ definition: string }>(
         `select pg_get_triggerdef(oid) as definition
@@ -2926,6 +2939,13 @@ describe('the access-control layer runs as the owner and hands that power to nob
     // re-checks itself, on 5.2a's amend's attributes. 0038 added the shift
     // type, dropping the five-argument signature.
     { name: 'replace_conflict_member', argumentCount: 6 },
+    // STORY 21.7 (0081). The replacement by assignment: the replacement's
+    // assignment through 0077's save and its linked resolution, in one
+    // transaction past the insert policy it re-checks itself; and the trigger
+    // that ends such a resolution when its assignment is removed.
+    { name: 'resolve_with_personal_assignment', argumentCount: 1 },
+    { name: 'end_resolution_with_assignment', argumentCount: 0, schema: 'private' },
+    { name: 'relink_resolution_to_assignment', argumentCount: 0, schema: 'private' },
     // STORY 5.4a. The born-on-leave trigger reads `leave_records` past row
     // level security and share-locks the row, as 0023's triggers read past it.
     { name: 'refuse_conflict_resolution_off_leave', argumentCount: 0 },
@@ -3154,6 +3174,11 @@ describe('the access-control layer runs as the owner and hands that power to nob
     { name: 'my_conflict_resolutions', argumentCount: 0, expected: ['authenticated'] },
     // STORY 5.4c. The replacement, on 5.2a's amend's terms; six arguments since 0038.
     { name: 'replace_conflict_member', argumentCount: 6, expected: ['authenticated'] },
+    // STORY 21.7 (0081). The replacement by assignment, on 5.4c's terms; its
+    // lifetime trigger function, on 0023's: its owner, and nobody else.
+    { name: 'resolve_with_personal_assignment', argumentCount: 1, expected: ['authenticated'] },
+    { name: 'end_resolution_with_assignment', argumentCount: 0, expected: [], schema: 'private' },
+    { name: 'relink_resolution_to_assignment', argumentCount: 0, expected: [], schema: 'private' },
     // The zero-admin trigger function. Nothing calls it by hand and Postgres
     // checks EXECUTE when the trigger is created, not when it fires, so it
     // needs no grantee at all: its owner, and nobody else (0020). The

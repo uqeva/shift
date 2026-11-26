@@ -57,7 +57,7 @@ export function ConflictsBody({
   readonly onRetry: (() => void) | null;
 }): ReactNode {
   // STORY 9.4: a leave request's decision rides in the same slot, named by its own line; since story 12.4, a swap's too.
-  const line = saved === null ? null : resolutionSavedLineOf(saved);
+  const line = saved === null ? null : resolutionSavedLineOf(saved, t('kalendar.cell.noTeam'));
 
   return (
     <div className="flex min-w-0 flex-col gap-3">

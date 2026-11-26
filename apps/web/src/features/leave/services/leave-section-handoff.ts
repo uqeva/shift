@@ -84,7 +84,8 @@ export const LEAVE_HANDOFF_ORIGIN_STATE = 'leaveHandoffOrigin';
 export interface LeaveHandoffOrigin {
   readonly memberId: string;
   readonly date: string;
-  readonly teamId: string;
+  /** `null` for a collision with no team (story 21.7). */
+  readonly teamId: string | null;
 }
 
 export type LeaveHandoff =
@@ -120,7 +121,7 @@ function originOf(origin: unknown): LeaveHandoffOrigin | null {
 
   const { memberId, date, teamId } = origin as Record<string, unknown>;
 
-  if (!isText(memberId) || typeof date !== 'string' || !isIsoDate(date) || !isText(teamId)) return null;
+  if (!isText(memberId) || typeof date !== 'string' || !isIsoDate(date) || !(teamId === null || isText(teamId))) return null;
 
   return { memberId, date, teamId };
 }

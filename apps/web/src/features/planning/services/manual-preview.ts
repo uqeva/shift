@@ -1,4 +1,5 @@
 import {
+  collisionKeyOf,
   collisionsOf,
   dutiesOf,
   memberScheduleOfMonth,
@@ -24,11 +25,12 @@ import { compareText, formatIsoDayMonth, formatIsoWeekdayShortName, nextIsoDate,
  * `loanPreviewOf`), with one difference that is the point of this story: a
  * Personal Shift counted with NO team is read, never skipped — it is lost or
  * gained, it double-books and it joins a no-rest duty like any other shift
- * (R14.5, R14.9), and a leave over it is a conflict *Za odluku* cannot list
- * until story 21.7 ({@link ManualTeamlessConflict}).
+ * (R14.5, R14.9), and a leave over it is a conflict like any other. STORY
+ * 21.7: *Za odluku* lists it (with a team or none), so the line says where the
+ * new conflict goes ({@link ManualNewConflict}), for every team.
  *
  * Only what the save MAKES is said: a double booking, a no-rest duty or a
- * teamless conflict already there before is not repeated. Nothing here
+ * conflict already there before is not repeated. Nothing here
  * blocks; only an erasure does (`manual-save`).
  */
 
@@ -70,8 +72,8 @@ export interface ManualRestGapLine {
   readonly totalMinutes: number;
 }
 
-/** A leave over a Personal Shift counted with no team: a real conflict *Za odluku* does not list yet (story 21.7). */
-export interface ManualTeamlessConflict {
+/** A date the save puts a working shift over the member's existing leave: a new conflict *Za odluku* lists (story 21.7). */
+export interface ManualNewConflict {
   readonly key: string;
   readonly date: string;
 }
@@ -84,7 +86,7 @@ export interface ManualMemberPreview {
   readonly moreShifts: number;
   readonly doubles: readonly ManualDoubleLine[];
   readonly restGaps: readonly ManualRestGapLine[];
-  readonly teamless: readonly ManualTeamlessConflict[];
+  readonly newConflicts: readonly ManualNewConflict[];
 }
 
 /** A roster override that applies before and no longer would: kept, listed (the admin removes it in *Kalendar*). */
@@ -194,7 +196,7 @@ function scheduleInputOf(snapshot: CalendarSnapshot): ScheduleInput {
  * each date, by team and type; and, over the legs read
  * {@link MANUAL_DUTY_REACH_DAYS} days either side, every new double booking
  * and every new no-rest duty with a leg in `[from − 1, to + 1]`; and every new
- * leave conflict over a teamless shift inside the window.
+ * leave conflict inside the window, with a team or none.
  */
 function memberPreviewOf(
   before: CalendarSnapshot,
@@ -266,36 +268,39 @@ function memberPreviewOf(
     moreShifts: Math.max(lines.length - MANUAL_SHOWN_SHIFTS, 0),
     doubles,
     restGaps,
-    teamless: records === null ? [] : teamlessConflictsOf(before, after, memberId, window, records),
+    newConflicts: records === null ? [] : newConflictsOf(before, after, memberId, window, records),
   };
 }
 
 /**
- * THE 21.4 GATE (deferred-work, from story 21.1's review): every conflict
- * with no team the "after" raises for `memberId` in `window` that `before`
- * did not — a leave over a Personal Shift counted with no team. Warned, never
- * refused (R14.5 makes it a real conflict, and the admin may mean it); the
- * line says *Za odluku* does not list it until story 21.7.
+ * THE NEW CONFLICTS (story 21.4's gate, widened by story 21.7): every date in
+ * `window` on which the "after" raises a conflict for `memberId` that
+ * `before` did not — a working shift saved over their existing leave, with a
+ * team or none. Said, never refused (R14.5 makes it a real conflict, and the
+ * admin may mean it); since 21.7 *Za odluku* lists every one, and the line
+ * says so.
  */
-export function teamlessConflictsOf(
+export function newConflictsOf(
   before: CalendarSnapshot,
   after: CalendarSnapshot,
   memberId: string,
   window: { readonly from: string; readonly to: string },
   records: readonly OrganizationLeaveRecord[],
-): readonly ManualTeamlessConflict[] {
+): readonly ManualNewConflict[] {
   const own = records.filter((record) => record.memberId === memberId && record.from <= window.to && window.from <= record.to);
 
   if (own.length === 0) return [];
 
-  const teamless = (snapshot: CalendarSnapshot): readonly string[] =>
-    collisionsOf(collisionInputOf(snapshot, own))
-      .filter((collision) => collision.teamId === null && collision.date >= window.from && collision.date <= window.to)
-      .map((collision) => collision.date);
-  const was = new Set(teamless(before));
+  // By key, so a shift moved from one team to another on a date still on leave is a new conflict too.
+  const conflicts = (snapshot: CalendarSnapshot): ReadonlyMap<string, string> =>
+    new Map(
+      collisionsOf(collisionInputOf(snapshot, own))
+        .filter((collision) => collision.date >= window.from && collision.date <= window.to)
+        .map((collision) => [collisionKeyOf(collision), collision.date]),
+    );
+  const was = conflicts(before);
 
-  return [...new Set(teamless(after))]
-    .filter((date) => !was.has(date))
+  return [...new Set([...conflicts(after)].filter(([key]) => !was.has(key)).map(([, date]) => date))]
     .sort()
     .map((date) => ({ key: date, date }));
 }
@@ -305,7 +310,7 @@ export function teamlessConflictsOf(
  * with nothing to say left out), and the roster overrides in force in the
  * window that apply before and not after (`rosterOverridesMadeInertOf`),
  * listed and kept. `records` is the organization's leave as freshly read, or
- * `null` when it is not known (then no teamless line is said).
+ * `null` when it is not known (then no new-conflict line is said).
  *
  * @throws RangeError on any precondition of the domain's derivations, or a
  *   member, team or shift type the snapshots lack.
@@ -321,7 +326,7 @@ export function manualPreviewOf(
     .map((memberId) => memberPreviewOf(before, after, memberId, window, records))
     .filter(
       (block) =>
-        block.shifts.length > 0 || block.doubles.length > 0 || block.restGaps.length > 0 || block.teamless.length > 0,
+        block.shifts.length > 0 || block.doubles.length > 0 || block.restGaps.length > 0 || block.newConflicts.length > 0,
     )
     .sort((first, second) => compareText(first.name, second.name));
   const names = new Map(before.members.map((member) => [member.id, member.name]));
