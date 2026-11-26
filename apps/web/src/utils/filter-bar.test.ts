@@ -221,7 +221,8 @@ describe('what a press changes', () => {
 
     expect(filterRemovalOf(both, FILTER_TEAM)).toEqual({ smjena: null, osoba: 'luka' });
     expect(filterRemovalOf(both, FILTER_PERSON)).toEqual({ smjena: 'b', osoba: null });
-    expect(FILTERS_CLEARED).toEqual({ smjena: null, osoba: null });
+    // Story 21.25: the role too, which a bar that offers none (Sati) ignores.
+    expect(FILTERS_CLEARED).toEqual({ smjena: null, osoba: null, posao: null });
   });
 });
 
@@ -337,5 +338,64 @@ describe('option chips count what is set and pass focus on after a removal (stor
     // Level is not set, so not drawn: nothing of it to pass focus on from.
     expect(focusAfterOptionRemovalOf(chips, 'level')).toBeNull();
     expect(focusAfterOptionRemovalOf([], 'status')).toBeNull();
+  });
+});
+
+describe('Posao (story 21.25)', () => {
+  const ROLES = [
+    { id: 'dispecer', name: 'Dispečer', count: 3 },
+    { id: 'none', name: '', count: 14 },
+  ];
+  const withRoles = (input: Partial<FilterBarInput> = {}) =>
+    filterBarOf({ combine: false, teams: TEAMS, team: null, people: PEOPLE, person: null, shownCount: 17, roles: ROLES, ...input });
+
+  it('draws the Posao chip between Tim and Osoba, and counts it on', () => {
+    const model = withRoles({ role: 'dispecer', team: 'b', shownCount: 2 });
+
+    expect(model.chips.map((chip) => chip.key)).toEqual(['team', 'role', 'person']);
+    expect(activeChipsOf(model)).toEqual([
+      { key: 'team', value: 'Smjena B' },
+      { key: 'role', value: 'Dispečer' },
+    ]);
+    expect(model.activeCount).toBe(2);
+    expect(filterChipMessageKey({ key: 'role', value: 'Dispečer' })).toBe('filter.chip.role');
+    expect(filterRemoveMessageKey({ key: 'role', value: 'Dispečer' })).toBe('filter.remove.role');
+  });
+
+  it('offers no Posao while nobody holds a role and none is chosen, and ignores an unknown role', () => {
+    expect(withRoles({ roles: [{ id: 'none', name: '', count: 17 }] }).roles).toEqual([]);
+    expect(withRoles({ role: 'gone' }).role).toBeNull();
+  });
+
+  it('a person replaces the role in Kalendar; a role combines with the team and drops the person', () => {
+    const withPerson = withRoles({ person: 'luka', role: 'dispecer', shownCount: 1 });
+
+    expect(withPerson.role).toBeNull();
+    expect(withPerson.chips).toEqual([{ key: 'person', value: 'Luka Knežević' }]);
+
+    const withTeam = withRoles({ team: 'b', role: 'dispecer', shownCount: 2 });
+
+    expect(filterChoiceOf(withTeam, 'role', 'none')).toEqual({ smjena: 'b', osoba: null, posao: 'none' });
+    expect(filterChoiceOf(withTeam, FILTER_TEAM, 'a')).toEqual({ smjena: 'a', osoba: null, posao: 'dispecer' });
+    expect(filterChoiceOf(withTeam, FILTER_PERSON, 'ana')).toEqual({ smjena: null, osoba: 'ana', posao: null });
+    expect(filterRemovalOf(withTeam, 'role')).toEqual({ smjena: 'b', osoba: null, posao: null });
+    expect(filterRemovalOf(withTeam, FILTER_TEAM)).toEqual({ smjena: null, osoba: null, posao: 'dispecer' });
+    expect(modelStateKeyOf(withTeam)).toBe(filterStateKeyOf({ smjena: 'b', osoba: null, posao: 'dispecer' }));
+  });
+
+  it('a bar with no role writes no posao (Sati)', () => {
+    const sati = filterBarOf({ combine: true, teams: TEAMS, team: 'b', people: PEOPLE, person: null, shownCount: 4 });
+
+    expect(sati.roles).toEqual([]);
+    expect(filterChoiceOf(sati, FILTER_TEAM, 'a')).toEqual({ smjena: 'a', osoba: null });
+    expect(filterRemovalOf(sati, FILTER_TEAM)).toEqual({ smjena: null, osoba: null });
+  });
+
+  it('names the role after the summary, and counts what it leaves under every team', () => {
+    const model = withRoles({ role: 'dispecer', shownCount: 3 });
+
+    expect(model.summary).toEqual({ kind: 'all', teams: 4, people: 3 });
+    expect(model.summaryRole).toEqual({ id: 'dispecer', name: 'Dispečer' });
+    expect(t('filter.summary.withRole', { summary: 'Prikazano: x', role: 'Dispečer' })).toBe('Prikazano: x · Posao: Dispečer');
   });
 });

@@ -16,13 +16,16 @@ import {
   shiftTypeVersionOn,
   shortStaffedShiftsOf,
   staffingOn,
+  PERSONAL_ASSIGNMENT_OFF,
   type Collision,
   type CollisionLeaveRecord,
   type CollisionResolution,
   type DutyLeg,
   type LeaveRange,
   type Loan,
+  type MemberScheduleDay,
   type MemberScheduleInput,
+  type MemberShift,
   type MembershipVersion,
   type OverrideStanding,
   type StaffingInput,
@@ -63,6 +66,8 @@ import {
   type ShiftTypeRow,
 } from '@/features/shift-types/services/list';
 import { splitTeams, type TeamRow } from '@/features/teams/services/list';
+import { ALL_ROLES, NO_ROLE, chooseRole, type RoleFilterOption } from '@/features/members/services/list';
+import { compareText } from '@/lib/i18n/format';
 import { instantMicrosOf } from '@/features/rotation/services/list';
 import {
   MONTH_SEARCH_PARAM,
@@ -200,6 +205,13 @@ export const MODE_SEARCH_PARAM = 'prikaz';
  * open closes it.
  */
 export const DAY_SEARCH_PARAM = 'dan';
+
+/**
+ * STORY 21.25: the job role *Sve smjene* is narrowed to, `?posao=<role id>`
+ * or `?posao=none`, on *Ljudi*'s semantics (story 21.12): an id nobody in the
+ * month holds is every role, and the URL keeps it.
+ */
+export const ROLE_SEARCH_PARAM = 'posao';
 export const DAY_TEAM_SEARCH_PARAM = 'danSmjena';
 
 /**
@@ -231,6 +243,8 @@ export interface CalendarSearch {
   readonly prikaz?: CalendarMode | undefined;
   readonly smjena?: string | undefined;
   readonly osoba?: string | undefined;
+  /** STORY 21.25: the job role chosen (`?posao=`): a role's id, or `none`. */
+  readonly posao?: string | undefined;
   /** The open day's date, always with `danSmjena`. */
   readonly dan?: string | undefined;
   /** The open day's team, always with `dan`. */
@@ -250,6 +264,8 @@ export interface CalendarOpenDay {
 export interface CalendarFilterChange {
   readonly smjena: string | null;
   readonly osoba: string | null;
+  /** STORY 21.25: the job role; absent where the bar offers none, which keeps it. */
+  readonly posao?: string | null;
 }
 
 /**
@@ -315,6 +331,7 @@ const CALENDAR_SEARCH_ORDER = [
   MODE_SEARCH_PARAM,
   TEAM_SEARCH_PARAM,
   PERSON_SEARCH_PARAM,
+  ROLE_SEARCH_PARAM,
   DAY_SEARCH_PARAM,
   DAY_TEAM_SEARCH_PARAM,
 ] as const;
@@ -378,6 +395,7 @@ export function calendarSearchOf(search: Record<string, unknown>): CalendarSearc
   const mode = search[MODE_SEARCH_PARAM];
   const team = search[TEAM_SEARCH_PARAM];
   const person = search[PERSON_SEARCH_PARAM];
+  const role = search[ROLE_SEARCH_PARAM];
   const day = search[DAY_SEARCH_PARAM];
   const dayTeam = search[DAY_TEAM_SEARCH_PARAM];
   const dayWhole = typeof day === 'string' && isIsoDate(day) && typeof dayTeam === 'string' && dayTeam !== '';
@@ -387,6 +405,7 @@ export function calendarSearchOf(search: Record<string, unknown>): CalendarSearc
     ...searchEntryOf(MODE_SEARCH_PARAM, mode, isCalendarMode),
     ...searchEntryOf(TEAM_SEARCH_PARAM, team, isSearchText),
     ...searchEntryOf(PERSON_SEARCH_PARAM, person, isSearchText),
+    ...searchEntryOf(ROLE_SEARCH_PARAM, role, isSearchText),
     ...(dayWhole ? { dan: day, danSmjena: dayTeam } : {}),
   };
 }
@@ -804,9 +823,11 @@ export interface CalendarFilterPerson {
    * from ({@link filterTeamOf}). ABSENT for everyone not lent then.
    */
   readonly lentFrom?: LentFrom;
+  /** STORY 21.25: their job role's id, or `null` for none; what *Posao* narrows by. */
+  readonly roleId: string | null;
 }
 
-/** The filter of *Sve smjene*: one team (story 3.3a) or one person (story 3.3b). */
+/** The filter of *Sve smjene*: one team (story 3.3a) or one person (story 3.3b), and a job role (story 21.25). */
 export interface CalendarFilter {
   /** Its team options: every active team, in column order. */
   readonly teams: readonly CalendarColumn[];
@@ -829,6 +850,14 @@ export interface CalendarFilter {
    * on an archived one, counts in no team.
    */
   readonly teamCounts: Readonly<Record<string, number>>;
+  /**
+   * STORY 21.25: the *Posao* options, on *Ljudi*'s semantics — every role,
+   * the roles somebody active in the month holds by name, and no role — each
+   * with the people it would show (inside the team chosen).
+   */
+  readonly roles: readonly RoleFilterOption[];
+  /** The role the month IS narrowed to, one of `roles` but every role; `null` for every role, and whenever a person is chosen. */
+  readonly role: string | null;
 }
 
 /** The person *Sve smjene* shows in place of the grid (story 3.3b). */
@@ -938,6 +967,70 @@ export interface CalendarMonth extends MonthHeader {
    * one, which *Moj raspored* states under its sentence. ABSENT with none.
    */
   readonly ownLoan?: LoanNotice;
+  /**
+   * STORY 21.25 (UX-DR83), *KALENDAR KAO PAPIR*: the grid from 640 px reads
+   * as the paper roster, a column per date. Its first rows are the teams —
+   * every shown column, as the grid's columns were: a turnus team its type
+   * per date, a team with no rotation (a day team) `—` or the staffing
+   * groups of the Personal Shifts counted with it (story 21.6) — each a cell
+   * per date. A team row is never dropped for want of a rotation, so a
+   * team the filter offers is always a row the grid draws.
+   */
+  readonly teamRows: readonly CalendarTeamRow[];
+  /**
+   * Then the people on a personal or manual schedule — active in the month
+   * and on no active turnus team ({@link teamHasRotationBy}) on any date they
+   * are active: on no team, an archived one or a team with no rotation —
+   * grouped by job role, narrowed by the team and the role chosen.
+   */
+  readonly peopleGroups: readonly CalendarPeopleGroup[];
+}
+
+/**
+ * STORY 21.25 (UX-DR83): a team's row of the paper grid — the team, its
+ * index among `columns` (where its cells' labels are), and a cell per date.
+ */
+export interface CalendarTeamRow {
+  readonly team: CalendarColumn;
+  readonly column: number;
+  readonly cells: readonly CalendarCell[];
+}
+
+/** STORY 21.25: one date of a person's row of the paper grid. */
+export interface CalendarPersonCell {
+  readonly date: string;
+  /** The shift shown — the first with a type, as *Ručni raspored* draws it — or `null` for none. */
+  readonly cell: CalendarCell | null;
+  /** An assigned plain day off (*Slobodno*). */
+  readonly off: boolean;
+  /** A Personal Assignment gives the day (UX-DR73): drawn with the assigned mark. */
+  readonly assigned: boolean;
+  /** Active that date (R7); an inactive date shows nothing. */
+  readonly active: boolean;
+  /**
+   * The active team whose day detail the cell opens: the shift's team, else
+   * their own team that date, else the first team shown; `null` where
+   * no team exists to open, and the cell then opens nothing.
+   */
+  readonly teamId: string | null;
+}
+
+/** STORY 21.25: a person on a personal or manual schedule, a row of the paper grid. */
+export interface CalendarPersonRow {
+  readonly memberId: string;
+  readonly name: string;
+  /** Their team for the month, by name, or `null` for none: the line under the name. */
+  readonly teamName: string | null;
+  readonly cells: readonly CalendarPersonCell[];
+  /** Their days could not be derived (their failure alone, logged): the row says so, its cells empty. */
+  readonly unavailable: boolean;
+}
+
+/** STORY 21.25: the people of one job role, by name; `roleId: null` is the people with none (last). */
+export interface CalendarPeopleGroup {
+  readonly roleId: string | null;
+  readonly roleName: string | null;
+  readonly rows: readonly CalendarPersonRow[];
 }
 
 /** The day list, or its own read failure — which the grid does not share. */
@@ -1123,6 +1216,16 @@ export function dayMonthOf(date: string): string {
 /** `subota`, as every row and day of the calendar reads it. */
 export function weekdayOf(date: string): string {
   return formatted(formatIsoWeekdayName(date), `the weekday of ${date}`);
+}
+
+/**
+ * Whether `teamId` has a rotation version in effect on or before `last`: a
+ * TURNUS TEAM for a month ending on `last`. THE ONE RULE *Ručni raspored*'s
+ * *rotacija tima* (story 21.4) and the paper grid's team rows (story 21.25)
+ * share.
+ */
+export function teamHasRotationBy(snapshot: Pick<CalendarSnapshot, 'assignments'>, teamId: string, last: string): boolean {
+  return snapshot.assignments.some((assignment) => assignment.teamId === teamId && assignment.effectiveFrom <= last);
 }
 
 /**
@@ -1404,15 +1507,12 @@ export function calendarMonthOf(
       ),
     ),
   );
-  const lookup = cellLookupOf(snapshot, [
-    ...schedule.flatMap((row) => row.cells.map((cell) => cell.shiftTypeId)),
-    ...[...groups.values()].flat(),
-  ]);
   // ACTIVE IN THE MONTH SHOWN: a member active on at least one of its dates,
   // by the domain's rule over their status versions (story 3.4a) — the same
   // membership rule as a Sati row, so a Sati name always opens that member.
   // One list feeds both the Osoba picker and `chosenPersonOf`.
   const dates = datesOfMonth(month);
+  const last = dates.at(-1) ?? month;
   const marked = marksLookupOf(
     { ...marks, uncovered: uncoveredOnRosterOf(snapshot, schedule, marks.uncovered) },
     shortStaffedOfMonth(snapshot, marks.staffingLeave, dates),
@@ -1431,7 +1531,7 @@ export function calendarMonthOf(
 
     if (teamName === undefined) throw new RangeError(`team ${String(teamId)} is not in the snapshot`);
 
-    const filtered: CalendarFilterPerson = { id: member.id, name: member.name, teamId, teamName };
+    const filtered: CalendarFilterPerson = { id: member.id, name: member.name, teamId, teamName, roleId: member.jobRole?.id ?? null };
 
     return { member, filtered: lentFrom === null ? filtered : { ...filtered, lentFrom } };
   });
@@ -1439,8 +1539,130 @@ export function calendarMonthOf(
     teams.map((team) => [team.id, offered.filter((one) => one.filtered.teamId === team.id).length]),
   );
   const chosenOne = offered.find((one) => one.member.id === person) ?? null;
-  const shown = (teamId: string): boolean => chosen === null || teamId === chosen;
+  const inTeam = (one: (typeof offered)[number]): boolean => chosen === null || one.filtered.teamId === chosen;
+  // STORY 21.25: *Posao*, on *Ljudi*'s semantics, faceted inside the team chosen.
+  const roleOf = (one: (typeof offered)[number]): string => one.filtered.roleId ?? NO_ROLE;
+  const held = new Map<string, string>();
+
+  for (const member of people) if (member.jobRole !== null) held.set(member.jobRole.id, member.jobRole.name);
+
+  const roleValues = [
+    ALL_ROLES,
+    ...[...held].sort(([firstId, one], [secondId, other]) => compareText(one, other) || compareText(firstId, secondId)).map(([id]) => id),
+    NO_ROLE,
+  ];
+  const roles: RoleFilterOption[] = roleValues.map((value) => ({
+    value,
+    roleName: held.get(value) ?? '',
+    count: offered.filter((one) => inTeam(one) && (value === ALL_ROLES || roleOf(one) === value)).length,
+  }));
+  const appliedRole = chooseRole(search.posao ?? ALL_ROLES, roles);
+  const role = person !== null || appliedRole === ALL_ROLES ? null : appliedRole;
+  const holdsRole = (one: (typeof offered)[number]): boolean => role === null || roleOf(one) === role;
+  // A ROLE NARROWS THE TEAMS TOO: a team is shown while somebody holding it is on it for the month.
+  const roleTeams = new Set(offered.filter(holdsRole).map((one) => one.filtered.teamId));
+  const shown = (teamId: string): boolean => (chosen === null || teamId === chosen) && (role === null || roleTeams.has(teamId));
   const columns = teams.filter((team) => shown(team.id));
+  // STORY 21.25: the people on a personal or manual schedule, each their own day.
+  const activeTeams = new Set(teams.map((team) => team.id));
+  const turnus = (teamId: string): boolean => teamHasRotationBy(snapshot, teamId, last);
+  const shared = snapshotScheduleInputOf(snapshot);
+  // Every person row of the month, unfiltered: the letters are worked out over
+  // all of them, so a team or role filter never changes a letter (the team
+  // filter narrows last, as above); only then are the rows narrowed.
+  // A member on an active turnus team on ANY date they are active in the month
+  // is read on that team's row (a mid-month joiner too); everyone else is a person.
+  const onTurnus = (member: (typeof offered)[number]['member']): boolean =>
+    dates.some((date) => {
+      const teamId = activeOn(member.statuses, date) ? (membershipOn(member.memberships, date)?.teamId ?? null) : null;
+
+      return teamId !== null && activeTeams.has(teamId) && turnus(teamId);
+    });
+  const everyManual = offered
+    .filter((one) => !onTurnus(one.member))
+    .map((one) => ({ one, days: personDaysOf(snapshot, { ...one.member, memberId: one.member.id }, shared, month) }));
+  const manual = everyManual.filter(({ one }) => inTeam(one) && holdsRole(one));
+  const typed = (day: MemberScheduleDay): MemberShift | undefined => day.shifts.find((shift) => shift.shiftTypeId !== null);
+  const lookup = cellLookupOf(snapshot, [
+    ...schedule.flatMap((row) => row.cells.map((cell) => cell.shiftTypeId)),
+    ...everyManual.flatMap(({ days }) => (days ?? []).map((day) => (day.active ? (typed(day)?.shiftTypeId ?? null) : null))),
+    // STORY 21.6 (R14.6): a team cell's staffing groups name their types too.
+    ...[...groups.values()].flat(),
+  ]);
+  const teamRowsShown = columns.map((team, column) => ({ team, column }));
+  // A person's cell with no team of its own opens the first turnus team's day, else the first team's.
+  const opensFirst = (teamRowsShown.find(({ team }) => turnus(team.id)) ?? teamRowsShown[0])?.team.id ?? null;
+  const rows: CalendarRow[] = schedule.map((row) => ({
+    date: row.date,
+    dayMonth: dayMonthOf(row.date),
+    weekday: weekdayOf(row.date),
+    isToday: row.date === today,
+    cells: row.cells
+      .filter((cell) => shown(cell.teamId))
+      .map((cell) =>
+        cellOf(
+          lookup,
+          cell.teamId,
+          cell.shiftTypeId,
+          row.date,
+          gridCellMarksOf(marked, cell.teamId, row.date, cell.overridden || cell.rosterChanged),
+          { groups: groups.get(teamDateKeyOf(cell.teamId, row.date)) ?? [] },
+        ),
+      ),
+  }));
+  const personCellOf = (memberId: string, memberships: readonly MembershipVersion[], day: MemberScheduleDay): CalendarPersonCell => {
+    const shift = day.active ? typed(day) : undefined;
+    const own = membershipOn(memberships, day.date)?.teamId ?? null;
+    const opens = [shift?.teamId ?? null, own].find((teamId) => teamId !== null && activeTeams.has(teamId)) ?? opensFirst;
+    const assignment = day.active ? day.personalAssignment : undefined;
+
+    return {
+      date: day.date,
+      cell:
+        shift === undefined || shift.shiftTypeId === null
+          ? null
+          : cellOf(
+              lookup,
+              shift.teamId,
+              shift.shiftTypeId,
+              day.date,
+              memberCellMarksOf(marked, memberId, shift.teamId, day.date, shift.overridden || shift.rosterChanged),
+              // STORY 21.6 (UX-DR73): a Personal Shift is marked as assigned, as everywhere.
+              { assigned: shift.personalAssignmentId !== undefined },
+            ),
+      off: assignment?.kind === PERSONAL_ASSIGNMENT_OFF,
+      assigned: assignment !== undefined,
+      active: day.active,
+      teamId: opens ?? null,
+    };
+  };
+  const byRole = new Map<string | null, CalendarPersonRow[]>();
+
+  for (const { one, days } of manual) {
+    const row: CalendarPersonRow = {
+      memberId: one.member.id,
+      name: one.member.name,
+      teamName: one.filtered.teamName,
+      cells:
+        days === null
+          ? dates.map((date) => ({ date, cell: null, off: false, assigned: false, active: true, teamId: null }))
+          : days.map((day) => personCellOf(one.member.id, one.member.memberships, day)),
+      unavailable: days === null,
+    };
+    const key = one.filtered.roleId;
+    const list = byRole.get(key);
+
+    if (list === undefined) byRole.set(key, [row]);
+    else list.push(row);
+  }
+
+  const byName = (one: CalendarPersonRow, other: CalendarPersonRow): number => compareText(one.name, other.name);
+  const peopleGroups = [...roleValues.filter((value) => value !== ALL_ROLES)].flatMap((value): CalendarPeopleGroup[] => {
+    const roleId = value === NO_ROLE ? null : value;
+    const list = byRole.get(roleId);
+
+    return list === undefined ? [] : [{ roleId, roleName: roleId === null ? null : (held.get(roleId) ?? null), rows: [...list].sort(byName) }];
+  });
 
   return {
     ...monthHeaderOf(month, today),
@@ -1451,25 +1673,10 @@ export function calendarMonthOf(
       people: offered.map((one) => one.filtered),
       person,
       teamCounts,
+      roles,
+      role,
     },
-    rows: schedule.map((row) => ({
-      date: row.date,
-      dayMonth: dayMonthOf(row.date),
-      weekday: weekdayOf(row.date),
-      isToday: row.date === today,
-      cells: row.cells
-        .filter((cell) => shown(cell.teamId))
-        .map((cell) =>
-          cellOf(
-            lookup,
-            cell.teamId,
-            cell.shiftTypeId,
-            row.date,
-            gridCellMarksOf(marked, cell.teamId, row.date, cell.overridden || cell.rosterChanged),
-            { groups: groups.get(teamDateKeyOf(cell.teamId, row.date)) ?? [] },
-          ),
-        ),
-    })),
+    rows,
     days: dayListOutcomeOf(snapshot, snapshot.viewer, month, today, marks),
     ownTeamName: ownTeamNameOf(snapshot, dates, teamNames),
     ...ownLoanFieldOf(snapshot, today),
@@ -1477,9 +1684,15 @@ export function calendarMonthOf(
       chosenOne === null
         ? null
         : {
-            ...chosenOne.filtered,
+            ...personShownOf(chosenOne.filtered),
             days: dayListOutcomeOf(snapshot, { ...chosenOne.member, memberId: chosenOne.member.id }, month, today, marks),
           },
+    teamRows: teamRowsShown.map(({ team, column }) => ({
+      team,
+      column,
+      cells: rows.map((row) => row.cells[column]).filter((cell) => cell !== undefined),
+    })),
+    peopleGroups,
   };
 }
 
@@ -1512,6 +1725,33 @@ function staffingGroupsOf(
       .filter((one) => one.shiftTypeId !== scheduledWorking)
       .map((one) => one.shiftTypeId);
   };
+}
+
+/**
+ * A person's days for the paper grid (story 21.25), GUARDED and LOCAL as
+ * their day list is: a `RangeError` from their history — a team whose
+ * rotation the grid never projects — is that row's failure alone, logged,
+ * and never takes the month down with it. `null` then.
+ */
+function personDaysOf(
+  snapshot: CalendarSnapshot,
+  history: CalendarMemberHistory,
+  shared: SnapshotScheduleInput,
+  month: string,
+): readonly MemberScheduleDay[] | null {
+  try {
+    return memberScheduleOfMonth(memberScheduleInputOf(snapshot, history, shared), month);
+  } catch (cause) {
+    if (!(cause instanceof RangeError)) throw cause;
+    console.error(CALENDAR_UNAVAILABLE, cause);
+
+    return null;
+  }
+}
+
+/** The person chosen as the month names them: the filter's person, less the role it narrows by. */
+function personShownOf({ roleId: _role, ...person }: CalendarFilterPerson): Omit<CalendarFilterPerson, 'roleId'> {
+  return person;
 }
 
 /**
@@ -1604,3 +1844,45 @@ export const SKELETON_COLUMN_COUNT = 4;
 export const SKELETON_GRID_STYLE = {
   gridTemplateColumns: `repeat(${String(SKELETON_COLUMN_COUNT + 1)}, minmax(0, 1fr))`,
 } as const;
+
+/**
+ * STORY 21.25: the paper grid's rows in its order — the teams, then
+ * each job role's people — as the keys walk them: a data cell's `row`.
+ */
+export function paperRowCountOf(month: Pick<CalendarMonth, 'teamRows' | 'peopleGroups'>): number {
+  return month.teamRows.length + month.peopleGroups.reduce((count, group) => count + group.rows.length, 0);
+}
+
+/**
+ * The day a paper grid cell opens (story 21.25): a team row's team on the
+ * column's date, or the team a person's cell names (`CalendarPersonCell.teamId`);
+ * `null` for a position the grid does not hold, or a person's cell with no
+ * team to open.
+ */
+export function paperCellTargetOf(
+  month: Pick<CalendarMonth, 'teamRows' | 'peopleGroups' | 'rows'>,
+  row: number,
+  column: number,
+): CalendarOpenDay | null {
+  const date = month.rows[column]?.date;
+
+  if (date === undefined) return null;
+
+  const team = month.teamRows[row];
+
+  if (team !== undefined) return { teamId: team.team.id, date };
+
+  const person = month.peopleGroups.flatMap((group) => group.rows)[row - month.teamRows.length];
+  const teamId = person?.cells[column]?.teamId ?? null;
+
+  return teamId === null ? null : { teamId, date };
+}
+
+/**
+ * The fill of a cell on its own — the type's colour, or none — without
+ * {@link CALENDAR_CELL_CLASS}'s shape, for the paper grid's letter boxes
+ * (story 21.25), which take a square shape of their own.
+ */
+export function cellFillClassOf(cell: Pick<CalendarCell, 'className'>): string {
+  return cell.className.startsWith(CALENDAR_CELL_CLASS) ? cell.className.slice(CALENDAR_CELL_CLASS.length).trim() : cell.className;
+}

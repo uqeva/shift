@@ -23,7 +23,7 @@ Epics 16–19 were added on 2026-11-20 by `sprint-change-proposal-2026-11-20-v2-
 
 Epic 20 was added on 2026-11-20 by `sprint-change-proposal-2026-11-20-self-hosting.md`: Shift is hosted on our own server through Coolify, with no Supabase cloud and no Cloudflare Pages. It changes no product behaviour. Its later stories wait for the founder decisions H-1 to H-15 and the inputs that proposal lists.
 
-Epic 21 was added on 2026-11-25 by `sprint-change-proposal-2026-11-25-pilot-readiness.md`, on the founder's approval of the first production pilot's scope and the founder's additions the same day. It covers personal scheduling (a manual grid, a pattern fill, personal rotations, seasons), job roles and floater cover, organization holidays, a minimum per team, a public product page and a label rename. Its requirements are CAP-29 to CAP-32, CAP-21 as amended, Q31 and UX-DR71 to UX-DR82 below, from PRD FR-102 to FR-116 and NFR-35, and engine rules R13 to R16. Production (20.9) stays after it.
+Epic 21 was added on 2026-11-25 by `sprint-change-proposal-2026-11-25-pilot-readiness.md`, on the founder's approval of the first production pilot's scope and the founder's additions the same day. It covers personal scheduling (a manual grid, a pattern fill, personal rotations, seasons), job roles and floater cover, organization holidays, a minimum per team, a public product page and a label rename. Its requirements are CAP-29 to CAP-32, CAP-21 as amended, Q31 and UX-DR71 to UX-DR83 below, from PRD FR-102 to FR-116 and NFR-35, and engine rules R13 to R16. Production (20.9) stays after it.
 
 **Requirements basis:** the SPEC package is canonical. `prd.md` is a fully-absorbed source and is deliberately not an input — it retains a retired rotation table, a pre-narrowing FR-16, and pre-architecture conflict framing. The PRD **addendum** is an adopted companion and is an input, for the pilot seed configuration and the epic seed.
 
@@ -243,6 +243,7 @@ From `DESIGN.md` (visual) and `EXPERIENCE.md` (behavioural). Both are binding an
 - **UX-DR80** The public page (story 21.21). One page in the app's visual language (direction G): hero with *Smjenko*, what it does, who it is for, *Javi se* and *Prijava* (and *Registriraj se* only once production signup opens), and a footer `Bez kolačića i praćenja.`, all in both themes and at phone width first.
 - **UX-DR81** The product's name and mark (story 21.24; the founder's decisions of 2026-11-25). The name a user sees is *Smjenko* everywhere: the page title, the installed app, the sign-in panel and the setup header, Auth mail and its sender, the calendar feed and the month download, the PDF's metadata and a push without a title. The mark is concept C, *Predaja smjene*: an S of two 290° clock arcs meeting at a seam, accent blue `#3FA0FA` over white, on an ink-navy `#0F172A` tile (rx 112 of 512), its colours fixed in both themes, a white 16 % hairline on dark glass, and kept under forced colours. The wordmark is text in Outfit 600, never an image. Internal identifiers (`@shift/*`, the repository, env var names, databases, URLs, UID domains) stay.
 - **UX-DR82** The compact toolbar (story 21.23). On every filtered or exporting list (*Kalendar*, *Ljudi*, *Godišnji*, *Povijest promjena*): one row of the title, the search (`Traži…`), `Filtri` with its count, `Prikaz ▾`, `Izvoz ▾` and the primary action; under it the result count and the removable chips with `Očisti sve`. On a phone two rows at most, the buttons icon-only (their names unchanged). `Filtri` opens a dropdown panel from 1024 px and a bottom sheet below it, with `Očisti` and `Primijeni`.
+- **UX-DR83** *Kalendar kao papir* (story 21.25, founder request 2026-11-25). *Svi timovi* from 640 px reads like the paper roster: the dates of the month are the columns, the rows are first the teams (a turnus team its type per date, a team with no rotation `—` or its staffing groups) and then the people on a personal or manual schedule (active in the month and on no team with a rotation on any date they are active), grouped by job role by name with *Bez posla* last. A cell draws the type's letter in its fill, with the marks' rings, hatches and glyphs and the assigned pencil; its accessible name says the date, the team or person, the type, its times and every mark. A key of letters sits above the grid. Sticky date strip and name column, the page scrolls and the grid only sideways (UX-DR71), shared with *Ručni raspored*. A cell opens the day detail. The phone keeps the day list of every shown team. *Filtri* adds *Posao* (`?posao=`, *Ljudi*'s semantics), which narrows the people to the role and the teams to those someone holding it is on; *Ručni raspored*'s toolbar gets the same *Posao* filter.
 
 ### FR Coverage Map
 
@@ -3598,7 +3599,7 @@ The admin of a fire department with mixed teams opens *Ručni raspored*. The fou
 
 Added 2026-11-25 by `sprint-change-proposal-2026-11-25-pilot-readiness.md`, on the founder's approval of the first production pilot's scope. That approval covers two organizations, a fire department on 24-hour duty and a department that mixes 24-hour crews with day workers, floater students and leave, and it was widened the same day by the founder's additions recorded in the proposal (§1). The source is modelling a real month on staging with the operator script `supabase/operator/demo-mladost.sql` (DEPLOY §7.6), whose workarounds this epic retires. **Production (20.9) stays after this epic.**
 
-**Capabilities:** CAP-29, CAP-30, CAP-31, CAP-32, CAP-21 (amended) · **Governed by:** AD-2, AD-4, AD-5, AD-7, AD-11, AD-13, AD-18, AD-19, AD-20, and AD-26 to AD-28 (added 2026-11-25) · **Engine rules:** R14, R15, R16, R13, R10.2 (amended) · **Proves:** Q2, Q9, Q11, Q12, Q21, Q22, Q25, Q27, Q31 · **UX:** UX-DR71–UX-DR82 · **Decisions:** E-1 to E-8 (proposal §6; each story names its own), all accepted at the recommended defaults by the founder on 2026-11-25
+**Capabilities:** CAP-29, CAP-30, CAP-31, CAP-32, CAP-21 (amended) · **Governed by:** AD-2, AD-4, AD-5, AD-7, AD-11, AD-13, AD-18, AD-19, AD-20, and AD-26 to AD-28 (added 2026-11-25) · **Engine rules:** R14, R15, R16, R13, R10.2 (amended) · **Proves:** Q2, Q9, Q11, Q12, Q21, Q22, Q25, Q27, Q31 · **UX:** UX-DR71–UX-DR83 · **Decisions:** E-1 to E-8 (proposal §6; each story names its own), all accepted at the recommended defaults by the founder on 2026-11-25
 
 **Planning status (2026-11-25):** every story is `ready-for-dev` in `sprint-status.yaml` until it is built (`sprint-status.yaml` holds each story's current status). Each story's spec is written by `bmad-create-story` when it starts. 21.22 is unblocked: the founder chose *Timovi* (E-6, 2026-11-25). 21.24 (the *Smjenko* name and mark) was added the same day by the founder's decisions reversing E-5's default; it is built together with 21.22 on one branch (`feat/smjenko-brand`), since both rewrite `hr.json`'s copy. 21.21 waits for the founder's contact address only to publish (E-4), not to build. The order below is the build order. 21.3, 21.12, 21.20 and 21.21 touch no other story's files and may run in parallel worktrees; 21.22 is built with 21.24 on one branch. There is no 21.23: the number was left unassigned when 21.24 was named by the founder.
 
@@ -4102,3 +4103,35 @@ So that the list starts at once instead of under a screen of filters.
 **Given** every filter and its URL state as before this story
 **When** this ships
 **Then** each filter, chip, default and URL key behaves as before, the glass rules, 44 px targets, focus rings, forced colours and reduced motion hold, and the e2e specs that located the old controls are updated
+
+### Story 21.25: The calendar reads like paper (*Kalendar kao papir*)
+
+As an admin reading the month,
+I want *Svi timovi* laid out like the paper roster, dates across and teams then people down,
+So that the crews, the dispatchers, the cleaners and the students are read on one page as they are on paper.
+
+**Depends on:** 21.3, 21.4, 21.12, 21.23; reads 21.6's staffing groups and assigned marks. **Blocked on:** nothing. Added on the founder's request of 2026-11-25. Applies UX-DR83. Owns the *Posao* filter deferred by 21.12 and 21.5. No migration.
+
+**Acceptance Criteria:**
+
+**Given** *Kalendar*'s *Svi timovi* from 640 px
+**When** the month renders
+**Then** its columns are the dates of the month, its first rows the teams (each team's type per date), and then the people on a personal or manual schedule grouped by job role (`CalendarMember.jobRole`), with no role last (UX-DR83)
+**And** the date header and the name column are sticky, the page scrolls and the grid only sideways (UX-DR71), with the frame, strip and heads shared with *Ručni raspored*
+
+**Given** a cell of a team or a person
+**When** it is clicked, or Enter or Space is pressed on it
+**Then** the existing day detail opens (a person's: the team their shift counts with, else their own, else the first turnus team shown), and the grid keeps one tab stop that the arrows, Home and End move (UX-DR33)
+
+**Given** a phone
+**When** *Svi timovi* opens
+**Then** 21.3's day list of every shown team is drawn, never the grid
+
+**Given** the compact toolbar (21.23)
+**When** somebody active in the month holds a job role, or one is chosen
+**Then** *Filtri* offers *Posao* (`?posao=`: every role, a role or nobody's; an unknown id is every role) on *Kalendar* and on *Ručni raspored*, with its chip, and a person chosen replaces it on *Kalendar*
+
+**Given** *Moj raspored*, print, the keyboard rules and the e2e
+**When** this ships
+**Then** *Moj raspored* is unchanged, the month prints as one table, and the e2e and perf specs that read the 21.3 grid read the transposed one
+

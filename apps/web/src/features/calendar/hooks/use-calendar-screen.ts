@@ -26,6 +26,8 @@ import {
   calendarMonthOutcomeOf,
   calendarOpenDayOf,
   calendarSearchTo,
+  paperCellTargetOf,
+  paperRowCountOf,
   type CalendarFilterChange,
   type CalendarMode,
   type CalendarMonth,
@@ -283,14 +285,15 @@ export function useCalendarScreen(
   const mjesec = search.mjesec;
   const smjena = search.smjena;
   const osoba = search.osoba;
+  const posao = search.posao;
   // GUARDED (`calendarMonthOutcomeOf`): a month the domain refuses is the read
   // failure, never a crashed route.
   const outcome = useMemo(
     () =>
       snapshot === null || today === null || marks === null
         ? null
-        : calendarMonthOutcomeOf(snapshot, { mjesec, smjena, osoba }, today, marks),
-    [snapshot, mjesec, smjena, osoba, today, marks],
+        : calendarMonthOutcomeOf(snapshot, { mjesec, smjena, osoba, posao }, today, marks),
+    [snapshot, mjesec, smjena, osoba, posao, today, marks],
   );
   // A retry only where reading again can help: a failed read (the refusal's
   // own `retryable`) — and, below, only online.
@@ -429,12 +432,11 @@ export function useCalendarScreen(
     go(calendarSearchTo(search, change));
   }
 
-  /** Opens the detail of the grid cell at `from`, `target` its element. */
+  /** Opens the detail of the grid cell at `from`, `target` its element (story 21.25: a row is a team or a person, a column a date). */
   function openCell(shown: CalendarMonth, from: GridPosition, target: HTMLElement): void {
-    const row = shown.rows[from.row];
-    const cell = row?.cells[from.column];
+    const day = paperCellTargetOf(shown, from.row, from.column);
 
-    if (row !== undefined && cell !== undefined) openDay(cell.teamId, row.date, target);
+    if (day !== null) openDay(day.teamId, day.date, target);
   }
 
   /** Focus moved to a cell: it becomes the grid's one tab stop. */
@@ -474,8 +476,8 @@ export function useCalendarScreen(
     }
 
     const next = gridFocusAfter(event.key, modifiers, from, {
-      rows: shown.rows.length,
-      columns: shown.columns.length,
+      rows: paperRowCountOf(shown),
+      columns: shown.rows.length,
     });
 
     if (next === null) return;

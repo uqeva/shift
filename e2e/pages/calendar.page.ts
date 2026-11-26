@@ -203,8 +203,8 @@ export class CalendarPage extends BasePage {
   }
 
   /**
-   * The grid's sticky team strip (story 21.3): a visual copy of the header
-   * row, `aria-hidden`, outside the grid's horizontal scroller. Its `inert`
+   * The grid's sticky date strip (stories 21.3, 21.25): a visual copy of the
+   * header row, `aria-hidden`, outside the grid's horizontal scroller. Its `inert`
    * copy is {@link stripCopy}, the element that follows the scroller sideways.
    */
   get strip(): Locator {
@@ -233,48 +233,78 @@ export class CalendarPage extends BasePage {
     return this.dayListItems.first().getByRole('button').count();
   }
 
-  /** A team's column header. */
-  columnHeader(teamName: string): Locator {
-    return this.grid.getByRole('columnheader', { name: teamName, exact: true });
+  /**
+   * A team's row header (story 21.25, *Kalendar kao papir*: the teams are
+   * the grid's first ROWS, the dates its columns).
+   */
+  teamHeader(teamName: string): Locator {
+    return this.teamRows.getByRole('rowheader', { name: teamName, exact: true });
   }
 
-  /** The grid's header cells: the date's, then one per team. */
+  /** The paper grid's key of letters (story 21.25): `D Dan`, `N Noć`, … */
+  get letters(): Locator {
+    return this.page.getByRole('list', { name: kalendar.paper.letters, exact: true });
+  }
+
+  /** The grid's people rows (story 21.25): a person on a personal or manual schedule, under their role's heading. */
+  get personRows(): Locator {
+    return this.grid.locator('tbody tr:not([data-team-row]):has([role="gridcell"])');
+  }
+
+  /** A person's row, by the name its head starts with (the line under it is their team, or *Bez tima*). */
+  personRow(name: string): Locator {
+    return this.personRows.filter({ has: this.page.getByRole('rowheader', { name: new RegExp(`^${escapeRegExp(name)}`) }) });
+  }
+
+  /** The grid's team rows (story 21.25). */
+  get teamRows(): Locator {
+    return this.grid.locator('tr[data-team-row]');
+  }
+
+  /** How many teams the grid shows as rows. */
+  async teamCount(): Promise<number> {
+    return this.teamRows.count();
+  }
+
+  /**
+   * Every active team, as the summary line says while no filter is on
+   * (`Prikazano: svi timovi (4) · …`): what the Tim picker offers, whichever
+   * rows a filter leaves.
+   */
+  async activeTeamCount(): Promise<number> {
+    const found = /\((\d+)\)/.exec(await this.filters.summary.innerText());
+    if (found === null) throw new Error('E2E: the summary names no team count');
+
+    return Number(found[1]);
+  }
+
+  /** The grid's header cells: the corner, then one per date. */
   get headerCells(): Locator {
     return this.grid.locator('thead th');
   }
 
-  /** The grid's team columns: its column headers but the date's. */
-  async columnCount(): Promise<number> {
+  /** The grid's date columns: its column headers but the corner's. */
+  async dateCount(): Promise<number> {
     return (await this.headerCells.count()) - 1;
   }
 
-  /** The grid's body rows, one per date. */
-  async rowCount(): Promise<number> {
-    return this.grid.locator('tbody tr').count();
+  /** The grid's data rows — the teams, then the people — never a group's heading row. */
+  async gridRowCount(): Promise<number> {
+    return this.grid.locator('tbody tr:has([role="gridcell"])').count();
   }
 
   get cells(): Locator {
     return this.grid.getByRole('gridcell');
   }
 
-  /** Today's row anywhere on the page, the grid or not. */
-  get todayRowAnywhere(): Locator {
-    return this.page.locator('tr[aria-current="date"]');
+  /** Today's date column head anywhere on the page, the grid or not (`aria-current="date"`). */
+  get todayColumnAnywhere(): Locator {
+    return this.page.locator('th[aria-current="date"]');
   }
 
-  /** Today's row in the grid. */
-  get todayRow(): Locator {
-    return this.grid.locator('tr[aria-current="date"]');
-  }
-
-  /** Today's first team's cell. */
+  /** The first row's cell on today: the grid's tab stop before anything is focused (story 21.25). */
   get todayFirstCell(): Locator {
-    return this.todayRow.getByRole('gridcell').first();
-  }
-
-  /** A row's header, its date. */
-  rowHeaderIn(row: Locator): Locator {
-    return row.getByRole('rowheader');
+    return this.grid.locator('[role="gridcell"][data-row="0"][data-today]');
   }
 
   /** The grid's tab stops; the roving tab stop keeps exactly one. */
@@ -282,49 +312,48 @@ export class CalendarPage extends BasePage {
     return this.grid.locator('[role="gridcell"][tabindex="0"]');
   }
 
-  /** A data cell by its position. */
+  /** A data cell by its position: `row` the team or person, `column` the date. */
   cellAt(position: GridPosition): Locator {
     return this.grid.locator(
       `[role="gridcell"][data-row="${String(position.row)}"][data-column="${String(position.column)}"]`,
     );
   }
 
-  /** The grid's cell for `teamName` on `date`. */
+  /**
+   * The grid's cell for `teamName` on `date` (story 21.25): the team's row,
+   * the date's column. The month shown must hold `date`; its day of the
+   * month is its column.
+   */
   async cellOf(teamName: string, date: string): Promise<Locator> {
-    const grid = this.grid;
     // The grid renders once the snapshot has landed; the skeleton has no headers.
-    await expect(this.columnHeader(teamName)).toBeVisible();
-    // The header's text without its compressed letter, which is `aria-hidden`.
-    const heads = await grid.getByRole('columnheader').evaluateAll((elements) =>
-      elements.map((element) => {
-        const copy = element.cloneNode(true) as Element;
-        for (const hidden of copy.querySelectorAll('[aria-hidden="true"]')) hidden.remove();
+    await expect(this.teamHeader(teamName)).toBeVisible();
+    const day = Number(date.slice(8, 10));
+    // `has` is matched INSIDE each row, so it is a bare rowheader locator,
+    // never one rooted at the grid (which no row contains).
+    const row = this.teamRows.filter({ has: this.page.getByRole('rowheader', { name: teamName, exact: true }) });
+    await expect(row, `the grid has no row for ${teamName}`).toHaveCount(1);
+    await expect(this.headerCells.nth(day), `the grid has no column for ${date}`).toContainText(`${String(day)}.`);
 
-        return copy.textContent ?? '';
-      }),
-    );
-    const column = heads.indexOf(teamName);
-    if (column <= 0) throw new Error(`E2E: the grid has no column for ${teamName}: ${heads.join(', ')}`);
-    const escaped = dayMonth(date).replace(/\./g, '\\.');
-    const row = grid
-      .getByRole('row')
-      .filter({ has: this.page.getByRole('rowheader', { name: new RegExp(`^${escaped}`) }) });
-    await expect(row, `the grid has no row for ${date}`).toHaveCount(1);
-
-    // The first column is the row header; the cells follow it.
-    return row.getByRole('gridcell').nth(column - 1);
+    return row.locator(`[role="gridcell"][data-column="${String(day - 1)}"]`);
   }
 
-  /** The focused gridcell's position among the data cells, or `null` when focus is not on one. */
+  /**
+   * A cell's type, as its full name reads it (story 21.25): the paper grid
+   * DRAWS the type's letter only, and names the type, its times and every
+   * mark in the cell's accessible name — `subota 05.10., Smjena A, Dan, …`.
+   */
+  typeNamed(typeName: string): RegExp {
+    return new RegExp(`, ${escapeRegExp(typeName)}(,|$)`);
+  }
+
+  /** The focused gridcell's position, by its `data-row` and `data-column`, or `null` when focus is not on one. */
   async focusedCell(): Promise<GridPosition | null> {
     return this.page.evaluate(() => {
       const active = document.activeElement;
       if (!(active instanceof HTMLTableCellElement) || active.getAttribute('role') !== 'gridcell') return null;
-      const row = active.parentElement;
-      if (!(row instanceof HTMLTableRowElement)) return null;
+      const { row, column } = active.dataset;
 
-      // Past the header row and the date column.
-      return { row: row.rowIndex - 1, column: active.cellIndex - 1 };
+      return row === undefined || column === undefined ? null : { row: Number(row), column: Number(column) };
     });
   }
 
@@ -336,7 +365,7 @@ export class CalendarPage extends BasePage {
   /**
    * Moves the grid's tab stop off today's first cell, so a later reset of it is
    * observable: focus that cell, then Ctrl+Home — or Ctrl+End when today is the
-   * first row — and wait for the one tab stop to leave it.
+   * first date — and wait for the one tab stop to leave it.
    */
   async moveTabStopOffToday(): Promise<void> {
     const todayFirst = this.todayFirstCell;
@@ -435,7 +464,8 @@ export class CalendarPage extends BasePage {
 
   /** Every gridcell whose label names a conflict or leave mark (story 5.3c). */
   get cellsMarkedConflictOrLeave(): Locator {
-    return this.grid.getByRole('gridcell', {
+    // The TEAM rows' cells (story 21.25): a person's row marks their own leave on every date it covers.
+    return this.teamRows.getByRole('gridcell', {
       name: new RegExp(`, (${escapeRegExp(kalendar.modifier.conflict)}|${escapeRegExp(kalendar.modifier.leave)})(,|$)`),
     });
   }

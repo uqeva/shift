@@ -25,7 +25,25 @@ export const FILTER_TEAM = 'team';
 /** The person filter's chip, written to the URL as `?osoba=<member id>`. */
 export const FILTER_PERSON = 'person';
 
-export type FilterKey = typeof FILTER_TEAM | typeof FILTER_PERSON;
+/** STORY 21.25: *Kalendar*'s job role chip, written to the URL as `?posao=<role id>` or `?posao=none`. */
+export const FILTER_ROLE = 'role';
+
+export type FilterKey = typeof FILTER_TEAM | typeof FILTER_PERSON | typeof FILTER_ROLE;
+
+/**
+ * The role option that is nobody's role, `?posao=none` (story 21.12's
+ * `NO_ROLE`): no role id is ever `none`. Its name is the component's words.
+ */
+export const NO_ROLE_OPTION = 'none';
+
+/** STORY 21.25: a job role the *Posao* picker offers, with how many people it would show. */
+export interface FilterRoleOption {
+  /** The role's id, or {@link NO_ROLE_OPTION}. */
+  readonly id: string;
+  /** The role's name, data; `''` for {@link NO_ROLE_OPTION}, which the component words. */
+  readonly name: string;
+  readonly count: number;
+}
 
 /** A team the Smjena picker offers, with how many people it holds for the month. */
 export interface FilterTeamOption {
@@ -51,6 +69,12 @@ export interface FilterChip {
   readonly value: string | null;
 }
 
+/** STORY 21.25: the role a summary names, by id (so `none` can be worded) and name. */
+export interface FilterSummaryRole {
+  readonly id: string;
+  readonly name: string;
+}
+
 /** What the summary line says is shown: the operands of `filter.summary.*`. */
 export type FilterSummary =
   | { readonly kind: 'all'; readonly teams: number; readonly people: number }
@@ -73,7 +97,17 @@ export interface FilterBarModel {
   /** The person chosen, one of `people`; `null` for everybody. */
   readonly person: string | null;
   readonly summary: FilterSummary;
-  /** How many filters are on: 0, 1 or 2. */
+  /**
+   * STORY 21.25: the *Posao* picker's options — every role held and no role,
+   * never "every role", which is `role: null` — empty where the screen offers
+   * none (*Sati*), or nobody holds a role and none is chosen: no field, no chip.
+   */
+  readonly roles: readonly FilterRoleOption[];
+  /** The role chosen, one of `roles`; `null` for every role. */
+  readonly role: string | null;
+  /** The role the summary line names after its words, or `null` for none. */
+  readonly summaryRole: FilterSummaryRole | null;
+  /** How many filters are on: 0 to 3. */
   readonly activeCount: number;
   /** How many people the screen shows under the filters: the sheet's `Prikaži {n} osoba`. */
   readonly shownCount: number;
@@ -83,6 +117,8 @@ export interface FilterBarModel {
 export interface FilterChange {
   readonly smjena: string | null;
   readonly osoba: string | null;
+  /** STORY 21.25: the job role, on every change from a bar that offers it; absent from one that does not (*Sati*). */
+  readonly posao?: string | null;
 }
 
 /** What a screen hands the builder: its rule, its options, what is chosen and what is shown. */
@@ -93,6 +129,10 @@ export interface FilterBarInput {
   readonly people: readonly FilterPersonOption[];
   readonly person: string | null;
   readonly shownCount: number;
+  /** STORY 21.25: the *Posao* options, absent where the screen offers none. */
+  readonly roles?: readonly FilterRoleOption[];
+  /** The role chosen, one of `roles`; `null` or absent for every role. */
+  readonly role?: string | null;
 }
 
 /**
@@ -100,12 +140,34 @@ export interface FilterBarInput {
  * `teams` and `people` — the screens resolve a stale id to `null` first — and
  * in *Kalendar* (`combine: false`) at most one is set.
  */
-export function filterBarOf({ combine, teams, team, people, person, shownCount }: FilterBarInput): FilterBarModel {
+export function filterBarOf({
+  combine,
+  teams,
+  team,
+  people,
+  person,
+  shownCount,
+  roles = [],
+  role = null,
+}: FilterBarInput): FilterBarModel {
   const chosenTeam = teams.find((one) => one.id === team) ?? null;
   const chosenPerson = people.find((one) => one.id === person) ?? null;
+  // STORY 21.25: a person replaces the role too in *Kalendar*, as it replaces the team.
+  const chosenRole = !combine && chosenPerson !== null ? null : (roles.find((one) => one.id === role) ?? null);
+  // THE *Posao* FIELD AND CHIP while somebody holds a role or one is chosen (*Ljudi*'s `roleChipShown`).
+  const offered = chosenRole !== null || roles.some((one) => one.id !== NO_ROLE_OPTION) ? roles : [];
   const teamChip: FilterChip = { key: FILTER_TEAM, value: chosenTeam?.name ?? null };
   const personChip: FilterChip = { key: FILTER_PERSON, value: chosenPerson?.name ?? null };
-  const chips = !combine && chosenPerson !== null ? [personChip] : [teamChip, personChip];
+  const roleChip: FilterChip = { key: FILTER_ROLE, value: chosenRole === null ? null : chosenRole.name };
+  const chips =
+    !combine && chosenPerson !== null
+      ? [personChip]
+      : offered.length === 0
+        ? [teamChip, personChip]
+        : [teamChip, roleChip, personChip];
+  const base = summaryOf(chosenTeam, chosenPerson, teams.length, people.length, shownCount);
+  // With a role on, *svi timovi* counts the people the role leaves, not everybody.
+  const summary = chosenRole !== null && base.kind === 'all' ? { ...base, people: shownCount } : base;
 
   return {
     combine,
@@ -114,8 +176,11 @@ export function filterBarOf({ combine, teams, team, people, person, shownCount }
     team: chosenTeam?.id ?? null,
     people,
     person: chosenPerson?.id ?? null,
-    summary: summaryOf(chosenTeam, chosenPerson, teams.length, people.length, shownCount),
-    activeCount: (chosenTeam === null ? 0 : 1) + (chosenPerson === null ? 0 : 1),
+    summary,
+    roles: offered,
+    role: chosenRole?.id ?? null,
+    summaryRole: chosenRole === null ? null : { id: chosenRole.id, name: chosenRole.name },
+    activeCount: (chosenTeam === null ? 0 : 1) + (chosenPerson === null ? 0 : 1) + (chosenRole === null ? 0 : 1),
     shownCount,
   };
 }
@@ -166,13 +231,27 @@ export function filterSummaryValuesOf(summary: FilterSummary): Readonly<Record<s
  * An active chip's text: `Smjena: Smjena B`. Only an active chip is drawn
  * (story 15.7), so there is no `sve` form.
  */
-export function filterChipMessageKey(chip: FilterChip): 'filter.chip.team' | 'filter.chip.person' {
-  return chip.key === FILTER_TEAM ? 'filter.chip.team' : 'filter.chip.person';
+export function filterChipMessageKey(chip: FilterChip): 'filter.chip.team' | 'filter.chip.person' | 'filter.chip.role' {
+  switch (chip.key) {
+    case FILTER_TEAM:
+      return 'filter.chip.team';
+    case FILTER_PERSON:
+      return 'filter.chip.person';
+    case FILTER_ROLE:
+      return 'filter.chip.role';
+  }
 }
 
 /** A chip's ✕, named for what it removes: `Ukloni filtar smjena: Smjena B`. */
-export function filterRemoveMessageKey(chip: FilterChip): 'filter.remove.team' | 'filter.remove.person' {
-  return chip.key === FILTER_TEAM ? 'filter.remove.team' : 'filter.remove.person';
+export function filterRemoveMessageKey(chip: FilterChip): 'filter.remove.team' | 'filter.remove.person' | 'filter.remove.role' {
+  switch (chip.key) {
+    case FILTER_TEAM:
+      return 'filter.remove.team';
+    case FILTER_PERSON:
+      return 'filter.remove.person';
+    case FILTER_ROLE:
+      return 'filter.remove.role';
+  }
 }
 
 /** Whether any filter is on: `Očisti sve` shows only then. */
@@ -199,14 +278,35 @@ export function filterBadgeCountOf(activeCount: number): number | null {
  * person, and a person drops the team (story 3.3b).
  */
 export function filterChoiceOf(model: FilterBarModel, key: FilterKey, id: string | null): FilterChange {
-  if (key === FILTER_TEAM) return { smjena: id, osoba: model.combine ? model.person : null };
+  const withRole = (change: FilterChange, posao: string | null): FilterChange =>
+    model.roles.length === 0 && posao === null ? change : { ...change, posao };
 
-  return { smjena: model.combine || id === null ? model.team : null, osoba: id };
+  switch (key) {
+    case FILTER_TEAM:
+      return withRole({ smjena: id, osoba: model.combine ? model.person : null }, model.role);
+    case FILTER_ROLE:
+      // STORY 21.25: a role combines with the team, and drops a person in *Kalendar*.
+      return withRole({ smjena: model.team, osoba: model.combine ? model.person : null }, id);
+    case FILTER_PERSON:
+      return withRole(
+        { smjena: model.combine || id === null ? model.team : null, osoba: id },
+        model.combine || id === null ? model.role : null,
+      );
+  }
 }
 
-/** What a chip's ✕ changes: that filter dropped, the other kept. */
+/** What a chip's ✕ changes: that filter dropped, the others kept. */
 export function filterRemovalOf(model: FilterBarModel, key: FilterKey): FilterChange {
-  return key === FILTER_TEAM ? { smjena: null, osoba: model.person } : { smjena: model.team, osoba: null };
+  const kept = { smjena: model.team, osoba: model.person };
+
+  switch (key) {
+    case FILTER_TEAM:
+      return model.roles.length === 0 ? { ...kept, smjena: null } : { ...kept, smjena: null, posao: model.role };
+    case FILTER_PERSON:
+      return model.roles.length === 0 ? { ...kept, osoba: null } : { ...kept, osoba: null, posao: model.role };
+    case FILTER_ROLE:
+      return { ...kept, posao: null };
+  }
 }
 
 /** The Smjena picker's `Sve smjene` option: no team id is ever `*`. */
@@ -255,16 +355,16 @@ export function entersPickerList(key: string): boolean {
  * re-render draws, never on a chip it is about to hide or bring back.
  */
 export function filterStateKeyOf(change: FilterChange): string {
-  return `${change.smjena ?? NO_SEARCH}|${change.osoba ?? NO_SEARCH}`;
+  return `${change.smjena ?? NO_SEARCH}|${change.osoba ?? NO_SEARCH}|${change.posao ?? NO_SEARCH}`;
 }
 
 /** What the model shows chosen, as {@link filterStateKeyOf} reads a change. */
 export function modelStateKeyOf(model: FilterBarModel): string {
-  return filterStateKeyOf({ smjena: model.team, osoba: model.person });
+  return filterStateKeyOf({ smjena: model.team, osoba: model.person, posao: model.role });
 }
 
-/** `Poništi filtre`: both dropped. */
-export const FILTERS_CLEARED: FilterChange = { smjena: null, osoba: null };
+/** `Poništi filtre`: every filter dropped, the role (story 21.25) too. */
+export const FILTERS_CLEARED: FilterChange = { smjena: null, osoba: null, posao: null };
 
 /**
  * Where focus goes after a chip's ✕ (story 15.7): the next active chip, which

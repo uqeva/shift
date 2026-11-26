@@ -1231,11 +1231,31 @@ const SANCTIONED_SCREEN_KEYS = [
   // DEFERRED-WORK E792, E795: the picker's phone sheet close, and its footer's key hint.
   'kalendar.monthPickerClose',
   'kalendar.monthPickerKeys',
-  'kalendar.columnDate',
   'kalendar.noRotation',
   'kalendar.noTeams',
   // STORY 19.4 (UX-DR70): where a schedule comes from.
   'kalendar.noTeamsWhy',
+  // STORY 21.25 (UX-DR83), *Kalendar kao papir*: the paper grid — its corner
+  // (the date column head is gone: the dates are the columns), the teams'
+  // heading, a person's no role and no team, a filter that leaves nothing,
+  // a person's days that cannot be read, the
+  // key of letters with its entry, *Slobodno* and its mark, a staffing
+  // group's `+N` (story 21.6's groups), and a person's cell's words (off,
+  // none, inactive).
+  'kalendar.paper.corner',
+  'kalendar.paper.teams',
+  'kalendar.paper.noRole',
+  'kalendar.paper.noTeam',
+  'kalendar.paper.empty',
+  'kalendar.paper.unavailable',
+  'kalendar.paper.letters',
+  'kalendar.paper.letter',
+  'kalendar.paper.off',
+  'kalendar.paper.offMark',
+  'kalendar.paper.groupMark',
+  'kalendar.paper.cell.off',
+  'kalendar.paper.cell.none',
+  'kalendar.paper.cell.inactive',
   'kalendar.error.unavailable',
   // STORY 3.2a: the mode switch — its label, *Moj raspored* and *Sve smjene*
   // — the notice for a viewer on no team all month, and a day on no team.
@@ -1314,6 +1334,16 @@ const SANCTIONED_SCREEN_KEYS = [
   'filter.person',
   'filter.replaceNote',
   'filter.sheetReset',
+  // STORY 21.25: *Posao* in *Kalendar*'s and *Ručni raspored*'s *Filtri* —
+  // its chip and ✕, its field and picker, *Svi poslovi*, *Bez posla*, and the
+  // summary with the role after it.
+  'filter.chip.role',
+  'filter.remove.role',
+  'filter.role',
+  'filter.rolePicker',
+  'filter.allRoles',
+  'filter.noRole',
+  'filter.summary.withRole',
   // STORY 21.23: the compact toolbar — the panel's `Primijeni`, the chips'
   // own group, the search's placeholder, and `Prikaz` and `Izvoz` with their
   // menus' names.

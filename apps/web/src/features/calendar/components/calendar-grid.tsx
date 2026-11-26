@@ -1,163 +1,175 @@
-import { useLayoutEffect, useRef, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
-import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CalendarCellBox } from '@/features/calendar/components/calendar-cell';
+import {
+  DateGridCorner,
+  DateGridFrame,
+  DateGridGroupHead,
+  DateGridRowHead,
+  DateHead,
+} from '@/components/date-grid';
+import { TableBody, TableCell, TableRow } from '@/components/ui/table';
+import { CalendarLetterBox } from '@/features/calendar/components/calendar-cell';
 import { CalendarTeamDays } from '@/features/calendar/components/calendar-day-list';
 import { CalendarLegend } from '@/features/calendar/components/calendar-legend';
 import type { CalendarScreenState } from '@/features/calendar/hooks/use-calendar-screen';
+import { translateCellLabel } from '@/features/calendar/utils/cell-label';
 import { DAY_DETAIL_POPUP } from '@/features/calendar/utils/day-detail';
 import { MONTH_HEADING_ID, gridTabStopOf, isSameGridPosition, type GridPosition } from '@/features/calendar/utils/grid-keys';
-import type { CalendarMonth, CalendarRow, CalendarTeamCell } from '@/features/calendar/utils/month';
+import { LABEL_SEPARATOR, cellLabelOf } from '@/features/calendar/utils/modifiers';
+import {
+  paperRowCountOf,
+  type CalendarCell,
+  type CalendarMonth,
+  type CalendarPersonCell,
+  type CalendarPersonRow,
+} from '@/features/calendar/utils/month';
 import { usePhone } from '@/hooks/viewport';
 import { t } from '@/lib/i18n';
+import { cn } from '@/lib/utils';
+import { DATE_CELL_SCROLL_CLASS, dateCellClassOf, gridDatesOf, type GridDate } from '@/utils/grid-dates';
+import { NO_TEXT } from '@/utils/text';
+
+/** What one data cell opens, and how it is named. */
+interface LiveCell {
+  readonly label: string | undefined;
+  /** The team whose day the cell opens on its date, or `null`: it opens nothing. */
+  readonly teamId: string | null;
+}
 
 /**
- * One data cell: a `gridcell` named in full by `cellLabelOf` (through
- * `gridCellLabelsOf`) — the date, the team, the type, the range and each
- * modifier, never a letter — with its drawing `aria-hidden` beside it.
+ * One data cell. In the grid: a `gridcell` named in full, at its position
+ * (`data-row`, `data-column`), the one tab stop or not, opening its day on a
+ * click. In the strip's copy (`copy`): the drawing alone — no role, position,
+ * name, handler or tab stop.
  */
 function renderCell(
   screen: CalendarScreenState,
   month: string,
-  date: string,
-  cell: CalendarTeamCell,
-  label: string | undefined,
+  date: GridDate,
+  live: LiveCell,
   position: GridPosition,
   tabStop: GridPosition,
+  drawing: ReactNode,
+  copy: boolean,
 ): ReactNode {
+  if (copy) {
+    return (
+      <TableCell
+        key={date.date}
+        className={cn(
+          DATE_CELL_SCROLL_CLASS,
+          'p-0.5 outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring print:p-px',
+          live.teamId !== null && 'cursor-pointer',
+          dateCellClassOf(date),
+        )}
+      >
+        {drawing}
+      </TableCell>
+    );
+  }
+
   return (
     <TableCell
-      key={cell.teamId}
+      key={date.date}
       role="gridcell"
       data-row={position.row}
       data-column={position.column}
+      data-today={date.today ? true : undefined}
       tabIndex={isSameGridPosition(position, tabStop) ? 0 : -1}
-      aria-label={label}
-      aria-haspopup={DAY_DETAIL_POPUP}
+      aria-label={live.label}
+      aria-haspopup={live.teamId === null ? undefined : DAY_DETAIL_POPUP}
       onFocus={(event) => {
         screen.remember(month, position);
         screen.reveal(event.currentTarget);
       }}
       onClick={(event) => {
-        screen.openDay(cell.teamId, date, event.currentTarget);
+        if (live.teamId !== null) screen.openDay(live.teamId, date.date, event.currentTarget);
       }}
-      className="scroll-ml-28 scroll-mt-11 cursor-pointer px-1 py-1 outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring print:px-0.5 print:py-px"
+      className={cn(
+        DATE_CELL_SCROLL_CLASS,
+        'p-0.5 outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring print:p-px',
+        live.teamId !== null && 'cursor-pointer',
+        dateCellClassOf(date),
+      )}
     >
-      <CalendarCellBox cell={cell} inGrid />
+      {drawing}
     </TableCell>
   );
 }
 
-/** A date's row header, in the grid and in the strip's copy alike. */
-function renderRowHeader(row: CalendarRow): ReactNode {
-  return (
-    <TableHead
-      scope="row"
-      className={
-        row.isToday
-          ? 'sticky left-0 z-10 h-auto whitespace-nowrap border-l-4 border-foreground bg-card py-1 text-sm font-bold normal-case tracking-normal text-foreground print:whitespace-normal print:px-1 print:py-px print:text-xs'
-          : 'sticky left-0 z-10 h-auto whitespace-nowrap bg-card py-1 text-sm font-medium normal-case tracking-normal text-foreground print:whitespace-normal print:px-1 print:py-px print:text-xs'
-      }
-    >
-      <span className="block tabular-nums print:inline">{row.dayMonth}</span>
-      <span className="block text-xs font-normal text-muted-foreground print:ml-1 print:inline">{row.weekday}</span>
-    </TableHead>
-  );
-}
-
 /**
- * The header row, in the grid and in the strip's copy alike: the corner
- * (sticky on the left, which only the strip's ever shows) and a team per
- * column, each `h-11` — the strip's height and the grid's pull-up.
+ * A person's cell named in full, as a team's is (`cellLabelOf`): the date,
+ * the person, the type with its times (or *slobodno*, or *nema smjene*), each
+ * mark, *dodijeljeno ručno* for an assigned day and an inactive date.
  */
-function renderHeaderRow(shown: CalendarMonth): ReactNode {
-  return (
-    <TableRow>
-      <TableHead
-        scope="col"
-        className="sticky left-0 z-30 h-11 w-28 min-w-28 bg-muted shadow-[inset_0_-1px_0_var(--border)] forced-colors:border-b forced-colors:border-[CanvasText] print:h-auto print:border-b print:px-1 print:py-1"
-      >
-        {t('kalendar.columnDate')}
-      </TableHead>
-      {shown.columns.map((team) => (
-        <TableHead
-          key={team.id}
-          scope="col"
-          className="h-11 whitespace-nowrap bg-muted normal-case shadow-[inset_0_-1px_0_var(--border)] forced-colors:border-b forced-colors:border-[CanvasText] print:h-auto print:whitespace-normal print:[overflow-wrap:anywhere] print:border-b print:px-1 print:py-1"
-        >
-          {team.name}
-        </TableHead>
-      ))}
-    </TableRow>
-  );
+function personLabelOf(row: CalendarPersonRow, cell: CalendarPersonCell, date: { readonly weekday: string; readonly dayMonth: string }): string {
+  const name = cell.cell?.name ?? (cell.off ? t('kalendar.paper.cell.off') : t('kalendar.paper.cell.none'));
+  const parts = [
+    cellLabelOf(
+      {
+        weekday: date.weekday,
+        dayMonth: date.dayMonth,
+        teamName: row.name,
+        name,
+        range: cell.cell?.range ?? null,
+        modifiers: cell.cell?.modifiers ?? [],
+        // STORY 21.6 (UX-DR73): an assigned day is named `dodijeljeno ručno`, as everywhere.
+        assigned: cell.assigned,
+      },
+      translateCellLabel,
+    ),
+  ];
+
+  if (!cell.active) parts.push(t('kalendar.paper.cell.inactive'));
+  if (row.unavailable) parts.push(t('kalendar.paper.unavailable'));
+
+  return parts.join(LABEL_SEPARATOR);
+}
+
+/** The letters the month draws, once each in the types' own order (`order`, by id), with the type's name: the paper's key. */
+function lettersOf(
+  cells: readonly (CalendarCell | null)[],
+  order: readonly string[],
+): readonly { readonly letter: string; readonly name: string }[] {
+  const seen = new Map<string, { readonly letter: string; readonly name: string; readonly place: number }>();
+
+  const add = (shiftTypeId: string | null, letter: string | null, name: string | null): void => {
+    if (shiftTypeId === null || letter === null || name === null || seen.has(letter)) return;
+
+    const place = order.indexOf(shiftTypeId);
+
+    seen.set(letter, { letter, name, place: place === -1 ? order.length : place });
+  };
+
+  for (const cell of cells) {
+    if (cell === null) continue;
+    add(cell.shiftTypeId, cell.letter, cell.name);
+    // STORY 21.6: a staffing group's letter is drawn too, so the key names it.
+    for (const group of cell.groups ?? []) add(group.shiftTypeId, group.letter, group.name);
+  }
+
+  return [...seen.values()].sort((one, other) => one.place - other.place);
 }
 
 /**
- * THE STRIP's table (story 21.3): a VISUAL COPY of the grid — its header row
- * AND its body rows, the same content through the same primitives and
- * classes, in a table as wide as the grid — so auto table layout gives it the
- * grid's column widths by construction, never by measuring. The strip clips
- * everything below the header row. The copy has no roles, ids, handlers or
- * `aria-current`, is `inert`, and the strip around it is `aria-hidden`, so
- * the grid's own `thead` is what assistive technology and print read.
- */
-function renderStripTable(shown: CalendarMonth): ReactNode {
-  return (
-    <table className="w-full caption-bottom text-sm">
-      <TableHeader>{renderHeaderRow(shown)}</TableHeader>
-      <TableBody>
-        {shown.rows.map((row) => (
-          <TableRow key={row.date}>
-            {renderRowHeader(row)}
-            {row.cells.map((cell) => (
-              <TableCell key={cell.teamId} className="px-1 py-1">
-                <CalendarCellBox cell={cell} inGrid />
-              </TableCell>
-            ))}
-          </TableRow>
-        ))}
-      </TableBody>
-    </table>
-  );
-}
-
-/**
- * *Sve smjene*'s grid (stories 3.1, 3.2b): a row per date and a column per
- * active team, an ARIA grid with one tab stop that the arrows, Home and End
- * move by `@/features/calendar/utils/grid-keys`, and the legend above it
- * while a mark is on screen. Below 640 px (`usePhone()`) it is not drawn: the
- * phone reads the same month as a day list of every shown team
- * (`CalendarTeamDays`, story 21.3), so a phone never scrolls sideways.
- * Exactly one form is in the DOM.
+ * *Sve smjene*'s grid (stories 3.1, 3.2b; since story 21.25, UX-DR83, *KALENDAR
+ * KAO PAPIR*): the month as the paper roster reads it — a column per date,
+ * and in rows first the teams (`teamRows`), each its type per date,
+ * then the people on a personal or manual schedule (`peopleGroups`), grouped
+ * by job role. One ARIA grid with one tab stop that the arrows, Home and End
+ * move by `@/features/calendar/utils/grid-keys`; a cell — clicked, or Enter
+ * or Space on it — opens the day detail. The key of letters and the legend of
+ * marks are above it.
  *
- * THE PAGE SCROLLS, NEVER THE GRID (story 21.3). The grid has no height bound
- * and no vertical scroll container: a 28–31-row month is as tall as it is, and
- * the page scrolls it. Its one scroller is HORIZONTAL only
- * (`overflow-x-auto overflow-y-hidden`), so a wide month scrolls sideways
- * inside it and the page never does; the date column is sticky on that axis.
+ * Below 640 px (`usePhone()`) it is not drawn: the phone keeps 21.3's day
+ * list of every shown team (`CalendarTeamDays`), so a phone never scrolls
+ * sideways. Exactly one form is in the DOM.
  *
- * THE HEADER IS A SEPARATE STRIP. An `overflow-x: auto` box is a sticky
- * element's scroll container on BOTH axes, so a header inside the scroller
- * could never stick to the page. The strip sits outside it, in the same
- * ISOLATED frame: sticky at the viewport's top, `h-11`, clipping its copy table to the
- * header row, and kept in step with the scroller's `scrollLeft` (its corner
- * is sticky on the left, as the date column is). The grid's real `thead`
- * stays in the table for assistive technology and print, pulled up `-mt-11`
- * behind the strip, where the scroller clips it; in its natural place it
- * coincides with the strip. In print the strip is not drawn and the pull-up is
- * lifted: the one table prints whole, its header row repeated on every page.
- *
- * A phone never draws the grid (it draws the day list), so the strip never
- * meets the phone's sticky head. Its `max-sm:top-[var(--sticky-head,0px)]`
- * is only a GUARD for the fractional gap between `usePhone()`'s
- * `(max-width: 639px)` and the `max-sm` breakpoint (below 640 px): at a
- * width such as 639.5 px the grid is drawn under `max-sm` CSS, and there the
- * strip sits under the head rather than behind it.
- *
- * THE MARGINS ARE THE SIZES: the date column is `w-28` and each cell's
- * `scroll-margin-left` is `28`; the strip is `h-11` and each cell's
- * `scroll-margin-top` is `11`. `useCalendarScreen`'s `reveal` scrolls a focused
- * cell inside them, so it lands clear of both.
+ * THE PAGE SCROLLS, NEVER THE GRID (story 21.3, UX-DR71): the frame, the
+ * sticky date strip and the sticky name column are *Ručni raspored*'s own
+ * pieces (`@/components/date-grid`), so the two grids read and scroll alike.
+ * Each renderer here draws the strip's copy too (`copy`), with none of the
+ * live attributes: `renderCell` returns the copy's cell before it sets any.
  */
 export function CalendarGrid({
   shown,
@@ -167,16 +179,11 @@ export function CalendarGrid({
   readonly screen: CalendarScreenState;
 }): ReactNode {
   const isPhone = usePhone();
-  const strip = useRef<HTMLDivElement>(null);
-  const scroller = useRef<HTMLDivElement>(null);
 
-  // The strip follows the scroller after every render too: a month or a
-  // filter that changes the width can move `scrollLeft` with no scroll event.
-  useLayoutEffect(() => {
-    if (strip.current !== null && scroller.current !== null) strip.current.scrollLeft = scroller.current.scrollLeft;
-  });
+  const filtered = shown.filter.chosen !== null || shown.filter.role !== null;
 
-  if (shown.columns.length === 0) {
+  // No active team at all: on a phone always (its list is the teams'), from 640 px while nobody is shown either.
+  if (shown.filter.teams.length === 0 && (isPhone || (shown.peopleGroups.length === 0 && !filtered))) {
     // STORY 19.4 (UX-DR70): the fact, and where a schedule comes from.
     return (
       <div className="grid gap-1 px-4 pb-4 text-sm">
@@ -187,72 +194,125 @@ export function CalendarGrid({
   }
 
   if (isPhone) {
-    return <CalendarTeamDays shown={shown} labels={screen.labels} openDay={screen.openDay} />;
+    return shown.columns.length === 0 ? (
+      <p className="px-4 pb-4 text-sm text-muted-foreground">{t('kalendar.paper.empty')}</p>
+    ) : (
+      <CalendarTeamDays shown={shown} labels={screen.labels} openDay={screen.openDay} />
+    );
   }
 
-  const tabStop = gridTabStopOf(screen.gridFocus, shown.month, shown.rows, shown.columns.length);
+  const rows = paperRowCountOf(shown);
+
+  // Every active team is a row, so no row is a filter that leaves nothing.
+  if (rows === 0) {
+    return <p className="px-4 pb-4 text-sm text-muted-foreground">{t('kalendar.paper.empty')}</p>;
+  }
+
+  const dates = gridDatesOf(
+    shown.rows.map((row) => row.date),
+    shown.rows.find((row) => row.isToday)?.date ?? NO_TEXT,
+  );
+  const tabStop = gridTabStopOf(screen.gridFocus, shown.month, dates, rows);
+  const people = shown.peopleGroups.flatMap((group) => group.rows);
+  const personCells = people.flatMap((row) => row.cells.map((cell) => cell.cell));
+  const teamCells = shown.teamRows.flatMap((row) => row.cells);
+  const letters = lettersOf([...teamCells, ...personCells], (screen.snapshot?.types ?? []).map((type) => type.id));
+  const anyOff = people.some((row) => row.cells.some((cell) => cell.off));
+  const peopleStart = shown.teamRows.length;
+  const rowOf = new Map(people.map((row, index) => [row.memberId, peopleStart + index]));
 
   return (
     <>
-      <CalendarLegend cells={shown.rows.flatMap((row) => row.cells)} />
-      {/* The frame ISOLATES the sticky layers' stacking from the page's. */}
-      <div data-grid-frame className="isolate">
-        {/* The strip is `aria-hidden`; its copy is `inert`. An inert box is
-            no target for a pointer either, so a press on the copy would land
-            on the cell scrolled under it: the strip itself, outside the
-            inert copy, takes the press and does nothing. */}
-        <div
-          aria-hidden
-          data-grid-strip
-          className="sticky top-0 z-20 h-11 bg-muted forced-colors:border-b forced-colors:border-[CanvasText] max-sm:top-[var(--sticky-head,0px)] print:hidden"
-        >
-          <div ref={strip} inert data-grid-strip-copy className="h-full overflow-hidden">
-            {renderStripTable(shown)}
-          </div>
-        </div>
-        <div
-          ref={scroller}
-          data-grid-scroller
-          className="overflow-x-auto overflow-y-hidden print:overflow-visible"
-          onScroll={(event) => {
-            if (strip.current !== null) strip.current.scrollLeft = event.currentTarget.scrollLeft;
-          }}
-        >
-          <table
-            ref={screen.gridRef}
-            className="-mt-11 w-full caption-bottom text-sm print:mt-0 print:table-fixed"
-            role="grid"
-            aria-readonly
-            aria-labelledby={MONTH_HEADING_ID}
-            onKeyDown={(event) => {
-              screen.moveGridFocus(event, shown);
-            }}
-            onKeyUp={(event) => {
-              screen.openOnKeyUp(event, shown);
-            }}
-          >
-            <TableHeader>{renderHeaderRow(shown)}</TableHeader>
-            <TableBody>
-              {shown.rows.map((row, rowIndex) => (
-                <TableRow key={row.date} aria-current={row.isToday ? 'date' : undefined} className="print:break-inside-avoid">
-                  {renderRowHeader(row)}
-                  {row.cells.map((cell, column) =>
-                    renderCell(
-                      screen,
-                      shown.month,
-                      row.date,
-                      cell,
-                      screen.labels?.[rowIndex]?.[column],
-                      { row: rowIndex, column },
-                      tabStop,
-                    ),
-                  )}
-                </TableRow>
-              ))}
-            </TableBody>
-          </table>
-        </div>
-      </div>
+      {/* THE PAPER'S KEY: what each letter is and *Slobodno*'s mark; the assigned pencil is the legend's (story 21.6). */}
+      <ul
+        aria-label={t('kalendar.paper.letters')}
+        className="flex min-w-0 flex-wrap gap-x-3 gap-y-1 px-4 pb-3 text-sm text-muted-foreground"
+      >
+        {letters.map((entry) => (
+          <li key={entry.letter}>{t('kalendar.paper.letter', { letter: entry.letter, name: entry.name })}</li>
+        ))}
+        {anyOff ? <li>{t('kalendar.paper.off', { mark: t('kalendar.paper.offMark') })}</li> : null}
+      </ul>
+      <CalendarLegend cells={[...teamCells, ...personCells]} />
+      <DateGridFrame
+        header={(copy) => (
+          <TableRow>
+            <DateGridCorner>{t('kalendar.paper.corner')}</DateGridCorner>
+            {dates.map((date) => (
+              <DateHead key={date.date} date={date} copy={copy} />
+            ))}
+          </TableRow>
+        )}
+        body={(copy) => (
+          <>
+            {shown.teamRows.length === 0 ? null : (
+              <TableBody>
+                <DateGridGroupHead name={t('kalendar.paper.teams')} columns={dates.length} />
+                {shown.teamRows.map((teamRow, row) => (
+                  <TableRow key={teamRow.team.id} data-team-row className="print:break-inside-avoid">
+                    <DateGridRowHead name={teamRow.team.name} line={null} />
+                    {teamRow.cells.map((cell, column) => {
+                      const date = dates[column];
+
+                      return date === undefined
+                        ? null
+                        : renderCell(
+                            screen,
+                            shown.month,
+                            date,
+                            { label: screen.labels?.[column]?.[teamRow.column], teamId: teamRow.team.id },
+                            { row, column },
+                            tabStop,
+                            <CalendarLetterBox cell={cell} />,
+                            copy,
+                          );
+                    })}
+                  </TableRow>
+                ))}
+              </TableBody>
+            )}
+            {shown.peopleGroups.map((group) => (
+              <TableBody key={group.roleId ?? group.rows[0]?.memberId}>
+                <DateGridGroupHead name={group.roleName ?? t('kalendar.paper.noRole')} columns={dates.length} />
+                {group.rows.map((person) => (
+                  <TableRow key={person.memberId} className="print:break-inside-avoid">
+                    <DateGridRowHead
+                      name={person.name}
+                      line={person.unavailable ? t('kalendar.paper.unavailable') : (person.teamName ?? t('kalendar.paper.noTeam'))}
+                    />
+                    {person.cells.map((cell, column) => {
+                      const date = dates[column];
+                      const row = shown.rows[column];
+
+                      return date === undefined || row === undefined
+                        ? null
+                        : renderCell(
+                            screen,
+                            shown.month,
+                            date,
+                            { label: copy ? undefined : personLabelOf(person, cell, row), teamId: cell.teamId },
+                            { row: rowOf.get(person.memberId) ?? peopleStart, column },
+                            tabStop,
+                            <CalendarLetterBox cell={cell.cell} off={cell.off} assigned={cell.assigned} inactive={!cell.active} />,
+                            copy,
+                          );
+                    })}
+                  </TableRow>
+                ))}
+              </TableBody>
+            ))}
+          </>
+        )}
+        tableRef={screen.gridRef}
+        labelledBy={MONTH_HEADING_ID}
+        className="print:table-fixed"
+        onKeyDown={(event) => {
+          screen.moveGridFocus(event, shown);
+        }}
+        onKeyUp={(event) => {
+          screen.openOnKeyUp(event, shown);
+        }}
+      />
     </>
   );
 }

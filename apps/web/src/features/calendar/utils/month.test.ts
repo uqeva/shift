@@ -1004,9 +1004,15 @@ describe('the team filter (story 3.3a)', () => {
     expect(month.filter).toEqual({
       teams: [],
       chosen: null,
-      people: [{ id: VIEWER_MEMBER, name: VIEWER_NAME, teamId: null, teamName: null }],
+      people: [{ id: VIEWER_MEMBER, name: VIEWER_NAME, teamId: null, teamName: null, roleId: null }],
       person: null,
       teamCounts: {},
+      // Story 21.25: every role and no role, nobody holding one.
+      roles: [
+        { value: 'all', roleName: '', count: 1 },
+        { value: 'none', roleName: '', count: 1 },
+      ],
+      role: null,
     });
   });
 });
@@ -1071,9 +1077,9 @@ describe('the person filter (story 3.3b)', () => {
     // Story 7.5: the colleague moved to B on 2026-09-15, so B is their team
     // for this month; the spare is on none.
     expect(month.filter.people).toEqual([
-      { id: COLLEAGUE, name: 'Ante Babić', teamId: 'pilot-smjena-b', teamName: 'Smjena B' },
-      { id: VIEWER_MEMBER, name: VIEWER_NAME, teamId: 'pilot-smjena-a', teamName: 'Smjena A' },
-      { id: SPARE, name: 'Toni Bezsmjene', teamId: null, teamName: null },
+      { id: COLLEAGUE, name: 'Ante Babić', teamId: 'pilot-smjena-b', teamName: 'Smjena B', roleId: null },
+      { id: VIEWER_MEMBER, name: VIEWER_NAME, teamId: 'pilot-smjena-a', teamName: 'Smjena A', roleId: null },
+      { id: SPARE, name: 'Toni Bezsmjene', teamId: null, teamName: null, roleId: null },
     ]);
     expect(month.filter.person).toBeNull();
     expect(month.person).toBeNull();

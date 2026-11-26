@@ -311,6 +311,9 @@ export const RUCNI_RASPORED: readonly string[] = [
   join(srcRoot, 'features', 'planning', 'components', 'manual-fill-dialog.tsx'),
   join(srcRoot, 'features', 'planning', 'components', 'manual-copy-dialog.tsx'),
   join(srcRoot, 'features', 'planning', 'components', 'manual-people-field.tsx'),
+  // Story 21.25: the *Posao* filter, and the paper grid's pieces it shares with *Kalendar*.
+  join(srcRoot, 'features', 'planning', 'components', 'manual-filters.tsx'),
+  join(srcRoot, 'components', 'date-grid.tsx'),
 ];
 
 /** Story 21.4's rules: the preview's line keys and the save's refusals, off their `\w*MessageKey` unions; 21.5's fill and copy refusals. */

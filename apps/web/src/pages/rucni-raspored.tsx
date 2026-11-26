@@ -2,7 +2,6 @@ import { createRoute, useNavigate } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
 
 import { MonthNav } from '@/components/month-nav';
-import { PageToolbar } from '@/components/page-toolbar';
 import { StickyHead } from '@/components/sticky-head';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -11,6 +10,7 @@ import { PageTitle } from '@/components/ui/page-header';
 import { calendarMessageKey } from '@/features/calendar/services/snapshot';
 import { requireAdmin } from '@/features/navigation/services/admin-guard';
 import { ManualCopyDialog } from '@/features/planning/components/manual-copy-dialog';
+import { ManualFilters } from '@/features/planning/components/manual-filters';
 import { ManualFillDialog } from '@/features/planning/components/manual-fill-dialog';
 import { ManualGrid } from '@/features/planning/components/manual-grid';
 import { ManualMemberDays } from '@/features/planning/components/manual-member-days';
@@ -113,15 +113,17 @@ export function RucniRasporedScreen() {
   return (
     <main className="mx-auto flex w-full min-w-0 max-w-none flex-1 flex-col gap-6 p-6" aria-busy={screen.surface.loading}>
       {/* STORY 21.23'S COMPACT TOOLBAR: the title, the month control from 640 px,
-          and the selection's one action at the right. */}
-      <PageToolbar
+          `Filtri` with *Posao* (story 21.25) while somebody holds a role, and
+          the selection's one action at the right. */}
+      <ManualFilters
+        screen={screen}
         title={
           <PageTitle asChild>
             <h1>{t('nav.rucniRaspored')}</h1>
           </PageTitle>
         }
         lead={isPhone || refusal !== null ? undefined : <MonthNav month={screen.month} headingId={MANUAL_HEADING_ID} onShow={screen.show} />}
-        controls={
+        after={
           isPhone || refusal !== null ? undefined : (
             <>
               <ManualPlanButtons screen={screen} />

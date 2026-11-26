@@ -38,6 +38,9 @@ export const CALENDAR_SCREEN_PARTS = {
   filterBar: ['components', 'filter-bar.tsx'],
   monthBody: ['features', 'calendar', 'components', 'calendar-month-body.tsx'],
   grid: ['features', 'calendar', 'components', 'calendar-grid.tsx'],
+  // Story 21.25: the paper grid's frame, sticky date strip, corner and heads,
+  // shared with *Ručni raspored* from `components/`.
+  dateGrid: ['components', 'date-grid.tsx'],
   cell: ['features', 'calendar', 'components', 'calendar-cell.tsx'],
   legend: ['features', 'calendar', 'components', 'calendar-legend.tsx'],
   // Story 5.3c: the marks' glyphs, text and icon, drawn by the cell and the legend.

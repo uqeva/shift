@@ -10,8 +10,10 @@ import {
 } from '@shift/domain';
 
 import type { CalendarMember, CalendarSnapshot } from '@/features/calendar/services/snapshot';
-import { memberScheduleInputOf, snapshotScheduleInputOf, typeLettersOf } from '@/features/calendar/utils/month';
-import { compareText, formatIsoDayMonth, formatIsoWeekdayShortName } from '@/lib/i18n/format';
+import { memberScheduleInputOf, snapshotScheduleInputOf, teamHasRotationBy, typeLettersOf } from '@/features/calendar/utils/month';
+import { ALL_ROLES, NO_ROLE, chooseRole, type RoleFilter, type RoleFilterOption } from '@/features/members/services/list';
+import { compareText } from '@/lib/i18n/format';
+import { gridDatesOf, isWeekend, weekdayOf, type GridDate } from '@/utils/grid-dates';
 
 /**
  * *RUČNI RASPORED* (story 21.4; UX-DR72, UX-DR73; R14; AD-26): the month as a
@@ -313,6 +315,8 @@ export interface ManualRow {
   readonly name: string;
   /** The member's job role's name, shown beside the name (story 21.12, re-owned by 21.5), or `null` for none. */
   readonly jobRole: string | null;
+  /** That role's id, which the *Posao* filter narrows by (story 21.25), or `null` for none. */
+  readonly jobRoleId: string | null;
   readonly source: ManualRowSource;
   readonly cells: readonly ManualCell[];
 }
@@ -324,17 +328,8 @@ export interface ManualGroup {
   readonly rows: readonly ManualRow[];
 }
 
-export interface ManualDate {
-  readonly date: string;
-  /** `12.` */
-  readonly day: string;
-  /** `12.11.` */
-  readonly dayMonth: string;
-  /** `pon` */
-  readonly weekday: string;
-  readonly weekend: boolean;
-  readonly today: boolean;
-}
+/** A date column of the grid: `@/utils/grid-dates`' shared shape (story 21.25). */
+export type ManualDate = GridDate;
 
 export interface ManualLegendEntry {
   readonly letter: string;
@@ -351,27 +346,7 @@ export interface ManualMonth {
   readonly legend: readonly ManualLegendEntry[];
 }
 
-/** The weekday of a civil date (no zone): 0 is Sunday, 6 Saturday. */
-export function weekdayOf(date: string): number {
-  const [year, month, day] = date.split('-').map(Number) as [number, number, number];
-  // Sakamoto's method.
-  const offsets = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4] as const;
-  const y = month < 3 ? year - 1 : year;
-
-  return (y + Math.floor(y / 4) - Math.floor(y / 100) + Math.floor(y / 400) + (offsets[month - 1] ?? 0) + day) % 7;
-}
-
-/** Saturday or Sunday, by the civil date alone (no zone). */
-export function isWeekend(date: string): boolean {
-  const weekday = weekdayOf(date);
-
-  return weekday === 0 || weekday === 6;
-}
-
-/** Whether `teamId` has a rotation version in effect on or before `last` (the row's *rotacija tima*). */
-function hasRotation(calendar: CalendarSnapshot, teamId: string, last: string): boolean {
-  return calendar.assignments.some((assignment) => assignment.teamId === teamId && assignment.effectiveFrom <= last);
-}
+export { isWeekend, weekdayOf };
 
 /** The shift types' letters by id, over every type (so a letter never changes as types come and go from the month). */
 function lettersOf(calendar: CalendarSnapshot): ReadonlyMap<string, string> {
@@ -469,7 +444,8 @@ export function manualMonthOf(calendar: CalendarSnapshot, month: string, today: 
       memberId: member.id,
       name: member.name,
       jobRole: member.jobRole?.name ?? null,
-      source: teamId !== null && hasRotation(after, teamId, last) ? SOURCE_TEAM : SOURCE_MANUAL,
+      jobRoleId: member.jobRole?.id ?? null,
+      source: teamId !== null && teamHasRotationBy(after, teamId, last) ? SOURCE_TEAM : SOURCE_MANUAL,
       cells,
     };
     const list = byTeam.get(teamId);
@@ -500,20 +476,62 @@ export function manualMonthOf(calendar: CalendarSnapshot, month: string, today: 
 
   return {
     month,
-    dates: dates.map((date) => ({
-      date,
-      day: `${String(Number(date.slice(8, 10)))}.`,
-      dayMonth: formatIsoDayMonth(date) ?? date,
-      weekday: formatIsoWeekdayShortName(date) ?? '',
-      weekend: isWeekend(date),
-      today: date === today,
-    })),
+    dates: gridDatesOf(dates, today),
     groups,
     rows: groups.flatMap((group) => group.rows),
     legend: after.types
       .filter((type) => used.has(type.id))
       .map((type) => ({ letter: letters.get(type.id) ?? type.name, name: type.name })),
   };
+}
+
+// ------------------------------------------------------------- *Posao*
+
+/**
+ * STORY 21.25 (deferred from 21.12 and 21.5): *Ručni raspored*'s *Posao*
+ * filter, on *Ljudi*'s semantics (`?posao=`): every role, a role's id, or
+ * nobody's (`none`); an id no row holds is every role, the harmless
+ * direction; the chip is drawn only while somebody holds a role or one is
+ * chosen (`roleChipShown`).
+ */
+/** The *Posao* chip's key in the toolbar's *Filtri* panel: one chip, so one key. */
+export const MANUAL_ROLE_CHIP = 'posao';
+
+export interface ManualRoleFilter {
+  /** Every role, the roles held by name, and no role, each with its row count. */
+  readonly options: readonly RoleFilterOption[];
+  /** The role the rows were narrowed by: the one asked for, or every role once it is not an option. */
+  readonly applied: RoleFilter;
+  /** The month with only the rows of that role, a group with none left out. */
+  readonly shown: ManualMonth;
+}
+
+/** `month` narrowed to the rows holding `wanted` (`?posao=`), with the options it offers. */
+export function manualRoleFilterOf(month: ManualMonth, wanted: string | undefined): ManualRoleFilter {
+  const held = new Map<string, string>();
+
+  for (const row of month.rows) if (row.jobRoleId !== null && row.jobRole !== null) held.set(row.jobRoleId, row.jobRole);
+
+  const roleOf = (row: ManualRow): RoleFilter => row.jobRoleId ?? NO_ROLE;
+  const values: RoleFilter[] = [
+    ALL_ROLES,
+    ...[...held].sort(([firstId, first], [secondId, second]) => compareText(first, second) || compareText(firstId, secondId)).map(([id]) => id),
+    NO_ROLE,
+  ];
+  const options = values.map((value) => ({
+    value,
+    roleName: held.get(value) ?? '',
+    count: value === ALL_ROLES ? month.rows.length : month.rows.filter((row) => roleOf(row) === value).length,
+  }));
+  const applied = chooseRole(wanted ?? ALL_ROLES, options);
+
+  if (applied === ALL_ROLES) return { options, applied, shown: month };
+
+  const groups = month.groups
+    .map((group) => ({ ...group, rows: group.rows.filter((row) => roleOf(row) === applied) }))
+    .filter((group) => group.rows.length > 0);
+
+  return { options, applied, shown: { ...month, groups, rows: groups.flatMap((group) => group.rows) } };
 }
 
 /** The shift types the picker offers: every one not archived, working first, in the snapshot's order. */

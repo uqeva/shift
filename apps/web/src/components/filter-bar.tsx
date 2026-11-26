@@ -29,10 +29,12 @@ import {
   ALL_TEAMS_OPTION,
   FILTERS_CLEARED,
   FILTER_PERSON,
+  FILTER_ROLE,
   FILTER_TEAM,
   FIRST_CHIP,
   KEEP_IN_VIEW,
   NO_SEARCH,
+  NO_ROLE_OPTION,
   NO_TEAM_OPTION,
   activeChipsOf,
   entersPickerList,
@@ -54,6 +56,7 @@ import {
   typesIntoSearch,
   type FilterBarModel,
   type FilterChange,
+  type FilterChip,
   type FilterKey,
 } from '@/utils/filter-bar';
 import { NO_TEXT } from '@/utils/text';
@@ -418,8 +421,7 @@ export function FilterBar({
     [changeThenFocus],
   );
 
-  const summary =
-    model === null ? null : t(filterSummaryMessageKey(model.summary), filterSummaryValuesOf(model.summary));
+  const summary = model === null ? null : filterSummaryTextOf(model);
 
   /** One chip per filter on: in the toolbar their own group, `Aktivni filtri`; under the summary card the bar's. */
   function renderChips(): ReactNode {
@@ -430,8 +432,8 @@ export function FilterBar({
         label={toolbar === undefined ? undefined : t('filter.activeLabel')}
         chips={activeChipsOf(model).map((chip) => ({
           key: chip.key,
-          text: t(filterChipMessageKey(chip), { value: chip.value }),
-          removeLabel: t(filterRemoveMessageKey(chip), { value: chip.value }),
+          text: t(filterChipMessageKey(chip), { value: chipWordOf(model, chip) }),
+          removeLabel: t(filterRemoveMessageKey(chip), { value: chipWordOf(model, chip) }),
         }))}
         showClear={hasActiveFilter(model)}
         expandedBy={bar.expandedBy}
@@ -523,7 +525,30 @@ export function FilterBar({
  * under it (`StickyHead`, deferred-work E816).
  */
 export function activeFilterSummaryOf(model: FilterBarModel): string | null {
-  return hasActiveFilter(model) ? t(filterSummaryMessageKey(model.summary), filterSummaryValuesOf(model.summary)) : null;
+  return hasActiveFilter(model) ? filterSummaryTextOf(model) : null;
+}
+
+/** STORY 21.25: a role's name, data, or *Bez posla* for nobody's. */
+function roleWordOf(id: string, name: string): string {
+  return id === NO_ROLE_OPTION ? t('filter.noRole') : name;
+}
+
+/** An active chip's value in words: the team's, the person's or the role's name, *Bez posla* worded. */
+function chipWordOf(model: FilterBarModel, chip: FilterChip): string | null {
+  return chip.key === FILTER_ROLE && model.role !== null ? roleWordOf(model.role, chip.value ?? NO_TEXT) : chip.value;
+}
+
+/**
+ * The summary line in words — `Prikazano: …` — followed, while a role is on
+ * (story 21.25), by `· Posao: {role}`: the bar's result count, the phone
+ * head's line and the printed month's filter words alike.
+ */
+export function filterSummaryTextOf(model: FilterBarModel): string {
+  const words = t(filterSummaryMessageKey(model.summary), filterSummaryValuesOf(model.summary));
+
+  return model.summaryRole === null
+    ? words
+    : t('filter.summary.withRole', { summary: words, role: roleWordOf(model.summaryRole.id, model.summaryRole.name) });
 }
 
 /**
@@ -1028,6 +1053,34 @@ function TeamOptions({
   );
 }
 
+/** STORY 21.25: the *Posao* picker: `Svi poslovi`, then every role held by name, then *Bez posla*, each with its person count. */
+function RoleOptions({
+  model,
+  onPick,
+}: {
+  readonly model: FilterBarModel;
+  readonly onPick: (id: string | null) => void;
+}): ReactNode {
+  return (
+    <SearchableOptions
+      searchLabel={t('filter.optionSearch', { label: t('filter.role') })}
+      items={model.roles}
+      nameOf={(role) => roleWordOf(role.id, role.name)}
+      rowsOf={(matching) =>
+        matching.map((role) => ({
+          id: role.id,
+          name: roleWordOf(role.id, role.name),
+          count: t('filter.personCount', { count: role.count }),
+          group: null,
+        }))
+      }
+      pinned={{ id: null, name: t('filter.allRoles'), count: null, group: null }}
+      chosen={model.role}
+      onPick={onPick}
+    />
+  );
+}
+
 /**
  * The Osoba picker: `Traži osobu (17)`, `{n} od {total}`, `Sve osobe`, then
  * the people grouped by their team for the month, `Bez smjene` last.
@@ -1098,6 +1151,7 @@ function FilterSheetContent({
     chipValue(FILTER_TEAM) ??
     (teamPickedOf(model) === NO_TEAM_OPTION ? t('filter.teamReplaced') : t('filter.allTeams', { count: model.teams.length }));
   const personValue = chipValue(FILTER_PERSON) ?? t('filter.allPeople', { count: model.people.length });
+  const roleValue = model.role === null ? t('filter.allRoles') : roleWordOf(model.role, chipValue(FILTER_ROLE) ?? NO_TEXT);
 
   return (
     <>
@@ -1117,6 +1171,24 @@ function FilterSheetContent({
           />
         )}
       />
+      {/* STORY 21.25: *Posao*, while somebody holds a role or one is chosen. */}
+      {model.roles.length === 0 ? null : (
+        <FilterField
+          label={t('filter.role')}
+          value={roleValue}
+          pickerLabel={t('filter.rolePicker')}
+          fieldRef={fieldRef(FILTER_ROLE)}
+          picker={(done) => (
+            <RoleOptions
+              model={model}
+              onPick={(id) => {
+                onChange(filterChoiceOf(model, FILTER_ROLE, id));
+                done();
+              }}
+            />
+          )}
+        />
+      )}
       <div className="grid min-w-0 gap-2">
         <FilterField
           label={t('filter.person')}

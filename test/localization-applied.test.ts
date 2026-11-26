@@ -491,6 +491,12 @@ const SOURCES = [
   join(webRoot, 'src', 'features', 'planning', 'services', 'manual-fill.ts'),
   // Story 21.6: *Dodaj smjenu*, the member page's card that opens the grid on one cell.
   join(webRoot, 'src', 'features', 'planning', 'components', 'member-add-shift-card.tsx'),
+  // Story 21.25: the grid's *Posao* filter, the rows it narrows (`manual-grid.ts`),
+  // and the paper grid's frame and date columns, shared with *Kalendar*.
+  join(webRoot, 'src', 'features', 'planning', 'components', 'manual-filters.tsx'),
+  join(webRoot, 'src', 'features', 'planning', 'services', 'manual-grid.ts'),
+  join(webRoot, 'src', 'components', 'date-grid.tsx'),
+  join(webRoot, 'src', 'utils', 'grid-dates.ts'),
   join(webRoot, 'src', 'features', 'history', 'hooks', 'use-change-history.ts'),
   join(webRoot, 'src', 'features', 'history', 'components', 'history-body.tsx'),
   join(webRoot, 'src', 'features', 'history', 'components', 'history-filters.tsx'),

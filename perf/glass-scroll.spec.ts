@@ -32,7 +32,9 @@ import { LoginPage } from '../e2e/pages/login.page.ts';
  *     frames are only reported over 50 ms, so with none the phase reads 0.
  *  3. The same glass budget at a TABLET width (800 × 600, no touch; story
  *     21.3): *Sve smjene* is the grid there, scrolled by the page under its
- *     sticky team strip, whose copy table doubles the cell DOM. Its trace is
+ *     sticky date strip, whose copy table doubles the cell DOM; since story
+ *     21.25 the dates are its columns, so it is scrolled sideways inside its
+ *     own scroller too. Its trace is
  *     `glass-scroll-grid-trace.json`, its summary `glassBudgetGrid`.
  *
  * WHAT A PROXY CANNOT SHOW. CPU throttling slows the renderer's main thread;
@@ -233,14 +235,30 @@ async function measureGlassBudget(page: Page, browser: Browser, glass: GlassCase
       await page.mouse.wheel(0, 320);
       await page.waitForTimeout(120);
     }
-    // How far it got: the page's scroll (the month has no vertical scroller of its own), or any element's.
+    // STORY 21.25: the grid's dates are its columns, so it also scrolls SIDEWAYS
+    // inside its one scroller, the strip following it (a phone's list does not).
+    for (let step = 0; step < 8; step += 1) {
+      await page.mouse.wheel(320, 0);
+      await page.waitForTimeout(120);
+    }
+    // How far it got: the page's scroll (the month has no vertical scroller of
+    // its own), or any element's, on either axis.
     scrolled.push(
       await page.evaluate(() => {
-        let furthest = window.scrollY;
-        for (const element of document.querySelectorAll('*')) furthest = Math.max(furthest, element.scrollTop);
-        return furthest;
+        // Down first: the month's own scroll; sideways (the grid's) only where it scrolled nowhere down.
+        let down = window.scrollY;
+        let across = 0;
+        for (const element of document.querySelectorAll('*')) {
+          down = Math.max(down, element.scrollTop);
+          across = Math.max(across, element.scrollLeft);
+        }
+        return down > 0 ? down : across;
       }),
     );
+    for (let step = 0; step < 8; step += 1) {
+      await page.mouse.wheel(-320, 0);
+      await page.waitForTimeout(120);
+    }
     for (let step = 0; step < 16; step += 1) {
       await page.mouse.wheel(0, -320);
       await page.waitForTimeout(120);

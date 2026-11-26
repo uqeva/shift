@@ -237,11 +237,13 @@
     "chip": {
       "team": "Tim: {value}",
       "teamAll": "Tim: svi",
-      "person": "Osoba: {value}"
+      "person": "Osoba: {value}",
+      "role": "Posao: {value}"
     },
     "remove": {
       "team": "Ukloni filtar timova: {value}",
-      "person": "Ukloni filtar osoba: {value}"
+      "person": "Ukloni filtar osoba: {value}",
+      "role": "Ukloni filtar posao: {value}"
     },
     "teamPicker": "Odaberi tim",
     "personPicker": "Odaberi osobu",
@@ -257,7 +259,8 @@
       "team": "Prikazano: {team} · {shown, plural, one {# osoba} few {# osobe} other {# osoba}} od {total}",
       "person": "Prikazano: {person} · {team}",
       "personNoTeam": "Prikazano: {person} · Bez tima",
-      "both": "Prikazano: {team} i {person} · {shown, plural, one {# osoba} few {# osobe} other {# osoba}}"
+      "both": "Prikazano: {team} i {person} · {shown, plural, one {# osoba} few {# osobe} other {# osoba}}",
+      "withRole": "{summary} · Posao: {role}"
     },
     "clear": "Poništi filtre",
     "clearAll": "Očisti sve",
@@ -267,6 +270,10 @@
     "sheetClose": "Zatvori filtre",
     "team": "Tim",
     "person": "Osoba",
+    "role": "Posao",
+    "rolePicker": "Odaberi posao",
+    "allRoles": "Svi poslovi",
+    "noRole": "Bez posla",
     "replaceNote": "U Kalendaru osoba zamjenjuje tim.",
     "teamReplaced": "Zamijenjeno osobom",
     "sheetReset": "Očisti",
@@ -559,7 +566,6 @@
     "thisMonthShort": "ovaj",
     "previousYear": "Prethodna godina",
     "nextYear": "Sljedeća godina",
-    "columnDate": "Datum",
     "noRotation": "Bez rotacije",
     "noTeams": "Nijedan tim nije u upotrebi, pa kalendar nema što prikazati.",
     "noTeamsWhy": "Raspored nastaje iz timova, tipova smjena i rotacije.",
@@ -792,6 +798,24 @@
       "sentWithReturn": "Prijedlog zamjene za {date} · {team} je poslan. Kolega: {name}. Zauzvrat preuzimaš {returnDate} · {returnTeam}. Prijedlog čeka odgovor kolege.",
       "proposedMark": "Zamjena predložena · {name}",
       "alreadyProposed": "Za ovu smjenu već postoji tvoj otvoreni prijedlog zamjene. Kolega: {name}. Prijedlog možeš povući na stranici Danas."
+    },
+    "paper": {
+      "corner": "Tim / osoba",
+      "teams": "Timovi",
+      "noRole": "Bez posla",
+      "noTeam": "Bez tima",
+      "empty": "Odabrani filtri ne prikazuju nijedan tim ni osobu.",
+      "letters": "Kratice",
+      "letter": "{letter} {name}",
+      "off": "{mark} slobodno",
+      "offMark": "–",
+      "cell": {
+        "off": "slobodno",
+        "none": "nema smjene",
+        "inactive": "osoba tada nije aktivna"
+      },
+      "unavailable": "Raspored nije dostupan",
+      "groupMark": "+{letter}"
     }
   },
   "godisnji": {

@@ -130,7 +130,7 @@ test('the admin records leave and opens Kalendar: the conflicts and the hatch ar
   // KALENDAR FIRST, so its two reads are cached before the write: what
   // follows proves the write's invalidation, never a first read.
   await calendarPage.goto('?prikaz=sve');
-  await expect(calendarPage.columnHeader(team.name)).toBeVisible();
+  await expect(calendarPage.teamHeader(team.name)).toBeVisible();
   await expect(calendarPage.cellsMarkedConflictOrLeave).toHaveCount(0);
   // A marker on the window: if any step below reloads the page, it is gone.
   await page.evaluate(() => {
@@ -147,7 +147,7 @@ test('the admin records leave and opens Kalendar: the conflicts and the hatch ar
   /** Kalendar, reached in the app alone, on today's month. */
   async function openKalendar(): Promise<void> {
     await peoplePage.navigationLink(hr.nav.kalendar, { exact: true }).click();
-    await expect(calendarPage.columnHeader(team.name)).toBeVisible();
+    await expect(calendarPage.teamHeader(team.name)).toBeVisible();
   }
 
   // RECORD THE WORKED EXAMPLE on the member's page.
@@ -317,7 +317,7 @@ test('a failed leave read shows the unavailable alert and no month, and the retr
 
   await page.unroute(records);
   await calendarPage.retryButton.click();
-  await expect(calendarPage.columnHeader(fixture.team.name)).toBeVisible();
+  await expect(calendarPage.teamHeader(fixture.team.name)).toBeVisible();
   await expect(calendarPage.unavailableAlert).toHaveCount(0);
   await expect(calendarPage.retryButton).toHaveCount(0);
 });
@@ -334,7 +334,7 @@ test('a conflict accepted as uncovered carries the uncovered mark and no conflic
   await seedConflictResolution(fixture.slug, member.id, today, team.id);
 
   await calendarPage.goto('?prikaz=sve');
-  await expect(calendarPage.columnHeader(team.name)).toBeVisible();
+  await expect(calendarPage.teamHeader(team.name)).toBeVisible();
   for (const offset of COLLIDING) {
     const date = isoDaysAfter(today, offset);
     await calendarPage.showMonthOf(date, today);
@@ -473,6 +473,6 @@ test('a failed resolutions read shows the unavailable alert and no month, and th
 
   await page.unroute(resolutions);
   await calendarPage.retryButton.click();
-  await expect(calendarPage.columnHeader(fixture.team.name)).toBeVisible();
+  await expect(calendarPage.teamHeader(fixture.team.name)).toBeVisible();
   await expect(calendarPage.unavailableAlert).toHaveCount(0);
 });

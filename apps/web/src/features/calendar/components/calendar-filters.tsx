@@ -1,15 +1,14 @@
 import type { ReactNode } from 'react';
 
-import { FilterBar, activeFilterSummaryOf, type ToolbarSlots } from '@/components/filter-bar';
+import { FilterBar, activeFilterSummaryOf, filterSummaryTextOf, type ToolbarSlots } from '@/components/filter-bar';
 import { calendarFilterBarOf } from '@/features/calendar/utils/filters';
 import type { CalendarFilterChange, CalendarMonth } from '@/features/calendar/utils/month';
-import { t } from '@/lib/i18n';
-import { filterSummaryMessageKey, filterSummaryValuesOf } from '@/utils/filter-bar';
 
 /**
  * *Kalendar*'s compact toolbar (stories 7.5, 21.23) with the filters of *Sve
  * smjene*: the shared filter bar's `Filtri` among the toolbar's controls,
- * Smjena and Osoba as chips under it with the summary as the result count.
+ * Tim, Posao (story 21.25) and Osoba as chips under it with the summary as
+ * the result count.
  * Which team or person is chosen — an unknown or archived id being none — is
  * `calendarMonthOf`'s decision, and the bar's model is
  * `calendarFilterBarOf`'s: a person replaces the team (story 3.3b). The state
@@ -26,7 +25,8 @@ export function CalendarFilters({
   readonly toolbar: ToolbarSlots;
   readonly onFilter: (change: CalendarFilterChange) => void;
 }): ReactNode {
-  const filtered = shown !== null && (shown.filter.teams.length !== 0 || shown.filter.people.length !== 0);
+  const filtered =
+    shown !== null && (shown.filter.teams.length !== 0 || shown.filter.people.length !== 0);
 
   return <FilterBar model={filtered ? calendarFilterBarOf(shown) : null} onChange={onFilter} toolbar={toolbar} />;
 }
@@ -43,7 +43,5 @@ export function calendarFilterSummaryOf(shown: CalendarMonth): string | null {
  * screen said.
  */
 export function calendarFilterWordsOf(shown: CalendarMonth): string {
-  const { summary } = calendarFilterBarOf(shown);
-
-  return t(filterSummaryMessageKey(summary), filterSummaryValuesOf(summary));
+  return filterSummaryTextOf(calendarFilterBarOf(shown));
 }

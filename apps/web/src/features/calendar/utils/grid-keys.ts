@@ -7,9 +7,11 @@
  * holds the stepper's rules: `pages/kalendar.tsx` only moves DOM focus to the
  * position these rules return.
  *
- * A POSITION is a data cell's: `row` the date's index in the month, `column`
- * the team's index among the columns. The date column and the header row are
- * not in it — neither takes focus.
+ * A POSITION is a data cell's: since story 21.25 (*Kalendar kao papir*)
+ * `row` the row's index in the paper grid — the turnus teams first, then the
+ * people, the group heading rows not counted — and `column` the date's index
+ * in the month. The name column and the header row are not in it — neither
+ * takes focus.
  */
 
 /** One data cell of the grid. */
@@ -24,7 +26,7 @@ export interface GridSize {
   readonly columns: number;
 }
 
-/** The first cell of the month. */
+/** The first cell of the grid. */
 export const GRID_ORIGIN: GridPosition = { row: 0, column: 0 };
 
 function clamp(value: number, last: number): number {
@@ -59,8 +61,8 @@ export function keyModifiersOf(event: {
  * ({@link isOpenGridKey}, story 3.4b).
  *
  * Arrows move one cell and STOP at the edges; Home and End go to the start and
- * end of the row; Ctrl+Home and Ctrl+End to the first and last cell of the
- * month. Ctrl counts with Home and End only: Ctrl+Arrow is not handled, and
+ * end of the row (the month's first and last date); Ctrl+Home and Ctrl+End to
+ * the first and last cell of the grid. Ctrl counts with Home and End only: Ctrl+Arrow is not handled, and
  * neither is any key with Alt, Meta or Shift held — those belong to the
  * browser and assistive technology. A grid with no cells handles nothing.
  */
@@ -156,8 +158,8 @@ export function gridOpensOnKeyUp(
 
 /**
  * How a focused cell is scrolled into view: the least scroll that shows
- * it whole, on both axes, inside its `scroll-margin` — the sticky date
- * column's width and the sticky header's height (`calendar-grid.tsx`) — so it
+ * it whole, on both axes, inside its `scroll-margin` — the sticky name
+ * column's width and the sticky header's height (`@/components/date-grid`) — so it
  * never lands under either (package 3c).
  */
 export const GRID_REVEAL: ScrollIntoViewOptions = { block: 'nearest', inline: 'nearest' };
@@ -197,13 +199,14 @@ export function gridPositionOf(dataset: {
 }
 
 /**
- * The grid's one tab stop before anything has been focused: today's first
- * team's cell when the month shows today, otherwise the first cell.
+ * The grid's one tab stop before anything has been focused (story 21.25: the
+ * dates are the COLUMNS): the first row's cell on today when the month shows
+ * today, otherwise the first cell.
  */
-export function initialGridFocusOf(rows: readonly { readonly isToday: boolean }[]): GridPosition {
-  const today = rows.findIndex((row) => row.isToday);
+export function initialGridFocusOf(dates: readonly { readonly today: boolean }[]): GridPosition {
+  const today = dates.findIndex((date) => date.today);
 
-  return today === -1 ? GRID_ORIGIN : { row: today, column: 0 };
+  return today === -1 ? GRID_ORIGIN : { row: 0, column: today };
 }
 
 /** The focus the grid remembers: a position, and the month it was taken in. */
@@ -214,22 +217,22 @@ export interface GridFocus {
 
 /**
  * The tab stop shown: the remembered position while the month is the one it
- * was taken in (kept inside the grid, should the columns change on a
- * refetch), and {@link initialGridFocusOf} after the month changes.
+ * was taken in (kept inside the grid, should the rows change on a refetch or
+ * a filter), and {@link initialGridFocusOf} after the month changes.
  */
 export function gridTabStopOf(
   remembered: GridFocus | null,
   month: string,
-  rows: readonly { readonly isToday: boolean }[],
-  columns: number,
+  dates: readonly { readonly today: boolean }[],
+  rows: number,
 ): GridPosition {
-  if (remembered === null || remembered.month !== month || rows.length === 0 || columns === 0) {
-    return initialGridFocusOf(rows);
+  if (remembered === null || remembered.month !== month || dates.length === 0 || rows === 0) {
+    return initialGridFocusOf(dates);
   }
 
   return {
-    row: clamp(remembered.position.row, rows.length - 1),
-    column: clamp(remembered.position.column, columns - 1),
+    row: clamp(remembered.position.row, rows - 1),
+    column: clamp(remembered.position.column, dates.length - 1),
   };
 }
 

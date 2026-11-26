@@ -552,6 +552,10 @@ describe('the screen is read at all, so every sweep below means something', () =
     const sharedLoanMark = join(srcRoot, ...CALENDAR_SCREEN_PARTS.loanMark);
 
     expect(KALENDAR, 'the shared loan mark left the set').toContain(sharedLoanMark);
+    // STORY 21.25: the paper grid's pieces are shared with *Ručni raspored* from `@/components/date-grid`.
+    const sharedDateGrid = join(srcRoot, ...CALENDAR_SCREEN_PARTS.dateGrid);
+
+    expect(KALENDAR, 'the shared paper grid left the set').toContain(sharedDateGrid);
     expect(
       found.filter((file) => !exempt.has(file)).sort(),
       'the calendar file set and the feature folders disagree',
@@ -562,6 +566,7 @@ describe('the screen is read at all, so every sweep below means something', () =
           file !== SHARED_MONTH_NAV &&
           file !== SHARED_FILTER_BAR &&
           file !== sharedLoanMark &&
+          file !== sharedDateGrid &&
           !swapParts.includes(file),
       ).sort(),
     );
@@ -678,7 +683,8 @@ describe('the screen is read at all, so every sweep below means something', () =
     expect(source(CALENDAR_FILTERS)).toMatch(/<FilterBar\b/);
     expect(source(HOURS_FILTERS)).toMatch(/<FilterBar\b/);
     // A ✕ is named by an expression — the filter and its value — never a literal.
-    expect(bar).toMatch(/removeLabel: t\(filterRemoveMessageKey\(chip\), \{ value: chip\.value \}\)/);
+    // STORY 21.25: the value worded by `chipWordOf` (a role's *Bez posla*), still an expression.
+    expect(bar).toMatch(/removeLabel: t\(filterRemoveMessageKey\(chip\), \{ value: chipWordOf\(model, chip\) \}\)/);
     expect(bar).toMatch(/aria-label=\{chip\.removeLabel\}/);
     // STORY 7.13: *Ljudi* draws the same chips through the option-chip bar.
     expect(source(MEMBER_LIST)).toMatch(/<OptionFilterBar\b/);
