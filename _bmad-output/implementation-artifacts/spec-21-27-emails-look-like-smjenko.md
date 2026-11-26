@@ -2,11 +2,13 @@
 title: 'Story 21.27: Emails look like Smjenko (Emailovi izgledaju kao Smjenko)'
 type: 'feature'
 created: '2026-11-26'
-status: 'in-review'
+status: 'done'
 baseline_commit: 'a2d8fe865ccad6873ae303096e52e39ef4c9ba3b'
 review_loop_iteration: 0
 context: []
 ---
+
+Status: done. PR #390, squash `6e2f824`, merged 2026-11-26 with `CI passed` green on the PR's only run (45859333772 at `a390fb9`). `main`'s push run for `6e2f824` (45861492689) was in progress when this line was written. No migration. Set `done` and this line written by the epic 21 retrospective (2026-11-26).
 
 Baseline: `origin/main` at a2d8fe86 (after 21.11's merge). Touches the hot file `hr.json`: sequential after the last merged story, as the HOT FILES rule asks.
 

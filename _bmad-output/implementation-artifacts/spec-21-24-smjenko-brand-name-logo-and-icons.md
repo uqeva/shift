@@ -2,12 +2,14 @@
 title: '21.24 Smjenko brand: name, logo and icons (with 21.22, teams are called Timovi)'
 type: 'feature'
 created: '2026-11-25'
-status: 'in-review'
+status: 'done'
 baseline_commit: '771ce06a4dff467608f98021680ec21d522081d8'
 review_loop_iteration: 0
 context:
   - '{project-root}/_bmad-output/planning-artifacts/sprint-change-proposal-2026-11-25-pilot-readiness.md'
 ---
+
+Status: done. Built with 21.22 (teams are *Timovi*) on `feat/smjenko-brand`, merged as PR #366, squash `46f4815`, 2026-11-25, with `CI passed` green (run 45641761289 at `48b39d8`). CI run 1 (45635097029 at `d08dd93`) failed `test/e2e-plural.test.ts` (it still expected *smjene*); `48b39d8` pinned the *Tim* forms. The e2e this spec lists as unrun (`glass-fallbacks`, `kalendar-na-mobitelu`, `layout`, every spec reading the renamed labels) ran green in run 45641761289; the web image probe is the operator's. Set `done` and this line written by the epic 21 retrospective (2026-11-26).
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 

@@ -10,7 +10,7 @@ context:
   - '{project-root}/_bmad-output/implementation-artifacts/spec-21-7-a-leave-over-a-personal-shift-is-a-conflict-and-a-replacement-is-an-assignment.md'
 ---
 
-Status: review, built, CI pending (no PR yet; branch `feat/21-8-personal-swaps`). Baseline: `main` at `25f38d3` (21.7 merged, `0081`). Migration `0083`, after 21.20's `0082`: rebased onto `ebfa939` (#383, 21.20) before the push (conflicts: appended blocks in `rls-isolation`, `supabase-scaffold`, `deferred-work.md`, and *Danas*'s string pin, now 117). Touches `hr.json` (hot). Run unattended (the coordinator's brief): the migration number and the stored type were approved by the coordinator; both checkpoints self-approved, decisions in Design Notes.
+Status: done. PR #384, squash `063a648`, merged 2026-11-26 with `CI passed` green (run 45800157968 at `bf5823a`). CI run 1 (45793050063 at `035c2a1`) failed e2e shard 4: the teamless colleague's *Danas* drew no *Zamjene* (a 21.6 gap), fixed in the pushed head; its shard 1 was cancelled at the 30-minute limit with no failure reported (see the Spec Change Log). Every database case and e2e spec this spec lists as unrun, `0083` included, ran green in run 45800157968. Migration `0083`, after 21.20's `0082`. Set `done` and this line written by the epic 21 retrospective (2026-11-26).
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 

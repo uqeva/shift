@@ -2,7 +2,7 @@
 title: '21.14 A floater covers a whole leave in one action'
 type: 'feature'
 created: '2026-11-26'
-status: 'in-review'
+status: 'done'
 baseline_commit: 'f9451c664a16656d173d031693e54fe77456e8ad'
 review_loop_iteration: 0
 context:
@@ -11,7 +11,7 @@ context:
   - '{project-root}/_bmad-output/implementation-artifacts/spec-21-13-floaters-are-suggested-for-an-uncovered-shift-by-role.md'
 ---
 
-Status: built, in review (CI pending; not committed by the implementer). Was: in progress (self-approved, unattended). Baseline: story 21.13's commit `f9451c6` on `feat/21-13-21-14-floaters` (migration `0084`). No migration. Touches the hot file `hr.json`. Run unattended (the coordinator's brief): both checkpoints self-approved, decisions in Design Notes.
+Status: done. Merged with 21.13 as PR #387, squash `b1959e0`, 2026-11-26, with `CI passed` green (run 45838771823 at `b9f4254`; run 1's only hard failure was 21.13's history export case, see spec 21.13). Every case this spec lists as unrun ran green there. No migration. Set `done` and this line written by the epic 21 retrospective (2026-11-26).
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 

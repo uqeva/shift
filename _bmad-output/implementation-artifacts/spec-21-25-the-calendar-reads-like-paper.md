@@ -2,7 +2,7 @@
 title: '21.25 The calendar reads like paper (Kalendar kao papir)'
 type: 'feature'
 created: '2026-11-25'
-status: 'review'
+status: 'done'
 baseline_commit: '7ddc632' # main after #375 (the personalShiftOn hotfix), #374 (21.6) and #373 (21.9); the hot files hr.json, the sweep pins and the shared filter bar start from 21.6's merge
 review_loop_iteration: 1 # pass 1 done
 context:
@@ -12,7 +12,7 @@ context:
   - '{project-root}/_bmad-output/implementation-artifacts/spec-21-6-personal-shifts-are-read-wherever-shifts-are-read.md'
 ---
 
-Status: review — built, CI pending (branch `feat/21-25-calendar-like-paper`).
+Status: done. PR #376, squash `b130440`, merged 2026-11-26 with `CI passed` green (run 45727993162 at `2e76731`). CI run 1 (45724396071 at `9b42d92`) failed all four e2e shards on the page object's `cellOf` (a `has:` locator rooted at the grid) and the transposed tab stop, both fixed in the pushed head (see Verification). The rewritten e2e ran green in run 45727993162; `perf/glass-scroll.spec.ts` stays the operator's. Set `done` and this line written by the epic 21 retrospective (2026-11-26).
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 

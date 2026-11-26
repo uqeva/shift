@@ -2,7 +2,7 @@
 title: '21.13 Floaters are suggested for an uncovered shift, by role'
 type: 'feature'
 created: '2026-11-26'
-status: 'review'
+status: 'done'
 baseline_commit: '8c23b400cbbcf2db23e7b2b279bb435127a43e89'
 review_loop_iteration: 0
 context:
@@ -10,7 +10,7 @@ context:
   - '{project-root}/_bmad-output/specs/spec-shift/engine-rules.md'
 ---
 
-Status: built, in review (CI pending; not committed by the implementer). Was: ready-for-dev (self-approved, unattended). Baseline: `main` at `8c23b40` (21.26 merged, #386; migrations to `0083`). Migration `0084`. Touches the hot file `hr.json`; 21.14 follows on this branch. Run unattended (the coordinator's brief): both checkpoints self-approved, decisions in Design Notes.
+Status: done. Merged with 21.14 as PR #387, squash `b1959e0`, 2026-11-26, with `CI passed` green (run 45838771823 at `b9f4254`). CI run 1 (45834966836 at `ddd31af`) failed e2e shard 2 on `history.spec.ts:137` (the PDF-failure case): the shared e2e organization's history had reached 2,078 rows, past the export's 2,000-row limit, so the export refused before loading the writer; fixed for CI by `b9f4254` (narrowed to the fixture's team). `kalendar-na-mobitelu.spec.ts:58` (a 502) and `layout.spec.ts:224` failed in that run and passed on retry, with no fix. Every `0084` case this spec lists as unrun (provisioning, rls-isolation, concurrent-writes, `floater-suggestions.spec.ts`) ran green in run 45838771823. Migration `0084`. Set `done` and this line written by the epic 21 retrospective (2026-11-26).
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 

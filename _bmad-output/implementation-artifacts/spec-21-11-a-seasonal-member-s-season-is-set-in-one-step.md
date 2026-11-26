@@ -2,14 +2,14 @@
 title: "21.11 A seasonal member's season is set in one step"
 type: 'feature'
 created: '2026-11-26'
-status: 'in-review'
+status: 'done'
 baseline_commit: 'b1959e02e3b9fcba605b7a4a677fa61310decd7e'
 review_loop_iteration: 0
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-21-context.md'
 ---
 
-Status: in review, built on `feat/21-11-seasons`, CI pending (no PR yet). Baseline: `main` at `b1959e0` (21.13/21.14 merged, `0084`). Migration `0085`. Touches `hr.json` (hot): branched from the latest merge; rebase on conflict.
+Status: done. PR #388, squash `a2d8fe8`, merged 2026-11-26 with `CI passed` green on the PR's only run (45850893676 at `1b4fe94`). Every case this spec lists as unrun (the provisioning grantees entry, the three rls-isolation season cases, `e2e/tests/people/member-season.spec.ts`) ran green there; `0085` was never applied locally. Migration `0085`. Set `done` and this line written by the epic 21 retrospective (2026-11-26).
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 

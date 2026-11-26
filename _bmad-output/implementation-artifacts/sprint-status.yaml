@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 14:26
-last_updated: 11-26-2026 12:00
+last_updated: 11-26-2026 16:55
 project: shift
 project_key: NOKEY
 tracking_system: file-system
@@ -743,7 +743,7 @@ development_status:
   # 21.21, 21.22. Decisions E-1..E-8 (proposal 6) were ACCEPTED by the founder
   # on 2026-11-25 at the recommended defaults (E-6: Timovi), so 21.22 is
   # unblocked. Production 20.9 stays after this epic.
-  epic-21: in-progress  # pilot readiness; gates 20.9 (founder 2026-11-25)
+  epic-21: done  # retro 2026-11-26: accepted-with-open-items; all 27 stories merged with CI green; no longer gates 20.9
   21-1-the-personal-assignment-rule-in-the-domain: done  # PR #363, squash 771ce06, CI green
   21-2-a-personal-assignment-is-a-recorded-exception: done  # PR #365, squash d23aef6, CI green
   21-3-the-calendar-scrolls-with-the-page-kalendar-bez-unutarnjeg-s: done  # PR #364, squash 9ea215f, CI green
@@ -751,27 +751,27 @@ development_status:
   21-5-popuni-uzorkom-and-kopiraj-fill-a-range: done  # PR #372, squash fdedebc, CI green; the role beside each name built, the grid's Posao filter deferred to 21.25
   21-6-personal-shifts-are-read-wherever-shifts-are-read: done  # PR #374, squash d09fffb, CI green
   21-7-a-leave-over-a-personal-shift-is-a-conflict-and-a-replacemen: done  # PR #381, squash 25f38d3, CI green (0081)
-  21-8-swaps-give-and-take-personal-shifts: review  # built, CI pending; feat/21-8-personal-swaps (0083, merges after 21.20's 0082), no PR yet
+  21-8-swaps-give-and-take-personal-shifts: done  # PR #384, squash 063a648, CI green (run 45800157968; run 45793050063 failed e2e, fixed); 0083
   21-9-the-schedule-source-rule-in-the-domain: done  # PR #373, squash 0163497, CI green
   21-10-an-admin-gives-a-member-their-own-rotation-or-makes-them-man: done  # PR #377, squash 14b3e58, CI green (0079); Ljudi directory label deferred
-  21-11-a-seasonal-member-s-season-is-set-in-one-step: review  # built, CI pending; feat/21-11-seasons (0085), no PR yet; independent
+  21-11-a-seasonal-member-s-season-is-set-in-one-step: done  # PR #388, squash a2d8fe8, CI green (run 45850893676, first run); 0085
   21-12-job-roles-are-organization-data: done  # PR #371, squash e1b6a65, CI green (0078)
-  21-13-floaters-are-suggested-for-an-uncovered-shift-by-role: review  # built, CI pending; feat/21-13-21-14-floaters (0084)
-  21-14-a-floater-covers-a-whole-leave-in-one-action: review  # built, CI pending; feat/21-13-21-14-floaters (no migration)
+  21-13-floaters-are-suggested-for-an-uncovered-shift-by-role: done  # PR #387, squash b1959e0, CI green (run 45838771823; run 45834966836 failed the history export case, fixed by b9f4254); 0084
+  21-14-a-floater-covers-a-whole-leave-in-one-action: done  # PR #387, squash b1959e0, CI green (run 45838771823); no migration
   21-15-the-holiday-rule-in-the-domain: done  # PR #378, squash cdf4fd1, CI green; domain only, no migration
   21-16-holidays-are-organization-data: done  # PR #380, squash 69ef8fc, CI green (run 45758802426); 0080
   21-17-an-admin-enters-holidays-and-imports-the-official-list: done  # PR #380, squash 69ef8fc, CI green (run 45758802426); no migration
-  21-18-holidays-show-on-the-calendar-the-schedule-and-the-grid: review  # built, CI pending; feat/21-18-21-19-holidays-shown, no migration, no PR yet
-  21-19-worked-holiday-hours-are-their-own-figure: review  # built, CI pending; feat/21-18-21-19-holidays-shown, no migration, no PR yet
-  21-20-each-team-has-its-own-minimum: review  # built, CI pending; feat/21-20-team-minimum, no PR yet; 0082
-  21-21-smjenko-the-public-page: review  # built, CI pending; feat/21-21-landing (no PR yet); independent; publishing waits: apex DNS and the info@<domain> mail route (founder; address decided 2026-11-25, a build input)
-  21-22-teams-are-called-timovi: review  # built, CI pending; on feat/smjenko-brand with 21.24 (spec-21-24); founder chose Timovi (E-6, 2026-11-25); reverses epic 18 retro A2
-  21-24-smjenko-brand-name-logo-and-icons: review  # built, CI pending; feat/smjenko-brand; founder 2026-11-25: E-5 reversed (app named Smjenko), logo concept C
-  21-23-compact-toolbar-and-filters: review  # built, CI pending; founder request 2026-11-25; presentation only, after 21.3
-  21-25-the-calendar-reads-like-paper-kalendar-kao-papir: review  # built, CI pending; feat/21-25-calendar-like-paper (no PR yet); founder request 2026-11-25; after 21.6, 21.9; no migration
-  21-26-set-the-schedule-up-in-one-place: review  # built, CI pending; feat/21-26-setup-in-one-place, no PR yet; founder request 2026-11-26; no migration; after 21.10, 21.12, 21.17, 21.20, 21.23
-  21-27-emails-look-like-smjenko: review  # built, CI pending; feat/21-27-email-templates, no PR yet; founder request 2026-11-26; no migration
-  epic-21-retrospective: optional
+  21-18-holidays-show-on-the-calendar-the-schedule-and-the-grid: done  # PR #382, squash f0af532, CI green (run 45769395192, first run); no migration
+  21-19-worked-holiday-hours-are-their-own-figure: done  # PR #382, squash f0af532, CI green (run 45769395192, first run); no migration
+  21-20-each-team-has-its-own-minimum: done  # PR #383, squash ebfa939, CI green (run 45780072431; run 45777662906 failed concurrent-writes column order, fixed by 979fb10); 0082
+  21-21-smjenko-the-public-page: done  # PR #370, squash b2e32d1, CI green (run 45681544695; run 45677842651 failed ShellCheck, fixed by 43afe08); live at the apex (orchestrator, 2026-11-26)
+  21-22-teams-are-called-timovi: done  # PR #366 with 21.24, squash 46f4815, CI green (run 45641761289); founder chose Timovi (E-6, 2026-11-25); reverses epic 18 retro A2
+  21-24-smjenko-brand-name-logo-and-icons: done  # PR #366 with 21.22, squash 46f4815, CI green (run 45641761289; run 45635097029 failed e2e-plural, fixed by 48b39d8); E-5 reversed, logo concept C
+  21-23-compact-toolbar-and-filters: done  # PR #367, squash dc02fff, CI green (run 45646006380, first run); founder request 2026-11-25
+  21-25-the-calendar-reads-like-paper-kalendar-kao-papir: done  # PR #376, squash b130440, CI green (run 45727993162; run 45724396071 failed e2e, fixed); founder request 2026-11-25
+  21-26-set-the-schedule-up-in-one-place: done  # PR #386, squash 8c23b40, CI green (run 45810973672; runs 45804339616 and 45807411097 failed e2e, the StrictMode replay fixed); founder request 2026-11-26
+  21-27-emails-look-like-smjenko: done  # PR #390, squash 6e2f824, CI green (run 45859333772, first run); founder request 2026-11-26
+  epic-21-retrospective: done
 action_items:
   - id: "epic-4-retro-item-1-fix-c1-a-sati-name-for-a-member-no-longe"
     epic: 4
@@ -1544,3 +1544,107 @@ action_items:
     owner: "Perolipotic (process); dev for toml edits and the test"
     status: open
     ref: "_bmad-output/implementation-artifacts/epic-19-retro-2026-11-23.md"
+  - id: "epic-21-retro-item-99-a1-approve-promoting-0077-0085-past-stag"
+    epic: 21
+    action: "A1 Approve promoting 0077-0085 past staging, in the same queue as epic
+      14 A2, epic 16 A3, epic 17 A1, epic 18 A3 and epic 19 A1"
+    owner: "founder"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-21-retro-2026-11-26.md"
+  - id: "epic-21-retro-item-100-a2-20-9-production-supply-the-b2-off-hos"
+    epic: 21
+    action: "A2 20.9 production: supply the B2 off-host backup bucket (H-11) and key,
+      choose the alert channel, give the go; epic 21 no longer gates it, the other
+      sprint-status 20.9 gates still stand"
+    owner: "founder"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-21-retro-2026-11-26.md"
+  - id: "epic-21-retro-item-101-a3-process-bmad-build-toml-injected-e2e"
+    epic: 21
+    action: "A3 Process (bmad-build.toml): INJECTED E2E ROWS FOLLOW THE PARSER - a
+      field a web parser requires is added to every hand-built e2e row of that table
+      in the same change, ideally through one helper derived from the parser's columns
+      (off_on_holidays, minimum_members)"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-21-retro-2026-11-26.md"
+  - id: "epic-21-retro-item-102-a4-process-bmad-build-toml-no-policy-rea"
+    epic: 21
+    action: "A4 Process (bmad-build.toml): NO POLICY READS ITS OWN TABLE - use a private
+      security-definer predicate on 0064's pattern; widen 21.10's scaffold pin to
+      every policy (42P17)"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-21-retro-2026-11-26.md"
+  - id: "epic-21-retro-item-103-a5-process-bmad-build-toml-a-plpgsql-bod"
+    epic: 21
+    action: "A5 Process (bmad-build.toml): a plpgsql body names no alias old or new
+      and no variable after a column; cite 21.7's scaffold guard (42f386b)"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-21-retro-2026-11-26.md"
+  - id: "epic-21-retro-item-104-a6-process-bmad-build-toml-catalog-inven"
+    epic: 21
+    action: "A6 Process (bmad-build.toml): catalog inventories are written in the
+      catalog's order (trigger columns by attname, sorted FK/constraint/audited lists)
+      and every inventory is updated in the same change; consider deriving them or
+      comparing as sets"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-21-retro-2026-11-26.md"
+  - id: "epic-21-retro-item-105-a7-process-bmad-build-toml-strictmode-re"
+    epic: 21
+    action: "A7 Process (bmad-build.toml): StrictMode replays mount effects - open
+      a dialog only after children's mount effects ran; hooks resetting on an id get
+      a StrictMode-rendered test; consider StrictMode in the test render helper"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-21-retro-2026-11-26.md"
+  - id: "epic-21-retro-item-106-a8-process-bmad-build-toml-merge-only-on"
+    epic: 21
+    action: "A8 Process (bmad-build.toml): merge only on a green run of the branch
+      rebased on current main; founder decides on branch protection's require-up-to-date
+      setting"
+    owner: "dev (fact); founder (branch setting)"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-21-retro-2026-11-26.md"
+  - id: "epic-21-retro-item-107-a9-process-bmad-build-toml-e2e-cases-rea"
+    epic: 21
+    action: "A9 Process (bmad-build.toml): e2e cases read only their own fixture -
+      filter org-wide history, totals, exports and counts to the run's team; sweep
+      history/export/hours cases; note the holdRotation lock-holder cascade"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-21-retro-2026-11-26.md"
+  - id: "epic-21-retro-item-108-a10-land-epic-19-a8-a-a-status-chore-set"
+    epic: 21
+    action: "A10 Land epic 19 A8(a): a status chore sets a story done and rewrites
+      its spec right after its PR merges green; add a check that no review story has
+      a merged PR (14 stories lagged in epic 21)"
+    owner: "dev; founder for the process"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-21-retro-2026-11-26.md"
+  - id: "epic-21-retro-item-109-a11-deploy-md-record-the-public-page-liv"
+    epic: 21
+    action: "A11 DEPLOY.md: record the public page live at the apex (9.14), the staging
+      log for 0085 and 21.27, and close or re-own deferred-work's shift-landing deploy-job
+      entry"
+    owner: "operator"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-21-retro-2026-11-26.md"
+  - id: "epic-21-retro-item-110-a12-founder-decisions-on-epic-21-s-found"
+    epic: 21
+    action: "A12 Founder decisions on epic 21's founder-owned deferrals, first the
+      live landing page's legal footer (provider identification), then the sign-in
+      brand, Sati card, positions vs roles, Bez posla, paper letters, holiday readings
+      and email mark; then PO triage of the rest"
+    owner: "founder; PO (founder)"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-21-retro-2026-11-26.md"
+  - id: "epic-21-retro-item-111-a13-operator-perf-run-for-21-3-and-21-25"
+    epic: 21
+    action: "A13 Operator perf run for 21.3 and 21.25; plan the route split before
+      the entry chunk reaches its precache cap"
+    owner: "operator; dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-21-retro-2026-11-26.md"
