@@ -7655,12 +7655,28 @@ describe("a member's schedule source is versioned (0079, story 21.10)", () => {
     expect(insert).toMatch(/access\.member_role = 'admin'/);
     expect(insert).toMatch(/created_by = \(select auth\.uid\(\)\)/);
     expect(insert).toMatch(/effective_from >= public\.organization_today\(organization_id\)/);
-    expect(insert).toMatch(
-      /later\.effective_from >= member_schedule_versions\.effective_from\s+or later\.effective_from > public\.organization_today\(later\.organization_id\)/,
-    );
-    expect(insert).toMatch(/source = 'PERSONAL'\s+or source <> coalesce\(/);
     expect(remove).toMatch(/effective_from > public\.organization_today\(organization_id\)/);
-    expect(remove).toMatch(/later\.effective_from > member_schedule_versions\.effective_from/);
+    // NO POLICY READS ITS OWN TABLE (CI's 42P17 on the first build): the member's
+    // other versions are read by two definers, which answer only for an active admin.
+    for (const policy of [insert, remove, /create policy member_schedule_versions_select_own_organization[\s\S]*?\n {2}\);/.exec(text)?.[0] ?? '']) {
+      expect(policy).not.toMatch(/from public\.member_schedule_versions/);
+    }
+    expect(insert).toMatch(/private\.member_schedule_version_insertable\(organization_id, member_id, effective_from, source\)/);
+    expect(remove).toMatch(/private\.member_schedule_version_is_latest\(organization_id, member_id, effective_from\)/);
+    const insertable = definitionOf(raw(MIGRATION), 'private.member_schedule_version_insertable');
+    const latest = definitionOf(raw(MIGRATION), 'private.member_schedule_version_is_latest');
+    for (const helper of [insertable, latest]) {
+      expect(helper).toMatch(/security definer/);
+      expect(helper).toMatch(/set search_path = ''/);
+      expect(helper).toMatch(/access\.is_active\s+and access\.member_role = 'admin'/);
+    }
+    expect(insertable).toMatch(
+      /later\.effective_from >= p_effective_from\s+or later\.effective_from > public\.organization_today\(p_organization\)/,
+    );
+    expect(insertable).toMatch(/p_source = 'PERSONAL'\s+or p_source <> coalesce\(/);
+    expect(latest).toMatch(/later\.effective_from > p_effective_from/);
+    expect(text).toContain('grant execute on function private.member_schedule_version_insertable(uuid, uuid, date, text) to authenticated;');
+    expect(text).toContain('grant execute on function private.member_schedule_version_is_latest(uuid, uuid, date) to authenticated;');
     // 0023's lock, 0035's re-check and 0039's archived-type refusal, each attached unchanged.
     expect(text).toMatch(
       /create trigger member_schedule_versions_serialize_organization_writes\s+before insert or delete on public\.member_schedule_versions\s+for each statement\s+execute function public\.serialize_organization_writes\(\);/,

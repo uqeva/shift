@@ -3175,6 +3175,12 @@ describe('the access-control layer runs as the owner and hands that power to nob
     { name: 'notify_team_loan', argumentCount: 0, expected: [], schema: 'private' },
     // STORY 21.10 (0079). The schedule-source notice's trigger function, on 0043's terms.
     { name: 'notify_schedule_version', argumentCount: 0, expected: [], schema: 'private' },
+    // STORY 21.10 (0079). The insert and delete policies' reads of their own
+    // table (a policy selecting from it would recurse, 42P17): definers a
+    // policy runs as its caller, so `authenticated`'s alone, answering only
+    // for an active admin of the tenant they are given.
+    { name: 'member_schedule_version_insertable', argumentCount: 4, expected: ['authenticated'], schema: 'private' },
+    { name: 'member_schedule_version_is_latest', argumentCount: 3, expected: ['authenticated'], schema: 'private' },
     // STORY 18.4 (0064). The loan team rule its definers and re-check call,
     // and the archive refusal's trigger function, on 0043's terms.
     { name: 'team_loan_team_refused', argumentCount: 4, expected: [], schema: 'private' },

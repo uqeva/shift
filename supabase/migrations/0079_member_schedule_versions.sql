@@ -116,6 +116,103 @@ create index member_schedule_versions_organization_id_idx on member_schedule_ver
 create index member_schedule_versions_organization_pattern_idx on member_schedule_versions (organization_id, pattern_id);
 create index member_schedule_versions_pattern_id_idx on member_schedule_versions (pattern_id);
 
+-- ------------------------------------------------------------- the helpers
+
+-- THE POLICIES' READS OF THEIR OWN TABLE. A policy on `member_schedule_versions`
+-- that selects from `member_schedule_versions` re-enters its own row security
+-- (42P17, infinite recursion). So the two reads the writes need — the
+-- member's other versions — are definers here, as 0064's
+-- `private.team_loan_team_refused` holds 0062's loan conjuncts: they read the
+-- table past RLS, filtered by the tenant they are given, and answer only for
+-- an active admin of that tenant (false for anybody else), so they tell no
+-- other caller anything. VOLATILE, so a write behind 0023's lock reads what
+-- was committed while it waited. `authenticated` executes them (a policy runs
+-- as its caller); nobody else does.
+
+-- 0016's insert rule for one member: no version of theirs on or after the
+-- new date, none scheduled after today, and a `TEAM` or `MANUAL` version never
+-- repeating the source in force (none in force is `TEAM`, R15.2). A
+-- `PERSONAL` one re-anchors the rotation, so it is never a repeat.
+create function private.member_schedule_version_insertable(
+  p_organization uuid,
+  p_member uuid,
+  p_effective_from date,
+  p_source text
+)
+returns boolean
+language sql
+volatile
+security definer
+set search_path = ''
+as $$
+  select coalesce(
+    p_organization = (
+      select access.organization_id
+        from public.current_member_access() as access
+       where access.is_active
+         and access.member_role = 'admin'
+    )
+    and not exists (
+      select 1
+        from public.member_schedule_versions later
+       where later.organization_id = p_organization
+         and later.member_id = p_member
+         and (
+           later.effective_from >= p_effective_from
+           or later.effective_from > public.organization_today(p_organization)
+         )
+    )
+    and (
+      p_source = 'PERSONAL'
+      or p_source <> coalesce((
+        select latest.source
+          from public.member_schedule_versions latest
+         where latest.organization_id = p_organization
+           and latest.member_id = p_member
+         order by latest.effective_from desc
+         limit 1
+      ), 'TEAM')
+    ),
+    false
+  )
+$$;
+
+revoke execute on function private.member_schedule_version_insertable(uuid, uuid, date, text) from public, anon, service_role;
+grant execute on function private.member_schedule_version_insertable(uuid, uuid, date, text) to authenticated;
+
+-- 0016's cancel rule for one member: the version is their latest.
+create function private.member_schedule_version_is_latest(
+  p_organization uuid,
+  p_member uuid,
+  p_effective_from date
+)
+returns boolean
+language sql
+volatile
+security definer
+set search_path = ''
+as $$
+  select coalesce(
+    p_organization = (
+      select access.organization_id
+        from public.current_member_access() as access
+       where access.is_active
+         and access.member_role = 'admin'
+    )
+    and not exists (
+      select 1
+        from public.member_schedule_versions later
+       where later.organization_id = p_organization
+         and later.member_id = p_member
+         and later.effective_from > p_effective_from
+    ),
+    false
+  )
+$$;
+
+revoke execute on function private.member_schedule_version_is_latest(uuid, uuid, date) from public, anon, service_role;
+grant execute on function private.member_schedule_version_is_latest(uuid, uuid, date) to authenticated;
+
 -- ------------------------------------------------------------- the policies
 
 -- Every active member of the token's organization reads every version (AD-13
@@ -132,11 +229,8 @@ create policy member_schedule_versions_select_own_organization on public.member_
     )
   );
 
--- 0016's rotation-version insert, for one member: from today on, after the
--- member's latest version, none of theirs scheduled after today, and not a
--- repeat of the source in force (none in force is `TEAM`, R15.2). A
--- `PERSONAL` version over a `PERSONAL` one re-anchors the rotation, so it is
--- always a change.
+-- 0016's rotation-version insert, for one member: from today on, and what
+-- `private.member_schedule_version_insertable` says of their other versions.
 create policy member_schedule_versions_insert_by_own_active_admin on public.member_schedule_versions
   for insert
   to authenticated
@@ -150,30 +244,11 @@ create policy member_schedule_versions_insert_by_own_active_admin on public.memb
     )
     and created_by = (select auth.uid())
     and effective_from >= public.organization_today(organization_id)
-    and not exists (
-      select 1
-        from public.member_schedule_versions later
-       where later.organization_id = member_schedule_versions.organization_id
-         and later.member_id = member_schedule_versions.member_id
-         and (
-           later.effective_from >= member_schedule_versions.effective_from
-           or later.effective_from > public.organization_today(later.organization_id)
-         )
-    )
-    and (
-      source = 'PERSONAL'
-      or source <> coalesce((
-        select latest.source
-          from public.member_schedule_versions latest
-         where latest.organization_id = member_schedule_versions.organization_id
-           and latest.member_id = member_schedule_versions.member_id
-         order by latest.effective_from desc
-         limit 1
-      ), 'TEAM')
-    )
+    and private.member_schedule_version_insertable(organization_id, member_id, effective_from, source)
   );
 
--- 0016's cancel: only the member's latest version, while it is still ahead.
+-- 0016's cancel: only the member's latest version
+-- (`private.member_schedule_version_is_latest`), while it is still ahead.
 create policy member_schedule_versions_delete_scheduled_by_own_active_admin on public.member_schedule_versions
   for delete
   to authenticated
@@ -186,13 +261,7 @@ create policy member_schedule_versions_delete_scheduled_by_own_active_admin on p
          and access.member_role = 'admin'
     )
     and effective_from > public.organization_today(organization_id)
-    and not exists (
-      select 1
-        from public.member_schedule_versions later
-       where later.organization_id = member_schedule_versions.organization_id
-         and later.member_id = member_schedule_versions.member_id
-         and later.effective_from > member_schedule_versions.effective_from
-    )
+    and private.member_schedule_version_is_latest(organization_id, member_id, effective_from)
   );
 
 -- -------------------------------------------------------------- privileges
