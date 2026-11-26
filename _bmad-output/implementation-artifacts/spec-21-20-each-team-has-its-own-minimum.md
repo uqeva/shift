@@ -2,7 +2,7 @@
 title: '21.20 Each team has its own minimum'
 type: 'feature'
 created: '2026-11-26'
-status: 'in-review'
+status: 'done'
 baseline_commit: '25f38d31a74048f6c25a65a8fd5505a3818a7ea0'
 review_loop_iteration: 0
 context:
@@ -10,7 +10,7 @@ context:
   - '{project-root}/_bmad-output/specs/spec-shift/engine-rules.md'
 ---
 
-Status: in review — built, CI pending (branch `feat/21-20-team-minimum`, no PR yet). Baseline: `main` at `25f38d3` (21.7 merged, PR #381, migration `0081`). Migration `0082`. Hot file `hr.json` (new `smjene.minimum.*` block and one *Danas* line).
+Status: done. PR #383, squash `ebfa939`, merged 2026-11-26 with `CI passed` green (run 45780072431 at `979fb10`). CI run 1 (45777662906 at `bf7b30d`) failed `test/concurrent-writes.test.ts`' trigger inventory: the catalog reads trigger columns ordered by `attname`, so 0082's widened triggers answer `archived, minimum_members, off_on_holidays`; fixed for CI by `979fb10`. The injected `layout.spec.ts` rows carried `minimum_members: null` from the start. Every case this spec lists as unrun ran green in run 45780072431. Migration `0082`. Set `done` and this line written by the epic 21 retrospective (2026-11-26).
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 

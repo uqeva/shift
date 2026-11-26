@@ -2,11 +2,13 @@
 title: 'Story 21.26: Set the schedule up in one place (Postavi raspored na jednom mjestu)'
 type: 'feature'
 created: '2026-11-26'
-status: 'in-review'
+status: 'done'
 review_loop_iteration: 0
 baseline_commit: 'ebfa939100aad0aac0665e5bfb6de5cb9fd6b6f5'
 context: []
 ---
+
+Status: done. PR #386, squash `8c23b40`, merged 2026-11-26 with `CI passed` green (run 45810973672 at `ba8b22b`). CI runs 45804339616 (at `0011bd2`: `phone-navigation.spec.ts`' *Postavke* pin, and the team dialog) and 45807411097 (at `def7964`: the team dialog again, the StrictMode effect replay) failed; both are recorded in Verification. `setup-in-one-place.spec.ts` ran green in run 45810973672. No migration. Set `done` and this line written by the epic 21 retrospective (2026-11-26).
 
 Baseline: `origin/main` at `ebfa9391` (21.20 merged). Touches the hot file `hr.json`; 21.8 (swaps, `0083`) runs in parallel and is rebased against.
 

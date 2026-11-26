@@ -2,7 +2,7 @@
 title: '21.18 Holidays show on the calendar, the schedule and the grid'
 type: 'feature'
 created: '2026-11-26'
-status: 'in-review'
+status: 'done'
 baseline_commit: '69ef8fc631ed39f2db6567fa1bf6af7e61bee874'
 review_loop_iteration: 0
 context:
@@ -10,7 +10,7 @@ context:
   - '{project-root}/_bmad-output/implementation-artifacts/spec-21-16-holidays-are-organization-data.md'
 ---
 
-Status: built, CI pending (branch `feat/21-18-21-19-holidays-shown`, no PR yet; planned unattended 2026-11-26). Baseline: `main` at `69ef8fc` (21.16 and 21.17 merged, PR #380). No migration (21.7 may add 0081 in parallel). Hot files `hr.json` and `components/ui/icon.tsx`; 21.19 follows on the same branch, from this commit.
+Status: done. Merged with 21.19 as PR #382, squash `f0af532`, 2026-11-26, with `CI passed` green on the PR's only run (45769395192 at `81faaa6`). The e2e and DB-connecting suites this spec lists as CI's ran green there. No migration. Set `done` and this line written by the epic 21 retrospective (2026-11-26).
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 

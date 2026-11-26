@@ -2,7 +2,7 @@
 title: 'Story 21.21: Smjenko, the public page'
 type: 'feature'
 created: '2026-11-25'
-status: 'in-review'
+status: 'done'
 baseline_commit: 'dc02fff50d307a52462f712aabd1bb052afb0132'
 review_loop_iteration: 0
 context:
@@ -10,7 +10,7 @@ context:
   - '{project-root}/_bmad-output/planning-artifacts/ux-designs/ux-shift-2026-09-02/DESIGN.md'
 ---
 
-Status: built, CI pending (branch `feat/21-21-landing`, no PR yet). Baseline: `origin/main` at `dc02fff` (21.23's merge), rebased onto `e5d3032` (#368) before the push. Touches no hot file. Contact address decided by the founder 2026-11-25: `info@<domain>` through Cloudflare Email Routing, still the build input `LANDING_CONTACT_EMAIL`, never committed.
+Status: done. PR #370, squash `b2e32d1`, merged 2026-11-25 with `CI passed` green (run 45681544695 at `43afe08`). CI run 1 (45677842651 at `3fef5d8`) failed ShellCheck on the landing probe (SC2015, SC2317), fixed for CI by `43afe08`. Published: the page is live at the apex (the orchestrator, 2026-11-26; `DEPLOY.md` §9.14 still to record it, epic 21 retro A11). Contact address decided by the founder 2026-11-25: `info@<domain>`, still the build input `LANDING_CONTACT_EMAIL`, never committed. The copy's legal footer is open (`deferred-work.md`, founder). Set `done` and this line written by the epic 21 retrospective (2026-11-26).
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 

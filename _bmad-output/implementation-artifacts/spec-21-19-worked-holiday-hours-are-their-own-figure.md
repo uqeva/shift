@@ -2,7 +2,7 @@
 title: '21.19 Worked holiday hours are their own figure'
 type: 'feature'
 created: '2026-11-26'
-status: 'in-review'
+status: 'done'
 baseline_commit: 'b59f8570d5a8c1edfce25b7b7cfc7ee779a8996d'
 review_loop_iteration: 0
 context:
@@ -10,7 +10,7 @@ context:
   - '{project-root}/_bmad-output/specs/spec-shift/engine-rules.md'
 ---
 
-Status: planned unattended (2026-11-26); built the same day, in review, CI pending (no PR yet). Baseline: 21.18's commit on `feat/21-18-21-19-holidays-shown` (from `main` at `69ef8fc`). No migration. Hot file `hr.json`. Cuttable (proposal §3), kept small.
+Status: done. Merged with 21.18 as PR #382, squash `f0af532`, 2026-11-26, with `CI passed` green on the PR's only run (45769395192 at `81faaa6`). No rendered test or e2e draws *Sati na blagdan* (`deferred-work.md`, a later e2e pass); CI did not settle that gap. No migration. Set `done` and this line written by the epic 21 retrospective (2026-11-26).
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 

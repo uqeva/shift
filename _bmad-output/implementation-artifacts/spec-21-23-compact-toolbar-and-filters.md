@@ -2,7 +2,7 @@
 title: 'Story 21.23: compact toolbar and filters'
 type: 'feature'
 created: '2026-11-25'
-status: 'in-review'
+status: 'done'
 baseline_commit: '9ea215f'
 review_loop_iteration: 1
 context:
@@ -10,7 +10,7 @@ context:
   - '{project-root}/_bmad-output/planning-artifacts/ux-designs/ux-shift-2026-09-02/DESIGN.md'
 ---
 
-Status: built, CI pending (no PR yet). Baseline: `origin/main` at `9ea215f` (#364, story 21.3). Touches the hot files `hr.json`, `components/ui/dialog.tsx` and the structural pin tests; it starts from 21.3's merge. 21.2 and the brand branch (21.21/21.22, `hr.json`'s *Tim/Timovi* wording) may merge first: rebase and keep their wording.
+Status: done. PR #367, squash `dc02fff`, merged 2026-11-25 with `CI passed` green on the PR's only run (45646006380 at `d176dee`). The e2e and perf files this spec lists as unrun: the e2e ran green there; `perf/glass-scroll.spec.ts` runs in no CI job and stays the operator's. Set `done` and this line written by the epic 21 retrospective (2026-11-26).
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 
