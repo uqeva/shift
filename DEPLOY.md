@@ -1631,11 +1631,17 @@ pnpm exec supabase db query --local "delete from auth.users where email like '%@
 
 `supabase/operator/demo-mladost.sql` creates `dvd-mladost`, "DVD Mladost
 (demo)": one department's paper schedule for November 2026, rebuilt in the
-app so it can be compared with the paper day by day. Four 24-hour crews
-(`Smjena 1` to `Smjena 4`), two weekday day teams (`Dnevni A`, `Dnevni B`), a
-one-person morning team (`Jutarnji`), students who float between single days,
-the 18 November holiday, per-person exceptions and four annual leaves. The
-script's header explains how each part of the paper maps onto the model.
+app so it can be compared with the paper day by day, with Epic 21's tools:
+four 24-hour crews (`Smjena 1` to `Smjena 4`, a team rotation and a minimum of
+4 each), one day team (`Dnevni`, off on holidays, minimum 1) whose four
+dispatchers and one cleaner each have a personal rotation, manual-only
+students on no team whose days are personal assignments, the Croatian
+holidays for 2026 (so 18 November empties the day team's rotations), job
+roles, per-person exceptions as personal assignments, and four annual leaves,
+one of them partly covered by a replacement by assignment (0081). There is no
+carrier team, shift-type override or roster override. It needs the schema
+through 0082. The script's header explains how each part of the paper maps
+onto the model.
 
 It holds the schedule's **structure only**, keyed by abstract person keys
 (`S1-ZAP`, `A1`, `ST3`, …). The people are a parameter: `shift.demo_people`
@@ -1645,7 +1651,8 @@ out of the repository, the database and the logs. The script refuses with
 `DEMO_PEOPLE_INVALID` on a missing, unknown or repeated key, or on a blank
 field, and it refuses with `DEMO_TARGET_REFUSED` as §7.5 does. Re-running it
 replaces `dvd-mladost` and every `@dvd-mladost.shift.invalid` auth user, and
-nothing else. The person with key `S1-ZAP` is the admin.
+nothing else, including anything added to `dvd-mladost` by hand. The person
+with key `S1-ZAP` is the admin.
 
 Pass the JSON on `psql`'s stdin. Base64 keeps it one quoted token, and it
 never appears on a command line:
