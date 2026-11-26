@@ -1711,6 +1711,90 @@
         "refused": "Promjena nije spremljena. Odjavi se i prijavi ponovno.",
         "saveUnavailable": "Spremanje trenutačno nije moguće. Pokušaj ponovno."
       }
+    },
+    "holidays": {
+      "heading": "Blagdani",
+      "yearShown": "{year}.",
+      "yearPrevious": "Prethodna godina",
+      "yearNext": "Sljedeća godina",
+      "add": "Dodaj blagdan",
+      "import": "Uvezi državne blagdane za {year}.",
+      "importNone": "Državni blagdani za {year}. su upisani.",
+      "importBefore": "Državni blagdani mogu se uvesti od {first}. godine, otkad vrijedi sadašnji popis.",
+      "none": "Za {year}. nije upisan nijedan blagdan.",
+      "rowDate": "{weekday} {date}",
+      "rename": "Preimenuj",
+      "renameLabel": "Preimenuj blagdan {name}",
+      "remove": "Ukloni",
+      "removeLabel": "Ukloni blagdan {name}",
+      "addHeading": "Novi blagdan",
+      "renameHeading": "Preimenovanje blagdana",
+      "date": "Datum",
+      "name": "Naziv",
+      "pastWarning": "Datum je prošao. Blagdan mijenja i raspored koji je već bio.",
+      "close": "Zatvori",
+      "cancel": "Odustani",
+      "next": "Dalje",
+      "save": "Spremi",
+      "added": "Blagdan je dodan.",
+      "imported": "{count, plural, one {Uvezen je # blagdan.} few {Uvezena su # blagdana.} other {Uvezeno je # blagdana.}}",
+      "renamed": "Naziv blagdana je spremljen.",
+      "removed": "Blagdan je uklonjen.",
+      "erasureFree": "{member} (odsutnost) · blagdan: {team} taj dan ne radi",
+      "preview": {
+        "title": "Što se mijenja",
+        "ledeAdd": "{name}, {weekday} {date}: novi blagdan.",
+        "ledeRemove": "{name}, {weekday} {date}: blagdan se uklanja.",
+        "ledeImport": "{count, plural, one {Uvozi se # državni blagdan za {year}.} few {Uvoze se # državna blagdana za {year}.} other {Uvozi se # državnih blagdana za {year}.}}",
+        "proposed": "Državni blagdani za {year}.",
+        "proposedRow": "{weekday} {date} · {name}",
+        "stored": "već upisano: {name}",
+        "past": "prošao",
+        "pastNote": "{count, plural, one {# datum je prošao.} few {# datuma su prošla.} other {# datuma je prošlo.}} Blagdan mijenja i raspored koji je već bio.",
+        "teamsHeading": "Timovi koji ne rade na blagdane",
+        "teamLost": "{team} · {weekday} {date}: ne radi {type}",
+        "teamGained": "{team} · {weekday} {date}: opet {type}",
+        "noTeams": "Nijedan tim ne mijenja rad na te dane.",
+        "erasures": "{count, plural, one {Spremanje briše # sukob s odsutnošću. Potvrdit ćeš ga u sljedećem koraku.} few {Spremanje briše # sukoba s odsutnošću. Potvrdit ćeš ih u sljedećem koraku.} other {Spremanje briše # sukoba s odsutnošću. Potvrdit ćeš ih u sljedećem koraku.}}",
+        "back": "Natrag",
+        "save": "Spremi",
+        "importSave": "Uvezi",
+        "removeSave": "Ukloni",
+        "changed": "Nešto se promijenilo otkad je pregled otvoren. Ovo je novi pregled: provjeri ga prije spremanja.",
+        "pastNotPreviewed": "{count, plural, one {# prošli blagdan nije u pregledu, ali se i za njega raspored mijenja.} few {# prošla blagdana nisu u pregledu, ali se i za njih raspored mijenja.} other {# prošlih blagdana nije u pregledu, ali se i za njih raspored mijenja.}}",
+        "noOffTeams": "Nijedan tim nije označen da ne radi na blagdane, pa se rad timova ne mijenja."
+      },
+      "error": {
+        "unavailable": "Blagdane trenutačno nije moguće učitati. Pokušaj ponovno.",
+        "dateEmpty": "Upiši datum blagdana.",
+        "nameEmpty": "Naziv blagdana ne može biti prazan.",
+        "nameTooLong": "Naziv blagdana može imati najviše 100 znakova.",
+        "nameControl": "Naziv blagdana ne može sadržavati prijelom retka ni druge kontrolne znakove.",
+        "taken": "Na taj datum već je upisan blagdan.",
+        "stale": "Blagdan se u međuvremenu promijenio. Provjeri popis i pokušaj ponovno.",
+        "nothingNew": "Svi državni blagdani za tu godinu već su upisani.",
+        "noImport": "Za tu godinu nema popisa državnih blagdana.",
+        "refused": "Promjena nije spremljena. Odjavi se i prijavi ponovno.",
+        "saveUnavailable": "Spremanje trenutačno nije moguće. Pokušaj ponovno.",
+        "unchecked": "Ne mogu provjeriti što se mijenja. Pokušaj ponovno.",
+        "dateInvalid": "Taj datum ne postoji u kalendaru."
+      },
+      "national": {
+        "NEW_YEAR": "Nova godina",
+        "EPIPHANY": "Bogojavljenje ili Sveta tri kralja",
+        "EASTER_SUNDAY": "Uskrs",
+        "EASTER_MONDAY": "Uskrsni ponedjeljak",
+        "LABOUR_DAY": "Praznik rada",
+        "STATEHOOD_DAY": "Dan državnosti",
+        "CORPUS_CHRISTI": "Tijelovo",
+        "ANTI_FASCIST_STRUGGLE_DAY": "Dan antifašističke borbe",
+        "VICTORY_DAY": "Dan pobjede i domovinske zahvalnosti i Dan hrvatskih branitelja",
+        "ASSUMPTION_DAY": "Velika Gospa",
+        "ALL_SAINTS_DAY": "Svi sveti",
+        "REMEMBRANCE_DAY": "Dan sjećanja na žrtve Domovinskog rata i Dan sjećanja na žrtvu Vukovara i Škabrnje",
+        "CHRISTMAS_DAY": "Božić",
+        "ST_STEPHENS_DAY": "Sveti Stjepan"
+      }
     }
   },
   "rotation": {
@@ -2192,6 +2276,28 @@
     },
     "today": {
       "label": "Tvoj tim"
+    },
+    "offOnHolidays": {
+      "label": "Ne radi na blagdane",
+      "hint": "Na blagdan organizacije tim ne radi. Ono što je osobi upisano u Ručnom rasporedu ostaje.",
+      "archivedOn": "Ne radi na blagdane.",
+      "archivedOff": "Radi i na blagdane.",
+      "savedOn": "Tim od sada ne radi na blagdane.",
+      "savedOff": "Tim od sada radi i na blagdane.",
+      "preview": {
+        "title": "Što se mijenja",
+        "ledeOn": "{team} od sada ne radi na blagdane.",
+        "ledeOff": "{team} od sada radi i na blagdane.",
+        "noHolidays": "Organizacija nema upisanih blagdana, pa se raspored zasad ne mijenja.",
+        "back": "Natrag",
+        "save": "Spremi"
+      },
+      "error": {
+        "stale": "Tim se u međuvremenu promijenio. Provjeri ga i pokušaj ponovno.",
+        "refused": "Promjena nije spremljena. Odjavi se i prijavi ponovno.",
+        "saveUnavailable": "Spremanje trenutačno nije moguće. Pokušaj ponovno.",
+        "unchecked": "Ne mogu provjeriti što se mijenja. Pokušaj ponovno."
+      }
     }
   },
   "sort": {

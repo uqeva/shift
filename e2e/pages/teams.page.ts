@@ -67,6 +67,26 @@ export class TeamsPage extends BasePage {
     return this.editDialog.getByRole('button', { name: hr.smjene.save, exact: true });
   }
 
+  /** The edit dialog's *Ne radi na blagdane* switch (story 21.17). */
+  get offOnHolidaysSwitch(): Locator {
+    return this.editDialog.getByRole('switch', { name: hr.smjene.offOnHolidays.label, exact: true });
+  }
+
+  /** The switch's *Što se mijenja*, shown in place of the form. */
+  get offOnHolidaysPreview(): Locator {
+    return this.editDialog.getByRole('region', { name: hr.smjene.offOnHolidays.preview.title, exact: true });
+  }
+
+  /** The switch's own confirmation line. */
+  get offOnHolidaysStatus(): Locator {
+    return this.editDialog.locator('#team-off-on-holidays-status');
+  }
+
+  /** That preview's *Spremi*. */
+  get offOnHolidaysSave(): Locator {
+    return this.offOnHolidaysPreview.getByRole('button', { name: hr.smjene.offOnHolidays.preview.save, exact: true });
+  }
+
   /** The archive offer, named for the team as stored. */
   archiveButton(teamName: string): Locator {
     return this.editDialog.getByRole('button', { name: fill(hr.smjene.archive, { name: teamName }), exact: true });

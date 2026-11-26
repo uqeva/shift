@@ -3,7 +3,7 @@ import { createRoute } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Notice } from '@/components/ui/notice';
-import { TeamEditBody } from '@/features/teams/components/team-edit-body';
+import { TeamEditBody, TeamHolidayFlagErasures } from '@/features/teams/components/team-edit-body';
 import { useTeamEdit } from '@/features/teams/hooks/use-team-edit';
 import { teamHeadingMessageKey, teamsMessageKey, teamsRetryMessageKey } from '@/features/teams/services/list';
 import { teamSavedMessageKey, teamWriteMessageKey } from '@/features/teams/services/write';
@@ -61,8 +61,10 @@ function TeamScreen({ id }: { readonly id: string }) {
       <LjudiSmjeneScreen />
       <Dialog
         open={true}
+        // STORY 21.17: not dismissed while a write or the flag's check is in flight.
+        dismissible={!screen.pending}
         onOpenChange={(open) => {
-          if (!open) close();
+          if (!open && !screen.pending) close();
         }}
         aria-labelledby="team-edit-heading"
       >
@@ -101,6 +103,8 @@ function TeamScreen({ id }: { readonly id: string }) {
         )}
         <TeamEditBody screen={screen} />
       </Dialog>
+      {/* STORY 21.17: the flag's erasure confirmation, stacked above the dialog. */}
+      <TeamHolidayFlagErasures screen={screen} />
     </>
   );
 }

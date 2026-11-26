@@ -425,7 +425,8 @@ describe('the screen is read at all, so every sweep below means something', () =
     // A HUNDRED AND FOURTEEN SINCE STORY 21.12: the job role list's and write's rules.
     // A HUNDRED AND FIFTEEN SINCE STORY 21.6: the day detail's rules (`dayNotWorkingMessageKey`).
     // A HUNDRED AND SIXTEEN SINCE STORY 21.10: *Raspored osobe*'s rules.
-    expect(KEY_SOURCES).toHaveLength(116);
+    // A HUNDRED AND EIGHTEEN SINCE STORY 21.17: the holidays' rules and *Što se mijenja*'s body.
+    expect(KEY_SOURCES).toHaveLength(118);
   });
 
   // Vacuous-pass guard. A renamed or moved file would make each "contains no"
@@ -1261,6 +1262,8 @@ describe('the screen is read at all, so every sweep below means something', () =
         'services/directory.ts',
         'hooks/use-member-directory.ts',
         'components/member-directory.tsx',
+        // STORY 21.17: the team dialog's *Ne radi na blagdane* element ids.
+        'utils/element-ids.ts',
       ]
         .map((file) => join(TEAM_FEATURE, ...file.split('/')))
         .sort(),

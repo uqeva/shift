@@ -207,6 +207,12 @@ export default defineConfig({
           'auth-email/**',
         ],
         importScripts: ['push-sw.js'],
+        // STORY 21.17. The entry chunk passed Workbox's default 2 MiB with the
+        // *Blagdani* card (about 2.1 MB minified), and a file over the limit is
+        // dropped from the precache, which the build refuses. 3 MiB keeps the
+        // shell offline; `test/static-hosting.test.ts` still proves the entry
+        // chunk and every stylesheet are precached.
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         navigateFallback: '/index.html',
         sourcemap: false,
       },

@@ -256,6 +256,15 @@ export const FEATURE_PUBLIC = {
   history: [
     'services/history-search', // pages
   ],
+  // Story 21.17: *Organizacija*'s *Blagdani* card and the team dialog's *Ne
+  // radi na blagdane* check and write holidays through the one set of rules,
+  // and say *Što se mijenja* with the one body.
+  holidays: [
+    'components/holiday-check-body', // organization, teams
+    'services/holiday-check', // organization, teams
+    'services/holidays', // organization
+    'services/write', // organization, teams
+  ],
   'hour-bands': [
     // The generic time helpers (`minuteOfTime`, `durationValuesOf`)
     // moved to `utils/time`, so shift-types no longer reaches this module.

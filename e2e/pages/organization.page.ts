@@ -239,6 +239,96 @@ export class OrganizationPage extends BasePage {
     });
   }
 
+  /** *Blagdani* (story 21.17), named by its heading. */
+  get holidaysRegion(): Locator {
+    return this.page.getByRole('region', { name: organization.holidays.heading, exact: true });
+  }
+
+  /** The year the card shows, `2031.`. */
+  get holidaysYear(): Locator {
+    return this.holidaysRegion.locator('#organization-holidays-year');
+  }
+
+  /** The card's `›`, one year on. */
+  get holidaysNextYear(): Locator {
+    return this.holidaysRegion.getByRole('button', { name: organization.holidays.yearNext, exact: true });
+  }
+
+  /** The card's `‹`, one year back. */
+  get holidaysPreviousYear(): Locator {
+    return this.holidaysRegion.getByRole('button', { name: organization.holidays.yearPrevious, exact: true });
+  }
+
+  /** Steps the year picker until it shows `year`. */
+  async showHolidayYear(year: number): Promise<void> {
+    const shown = fill(organization.holidays.yearShown, { year: String(year) });
+
+    for (let step = 0; step < 20; step += 1) {
+      const text = (await this.holidaysYear.textContent()) ?? '';
+
+      if (text === shown) return;
+      await (Number.parseInt(text, 10) < year ? this.holidaysNextYear : this.holidaysPreviousYear).click();
+    }
+    await expect(this.holidaysYear).toHaveText(shown);
+  }
+
+  /** *Uvezi državne blagdane za {godina}*. */
+  holidayImport(year: number): Locator {
+    return this.holidaysRegion.getByRole('button', {
+      name: fill(organization.holidays.import, { year: String(year) }),
+      exact: true,
+    });
+  }
+
+  /** The import once every date of the year is stored: it says so, and offers nothing. */
+  holidayImportNone(year: number): Locator {
+    return this.holidaysRegion.getByRole('button', {
+      name: fill(organization.holidays.importNone, { year: String(year) }),
+      exact: true,
+    });
+  }
+
+  /** A holiday row's *Preimenuj*, named by its holiday. */
+  holidayRename(name: string): Locator {
+    return this.holidaysRegion.getByRole('button', {
+      name: fill(organization.holidays.renameLabel, { name }),
+      exact: true,
+    });
+  }
+
+  /** A holiday row's *Ukloni*, named by its holiday. */
+  holidayRemove(name: string): Locator {
+    return this.holidaysRegion.getByRole('button', {
+      name: fill(organization.holidays.removeLabel, { name }),
+      exact: true,
+    });
+  }
+
+  /** The card's own confirmation line (its last landed write). */
+  get holidaysStatus(): Locator {
+    return this.holidaysRegion.locator('#organization-holidays-status');
+  }
+
+  /** The card's `Dodaj blagdan`. */
+  get holidayAdd(): Locator {
+    return this.holidaysRegion.getByRole('button', { name: organization.holidays.add, exact: true });
+  }
+
+  /** The add dialog. */
+  get holidayAddDialog(): Locator {
+    return this.dialog(organization.holidays.addHeading);
+  }
+
+  /** The rename dialog. */
+  get holidayRenameDialog(): Locator {
+    return this.dialog(organization.holidays.renameHeading);
+  }
+
+  /** *Što se mijenja* of a holiday write. */
+  get holidayPreview(): Locator {
+    return this.dialog(organization.holidays.preview.title);
+  }
+
   /** Every field mounted on the page outside a dialog's portal. */
   get mainFields(): Locator {
     return this.page.locator('main input, main select');

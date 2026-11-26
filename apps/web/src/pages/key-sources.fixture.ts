@@ -4,6 +4,8 @@ import {
   ACCENT_KEYS,
   JOB_ROLE_LIST_KEYS,
   JOB_ROLE_WRITE_KEYS,
+  HOLIDAY_CHECK_BODY,
+  HOLIDAY_KEYS,
   AUTH_LAYOUT,
   CALENDAR_EMPTY_DAY_KEYS,
   CALENDAR_DAY_DETAIL_KEYS,
@@ -259,7 +261,15 @@ export const KEY_SOURCES = [
   // saved lines, the dialog title, the cap's label and hint, the expiry's
   // group label, its day and month labels and their empty choices, and the
   // first year's label and hint.
-  { name: 'the organization settings surface', file: SETTINGS, keys: translationKeys, strings: 125 },
+  // A HUNDRED AND FIFTY-NINE SINCE STORY 21.17: *Blagdani* — its heading, the
+  // year and its two steps, `Dodaj blagdan`, the import and its nothing-new
+  // and before-2020 lines, the empty year, a row's date, `Preimenuj` and
+  // `Ukloni` with their names, the dialog's two titles, close, date, name,
+  // past-date warning, Odustani, Dalje and Spremi, the unavailable read, the
+  // preview's title, three ledes, *Natrag* and three saves, and the official
+  // names through the hook (`nationalHolidayMessageKey`). A HUNDRED AND SIXTY:
+  // the read's retry is the shared `shell.retry`, and the preview's changed line.
+  { name: 'the organization settings surface', file: SETTINGS, keys: translationKeys, strings: 160 },
   {
     // EIGHT on the member list since story 1.5b, up from five, and the number is
     // still small because most of what this screen says is read off a table
@@ -361,10 +371,15 @@ export const KEY_SOURCES = [
     //
     // NINE SINCE DESIGN REFRESH C, as a dialog: its close replaced the link
     // back, and the archive offer shows a short word beside its whole name.
+    // TWENTY-TWO SINCE STORY 21.17: *Ne radi na blagdane* — the switch's
+    // label and hint, an archived team's two read-only lines, the two saved
+    // lines, and its *Što se mijenja*: title, two ledes, the no-holiday line,
+    // *Natrag* and *Spremi* (the erasure dialog's save is the same word).
+    // TWENTY-THREE with the preview's changed line.
     name: 'the team edit form',
     file: TEAM_EDIT,
     keys: translationKeys,
-    strings: 9,
+    strings: 23,
   },
   {
     // FIVE over three unions, so read by `memberListKeys`, which reads every
@@ -1545,6 +1560,29 @@ export const KEY_SOURCES = [
     file: JOB_ROLE_WRITE_KEYS,
     keys: messageKeyUnions,
     strings: 11,
+  },
+  {
+    // STORY 21.17: the fourteen official names of the import's codes, the
+    // eleven refusals of a holiday write (the date, the three name rules, the
+    // date taken, the stale card, nothing new, no import before 2020, the
+    // outright refusal, the service and the unchecked change), its four
+    // confirmations, and the team flag's four refusals. THIRTY-FOUR with the
+    // impossible date.
+    name: 'the holiday rules',
+    file: HOLIDAY_KEYS,
+    keys: messageKeyUnions,
+    strings: 34,
+  },
+  {
+    // STORY 21.17: *Što se mijenja* of a holiday write — the past dates'
+    // warning, the import's heading, row, *već upisano* and past mark, the
+    // teams' heading, their lost and gained lines and the none line, the
+    // erasure count, and the erasure row of a team the holiday empties;
+    // the flag's past holidays left out, and no team off on holidays.
+    name: 'the holiday preview body',
+    file: HOLIDAY_CHECK_BODY,
+    keys: translationKeys,
+    strings: 13,
   },
   {
     // STORY 10.3: the organization's email-notifications switch — its two

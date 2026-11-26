@@ -9,6 +9,7 @@ import {
   calendarOverrideRow,
   calendarPersonalAssignmentRow,
   calendarRosterOverrideRow,
+  calendarLoanRow,
   calendarTableOf,
   holidayRow,
   loansAnswerOf,
@@ -54,7 +55,7 @@ export const ARCHIVED_TYPE = 'pilot-staro';
 export const MONTH = '2026-10';
 export const TODAY = '2026-10-01';
 
-export { VIEWER_MEMBER, assignmentRow, calendarOverrideRow, holidayRow, calendarPersonalAssignmentRow, calendarRosterOverrideRow, memberMembershipRow, scheduleVersionRow, statusRow, stepRow };
+export { VIEWER_MEMBER, assignmentRow, calendarLoanRow, calendarOverrideRow, holidayRow, calendarPersonalAssignmentRow, calendarRosterOverrideRow, memberMembershipRow, scheduleVersionRow, statusRow, stepRow };
 
 type Row = Record<string, unknown>;
 
@@ -77,6 +78,8 @@ export interface PlanningSetup {
   readonly offTeams?: readonly string[];
   /** STORY 21.16: live shift-type overrides (`calendarOverrideRow`). */
   readonly overrides?: readonly Row[];
+  /** STORY 21.17: live loans (`calendarLoanRow`). */
+  readonly loans?: readonly Row[];
 }
 
 /** The calendar as `readCalendar` reads it from the fixture's rows. */
@@ -92,6 +95,7 @@ export async function planningSnapshotOf({
   holidays = [],
   offTeams = [],
   overrides = [],
+  loans = [],
 }: PlanningSetup = {}): Promise<CalendarSnapshot> {
   const teams = [...PILOT.teams, teamRow(DAY_TEAM, 'Dnevni'), teamRow(LATE_TEAM, 'Kasni'), teamRow(ARCHIVED_TEAM, 'Stari', { archived: true })];
   const rows = {
@@ -129,7 +133,7 @@ export async function planningSnapshotOf({
     ]),
     overridesAnswerOf(overrides),
     rosterOverridesAnswerOf(rosterOverrides),
-    loansAnswerOf([]),
+    loansAnswerOf(loans),
     personalAssignmentsAnswerOf(assignments),
   );
   const outcome = await readCalendar(source, source, viewerSession());
