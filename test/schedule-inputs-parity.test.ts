@@ -85,9 +85,12 @@ interface SceneIds {
   readonly leave: string[];
   /** Story 21.2: the Personal Assignments (0077). */
   readonly assignments: string[];
+  /** Story 21.10: the schedule versions (0079), and the pattern only they name. */
+  readonly versions: string[];
+  readonly patterns: string[];
 }
 
-const scene: SceneIds = { loans: [], rosterOverrides: [], overrides: [], leave: [], assignments: [] };
+const scene: SceneIds = { loans: [], rosterOverrides: [], overrides: [], leave: [], assignments: [], versions: [], patterns: [] };
 
 interface Viewer {
   readonly memberId: string;
@@ -111,6 +114,9 @@ interface SceneRows {
   readonly assignments: readonly string[];
   /** Story 21.2: an assignment of the member after the window: never carried. */
   readonly assignmentOutside: string;
+  /** Story 21.10: the bystander, on a personal rotation of a pattern no team uses, then manual only. */
+  readonly bystander: string;
+  readonly personalPattern: string;
 }
 
 interface FixtureScene {
@@ -120,7 +126,15 @@ interface FixtureScene {
   readonly window: { readonly from: string; readonly to: string };
   readonly viewers: readonly Viewer[];
   /** Where the scene's exceptions fall inside its loan, for R12 to be seen applying them. */
-  readonly dates: { readonly override: string; readonly fullDay: readonly string[]; readonly halfDay: string; readonly workingType: string };
+  readonly dates: {
+    readonly override: string;
+    readonly fullDay: readonly string[];
+    readonly halfDay: string;
+    readonly workingType: string;
+    /** Story 21.10: the bystander's personal rotation, and the manual-only spell after it. */
+    readonly personalFrom: string;
+    readonly manualFrom: string;
+  };
 }
 
 const scenes: FixtureScene[] = [];
@@ -252,6 +266,39 @@ async function buildScene(client: Client, fixture: (typeof FIXTURES)[number]): P
   const assignmentOutside = await assignmentOf(member.id, await at(190), 'SHIFT', working.id);
   scene.assignments.push(...assignments, assignmentOutside);
 
+  // Story 21.10: the bystander follows a rotation of their own — a pattern no team uses, so the
+  // assembly and the browser's read must both carry its steps — then is manual only. Written as the
+  // owner, attributed to the admin, as a session would after 0079's policy.
+  const personalPattern = await inserted(
+    'insert into rotation_patterns (organization_id, created_by) values ($1, $2) returning id',
+    [organization, admin.authUserId],
+  );
+  const personalSteps = [
+    await inserted(
+      `insert into rotation_steps (organization_id, pattern_id, position, shift_type_id, created_by)
+       values ($1, $2, 0, $3, $4) returning id`,
+      [organization, personalPattern, working.id, admin.authUserId],
+    ),
+    await inserted(
+      `insert into rotation_steps (organization_id, pattern_id, position, shift_type_id, created_by)
+       values ($1, $2, 1, $3, $4) returning id`,
+      [organization, personalPattern, working.id, admin.authUserId],
+    ),
+  ];
+  const personalFrom = await at(25);
+  const manualFrom = await at(60);
+  const versionOf = (from: string, source: string, patternId: string | null, stepId: string | null) =>
+    inserted(
+      `insert into member_schedule_versions (organization_id, member_id, effective_from, source, pattern_id, offset_step_id, created_by)
+       values ($1, $2, $3::date, $4, $5, $6, $7) returning id`,
+      [organization, bystander.id, from, source, patternId, stepId, admin.authUserId],
+    );
+  scene.patterns.push(personalPattern);
+  scene.versions.push(
+    await versionOf(personalFrom, 'PERSONAL', personalPattern, personalSteps[1] ?? null),
+    await versionOf(manualFrom, 'MANUAL', null, null),
+  );
+
   const viewers = (
     await client.query<Viewer>(
       `select m.id as "memberId", u.email
@@ -265,8 +312,22 @@ async function buildScene(client: Client, fixture: (typeof FIXTURES)[number]): P
   ).rows;
 
   return {
-    rows: { member: member.id, loan, lentTo, rosterOverride, override, fullDay, halfDay, straddling, outside, assignments, assignmentOutside },
-    dates: { override: overrideDate, fullDay: [leaveFrom, leaveTo], halfDay: halfDate, workingType: working.id },
+    rows: {
+      member: member.id,
+      loan,
+      lentTo,
+      rosterOverride,
+      override,
+      fullDay,
+      halfDay,
+      straddling,
+      outside,
+      assignments,
+      assignmentOutside,
+      bystander: bystander.id,
+      personalPattern,
+    },
+    dates: { override: overrideDate, fullDay: [leaveFrom, leaveTo], halfDay: halfDate, workingType: working.id, personalFrom, manualFrom },
     fixture: fixture.fixture,
     organization,
     window: { from: await at(-31), to: await at(182) },
@@ -288,7 +349,7 @@ afterAll(async () => {
   if (noApi) return;
   const client = await connect();
   try {
-    const subjects = [...scene.loans, ...scene.rosterOverrides, ...scene.overrides, ...scene.leave];
+    const subjects = [...scene.loans, ...scene.rosterOverrides, ...scene.overrides, ...scene.leave, ...scene.versions];
     await client.query('begin');
     await client.query('delete from notification_outbox where subject_id = any($1::uuid[])', [subjects]);
     await client.query('delete from leave_records where id = any($1::uuid[])', [scene.leave]);
@@ -296,6 +357,18 @@ afterAll(async () => {
     await client.query('delete from shift_type_overrides where id = any($1::uuid[])', [scene.overrides]);
     await client.query('delete from team_loans where id = any($1::uuid[])', [scene.loans]);
     await client.query('delete from personal_assignments where id = any($1::uuid[])', [scene.assignments]);
+    // Story 21.10: the versions first — a direct delete of a version still ahead is a cancel (0079), so
+    // its notice, under the cancel's own subject, is removed after it — then the pattern only they
+    // named, its steps first.
+    await client.query('delete from member_schedule_versions where id = any($1::uuid[])', [scene.versions]);
+    await client.query(
+      `delete from notification_outbox
+        where code = 'SCHEDULE_SOURCE_CHANGED'
+          and subject_id = any(select pg_catalog.md5('SCHEDULE_SOURCE_CANCELLED:' || id)::uuid from unnest($1::text[]) as id)`,
+      [scene.versions],
+    );
+    await client.query('delete from rotation_steps where pattern_id = any($1::uuid[])', [scene.patterns]);
+    await client.query('delete from rotation_patterns where id = any($1::uuid[])', [scene.patterns]);
     await client.query('commit');
   } finally {
     await client.query('rollback').catch(() => undefined);
@@ -437,6 +510,7 @@ describe('read parity: the server assembly equals the browser\'s read (AD-19)', 
     expect(scene.loans).toHaveLength(6);
     expect(scene.leave).toHaveLength(10);
     expect(scene.assignments).toHaveLength(6);
+    expect(scene.versions).toHaveLength(4);
   });
 
   for (const fixture of FIXTURES) {
@@ -490,6 +564,13 @@ describe('read parity: the server assembly equals the browser\'s read (AD-19)', 
         expect(carried, `${one.fixture}: the assignments in the window`).toEqual(expect.arrayContaining([...rows.assignments]));
         expect(carried, `${one.fixture}: an assignment after the window`).not.toContain(rows.assignmentOutside);
         expect(JSON.stringify(inputs)).not.toMatch(/Paritet/);
+        // Story 21.10: every member's versions, whole, and the steps of a pattern no team uses.
+        expect(
+          inputs.members.find((entry) => entry.id === rows.bystander)?.scheduleVersions?.map((version) => version.source),
+          `${one.fixture}: the bystander's versions`,
+        ).toEqual(['PERSONAL', 'MANUAL']);
+        expect(inputs.steps.filter((step) => step.patternId === rows.personalPattern), `${one.fixture}: the personal pattern's steps`).toHaveLength(2);
+        expect(inputs.assignments.some((assignment) => assignment.patternId === rows.personalPattern), `${one.fixture}: a team uses the pattern`).toBe(false);
 
         // R12 over it, so the parity above is not of empty projections: on the lent team, the
         // confirmed override replaces the date's type, the full days hold nothing, the half day
@@ -510,6 +591,17 @@ describe('read parity: the server assembly equals the browser\'s read (AD-19)', 
           shifts.filter((shift) => shift.personalAssignmentId === rows.assignments[0]).map((shift) => shift.shiftTypeId),
           `${one.fixture}: the Personal Shift`,
         ).toEqual([dates.workingType]);
+
+        // Story 21.10: the bystander's personal rotation is theirs from its date, and manual only gives nothing after.
+        const bystanderShifts = atWorkShiftsOf(await serverInputsOf(client, rows.bystander, one.window), one.window.from, one.window.to);
+        const rotated = bystanderShifts.filter((shift) => shift.personalRotation === true);
+        expect(rotated.length, `${one.fixture}: the personal rotation's shifts`).toBeGreaterThan(0);
+        expect(rotated.every((shift) => shift.date >= dates.personalFrom && shift.date < dates.manualFrom), one.fixture).toBe(true);
+        // Manual only: no shift of their own (a roster override the scene puts them on still applies, R15.8).
+        expect(
+          bystanderShifts.filter((shift) => shift.date >= dates.manualFrom && shift.personalAssignmentId === undefined && !shift.viaOverride),
+          `${one.fixture}: manual only`,
+        ).toEqual([]);
       }
     } finally {
       await client.end();

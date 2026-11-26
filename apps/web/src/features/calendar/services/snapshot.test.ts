@@ -72,6 +72,7 @@ import {
   calendarLoanRow,
   loansAnswerOf,
   personalAssignmentsAnswerOf,
+  scheduleVersionRow,
   calendarPersonalAssignmentRow,
   rosterOverridesAnswerOf,
   statusRow,
@@ -183,6 +184,7 @@ describe('the read', () => {
       statuses: [],
       loans: [],
       personalAssignments: [],
+      scheduleVersions: [],
     });
     expect(outcome.snapshot.members).toEqual([
       {
@@ -194,6 +196,7 @@ describe('the read', () => {
         statuses: [],
         loans: [],
         personalAssignments: [],
+        scheduleVersions: [],
       },
     ]);
   });
@@ -216,10 +219,12 @@ describe('the read', () => {
     // STORY 3.3b: every member's history, at the organization level — who is
     // on which team when — and STORY 3.4a: in which position, and when each
     // member was active. Nothing about the person beyond that.
+    // STORY 21.10: and from when each member follows which schedule source.
     expect(
       CALENDAR_COLUMNS.endsWith(
         ',team_membership_versions(organization_id,member_id,team_id,position,effective_from),' +
-          'member_status_versions(organization_id,member_id,active,effective_from)',
+          'member_status_versions(organization_id,member_id,active,effective_from),' +
+          'member_schedule_versions(organization_id,member_id,effective_from,source,pattern_id,offset_step_id)',
       ),
     ).toBe(true);
     expect([...CALENDAR_COLUMNS.matchAll(/team_membership_versions\(([^)]*)\)/g)].map((found) => found[1])).toEqual([
@@ -241,8 +246,11 @@ describe('the read', () => {
     // override is pending review; who saved it (`created_by`) stays out.
     expect(assignments).toBe('organization_id,team_id,pattern_id,offset_step_id,anchor_date,effective_from,created_at');
     // No member's fire rank (that is the rpc's), nothing projected or stored
-    // as a schedule.
-    expect(CALENDAR_COLUMNS.replace('uses_fire_ranks', '')).not.toMatch(/rank|cycle|projected|schedule|override/);
+    // as a schedule. STORY 21.10: `member_schedule_versions` is a versioned
+    // rule (R15), read as the rotation versions are, never a stored schedule.
+    expect(
+      CALENDAR_COLUMNS.replace('uses_fire_ranks', '').replace('member_schedule_versions(', 'member_source_versions('),
+    ).not.toMatch(/rank|cycle|projected|schedule|override/);
     // `position` in exactly two embeds: a rotation step's place in its
     // pattern, and the organization-level membership versions (story 3.4a).
     const positioned = [...CALENDAR_COLUMNS.matchAll(/(\w+)\(([^()]*)\)/g)]
@@ -481,6 +489,7 @@ describe('the read', () => {
       statuses: [],
       loans: [],
       personalAssignments: [],
+      scheduleVersions: [],
     });
     const none = await read(tableOf(answerOf(PILOT, [viewerRow([])])), session);
 
@@ -580,8 +589,9 @@ describe('the read', () => {
         statuses: [],
         loans: [],
         personalAssignments: [],
+        scheduleVersions: [],
       },
-      { id: namesake, name: 'Čedo Zorić', fireRank: null, jobRole: null, memberships: [], statuses: [], loans: [], personalAssignments: [] },
+      { id: namesake, name: 'Čedo Zorić', fireRank: null, jobRole: null, memberships: [], statuses: [], loans: [], personalAssignments: [], scheduleVersions: [] },
       {
         id: colleague,
         name: 'Čedo Zorić',
@@ -594,6 +604,7 @@ describe('the read', () => {
         statuses: [],
         loans: [],
         personalAssignments: [],
+        scheduleVersions: [],
       },
       {
         id: VIEWER_MEMBER,
@@ -604,6 +615,7 @@ describe('the read', () => {
         statuses: [{ active: true, effectiveFrom: '2021-03-01' }],
         loans: [],
         personalAssignments: [],
+        scheduleVersions: [],
       },
       {
         id: inactive,
@@ -617,6 +629,7 @@ describe('the read', () => {
         ],
         loans: [],
         personalAssignments: [],
+        scheduleVersions: [],
       },
     ]);
     // ONE HISTORY PER PERSON: the viewer's memberships and statuses are
@@ -1161,6 +1174,71 @@ describe('the read', () => {
       ).toEqual(REFUSED);
       expect(logged.mock.calls, JSON.stringify(answer)).toEqual([[CALENDAR_UNAVAILABLE, 'personalAssignment']]);
     }
+  });
+
+  it("carries each member's schedule versions on their entry and on the viewer, by date (story 21.10)", async () => {
+    const colleague = '00000000-0000-4000-8000-0000000000c1';
+    const pattern = PILOT.steps[0]?.['pattern_id'] as string;
+    const step = PILOT.steps[1]?.['id'] as string;
+    const organization = calendarOrganizationRow(PILOT, {
+      scheduleVersions: [
+        scheduleVersionRow(VIEWER_MEMBER, '2026-11-01', 'TEAM'),
+        scheduleVersionRow(VIEWER_MEMBER, '2026-10-01', 'MANUAL'),
+        scheduleVersionRow(colleague, '2026-10-05', 'PERSONAL', pattern, step),
+        // One of a member the members read does not yet name is ignored, as a loan is.
+        scheduleVersionRow('not-yet-named', '2026-10-01', 'MANUAL'),
+      ],
+    });
+    const outcome = await read(
+      tableOf(
+        { data: [organization], error: null, count: 1 },
+        membersAnswerOf([calendarMemberRow(VIEWER_MEMBER, VIEWER_NAME), calendarMemberRow(colleague, 'Ante Babić')]),
+      ),
+    );
+
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.snapshot.viewer.scheduleVersions).toEqual([
+      { effectiveFrom: '2026-10-01', source: 'MANUAL', patternId: null, offsetStepId: null },
+      { effectiveFrom: '2026-11-01', source: 'TEAM', patternId: null, offsetStepId: null },
+    ]);
+    expect(outcome.snapshot.members.find((member) => member.id === colleague)?.scheduleVersions).toEqual([
+      { effectiveFrom: '2026-10-05', source: 'PERSONAL', patternId: pattern, offsetStepId: step },
+    ]);
+    // ONE LIST PER PERSON: the viewer's are exactly their entry's.
+    expect(outcome.snapshot.viewer.scheduleVersions).toBe(
+      outcome.snapshot.members.find((member) => member.id === VIEWER_MEMBER)?.scheduleVersions,
+    );
+  });
+
+  it('refuses every bad schedule version with its own refusal (story 21.10)', async () => {
+    const logged = quiet();
+    const pattern = PILOT.steps[0]?.['pattern_id'] as string;
+    const step = PILOT.steps[1]?.['id'] as string;
+    const good = scheduleVersionRow(VIEWER_MEMBER, '2026-10-05', 'PERSONAL', pattern, step);
+    const manual = scheduleVersionRow(VIEWER_MEMBER, '2026-10-01', 'MANUAL');
+
+    for (const rows of [
+      [{ ...good, organization_id: 'another' }],
+      [{ ...good, effective_from: '2026-02-30' }],
+      [{ ...good, source: 'ROTATION' }],
+      [{ ...good, pattern_id: null }],
+      [{ ...good, offset_step_id: 'missing' }],
+      [{ ...good, pattern_id: 'another-pattern' }],
+      [{ ...manual, pattern_id: pattern, offset_step_id: step }],
+      [{ ...manual, member_id: null }],
+      // Two of one member on one date (0079's key).
+      [good, { ...manual, effective_from: '2026-10-05' }],
+    ]) {
+      logged.mockClear();
+      const organization = calendarOrganizationRow(PILOT, { scheduleVersions: rows });
+      expect(await read(tableOf({ data: [organization], error: null, count: 1 })), JSON.stringify(rows)).toEqual(REFUSED);
+      expect(logged.mock.calls, JSON.stringify(rows)).toEqual([[CALENDAR_UNAVAILABLE, 'scheduleVersion']]);
+    }
+    logged.mockClear();
+    const { member_schedule_versions: _versions, ...noEmbed } = calendarOrganizationRow(PILOT);
+    expect(await read(tableOf({ data: [noEmbed], error: null, count: 1 }))).toEqual(REFUSED);
+    expect(logged.mock.calls).toEqual([[CALENDAR_UNAVAILABLE, 'scheduleVersion']]);
   });
 
   it('refuses every bad loans answer with its own refusal (story 18.2)', async () => {

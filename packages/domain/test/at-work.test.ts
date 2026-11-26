@@ -53,10 +53,33 @@ describe('R12.1 — the working shifts of the member\'s day', () => {
     ]);
     // On no team, and lent: only the loan's working dates, and (story 21.2's
     // parity fixture) the day before it, their Personal Shift counted with no team.
-    expect(linesOn(pilotOf('pilot-m4'), '2026-03-01', '2027-10-31')).toEqual([
+    // Story 21.10: until their personal rotation starts on 2027-04-05.
+    expect(linesOn(pilotOf('pilot-m4'), '2026-03-01', '2027-04-04')).toEqual([
       '2027-03-26 no-team dan 420 1140',
       '2027-03-27 d noc 1140 1860 pilot-loan-2',
     ]);
+  });
+
+  it("is a personal rotation's working steps from its version on, counted with the member's team or none (R15.3, story 21.10)", () => {
+    // [Dan, Dan, Slobodno] from step 2 on 2027-04-05: Dan, off, Dan, Dan, off, Dan.
+    const teamless = atWorkShiftsOf(pilotOf('pilot-m4'), '2027-04-05', '2027-04-10');
+    expect(teamless.map(line)).toEqual([
+      '2027-04-05 no-team dan 420 1140',
+      '2027-04-07 no-team dan 420 1140',
+      '2027-04-08 no-team dan 420 1140',
+      '2027-04-10 no-team dan 420 1140',
+    ]);
+    expect(teamless.every((shift) => shift.personalRotation === true && shift.personalAssignmentId === undefined)).toBe(true);
+    // [Jutarnja, Jutarnja, Popodnevna, Slobodno] from step 1 on 2027-04-12, counted with B.
+    expect(linesOn(uj5Of('uj5-m2'), '2027-04-12', '2027-04-16')).toEqual([
+      '2027-04-12 b jutarnja 360 840',
+      '2027-04-13 b jutarnja 360 840',
+      '2027-04-14 b popodnevna 840 1320',
+      '2027-04-16 b jutarnja 360 840',
+    ]);
+    // Manual only: nothing from 2027-05-03, the team's rotation again from 2027-06-07.
+    expect(linesOn(pilotOf('pilot-m5'), '2027-05-03', '2027-06-06')).toEqual([]);
+    expect(linesOn(pilotOf('pilot-m5'), '2027-06-07', '2027-06-10').length).toBeGreaterThan(0);
   });
 
   it('applies a shift-type override in force, and not one pending review', () => {

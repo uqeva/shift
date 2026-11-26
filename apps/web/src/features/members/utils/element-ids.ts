@@ -61,3 +61,26 @@ export const MEMBER_ADD_CREATED_ID = 'member-add-created';
 /** The username's hint, which describes the field; with the refusal beside it once there is one. */
 export const MEMBER_ADD_USERNAME_HINT_ID = 'member-username-hint';
 export const MEMBER_ADD_USERNAME_HINT_AND_ERROR = `${MEMBER_ADD_USERNAME_HINT_ID} ${MEMBER_ADD_ERROR_ID}`;
+
+/** *Raspored osobe* (story 21.10): the card's heading, its dialogs' titles, its fields and its refusal. */
+export const MEMBER_SCHEDULE_HEADING_ID = 'member-schedule-heading';
+export const MEMBER_SCHEDULE_DIALOG_HEADING_ID = 'member-schedule-dialog-heading';
+export const MEMBER_SCHEDULE_PREVIEW_HEADING_ID = 'member-schedule-preview-heading';
+export const MEMBER_SCHEDULE_SOURCE_HEADING_ID = 'member-schedule-source-heading';
+export const MEMBER_SCHEDULE_FROM_ID = 'member-schedule-from';
+export const MEMBER_SCHEDULE_FROM_HINT_ID = 'member-schedule-from-hint';
+export const MEMBER_SCHEDULE_PATTERN_ID = 'member-schedule-pattern';
+export const MEMBER_SCHEDULE_START_ID = 'member-schedule-start';
+export const MEMBER_SCHEDULE_START_HINT_ID = 'member-schedule-start-hint';
+export const MEMBER_SCHEDULE_ERROR_ID = 'member-schedule-error';
+export const MEMBER_SCHEDULE_ERASURES_ID = 'member-schedule-erasures';
+
+/** A new pattern's step row `index` (0-based): its type. */
+export function memberScheduleRowTypeId(index: number): string {
+  return `member-schedule-row-${String(index)}-type`;
+}
+
+/** A new pattern's step row `index` (0-based): its count. */
+export function memberScheduleRowCountId(index: number): string {
+  return `member-schedule-row-${String(index)}-count`;
+}

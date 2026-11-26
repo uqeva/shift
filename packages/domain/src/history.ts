@@ -84,6 +84,8 @@ export const HISTORY_RECORDS = [
   'personal-assignment',
   // Story 21.12: a job role (`job_roles`, 0078).
   'job-role',
+  // Story 21.10: a member's schedule source from a date (`member_schedule_versions`, 0079).
+  'schedule-version',
   // A table this build does not know yet (an audited table added after it):
   // drawn as a generic record, its fields as raw operands, never a failed read.
   'other',
@@ -163,7 +165,7 @@ export type HistoryOperand =
   | { readonly type: 'raw'; readonly json: string };
 
 /** The fields whose values are drawn from a fixed vocabulary. */
-export type HistoryEnumField = 'role' | 'outcome' | 'answer' | 'kind' | 'half' | 'status';
+export type HistoryEnumField = 'role' | 'outcome' | 'answer' | 'kind' | 'half' | 'status' | 'scheduleSource';
 
 /**
  * A row's lifecycle state, read from its lifecycle columns (epic 14 retro A4):
@@ -232,6 +234,8 @@ export const HISTORY_FIELDS = [
   'absenceType',
   'drawsAllowance',
   'kind',
+  // Story 21.10 (0079): a schedule version's source, `TEAM`, `PERSONAL` or `MANUAL`.
+  'scheduleSource',
   'rosterOverride',
   'returnRosterOverride',
   'reason',
@@ -310,6 +314,7 @@ const RECORD_OF_TABLE: Readonly<Record<string, HistoryRecord>> = {
   calendar_feed_tokens: 'calendar-feed',
   personal_assignments: 'personal-assignment',
   job_roles: 'job-role',
+  member_schedule_versions: 'schedule-version',
 };
 
 /** The record an audited table holds, or `null` for a table this build does not know. */
@@ -461,6 +466,9 @@ const FIELD_OF_COLUMN: Readonly<Record<string, readonly [HistoryField, FieldType
   absence_type_id: ['absenceType', 'absence-type'],
   draws_allowance: ['drawsAllowance', 'boolean'],
   kind: ['kind', 'enum'],
+  // Story 21.10: `member_schedule_versions.source`, today the one audited `source` column; a later audited
+  // table with a `source` of another vocabulary needs its own field here (the migration-parsing test lists every column).
+  source: ['scheduleSource', 'enum'],
   reason: ['reason', 'text'],
   note: ['note', 'text'],
   answer: ['answer', 'enum'],

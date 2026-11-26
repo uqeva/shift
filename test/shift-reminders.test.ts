@@ -818,7 +818,9 @@ describe.each(FIXTURES)('the $fixture reminder of a Personal Assignment (0077)',
       await actAsService(client);
       for (const bad of [
         { ...team, source: 'TEAM' },
-        { ...team, source: 'PERSONAL_ROTATION' },
+        // Story 21.10 (0079): PERSONAL_ROTATION is a form of its own, nine keys exactly: an assignment id is a stray key.
+        { ...team, source: 'PERSONAL_ROTATION', personalAssignmentId: who.id },
+        { ...team, source: 'PERSONAL_ROTATION', teamId: 7 },
         noId,
         { ...assignment, personalAssignmentId: 'not-a-uuid' },
         { ...assignment, teamId: 7 },
@@ -829,6 +831,139 @@ describe.each(FIXTURES)('the $fixture reminder of a Personal Assignment (0077)',
         expect({ code: refusal.code, message: refusal.message }, JSON.stringify(bad)).toEqual(ITEMS_INVALID);
       }
       await actAsOwner(client);
+    });
+  });
+});
+
+// ---------------------------------------- story 21.10: the PERSONAL_ROTATION form
+
+/**
+ * STORY 21.10 (`0079`, AD-18 as amended 2026-11-25). An item of a personal
+ * rotation's shift carries `source: 'PERSONAL_ROTATION'`, nine keys, its team
+ * a team or null. It is written only while the member's schedule version in
+ * force on its date is `PERSONAL` and no live Personal Assignment holds that
+ * date; its subject is keyed `:p:`. Every scene is built as the owner before
+ * the service role acts.
+ */
+describe.each(FIXTURES)('the $fixture reminder of a personal rotation (0079)', ({ slug, admin, member: memberName, bystander }) => {
+  /** Owner scene: a version of `who` from `from`, attributed to `by` (0079's policy is a session's). */
+  async function versionOf(client: Client, who: Member, by: Member, from: string, source: string, pattern: { id: string; step: string } | null): Promise<void> {
+    await client.query(
+      `insert into member_schedule_versions (organization_id, member_id, effective_from, source, pattern_id, offset_step_id, created_by)
+       values ($1, $2, $3::date, $4, $5, $6, $7)`,
+      [who.organizationId, who.id, from, source, pattern?.id ?? null, pattern?.step ?? null, by.authUserId],
+    );
+  }
+
+  /** Owner scene: a one-step pattern of `shiftTypeId`, which no team uses. */
+  async function patternOf(client: Client, by: Member, shiftTypeId: string): Promise<{ id: string; step: string }> {
+    const { rows: patterns } = await client.query<{ id: string }>(
+      'insert into rotation_patterns (organization_id, created_by) values ($1, $2) returning id::text as id',
+      [by.organizationId, by.authUserId],
+    );
+    const id = patterns[0]!.id;
+    const { rows: steps } = await client.query<{ id: string }>(
+      `insert into rotation_steps (organization_id, pattern_id, position, shift_type_id, created_by)
+       values ($1, $2, 0, $3, $4) returning id::text as id`,
+      [by.organizationId, id, shiftTypeId, by.authUserId],
+    );
+    return { id, step: steps[0]!.id };
+  }
+
+  it.skipIf(noDatabase)('writes a teamless reminder keyed `:p:` while the rotation decides the date, and skips it under manual only or an assignment', async () => {
+    await inRolledBackTransaction(async (client) => {
+      const who = await member(client, slug, memberName);
+      const by = await member(client, slug, admin);
+      // 0069 holds at most two leads, in order: the skipped items below use them too, so
+      // only the schedule source and the assignment can be what skips them.
+      await remindable(client, who, ['H1', 'H2'], true);
+      const { teamId, shiftTypeId, shiftTypeName } = await teamAndType(client, who.organizationId);
+      const today = await todayOf(client, who.organizationId, 0);
+      const date = await todayOf(client, who.organizationId, 1);
+      const later = await todayOf(client, who.organizationId, 3);
+      const pattern = await patternOf(client, by, shiftTypeId);
+      await versionOf(client, who, by, today, 'PERSONAL', pattern);
+      await versionOf(client, who, by, later, 'MANUAL', null);
+      // An assignment on the fourth day holds it whatever the source.
+      const assigned = await todayOf(client, who.organizationId, 2);
+      await client.query(
+        `insert into personal_assignments (organization_id, member_id, date, kind, created_by)
+         values ($1, $2, $3::date, 'OFF', $4)`,
+        [who.organizationId, who.id, assigned, by.authUserId],
+      );
+      const startsAt = await isoFromNow(client, '1 day');
+      const item = (overrides: Record<string, unknown>) => ({
+        memberId: who.id,
+        date,
+        teamId: null,
+        shiftTypeId,
+        lead: 'H1',
+        start: 420,
+        end: 1140,
+        startsAt,
+        source: 'PERSONAL_ROTATION',
+        ...overrides,
+      });
+
+      await actAsService(client);
+      expect(
+        await enqueue(client, [
+          item({}),
+          // Teamed: the team form's operands, still keyed `:p:`.
+          item({ teamId, lead: 'H2' }),
+          // Manual only from `later`: no rotation decides it.
+          item({ date: later, lead: 'H1' }),
+          // An assignment holds the date (R15.3, step 1).
+          item({ date: assigned, lead: 'H2' }),
+        ]),
+      ).toBe(2);
+      await actAsOwner(client);
+
+      const rows = (await remindersOf(client, who)).filter((row) => row.channel === 'email');
+      // Only `date`'s two: nothing on `later` (manual only) or `assigned` (an assignment).
+      expect(rows.map((row) => [row.operands['date'], row.operands['lead']]).sort()).toEqual([
+        [date, 'H1'],
+        [date, 'H2'],
+      ]);
+      const h1 = rows.find((row) => row.operands['lead'] === 'H1');
+      expect(h1?.operands).toEqual({ date, start: 420, end: 1140, startsAt, lead: 'H1', leadHours: REMINDER_LEAD_HOURS.H1, shiftTypeName });
+      const { rows: keys } = await client.query<{ subject: string }>(
+        `select md5('SHIFT_REMINDER:' || $1 || ':' || $2 || ':p:H1')::uuid::text as subject`,
+        [who.id, date],
+      );
+      expect(h1?.subject).toBe(keys[0]?.subject);
+      expect(rows.find((row) => row.operands['lead'] === 'H2')?.operands['teamId']).toBe(teamId);
+    });
+  });
+
+  it.skipIf(noDatabase)('skips a PERSONAL_ROTATION item of a member on their team\'s rotation (no version, or a TEAM one)', async () => {
+    await inRolledBackTransaction(async (client) => {
+      const who = await member(client, slug, memberName);
+      const by = await member(client, slug, admin);
+      await remindable(client, who, ['H1', 'H2'], true);
+      const { teamId, shiftTypeId } = await teamAndType(client, who.organizationId);
+      const today = await todayOf(client, who.organizationId, 0);
+      const date = await todayOf(client, who.organizationId, 1);
+      const later = await todayOf(client, who.organizationId, 2);
+      const pattern = await patternOf(client, by, shiftTypeId);
+      // A personal rotation from today, then the team's rotation again from the day after `date`.
+      await versionOf(client, who, by, today, 'PERSONAL', pattern);
+      await versionOf(client, who, by, later, 'TEAM', null);
+      const startsAt = await isoFromNow(client, '1 day');
+      const item = { memberId: who.id, teamId, shiftTypeId, start: 420, end: 1140, startsAt, source: 'PERSONAL_ROTATION' };
+      // A bystander with no version at all.
+      const other = await member(client, slug, bystander);
+      await remindable(client, other, ['H1'], true);
+
+      await actAsService(client);
+      expect(
+        await enqueue(client, [
+          { ...item, date: later, lead: 'H1' },
+          { ...item, memberId: other.id, date, lead: 'H1' },
+        ]),
+      ).toBe(0);
+      await actAsOwner(client);
+      expect(await remindersOf(client, who)).toEqual([]);
     });
   });
 });

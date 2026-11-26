@@ -21,7 +21,7 @@ import { daysBetween, type AtWorkShift, type ScheduleInputs } from '@shift/domai
 import { contentOf, escapeText } from './text.js';
 import { localDateTimeOf, timeZoneLines, utcDateTimeOf } from './timezone.js';
 
-/** The feed's UID domain: `<date>-<teamId>-<memberId>@shift`, or `<date>-a-<assignmentId>-<memberId>@shift` for an assignment's shift (story 21.2). */
+/** The feed's UID domain: `<date>-<teamId>-<memberId>@shift`, `<date>-a-<assignmentId>-<memberId>@shift` for an assignment's shift (story 21.2), or `<date>-p-<memberId>@shift` for a personal rotation's (story 21.10). */
 export const FEED_UID_DOMAIN = 'shift';
 /** The month download's (16.5): the same UIDs under another domain, so an import beside the feed duplicates, never collides. */
 export const DOWNLOAD_UID_DOMAIN = 'shift-download';
@@ -100,9 +100,9 @@ export function calendarOf(request: CalendarRequest): string {
       throw new RangeError(`the shift on ${shift.date} starts outside the window ${window.from}–${window.to}`);
     }
     // Story 21.2 (AD-20 as amended): a Personal Shift may count with no team; its SUMMARY then names none.
-    // Only an assignment's shift may have no team today; a personal rotation's form is story 21.9's. Until
-    // then such a shift is left out, as 21.1 left out every teamless one, so it never fails the whole feed.
-    if (shift.teamId === null && shift.personalAssignmentId === undefined) continue;
+    // Story 21.10: an assignment's or a personal rotation's; any other teamless shift (none exists) is left
+    // out, as 21.1 left out every teamless one, so it never fails the whole feed.
+    if (shift.teamId === null && shift.personalAssignmentId === undefined && shift.personalRotation !== true) continue;
     const team = shift.teamId === null ? null : teamNames.get(shift.teamId);
     if (team === undefined) throw new RangeError(`the shift on ${shift.date} names team ${String(shift.teamId)}, which is not given`);
     const type = typeNames.get(shift.shiftTypeId);
@@ -113,11 +113,14 @@ export function calendarOf(request: CalendarRequest): string {
       throw new RangeError(`the shift on ${shift.date} ends at ${String(shift.endMinute)}, not after its start`);
     }
     // A team shift keeps its UID (FR-81); an assignment's is keyed by the assignment (AD-20 as amended), so it
-    // never collides with the team shift it replaced and a replaced assignment is a new event.
+    // never collides with the team shift it replaced and a replaced assignment is a new event. A personal
+    // rotation's (story 21.10) is the member's on that date, `-p-`: at most one a day, whatever team it counts with.
     const uid =
-      shift.personalAssignmentId === undefined
-        ? `${shift.date}-${String(shift.teamId)}-${inputs.memberId}@${uidDomain}`
-        : `${shift.date}-a-${shift.personalAssignmentId}-${inputs.memberId}@${uidDomain}`;
+      shift.personalAssignmentId !== undefined
+        ? `${shift.date}-a-${shift.personalAssignmentId}-${inputs.memberId}@${uidDomain}`
+        : shift.personalRotation === true
+          ? `${shift.date}-p-${inputs.memberId}@${uidDomain}`
+          : `${shift.date}-${String(shift.teamId)}-${inputs.memberId}@${uidDomain}`;
     if (uids.has(uid)) throw new RangeError(`two shifts on ${shift.date} would share the UID ${uid}`);
     uids.add(uid);
 

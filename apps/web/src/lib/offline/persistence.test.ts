@@ -352,18 +352,20 @@ describe('a kept snapshot is restored for its owner alone', () => {
     expect(storage.entries.has(DEVICE_SNAPSHOT_KEY)).toBe(false);
   });
 
-  it('is shape 5: story 21.12 added `jobRole` to the calendar snapshot\'s members and the member list\'s rows', () => {
-    // A shape-4 member has no `jobRole` (a shape-3 one no
-    // `personalAssignments`, story 21.2; a shape-2 one no `loans`, story
-    // 18.2), and the day detail and *Ljudi* would read it as `undefined`.
-    expect(DEVICE_SNAPSHOT_SHAPE).toBe(5);
+  it('is shape 6: story 21.10 added `scheduleVersions` to the calendar snapshot\'s members and viewer', () => {
+    // A shape-5 member has no `scheduleVersions` (a shape-4 one no `jobRole`,
+    // story 21.12; a shape-3 one no `personalAssignments`, story 21.2; a
+    // shape-2 one no `loans`, story 18.2), and every roster derived from it
+    // would ignore a personal rotation the database holds.
+    expect(DEVICE_SNAPSHOT_SHAPE).toBe(6);
   });
 
   it.each([
     ['an earlier', '1:member-a'],
     ['an older', '2:member-a'],
     ['an earlier still', '3:member-a'],
-    ['the previous', '4:member-a'],
+    ['one before the previous', '4:member-a'],
+    ['the previous', '5:member-a'],
     ['a later', `${String(DEVICE_SNAPSHOT_SHAPE + 1)}:member-a`],
   ])('restores nothing the same user saved in %s shape, and deletes the copy', async (_, buster) => {
     const storage = memoryStorage();

@@ -13,6 +13,7 @@ import { MANUAL_HEADING_ID, manualCellIdOf, type ManualScreen } from '@/features
 import {
   CELL_ASSIGNED,
   CELL_ROTATION,
+  SOURCE_PERSONAL,
   SOURCE_TEAM,
   draftKeyOf,
   type ManualCell,
@@ -28,10 +29,15 @@ import { NO_TEXT } from '@/utils/text';
 /**
  * A row's line under the name: its job role, when it has one (story 21.12's
  * entry, built by 21.5), and its source in words (UX-DR73) — `Vod · rotacija
- * tima`, or `ručno`.
+ * tima`, `osobna rotacija` (story 21.10) or `ručno`.
  */
 export function sourceText(row: ManualRow): string {
-  const source = row.source === SOURCE_TEAM ? t('rucniRaspored.source.team') : t('rucniRaspored.source.manual');
+  const source =
+    row.source === SOURCE_TEAM
+      ? t('rucniRaspored.source.team')
+      : row.source === SOURCE_PERSONAL
+        ? t('rucniRaspored.source.personal')
+        : t('rucniRaspored.source.manual');
 
   return row.jobRole === null ? source : t('rucniRaspored.rowLine', { role: row.jobRole, source });
 }

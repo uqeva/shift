@@ -12,6 +12,9 @@ import {
   overrideStandingOf,
   overridesByTeamAndDate,
   rosterOn,
+  scheduleSourceOn,
+  SCHEDULE_SOURCE_PERSONAL,
+  SCHEDULE_SOURCE_TEAM,
   scheduleOfMonth,
   shiftTypeVersionOn,
   shortStaffedShiftsOf,
@@ -979,8 +982,9 @@ export interface CalendarMonth extends MonthHeader {
   readonly teamRows: readonly CalendarTeamRow[];
   /**
    * Then the people on a personal or manual schedule — active in the month
-   * and on no active turnus team ({@link teamHasRotationBy}) on any date they
-   * are active: on no team, an archived one or a team with no rotation —
+   * and on no active turnus team ({@link teamHasRotationBy}) whose rotation
+   * they follow on any date they are active: on no team, an archived one, a
+   * team with no rotation, or a schedule source of their own (story 21.10) —
    * grouped by job role, narrowed by the team and the role chosen.
    */
   readonly peopleGroups: readonly CalendarPeopleGroup[];
@@ -1570,13 +1574,21 @@ export function calendarMonthOf(
   // Every person row of the month, unfiltered: the letters are worked out over
   // all of them, so a team or role filter never changes a letter (the team
   // filter narrows last, as above); only then are the rows narrowed.
-  // A member on an active turnus team on ANY date they are active in the month
-  // is read on that team's row (a mid-month joiner too); everyone else is a person.
+  // A member on an active turnus team on ANY date they are active in the month,
+  // and following its rotation that date (story 21.10: their schedule source is
+  // `TEAM`, `scheduleSourceOn`), is read on that team's row (a mid-month joiner
+  // too); everyone else — a member with their own rotation or manual only all
+  // month included — is a person.
   const onTurnus = (member: (typeof offered)[number]['member']): boolean =>
     dates.some((date) => {
       const teamId = activeOn(member.statuses, date) ? (membershipOn(member.memberships, date)?.teamId ?? null) : null;
 
-      return teamId !== null && activeTeams.has(teamId) && turnus(teamId);
+      return (
+        teamId !== null &&
+        activeTeams.has(teamId) &&
+        turnus(teamId) &&
+        scheduleSourceOn(member.scheduleVersions, date).source === SCHEDULE_SOURCE_TEAM
+      );
     });
   const everyManual = offered
     .filter((one) => !onTurnus(one.member))
@@ -1702,7 +1714,9 @@ export function calendarMonthOf(
  * other than its working Scheduled Shift, in `staffingOn`'s order — as type
  * ids. Read with no leave (`staffingInputOf(snapshot, [])`): the cell names
  * the types and never counts people. Only a date some member holds an
- * assignment on is asked, so a month with none asks nothing.
+ * assignment on is asked, so a month with none asks nothing. STORY 21.10: a
+ * personal rotation can make a group on any date from its version, so every
+ * date from the earliest `PERSONAL` version on is asked too.
  *
  * @throws RangeError on any precondition of `staffingOn`.
  */
@@ -1710,14 +1724,19 @@ function staffingGroupsOf(
   snapshot: CalendarSnapshot,
 ): (teamId: string, date: string, scheduled: string | null) => readonly string[] {
   const assignedDates = new Set(snapshot.members.flatMap((member) => member.personalAssignments.map((one) => one.date)));
+  const rotatingFrom =
+    snapshot.members
+      .flatMap((member) => member.scheduleVersions.filter((version) => version.source === SCHEDULE_SOURCE_PERSONAL))
+      .map((version) => version.effectiveFrom)
+      .sort()[0] ?? null;
 
-  if (assignedDates.size === 0) return () => [];
+  if (assignedDates.size === 0 && rotatingFrom === null) return () => [];
 
   const input = staffingInputOf(snapshot, []);
   const working = new Set(input.workingShiftTypeIds);
 
   return (teamId, date, scheduled) => {
-    if (!assignedDates.has(date)) return [];
+    if (!assignedDates.has(date) && (rotatingFrom === null || date < rotatingFrom)) return [];
 
     const scheduledWorking = scheduled !== null && working.has(scheduled) ? scheduled : null;
 

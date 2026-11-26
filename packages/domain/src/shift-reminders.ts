@@ -60,17 +60,22 @@ export interface ShiftReminder {
   /**
    * Story 21.2 (AD-18 as amended): `ASSIGNMENT` for the shift of a Personal
    * Assignment, which `enqueue_shift_reminders` writes only while that row is
-   * live and keys by its id. ABSENT for a team shift, the item's original
-   * eight keys (R14.7). 21.10 adds `PERSONAL_ROTATION`; until then a personal
-   * rotation's shift is skipped (story 21.9).
+   * live and keys by its id. Story 21.10 (AD-18 as amended):
+   * `PERSONAL_ROTATION` for a personal rotation's shift (R15.3), which the RPC
+   * writes only while the member's version in force that date is `PERSONAL`
+   * and keys `:p:`. ABSENT for a team shift, the item's original eight keys
+   * (R14.7, R15.6).
    */
-  readonly source?: typeof SHIFT_REMINDER_SOURCE_ASSIGNMENT;
+  readonly source?: typeof SHIFT_REMINDER_SOURCE_ASSIGNMENT | typeof SHIFT_REMINDER_SOURCE_PERSONAL_ROTATION;
   /** The assignment's id, with `source` only. */
   readonly personalAssignmentId?: string;
 }
 
 /** The reminder item's form for a Personal Assignment's shift (AD-18 as amended, story 21.2). */
 export const SHIFT_REMINDER_SOURCE_ASSIGNMENT = 'ASSIGNMENT';
+
+/** The reminder item's form for a personal rotation's shift (AD-18 as amended, story 21.10). */
+export const SHIFT_REMINDER_SOURCE_PERSONAL_ROTATION = 'PERSONAL_ROTATION';
 
 /**
  * The (shift, lead) pairs of `inputs.memberId` due in
@@ -99,10 +104,6 @@ export function shiftRemindersDueOf(
 
   const reminders: ShiftReminder[] = [];
   for (const shift of atWorkShiftsOf(inputs, window.from, window.to)) {
-    // Story 21.9: a personal rotation's shift has no item form yet. Sent as it is, a teamed one would read as a
-    // team shift and a teamless one would refuse the whole chunk. Its `PERSONAL_ROTATION` form ships with 21.10's
-    // assembly, which replaces this skip; until then no assembly carries a schedule version.
-    if (shift.personalRotation === true) continue;
     const startsAt = instantOf(shift.date, shift.startMinute, inputs.timeZone);
     if (startsAt <= now) continue;
     for (const lead of leads) {
@@ -120,6 +121,8 @@ export function shiftRemindersDueOf(
         ...(shift.personalAssignmentId === undefined
           ? {}
           : { source: SHIFT_REMINDER_SOURCE_ASSIGNMENT, personalAssignmentId: shift.personalAssignmentId }),
+        // Story 21.10: a personal rotation's shift is its own form (never both: a shift is one or the other).
+        ...(shift.personalRotation === true ? { source: SHIFT_REMINDER_SOURCE_PERSONAL_ROTATION } : {}),
       });
     }
   }

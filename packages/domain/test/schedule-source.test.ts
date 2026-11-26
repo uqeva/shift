@@ -23,6 +23,7 @@ import {
   scheduleOfMonth,
   scheduleSourceOn,
   shiftRemindersDueOf,
+  SHIFT_REMINDER_SOURCE_PERSONAL_ROTATION,
   shiftRoster,
   staffingOn,
   type MemberHoursInput,
@@ -99,9 +100,10 @@ function guardedFiguresOf(organization: Organization) {
 type ParityOrganization = (typeof PARITY_FIXTURES)[number]['organization'];
 
 /** R12 for every member of both parity fixtures (their Personal Assignments included), over the whole parity window. */
-function atWorkOf(organizationOf: (organization: ParityOrganization) => ParityOrganization) {
+function atWorkOf(organizationOf: (organization: ParityOrganization) => object) {
   return PARITY_FIXTURES.map(({ fixture, organization }) => {
-    const changed = organizationOf(organization);
+    // The fixtures' own row types are narrower than a changed member's versions; the assembly is the same shape.
+    const changed = organizationOf(organization) as ParityOrganization;
     return {
       fixture,
       atWork: changed.members.map((member) => atWorkShiftsOf(inputsOf(changed, member.id), PARITY_WINDOW.from, PARITY_WINDOW.to)),
@@ -139,7 +141,14 @@ describe('R15.6 — with no schedule version, every derived figure is what it wa
   }
 
   it("both parity fixtures: every member's at-work shifts (R12) digest as before", () => {
-    expect(digestOf(atWorkOf((organization) => organization))).toBe(BEFORE_SCHEDULE_SOURCE['at-work']);
+    // Story 21.10 gave the fixtures versions; with none (`[]`, R15.6) the digest is the baseline's.
+    const withoutVersions = (organization: ParityOrganization): object => ({
+      ...organization,
+      members: organization.members.map((member) => ({ ...member, scheduleVersions: [] })),
+    });
+    expect(digestOf(atWorkOf(withoutVersions))).toBe(BEFORE_SCHEDULE_SOURCE['at-work']);
+    // And with them, the fixtures' versions move R12 (non-trivial).
+    expect(digestOf(atWorkOf((organization) => organization))).not.toBe(BEFORE_SCHEDULE_SOURCE['at-work']);
   });
 });
 
@@ -199,7 +208,12 @@ describe('R15.6 — versions that decide nothing in the window derive exactly as
         }
       }
     }
-    for (const { atWork } of atWorkOf((organization) => organization)) {
+    // The parity fixtures with their versions emptied (story 21.10 gave them some).
+    const withoutVersions = (organization: ParityOrganization): object => ({
+      ...organization,
+      members: organization.members.map((member) => ({ ...member, scheduleVersions: [] })),
+    });
+    for (const { atWork } of atWorkOf(withoutVersions)) {
       for (const one of atWork.flat()) expect(Object.hasOwn(one, 'personalRotation')).toBe(false);
     }
   });
@@ -513,14 +527,28 @@ describe('R15.3, R15.4 — the matrix', () => {
     ]);
   });
 
-  it('`remind` gets no item for a personal rotation until its form ships (21.10), and a team shift its usual one', () => {
+  it('`remind` gets the PERSONAL_ROTATION item for a personal rotation (21.10), and a team shift its usual eight keys', () => {
     const due = reminderDueAt('H1', '2026-03-02', at(6), 'Europe/Zagreb');
     expect(atWorkShiftsOf(r157Inputs(members, 'w'), '2026-03-02', '2026-03-02')).toHaveLength(1);
-    expect(shiftRemindersDueOf(r157Inputs(members, 'w'), ['H1'], { from: '2026-03-02', to: '2026-03-02' }, due)).toEqual([]);
+    expect(shiftRemindersDueOf(r157Inputs(members, 'w'), ['H1'], { from: '2026-03-02', to: '2026-03-02' }, due)).toEqual([
+      {
+        memberId: 'w',
+        date: '2026-03-02',
+        teamId: 'D',
+        shiftTypeId: 't1',
+        lead: 'H1',
+        start: at(6),
+        end: at(14),
+        startsAt: '2026-03-02T05:00:00Z',
+        source: SHIFT_REMINDER_SOURCE_PERSONAL_ROTATION,
+      },
+    ]);
     const teamDue = reminderDueAt('H1', '2026-03-01', at(7), 'Europe/Zagreb');
     expect(shiftRemindersDueOf(r157Inputs(members, 'k3'), ['H1'], { from: '2026-03-01', to: '2026-03-01' }, teamDue)).toEqual([
       expect.objectContaining({ memberId: 'k3', date: '2026-03-01', teamId: 'K', shiftTypeId: 'dan', lead: 'H1' }),
     ]);
+    const [team] = shiftRemindersDueOf(r157Inputs(members, 'k3'), ['H1'], { from: '2026-03-01', to: '2026-03-01' }, teamDue);
+    expect(Object.keys(team ?? {}).sort()).toEqual(['date', 'end', 'lead', 'memberId', 'shiftTypeId', 'start', 'startsAt', 'teamId']);
   });
 });
 

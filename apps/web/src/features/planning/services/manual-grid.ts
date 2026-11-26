@@ -1,10 +1,13 @@
 import {
   PERSONAL_ASSIGNMENT_OFF,
   PERSONAL_ASSIGNMENT_SHIFT,
+  SCHEDULE_SOURCE_MANUAL,
+  SCHEDULE_SOURCE_PERSONAL,
   activeOn,
   datesOfMonth,
   memberScheduleOfMonth,
   membershipOn,
+  scheduleSourceOn,
   type MemberScheduleDay,
   type PersonalAssignment,
 } from '@shift/domain';
@@ -279,10 +282,11 @@ export function draftRefusalOf(calendar: CalendarSnapshot, draft: ManualDraft): 
 
 // ------------------------------------------------------------------ the grid
 
-/** Where a row's days come from (UX-DR73). *osobna rotacija* arrives with story 21.9/21.10. */
+/** Where a row's days come from (UX-DR73); *osobna rotacija* since story 21.10. */
 export const SOURCE_TEAM = 'team';
+export const SOURCE_PERSONAL = 'personal';
 export const SOURCE_MANUAL = 'manual';
-export type ManualRowSource = typeof SOURCE_TEAM | typeof SOURCE_MANUAL;
+export type ManualRowSource = typeof SOURCE_TEAM | typeof SOURCE_PERSONAL | typeof SOURCE_MANUAL;
 
 /** What a cell draws: an assignment (solid, a pencil), a rotation or override shift (muted, a glyph), or nothing. */
 export const CELL_ASSIGNED = 'assigned';
@@ -348,6 +352,27 @@ export interface ManualMonth {
 
 export { isWeekend, weekdayOf };
 
+/**
+ * A row's source (UX-DR73; story 21.10): the member's schedule source on the
+ * month's last date (`scheduleSourceOn`) — *osobna rotacija* for `PERSONAL`,
+ * *ručno* for `MANUAL` — and for `TEAM`, today's rule: *rotacija tima* when
+ * their team at the month's first date has a rotation version by its last
+ * date, else *ručno*.
+ */
+function rowSourceOf(
+  calendar: CalendarSnapshot,
+  member: CalendarSnapshot['members'][number],
+  teamId: string | null,
+  last: string,
+): ManualRowSource {
+  const source = scheduleSourceOn(member.scheduleVersions, last).source;
+
+  if (source === SCHEDULE_SOURCE_PERSONAL) return SOURCE_PERSONAL;
+  if (source === SCHEDULE_SOURCE_MANUAL) return SOURCE_MANUAL;
+
+  return teamId !== null && teamHasRotationBy(calendar, teamId, last) ? SOURCE_TEAM : SOURCE_MANUAL;
+}
+
 /** The shift types' letters by id, over every type (so a letter never changes as types come and go from the month). */
 function lettersOf(calendar: CalendarSnapshot): ReadonlyMap<string, string> {
   const letters = typeLettersOf(calendar.types.map((type) => type.name));
@@ -412,8 +437,9 @@ function cellOf(
  *   their team as at its first date (`membershipOn`, the home team), the
  *   teams in the snapshot's order, the no-team rows last; by name inside a
  *   group;
- * - a row names its source: *rotacija tima* when its team has a rotation
- *   version in effect by the month's last date, else *ručno*;
+ * - a row names its source ({@link rowSourceOf}): the member's own on the
+ *   month's last date, *osobna rotacija* or *ručno*, else *rotacija tima*
+ *   when its team has a rotation version in effect by then, else *ručno*;
  * - each cell is the member's day of the "after" (`memberScheduleOfMonth`).
  *
  * @throws RangeError on any precondition of the domain's derivations, or a month that is not `YYYY-MM`.
@@ -445,7 +471,7 @@ export function manualMonthOf(calendar: CalendarSnapshot, month: string, today: 
       name: member.name,
       jobRole: member.jobRole?.name ?? null,
       jobRoleId: member.jobRole?.id ?? null,
-      source: teamId !== null && teamHasRotationBy(after, teamId, last) ? SOURCE_TEAM : SOURCE_MANUAL,
+      source: rowSourceOf(after, member, teamId, last),
       cells,
     };
     const list = byTeam.get(teamId);

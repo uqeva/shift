@@ -8,6 +8,10 @@
  * 21.2, Personal Assignments too (R14): a teamless shift, a shift counted with
  * another team, a day off, a non-working type and one on an inactive date,
  * all in early 2027, outside the ICS golden's window and the reminder clocks.
+ * Since story 21.10, schedule versions too (R15): a personal rotation on a
+ * pattern no team uses, teamless in the pilot and counted with a team in
+ * UJ-5, and a manual-only spell ended by a return to the team's rotation, all
+ * in spring 2027, outside the same window and clocks.
  *
  * PLAIN DATA, AND IT IMPORTS NOTHING, so the runtime-parity probe
  * (`probe.ts`) loads it unchanged under Node and under the pinned
@@ -57,6 +61,21 @@ const assignment = (
   teamId: string | null,
 ): PersonalAssignmentRow => ({ id, date, kind, shiftTypeId, teamId });
 
+/** A schedule version as the assembly carries it (story 21.10): no member id or author. */
+interface ScheduleVersionRow {
+  readonly effectiveFrom: string;
+  readonly source: 'TEAM' | 'PERSONAL' | 'MANUAL';
+  readonly patternId: string | null;
+  readonly offsetStepId: string | null;
+}
+
+const version = (
+  effectiveFrom: string,
+  source: 'TEAM' | 'PERSONAL' | 'MANUAL',
+  patternId: string | null = null,
+  offsetStepId: string | null = null,
+): ScheduleVersionRow => ({ effectiveFrom, source, patternId, offsetStepId });
+
 /** The token vector: a 43-character unpadded base64url token, canonical (its last character carries no stray bits). */
 export const PARITY_VECTOR = 'shift-parity-vector_0123456789abcdefghijklA';
 
@@ -85,6 +104,10 @@ const PILOT = {
     { id: 'pilot-step-1', patternId: 'pilot-rotation', position: 1, shiftTypeId: 'pilot-noc' },
     { id: 'pilot-step-2', patternId: 'pilot-rotation', position: 2, shiftTypeId: 'pilot-slobodno' },
     { id: 'pilot-step-3', patternId: 'pilot-rotation', position: 3, shiftTypeId: 'pilot-slobodno' },
+    // Story 21.10: a pattern no team uses, only a member's schedule version.
+    { id: 'pilot-personal-0', patternId: 'pilot-personal', position: 0, shiftTypeId: 'pilot-dan' },
+    { id: 'pilot-personal-1', patternId: 'pilot-personal', position: 1, shiftTypeId: 'pilot-dan' },
+    { id: 'pilot-personal-2', patternId: 'pilot-personal', position: 2, shiftTypeId: 'pilot-slobodno' },
   ],
   assignments: ['a', 'b', 'c', 'd'].map((team, offset) => ({
     teamId: `pilot-smjena-${team}`,
@@ -106,6 +129,7 @@ const PILOT = {
       // Lent to C across the spring transition.
       loans: [{ id: 'pilot-loan-1', teamId: 'pilot-smjena-c', from: '2026-03-28', to: '2026-03-30' }],
       personalAssignments: [] as PersonalAssignmentRow[],
+      scheduleVersions: [] as ScheduleVersionRow[],
     },
     {
       id: 'pilot-m2',
@@ -113,6 +137,7 @@ const PILOT = {
       statuses: [],
       loans: [],
       personalAssignments: [assignment('pilot-assignment-1', '2027-01-10', 'OFF', null, null)],
+      scheduleVersions: [] as ScheduleVersionRow[],
     },
     {
       id: 'pilot-m3',
@@ -120,6 +145,7 @@ const PILOT = {
       statuses: [{ active: false, effectiveFrom: '2026-06-01' }],
       loans: [],
       personalAssignments: [] as PersonalAssignmentRow[],
+      scheduleVersions: [] as ScheduleVersionRow[],
     },
     {
       // On no team, and lent to D across the 2027 spring transition.
@@ -131,6 +157,10 @@ const PILOT = {
         // No team and no loan that date: a Personal Shift counted with no team.
         assignment('pilot-assignment-2', '2027-03-26', 'SHIFT', 'pilot-dan', null),
       ],
+      scheduleVersions: [
+        // On no team, after the loan: a personal rotation's shifts count with no team (R14.3).
+        version('2027-04-05', 'PERSONAL', 'pilot-personal', 'pilot-personal-1'),
+      ],
     },
     {
       id: 'pilot-m5',
@@ -141,6 +171,11 @@ const PILOT = {
       statuses: [],
       loans: [],
       personalAssignments: [] as PersonalAssignmentRow[],
+      scheduleVersions: [
+        // Manual only for five weeks, then back on the team's rotation.
+        version('2027-05-03', 'MANUAL'),
+        version('2027-06-07', 'TEAM'),
+      ],
     },
   ],
   overrides: [
@@ -188,6 +223,11 @@ const UJ5 = {
     { id: 'uj5-step-2', patternId: 'uj5-rotation', position: 2, shiftTypeId: 'uj5-nocna' },
     { id: 'uj5-step-3', patternId: 'uj5-rotation', position: 3, shiftTypeId: 'uj5-slobodno' },
     { id: 'uj5-step-4', patternId: 'uj5-rotation', position: 4, shiftTypeId: 'uj5-slobodno' },
+    // Story 21.10: a pattern no team uses, only a member's schedule version.
+    { id: 'uj5-personal-0', patternId: 'uj5-personal', position: 0, shiftTypeId: 'uj5-jutarnja' },
+    { id: 'uj5-personal-1', patternId: 'uj5-personal', position: 1, shiftTypeId: 'uj5-jutarnja' },
+    { id: 'uj5-personal-2', patternId: 'uj5-personal', position: 2, shiftTypeId: 'uj5-popodnevna' },
+    { id: 'uj5-personal-3', patternId: 'uj5-personal', position: 3, shiftTypeId: 'uj5-slobodno' },
   ],
   assignments: ['a', 'b', 'c'].map((team, offset) => ({
     teamId: `uj5-smjena-${team}`,
@@ -211,6 +251,7 @@ const UJ5 = {
         // A non-working type: off that date.
         assignment('uj5-assignment-1', '2027-02-11', 'SHIFT', 'uj5-slobodno', null),
       ],
+      scheduleVersions: [] as ScheduleVersionRow[],
     },
     {
       id: 'uj5-m2',
@@ -219,6 +260,10 @@ const UJ5 = {
       // Lent to C across the autumn transition.
       loans: [{ id: 'uj5-loan-1', teamId: 'uj5-smjena-c', from: '2026-10-24', to: '2026-10-25' }],
       personalAssignments: [] as PersonalAssignmentRow[],
+      scheduleVersions: [
+        // Their own rotation, counted with their team B.
+        version('2027-04-12', 'PERSONAL', 'uj5-personal', 'uj5-personal-0'),
+      ],
     },
     {
       id: 'uj5-m3',
@@ -229,6 +274,7 @@ const UJ5 = {
         // Counted with A, not their own C.
         assignment('uj5-assignment-2', '2027-02-10', 'SHIFT', 'uj5-popodnevna', 'uj5-smjena-a'),
       ],
+      scheduleVersions: [] as ScheduleVersionRow[],
     },
     {
       id: 'uj5-m4',
@@ -242,6 +288,7 @@ const UJ5 = {
         // On an inactive date: no shift (R14.3).
         assignment('uj5-assignment-3', '2027-02-12', 'SHIFT', 'uj5-jutarnja', null),
       ],
+      scheduleVersions: [] as ScheduleVersionRow[],
     },
   ],
   overrides: [

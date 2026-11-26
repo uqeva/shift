@@ -46,6 +46,7 @@ import {
   MEMBER_LIST_KEYS,
   MEMBER_MOVE_PREVIEW_KEYS,
   MEMBER_LOAN_KEYS,
+  MEMBER_SCHEDULE_SOURCE_KEYS,
   STAFFING_BLOCK,
   MEMBER_WRITE_KEYS,
   memberListKeys,
@@ -942,7 +943,8 @@ export const KEY_SOURCES = [
     // 207 SINCE STORY 21.6: the cell's `ručno`, `bez tima` and a group's `dodijeljeno ručno`, the legend's pencil, a staffing group's heading, an assigned member's `ručno` and `dodijeljeno ručno`, and the overlap hint's `bez tima`.
     // 206 SINCE ITS REVIEW: the off and no-rotation sentences moved to `dayNotWorkingMessageKey` (the day detail's rules).
     // 231 SINCE STORY 21.25 (*Kalendar kao papir*): the paper grid's calls — its corner, the teams' heading, a person's no role, no team and unreadable days (its line and its cells' names), a filter or a month that leaves nothing (twice), the key of letters, its entry, *Slobodno* with its mark, a letter box's off mark and a staffing group's `+N`, a person's cell's three words — less the date column head; and the shared filter bar's *Posao* field, picker, *Svi poslovi* (twice), *Bez posla* and the summary with a role.
-    strings: 231,
+    // 233 SINCE STORY 21.10: a day detail member's `osobna rotacija`, after the line's separator.
+    strings: 233,
   },
   {
     // STORY 12.2. On the swap proposal: its heading (twice, once while the
@@ -1245,7 +1247,8 @@ export const KEY_SOURCES = [
     // (`slobodno`, a type with its team) and a grouped save's kind line,
     // and the unknown type twice and team once more inside those values.
     // 169 SINCE STORY 21.12: the job role record, its field label and the unknown role.
-    strings: 169,
+    // 174 SINCE STORY 21.10: the schedule version record, its source field and the three sources.
+    strings: 174,
   },
   {
     // STORY 21.4: *Ručni raspored* — the page, the grid and its legend, the
@@ -1259,7 +1262,8 @@ export const KEY_SOURCES = [
     keys: translationKeys,
     // 120 SINCE STORY 21.6: *Dodaj smjenu*'s alert for a member with no row.
     // 128 SINCE STORY 21.25: the *Posao* filter's chip, ✕, picker, heading, *Svi poslovi*, *Bez posla*, count and result count (`manual-filters.tsx`).
-    strings: 128,
+    // 129 SINCE STORY 21.10: a row's source *osobna rotacija*.
+    strings: 129,
   },
   {
     // STORY 21.4: the preview's shift and inert-override lines, and the save's refusals.
@@ -1923,7 +1927,8 @@ export const KEY_SOURCES = [
     file: MEMBER_EDIT,
     keys: translationKeys,
     // 218 SINCE STORY 21.6: the loan preview's `bez tima` (four) and *Dodaj smjenu*'s card (its title and opener, the hint) and dialog (title, *Zatvori*, *Datum*, the hint, *Odustani*, *Odaberi smjenu*).
-    strings: 218,
+    // 264 SINCE STORY 21.10: *Raspored osobe* — its card (title, *Promijeni raspored*, the facts and their four line shapes, a run and its separator, *Povuci* and its name, the two saved lines, *Učitava se*, the unchecked alert), its form (the three sources and their hints, its heading, *Vrijedi od* and its hint, *Uzorak*, *Odaberi*, *Novi uzorak*, the steps' legend, a step's type, count and removal, *Dodaj korak*, *Početni korak*, its option and hint, *Zatvori*, *Odustani*, *Dalje*) and its *Što se mijenja* (title, two ledes, the window, *Natrag na uređivanje*, *Spremi*, *Povuci promjenu*).
+    strings: 264,
   },
   {
     // THIRTEEN on the member write path's rules: eleven `ljudi.form.error.*`
@@ -2041,6 +2046,15 @@ export const KEY_SOURCES = [
     file: MEMBER_LOAN_KEYS,
     keys: messageKeyUnions,
     strings: 22,
+  },
+  {
+    // STORY 21.10: *Raspored osobe*'s rules — the three sources' names
+    // (`scheduleSourceMessageKey`) and the twelve refusals' words
+    // (`scheduleSourceRefusalMessageKey`).
+    name: 'the schedule source rules',
+    file: MEMBER_SCHEDULE_SOURCE_KEYS,
+    keys: messageKeyUnions,
+    strings: 15,
   },
   {
     // ONE on the lockup: the accessible name it falls back to when the

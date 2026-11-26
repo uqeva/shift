@@ -376,9 +376,19 @@ export const FEATURE_PUBLIC = {
   ],
   // Story 8.2d: `services/surface-keys` is *Postavke rotacije*'s one key set,
   // which the shift type hooks decide their offline freshness over with the builder.
+  // STORY 21.10: *Raspored osobe* on the member page says *Što se mijenja* as
+  // *Ručni raspored* does — the same derivation over the same "after" shape,
+  // and the same body — rather than a second copy of either.
+  planning: [
+    'components/manual-preview-dialog', // members
+    'services/manual-preview', // members
+  ],
   rotation: [
-    'services/list', // calendar, onboarding, shift-types, teams
+    'services/list', // calendar, members, onboarding, shift-types, teams
     'services/surface-keys', // shift-types
+    // STORY 21.10: a member's own rotation writes a new pattern as the
+    // builder does, and removes it again after a definite refusal.
+    'services/write', // members
   ],
   'shift-types': [
     'services/list', // calendar, history, members, onboarding, rotation, pages

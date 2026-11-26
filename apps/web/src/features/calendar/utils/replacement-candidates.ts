@@ -4,7 +4,10 @@ import {
   effectiveTeamOn,
   memberScheduleOfMonth,
   monthOf,
+  personalAssignmentOn,
   rosterOn,
+  scheduleSourceOn,
+  SCHEDULE_SOURCE_PERSONAL,
   shiftRoster,
   type DutyLeg,
   type LeaveRange,
@@ -142,6 +145,20 @@ export function replacementCandidatesOf(
   }
   for (const one of snapshot.rosterOverrides) {
     if (one.teamId === teamId && one.date === date && one.memberInId !== null) excluded.add(one.memberInId);
+  }
+  // STORY 21.10 (R15.8, the domain's `countsWithOn`): a member whose own
+  // rotation decides the date and counts with this team is never a
+  // candidate: a roster override putting them on would be inert. The admin
+  // changes their day with a Personal Assignment. One an assignment holds
+  // that date is the assignment's, and stays a candidate.
+  for (const member of snapshot.members) {
+    if (
+      effectiveTeamOn(member, date)?.teamId === teamId &&
+      personalAssignmentOn(member.personalAssignments, date) === null &&
+      scheduleSourceOn(member.scheduleVersions, date).source === SCHEDULE_SOURCE_PERSONAL
+    ) {
+      excluded.add(member.id);
+    }
   }
 
   // Every record groups a candidate as on leave, a half day's too: they are

@@ -1,9 +1,13 @@
 import {
   PERSONAL_ASSIGNMENT_OFF,
   PERSONAL_ASSIGNMENT_SHIFT,
+  SCHEDULE_SOURCE_MANUAL,
+  SCHEDULE_SOURCE_PERSONAL,
+  SCHEDULE_SOURCE_TEAM,
   checkLoans,
   checkPersonalAssignments,
   checkRosterOverrides,
+  checkScheduleVersions,
   type Loan,
   type MembershipVersion,
   type PersonalAssignment,
@@ -11,6 +15,7 @@ import {
   type RotationAssignment,
   type RotationStep,
   type RotationVersionStamp,
+  type ScheduleVersion,
   type ShiftTypeOverride,
   type StatusVersion,
 } from '@shift/domain';
@@ -141,6 +146,15 @@ import {
  * rule (R14). None anywhere is `personalAssignments: []`, which derives
  * exactly as before (R14.7).
  *
+ * THE SCHEDULE VERSIONS (story 21.10). Every member's schedule source, from
+ * a date (`member_schedule_versions`, 0079), embedded as the team rotation
+ * versions are: every active member reads them. They ride on each member's
+ * entry and on the viewer, as loans do, so every figure follows a personal
+ * rotation or a manual-only spell through the domain's one rule (R15). The
+ * steps a personal rotation names are among `rotation_steps`, which is read
+ * whole. None anywhere is `scheduleVersions: []`, which derives exactly as
+ * before (R15.6).
+ *
  * `select` AND FIVE `rpc`s, AND NOTHING ELSE.
  */
 
@@ -165,7 +179,8 @@ export const CALENDAR_COLUMNS =
   'rotation_assignments(organization_id,team_id,pattern_id,offset_step_id,anchor_date,effective_from,created_at),' +
   'members(organization_id,id,role,team_membership_versions(organization_id,team_id,effective_from)),' +
   'team_membership_versions(organization_id,member_id,team_id,position,effective_from),' +
-  'member_status_versions(organization_id,member_id,active,effective_from)';
+  'member_status_versions(organization_id,member_id,active,effective_from),' +
+  'member_schedule_versions(organization_id,member_id,effective_from,source,pattern_id,offset_step_id)';
 
 /** The function every member is read through (0018): id, name and fire rank only. */
 export const CALENDAR_MEMBERS_FUNCTION = 'calendar_members';
@@ -307,6 +322,12 @@ export interface CalendarMember {
    * is `[]`. The domain reads it as `RosterMember.personalAssignments` (R14).
    */
   readonly personalAssignments: readonly PersonalAssignment[];
+  /**
+   * Every version of this member's schedule source (story 21.10), in
+   * `effectiveFrom` order; none is `[]`, team rotation on every date. The
+   * domain reads it as `RosterMember.scheduleVersions` (R15).
+   */
+  readonly scheduleVersions: readonly ScheduleVersion[];
 }
 
 /** The signed-in member reading the calendar. */
@@ -329,6 +350,8 @@ export interface CalendarViewer {
   readonly loans: readonly Loan[];
   /** Every live Personal Assignment of the viewer (story 21.2), the same as their entry in `members`. */
   readonly personalAssignments: readonly PersonalAssignment[];
+  /** Every schedule version of the viewer (story 21.10), the same as their entry in `members`. */
+  readonly scheduleVersions: readonly ScheduleVersion[];
 }
 
 /** The one answer the calendar draws from. */
@@ -446,7 +469,8 @@ type CalendarRefusal =
   | 'override'
   | 'rosterOverride'
   | 'loan'
-  | 'personalAssignment';
+  | 'personalAssignment'
+  | 'scheduleVersion';
 
 function unavailable(reason: CalendarRefusal, detail?: unknown): CalendarOutcome {
   if (detail === undefined) console.error(CALENDAR_UNAVAILABLE, reason);
@@ -603,6 +627,7 @@ export async function readCalendar(
   const memberRows = embedded(organization, 'members');
   const membershipRows = embedded(organization, 'team_membership_versions');
   const statusRows = embedded(organization, 'member_status_versions');
+  const scheduleVersionRows = embedded(organization, 'member_schedule_versions');
 
   if (organizationId === null || organizationName === null || timeZone === null) return unavailable('organization');
   if (typeof usesFireRanks !== 'boolean') return unavailable('organization');
@@ -613,6 +638,7 @@ export async function readCalendar(
   if (memberRows === null || memberRows.length !== 1) return unavailable('viewer');
   if (membershipRows === null) return unavailable('memberships');
   if (statusRows === null) return unavailable('statuses');
+  if (scheduleVersionRows === null) return unavailable('scheduleVersion');
 
   const teams: TeamRow[] = [];
 
@@ -734,7 +760,11 @@ export async function readCalendar(
 
   if (personalAssignments === null) return unavailable('personalAssignment');
 
-  const viewer = viewerOf(memberRows[0], organizationId, teamIds, memberIds, memberships, statuses, loans, personalAssignments);
+  const scheduleVersions = scheduleVersionsOf(scheduleVersionRows, organizationId, stepById, memberIds);
+
+  if (scheduleVersions === null) return unavailable('scheduleVersion');
+
+  const viewer = viewerOf(memberRows[0], organizationId, teamIds, memberIds, memberships, statuses, loans, personalAssignments, scheduleVersions);
 
   if (viewer === null) return unavailable('viewer');
 
@@ -745,6 +775,7 @@ export async function readCalendar(
       statuses: statuses.get(identity.id) ?? [],
       loans: loans.get(identity.id) ?? [],
       personalAssignments: personalAssignments.get(identity.id) ?? [],
+      scheduleVersions: scheduleVersions.get(identity.id) ?? [],
     }))
     .sort(compareMembers);
 
@@ -904,6 +935,63 @@ function personalAssignmentsOf(
   }
 
   return known;
+}
+
+/**
+ * One schedule version as embedded (story 21.10): of this organization, a
+ * calendar date, a known source, and a pattern and step for `PERSONAL` only,
+ * the step one the snapshot holds OF that pattern (AD-3); else `null`.
+ */
+function scheduleVersionOf(row: unknown, organizationId: string, stepById: ReadonlyMap<string, RotationStep>): ScheduleVersion | null {
+  if (!isRecord(row) || textAt(row, 'organization_id') !== organizationId) return null;
+
+  const effectiveFrom = textAt(row, 'effective_from');
+  const source = row['source'];
+
+  if (effectiveFrom === null || !isIsoDate(effectiveFrom)) return null;
+
+  if (source === SCHEDULE_SOURCE_PERSONAL) {
+    const patternId = textAt(row, 'pattern_id');
+    const offsetStepId = textAt(row, 'offset_step_id');
+    const step = offsetStepId === null ? undefined : stepById.get(offsetStepId);
+
+    if (patternId === null || offsetStepId === null || step === undefined || step.patternId !== patternId) return null;
+
+    return { effectiveFrom, source, patternId, offsetStepId };
+  }
+
+  if (source !== SCHEDULE_SOURCE_TEAM && source !== SCHEDULE_SOURCE_MANUAL) return null;
+  if (row['pattern_id'] !== null || row['offset_step_id'] !== null) return null;
+
+  return { effectiveFrom, source, patternId: null, offsetStepId: null };
+}
+
+/**
+ * Every member's schedule versions (story 21.10), by member, each in date
+ * order, or `null`: a row that does not validate ({@link scheduleVersionOf}),
+ * names no member or repeats a member's date, or a member's list
+ * `checkScheduleVersions` refuses. A valid one of a member the members read
+ * does not name is left out, as {@link versionsByMemberOf} does.
+ */
+function scheduleVersionsOf(
+  rows: readonly unknown[],
+  organizationId: string,
+  stepById: ReadonlyMap<string, RotationStep>,
+  memberIds: ReadonlySet<string>,
+): ReadonlyMap<string, readonly ScheduleVersion[]> | null {
+  const byMember = versionsByMemberOf(rows, memberIds, (row) => scheduleVersionOf(row, organizationId, stepById));
+
+  if (byMember === null) return null;
+
+  for (const versions of byMember.values()) {
+    try {
+      checkScheduleVersions(versions);
+    } catch {
+      return null;
+    }
+  }
+
+  return byMember;
 }
 
 /** By date, then id. */
@@ -1248,6 +1336,7 @@ function viewerOf(
   statuses: ReadonlyMap<string, readonly StatusVersion[]>,
   loans: ReadonlyMap<string, readonly Loan[]>,
   personalAssignments: ReadonlyMap<string, readonly PersonalAssignment[]>,
+  scheduleVersions: ReadonlyMap<string, readonly ScheduleVersion[]>,
 ): CalendarViewer | null {
   if (!isRecord(row) || textAt(row, 'organization_id') !== organizationId) return null;
 
@@ -1276,6 +1365,7 @@ function viewerOf(
     statuses: statuses.get(memberId) ?? [],
     loans: loans.get(memberId) ?? [],
     personalAssignments: personalAssignments.get(memberId) ?? [],
+    scheduleVersions: scheduleVersions.get(memberId) ?? [],
   };
 }
 
