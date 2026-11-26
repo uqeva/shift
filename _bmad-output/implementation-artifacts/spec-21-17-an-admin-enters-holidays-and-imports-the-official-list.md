@@ -2,7 +2,7 @@
 title: '21.17 An admin enters holidays and imports the official list'
 type: 'feature'
 created: '2026-11-26'
-status: 'in-review'
+status: 'done'
 baseline_commit: 'c5a8082'
 review_loop_iteration: 0
 context:
@@ -10,7 +10,7 @@ context:
   - '{project-root}/_bmad-output/implementation-artifacts/spec-21-16-holidays-are-organization-data.md'
 ---
 
-Status: built, CI pending (branch `feat/21-16-21-17-holidays`, no PR yet). Baseline: 21.16's commit `c5a8082` on `feat/21-16-21-17-holidays` (0080, the snapshot's `holidays`, `TeamRow.offOnHolidays`, `holidayRuleOfCalendar`). No migration. Hot file `hr.json`.
+Status: done — merged with 21.16 as PR #380, squash `69ef8fc`, `CI passed` green. CI: run 45756975501 failed on `e2e/tests/calendar/layout.spec.ts`, whose hand-injected team rows lacked `off_on_holidays` (the 21.16 parser requires it), fixed for CI by `523deb7`; run 45758802426 green. Baseline: 21.16's commit `c5a8082` on `feat/21-16-21-17-holidays` (0080, the snapshot's `holidays`, `TeamRow.offOnHolidays`, `holidayRuleOfCalendar`). No migration. Hot file `hr.json`.
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 
@@ -125,8 +125,8 @@ Status: built, CI pending (branch `feat/21-16-21-17-holidays`, no PR yet). Basel
 - `‹`/`›` are the icon-only `CaretLeft`/`CaretRight` buttons (a bare glyph is a literal the lint refuses), bounded to 1–9999.
 
 **Residual risks:**
-- FOUNDER DECISION: `apps/web/vite.config.ts` raises `workbox.maximumFileSizeToCacheInBytes` to 3 MiB. With this story the entry chunk is about 2.13 MB minified, past Workbox's default 2 MiB, which drops it from the precache and fails the build. `test/static-hosting.test.ts` still proves the entry chunk and every stylesheet are precached. The lasting fix is splitting the admin routes into their own chunks.
-- The e2e spec has never run: CI is its first run. It holds `holdRotation`'s lock, works in 2031, uses the run's own team for the flag, and cleans up with `cleanUpHolidaysInSql` in `afterEach`.
+- FOUNDER DECISION: `apps/web/vite.config.ts` raises `workbox.maximumFileSizeToCacheInBytes` to 3 MiB. With this story the entry chunk is about 2.13 MB minified, past Workbox's default 2 MiB, which drops it from the precache and fails the build. `test/static-hosting.test.ts` still proves the entry chunk and every stylesheet are precached. The lasting fix is splitting the admin routes into their own chunks (a `deferred-work.md` entry since 21.18, owner a later chore).
+- SETTLED BY CI (PR #380): the e2e spec (`holidays.spec.ts`) passed in run 45758802426. It holds `holdRotation`'s lock, works in 2031, uses the run's own team for the flag, and cleans up with `cleanUpHolidaysInSql` in `afterEach`. The earlier failed run (45756975501) was `layout.spec.ts`' injected teams lacking `off_on_holidays`, fixed by `523deb7`.
 - The check's cost grows with the window and the off teams' members: one year for a dozen members is about a second; the flag over several future years is slower, and the UI is pending meanwhile. The two-year unit case is bounded at 5 s inside a 20 s timeout.
 - The card and the team switch have no rendered-component test (the web suite is the node suite); they are covered by the structural and literal sweeps and by the e2e spec in CI.
 

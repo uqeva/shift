@@ -308,12 +308,21 @@ export function noTeamMessageKey(): 'kalendar.cell.noTeam' {
   return 'kalendar.cell.noTeam';
 }
 
+/**
+ * STORY 21.18 (UX-DR78): the word a holiday is named by — after the date as
+ * `blagdan {name}`, and in the type's place on a cell the holiday emptied.
+ */
+export function holidayWordMessageKey(): 'kalendar.holiday.word' {
+  return 'kalendar.holiday.word';
+}
+
 /** Every key a cell's label resolves through. */
 export type CellLabelKey =
   | ReturnType<typeof modifierMessageKey>
   | ReturnType<typeof noRotationMessageKey>
   | ReturnType<typeof assignedMessageKey>
-  | ReturnType<typeof noTeamMessageKey>;
+  | ReturnType<typeof noTeamMessageKey>
+  | ReturnType<typeof holidayWordMessageKey>;
 
 export type CellLabelTranslate = (key: CellLabelKey) => string;
 
@@ -333,6 +342,10 @@ export interface CellLabelSource {
   readonly assigned?: boolean;
   /** STORY 21.6: the cell's staffing groups, each named after the cell's own words. */
   readonly groups?: readonly { readonly name: string; readonly range: string | null }[];
+  /** STORY 21.18: the date's holiday name, read as `blagdan {name}` after the date. */
+  readonly holiday?: string;
+  /** STORY 21.18: a holiday emptied the cell, so its type reads `blagdan`, never "no rotation". */
+  readonly offForHoliday?: boolean;
 }
 
 /**
@@ -346,11 +359,15 @@ export interface CellLabelSource {
 export function cellLabelOf(source: CellLabelSource, translate: CellLabelTranslate): string {
   const groups = source.groups ?? [];
   const assigned = translate(assignedMessageKey());
+  // STORY 21.18: `blagdan {name}` after the date; `blagdan` in an emptied cell's type slot.
+  const empty = source.offForHoliday === true ? translate(holidayWordMessageKey()) : translate(noRotationMessageKey());
 
   return [
     `${source.weekday} ${source.dayMonth}`,
+    ...(source.holiday === undefined ? [] : [`${translate(holidayWordMessageKey())} ${source.holiday}`]),
     source.teamName,
-    ...(source.name === null && groups.length > 0 ? [] : [source.name ?? translate(noRotationMessageKey())]),
+    // STORY 21.18: an emptied cell keeps its `blagdan` slot before its groups.
+    ...(source.name === null && groups.length > 0 && source.offForHoliday !== true ? [] : [source.name ?? empty]),
     ...(source.range === null ? [] : [source.range]),
     ...(source.assigned === true ? [assigned] : []),
     ...canonicalModifiersOf(source.modifiers).map((modifier) => translate(modifierMessageKey(modifier))),
@@ -394,6 +411,8 @@ export function gridCellLabelsOf(
           range: cell.range,
           modifiers: cell.modifiers,
           ...(cell.groups === undefined ? {} : { groups: cell.groups }),
+          ...(row.holiday === undefined ? {} : { holiday: row.holiday }),
+          ...(cell.offForHoliday === true ? { offForHoliday: true } : {}),
         },
         translate,
       );
@@ -431,6 +450,8 @@ export function dayListLabelsOf(
           range: shift.cell.range,
           modifiers: shift.cell.modifiers,
           assigned: shift.cell.assigned === true,
+          ...(day.holiday === undefined ? {} : { holiday: day.holiday }),
+          ...(shift.cell.offForHoliday === true ? { offForHoliday: true } : {}),
         },
         translate,
       );

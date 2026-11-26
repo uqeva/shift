@@ -8,6 +8,7 @@ import { PencilSimple, UsersThree } from '@/components/ui/icon';
 import {
   DAY_DETAIL_DIALOG_ID,
   dayNotWorkingMessageKey,
+  holidayOffMessageKey,
   DAY_NO_ROTATION,
   DAY_OFF,
   type DayConflict,
@@ -22,6 +23,7 @@ import {
   type RosterLineTranslate,
   type SwapProposalMark,
 } from '@/features/calendar/utils/day-detail';
+import { HolidayMark } from '@/features/calendar/components/holiday-mark';
 import { MODIFIER_CONFLICT, MODIFIER_OVERRIDDEN, modifierTreatmentOf } from '@/features/calendar/utils/modifiers';
 import {
   OverrideChangeDialog,
@@ -463,9 +465,19 @@ function renderDetail(
   if (shown.kind === DAY_OFF || shown.kind === DAY_NO_ROTATION) {
     return (
       <div className="grid gap-4">
-        <p className="text-sm">
-          {t(dayNotWorkingMessageKey(shown), { team: shown.teamName })}
-        </p>
+        {shown.holidayOff === undefined ? (
+          <p className="text-sm">
+            {t(dayNotWorkingMessageKey(shown), { team: shown.teamName })}
+          </p>
+        ) : (
+          // STORY 21.18 (UX-DR78): the holiday emptied the day; the projected type is kept (R13.3).
+          <div className="grid gap-1 text-sm">
+            <p>{t(holidayOffMessageKey(shown), { team: shown.teamName })}</p>
+            <p className="text-muted-foreground">
+              {t('kalendar.holiday.projected', { type: shown.holidayOff.projectedTypeName })}
+            </p>
+          </div>
+        )}
         {renderConflicts(conflicts)}
         {renderGroups(shown, usesFireRanks, groupStaffing)}
         {renderChanges(shown, form, roster)}
@@ -662,6 +674,8 @@ export function DayDetailDialog({
             <DialogHeader closeLabel={t('kalendar.detail.close')} onClose={closeUnlessPending}>
               <DialogTitle id={DAY_DETAIL_HEADING_ID} tabIndex={-1}>{t('kalendar.detail.title', { team: detail.teamName, date: detail.date })}</DialogTitle>
             </DialogHeader>
+            {/* STORY 21.18 (UX-DR78): the date's holiday, the star and its name, under the title. */}
+            {detail.holiday === undefined ? null : <HolidayMark name={detail.holiday} className="text-sm" />}
             {renderDetail(detail, snapshot.usesFireRanks, conflicts, form, roster, staffing, groupStaffing)}
             {renderFooter(detail, form, roster, swapOffered, swapProposed)}
           </>

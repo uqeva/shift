@@ -56,6 +56,7 @@ import repeat from "@phosphor-icons/core/fill/repeat-fill.svg?raw"
 import rows from "@phosphor-icons/core/fill/rows-fill.svg?raw"
 import shieldCheck from "@phosphor-icons/core/fill/shield-check-fill.svg?raw"
 import signOut from "@phosphor-icons/core/fill/sign-out-fill.svg?raw"
+import star from "@phosphor-icons/core/fill/star-fill.svg?raw"
 import sun from "@phosphor-icons/core/fill/sun-fill.svg?raw"
 import trash from "@phosphor-icons/core/fill/trash-fill.svg?raw"
 import treePalm from "@phosphor-icons/core/fill/tree-palm-fill.svg?raw"
@@ -219,6 +220,8 @@ export const Repeat = glyph(repeat, "repeat")
 export const Rows = glyph(rows, "rows")
 export const ShieldCheck = glyph(shieldCheck, "shield-check")
 export const SignOut = glyph(signOut, "sign-out")
+/** A holiday (story 21.18): beside its name or *blagdan*, never alone. */
+export const Star = glyph(star, "star")
 export const Sun = glyph(sun, "sun")
 export const Trash = glyph(trash, "trash")
 export const TreePalm = glyph(treePalm, "tree-palm")

@@ -553,3 +553,51 @@ describe('the leave columns by absence type (story 13.2)', () => {
     expect(sheet.rows[ana]!.slice(first, -1).map((cell) => cell.kind)).toEqual(['count', 'empty', 'count']);
   });
 });
+
+describe('Sati na blagdan in the file (story 21.19)', () => {
+  const HOLIDAY = '2026-09-10';
+  const withHoliday = (snapshot: CalendarSnapshot): CalendarSnapshot => ({
+    ...snapshot,
+    holidays: [{ id: 'holiday', date: HOLIDAY, name: 'Blagdan' }],
+  });
+
+  it('without a worked holiday the header and the rows are exactly the pre-21.19 sheet', () => {
+    const view = viewOf(pilot, NO_LEAVE_RECORDS);
+    const sheet = hoursExportOf(view, 'Org');
+    // A holiday nobody works this month (outside it) changes nothing either.
+    const elsewhere = hoursExportOf(viewOf({ ...pilot, holidays: [{ id: 'h', date: '2026-12-25', name: 'Božić' }] }, NO_LEAVE_RECORDS), 'Org');
+
+    expect(sheet.columns).toEqual([
+      t('sati.organization.member'),
+      t('sati.organization.team'),
+      t('sati.organization.shifts'),
+      ...view.bands.map((band) => band.name),
+      t('sati.organization.total'),
+      ...view.leaveColumns.map((column) => t('sati.organization.export.days', { name: column.name ?? '' })),
+      t('sati.organization.conflicts'),
+    ]);
+    expect(sheet.rows.every((row) => row.length === sheet.columns.length)).toBe(true);
+    expect(elsewhere).toEqual(sheet);
+  });
+
+  it('with one, the column sits after Ukupno, each row and the footer as long as the header', () => {
+    const plain = hoursExportOf(viewOf(pilot, NO_LEAVE_RECORDS), 'Org');
+    const view = viewOf(withHoliday(pilot), NO_LEAVE_RECORDS);
+    const sheet = hoursExportOf(view, 'Org');
+    const total = sheet.columns.indexOf(t('sati.organization.total'));
+    const without = <T,>(cells: readonly T[]): readonly T[] => [...cells.slice(0, total + 1), ...cells.slice(total + 2)];
+
+    expect(sheet.columns[total + 1]).toBe(t('sati.holiday'));
+    expect(without(sheet.columns)).toEqual(plain.columns);
+    expect(sheet.rows.every((row) => row.length === sheet.columns.length)).toBe(true);
+    expect(sheet.footer).toHaveLength(sheet.columns.length);
+    expect(sheet.footer?.[total + 1]).toEqual({
+      kind: 'hours',
+      value: view.footer!.holidayMinutes! / MINUTES_PER_DAY,
+      shape: hoursShapeOf(view.footer!.holidayMinutes!),
+    });
+    // Every other cell is the pre-21.19 one.
+    expect(sheet.rows.map(without)).toEqual(plain.rows);
+    expect(without(sheet.footer!)).toEqual(plain.footer);
+  });
+});

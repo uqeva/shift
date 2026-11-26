@@ -119,6 +119,8 @@ export interface OrganizationHoursRow {
   /** One cell per band column, in the same order: its hours and its shifts. */
   readonly bands: readonly HoursBandRow[];
   readonly total: HoursFigure;
+  /** The worked hours inside a holiday (story 21.19, `MyHoursView.holiday`); absent with none, drawn `—`. */
+  readonly holiday?: HoursFigure;
   /** One cell per leave column, in the same order (story 13.2; `MyHoursView.leave`). */
   readonly leave: readonly HoursLeaveCell[];
   /** Working shifts with no times, counted as shifts and never in hours. */
@@ -148,6 +150,9 @@ export interface HoursFooter {
   /** The total's minutes, which the file writes as a duration. */
   readonly totalMinutes: number;
   readonly total: HoursFigure;
+  /** Story 21.19: the holiday hours of the rows shown, 0 included, only with the column (`holidayColumn`). */
+  readonly holidayMinutes?: number;
+  readonly holiday?: HoursFigure;
   /**
    * One per leave column, in the same order: the days of the rows shown, 0
    * included, which the file reads, and the figure, `null` when there are
@@ -179,6 +184,12 @@ export interface OrganizationHoursView {
   readonly bands: readonly HoursBandColumn[];
   /** Every leave column (story 13.2), in `leaveColumnsOf`'s order: never none, annual leave always draws. */
   readonly leaveColumns: readonly LeaveColumn[];
+  /**
+   * Story 21.19 (E-7): the *Sati na blagdan* column after *Ukupno*, present
+   * when any row of the month — before the filters — has holiday hours, so
+   * a filter never moves a column. Not sortable.
+   */
+  readonly holidayColumn?: true;
   /** The rows shown: filtered, then sorted. */
   readonly rows: readonly OrganizationHoursRow[];
   /** How many rows the month has before any filter. */
@@ -205,7 +216,7 @@ export interface OrganizationHoursView {
   readonly untimedShiftCount: number | null;
   /** The total of the rows shown (story 7.14), or `null` while none is. */
   readonly footer: HoursFooter | null;
-  /** How many columns a row has: the fixed five, one per band and one per leave column. */
+  /** How many columns a row has: the fixed five, one per band and one per leave column, and the holiday column. */
   readonly columnCount: number;
   /** What an empty table says, or `null` while it has a row. */
   readonly empty: HoursEmpty | null;
@@ -278,6 +289,7 @@ export function organizationHoursRowsOf(
       shiftCount: figures.shiftCount,
       bands: figures.bands,
       total: figures.total,
+      ...(figures.holiday === undefined ? {} : { holiday: figures.holiday }),
       leave: figures.leave,
       untimedShiftCount: hours.untimedShiftCount,
       conflictCount,
@@ -585,12 +597,14 @@ export function hoursFooterOf(
   rows: readonly OrganizationHoursRow[],
   bands: readonly HoursBandColumn[],
   leaveColumns: readonly LeaveColumn[],
+  holidayColumn = false,
 ): HoursFooter | null {
   if (rows.length === 0) return null;
 
   const sum = (minutesOf: (row: OrganizationHoursRow) => number): number =>
     rows.reduce((total, row) => total + minutesOf(row), 0);
   const totalMinutes = sum((row) => row.hours.totalMinutes);
+  const holidayMinutes = sum((row) => row.hours.holidayMinutes ?? 0);
 
   return {
     shiftCount: sum((row) => row.shiftCount),
@@ -601,6 +615,7 @@ export function hoursFooterOf(
     }),
     totalMinutes,
     total: figureOf(totalMinutes),
+    ...(holidayColumn ? { holidayMinutes, holiday: figureOf(holidayMinutes) } : {}),
     leave: leaveColumns.map((column) => leaveCellOf(column, sum((row) => leaveDaysOf(row, column.sortKey)))),
     conflictCount: sum((row) => row.conflictCount),
   };
@@ -626,6 +641,7 @@ export function organizationHoursViewOf(
   const bands = snapshot.bands.map((band) => ({ bandId: band.id, name: band.name, sortKey: bandSortKeyOf(band.id) }));
   const leaveColumns = leaveColumnsOf(snapshot);
   const all = organizationHoursRowsOf(snapshot, month, header, collisions, leaveKeys, leaveRecords, leaveColumns);
+  const holidayColumn = all.some((row) => row.hours.holidayMinutes !== undefined);
   const teams = hoursTeamsOf(all);
   const people = all.map((row) => ({ id: row.memberId, name: row.name }));
   const team = teams.find((one) => one.id === search.smjena)?.id ?? null;
@@ -639,6 +655,7 @@ export function organizationHoursViewOf(
     header,
     bands,
     leaveColumns,
+    ...(holidayColumn ? { holidayColumn: true as const } : {}),
     rows: sortedHoursRows(shown, sort),
     rowCount: all.length,
     sort,
@@ -655,8 +672,8 @@ export function organizationHoursViewOf(
       ...(sort.direction === DEFAULT_HOURS_SORT.direction ? {} : { smjer: sort.direction }),
     },
     untimedShiftCount: untimedShiftsOf(shown),
-    footer: hoursFooterOf(shown, bands, leaveColumns),
-    columnCount: FIXED_COLUMN_COUNT + bands.length + leaveColumns.length,
+    footer: hoursFooterOf(shown, bands, leaveColumns, holidayColumn),
+    columnCount: FIXED_COLUMN_COUNT + bands.length + leaveColumns.length + (holidayColumn ? 1 : 0),
     empty: hoursEmptyOf(shown.length, all, team, person, month),
     filters: hoursFilterBarOf(all, teams, team, person, shown.length),
   };

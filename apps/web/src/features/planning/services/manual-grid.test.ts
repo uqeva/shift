@@ -19,9 +19,11 @@ import {
   TODAY,
   VIEWER_MEMBER,
   calendarPersonalAssignmentRow,
+  holidayRow,
   planningSnapshotOf,
   statusRow,
 } from '@/features/planning/planning.fixture';
+import { cellLabelOf } from '@/features/planning/components/manual-grid';
 import {
   CELL_ASSIGNED,
   CELL_EMPTY,
@@ -166,6 +168,47 @@ describe('the month as the grid draws it (UX-DR72, UX-DR73)', () => {
 
   it('marks Saturdays and Sundays as the weekend', () => {
     expect(['2026-10-03', '2026-10-04', '2026-10-05', '2024-02-29', '2000-01-01'].map(isWeekend)).toEqual([true, true, false, false, true]);
+  });
+});
+
+describe('story 21.18: a holiday on the manual grid (UX-DR78)', () => {
+  const HOLIDAY = '2026-10-08';
+  const holidays = [holidayRow('h-1', HOLIDAY, 'Dan sjećanja')];
+
+  it('no holiday: no new key on the month, its dates or its cells', () => {
+    const month = manualMonthOf(planned, MONTH, TODAY, NO_DRAFT);
+
+    expect(month).not.toHaveProperty('holidays');
+    expect(month.dates.some((date) => Object.hasOwn(date, 'holiday'))).toBe(false);
+    expect(month.rows.some((row) => row.cells.some((cell) => Object.hasOwn(cell, 'holiday')))).toBe(false);
+  });
+
+  it("an emptied member's cell is `holiday` with no type; the date is named; an assignment on the holiday draws as before", async () => {
+    const off = await planningSnapshotOf({
+      holidays,
+      offTeams: [A],
+      assignments: [calendarPersonalAssignmentRow(IVA_DAN, IVA, HOLIDAY, 'SHIFT', DAN)],
+    });
+    const month = manualMonthOf(off, MONTH, TODAY, NO_DRAFT);
+    const cell = cellOf(month, ANA, HOLIDAY);
+
+    expect(cell).toMatchObject({ source: CELL_EMPTY, shiftTypeId: null, letter: null, holiday: true });
+    expect(cellOf(month, ANA, '2026-10-09')).not.toHaveProperty('holiday');
+    expect(cellOf(month, IVA, HOLIDAY)).toMatchObject({ source: CELL_ASSIGNED, shiftTypeId: DAN });
+    expect(cellOf(month, IVA, HOLIDAY)).not.toHaveProperty('holiday');
+    expect(month.holidays).toEqual([{ date: HOLIDAY, dayMonth: '08.10.', name: 'Dan sjećanja' }]);
+    const date = month.dates.find((one) => one.date === HOLIDAY);
+    expect(date?.holiday).toBe('Dan sjećanja');
+    // The cell's name: `blagdan {name}` after the date, and the value *blagdan*.
+    expect(cellLabelOf(cell, 'Ana', date, () => 'Dan', () => 'Smjena A')).toContain('08.10., blagdan Dan sjećanja: blagdan');
+  });
+
+  it('a holiday with nobody off names the date and empties no cell', async () => {
+    const month = manualMonthOf(await planningSnapshotOf({ holidays }), MONTH, TODAY, NO_DRAFT);
+
+    expect(month.dates.find((one) => one.date === HOLIDAY)?.holiday).toBe('Dan sjećanja');
+    expect(cellOf(month, ANA, HOLIDAY)).toMatchObject({ source: CELL_ROTATION, shiftTypeId: DAN });
+    expect(cellOf(month, ANA, HOLIDAY)).not.toHaveProperty('holiday');
   });
 });
 

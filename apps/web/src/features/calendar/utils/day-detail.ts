@@ -30,6 +30,7 @@ import {
   workingShiftTypeIdsOf,
 } from '@/features/calendar/utils/month';
 import {
+  holidayNamesOfCalendar,
   holidayRuleOfCalendar,
   type CalendarHolidayRule,
   type CalendarOverride,
@@ -136,6 +137,18 @@ export function dayNotWorkingMessageKey(
   if (detail.kind === DAY_OFF) return grouped ? 'kalendar.detail.offGroups' : 'kalendar.detail.off';
 
   return grouped ? 'kalendar.detail.noRotationGroups' : 'kalendar.detail.noRotation';
+}
+
+/**
+ * STORY 21.18 (UX-DR78): the sentence of a day a holiday emptied (R13.2).
+ * With a staffing group the team still has people at work (an assignment is
+ * never removed, R14.4), so the sentence says the team does not work the
+ * holiday and the groups follow — never a bare "does not work" over them.
+ */
+export function holidayOffMessageKey(
+  detail: { readonly groups?: readonly unknown[] | undefined },
+): 'kalendar.holiday.dayOff' | 'kalendar.holiday.dayOffGroups' {
+  return (detail.groups ?? []).length !== 0 ? 'kalendar.holiday.dayOffGroups' : 'kalendar.holiday.dayOff';
 }
 
 /** One member rostered on the day: shown as `Ime · čin · položaj`. */
@@ -295,6 +308,16 @@ export interface DayDetail {
    * none, so a day with no Personal Assignment is the detail it was.
    */
   readonly groups?: readonly DayDetailGroup[];
+  /**
+   * STORY 21.18 (UX-DR78): the date's holiday name (`calendar.holidays`),
+   * whether or not the team works it. ABSENT on every other date.
+   */
+  readonly holiday?: string;
+  /**
+   * STORY 21.18: the holiday emptied the team's day (R13.2): what the rotation
+   * projects for it, kept (R13.3), as `Prema rotaciji: {type}.`. ABSENT otherwise.
+   */
+  readonly holidayOff?: { readonly projectedTypeName: string };
 }
 
 function compareMembers(left: DayDetailMember, right: DayDetailMember): number {
@@ -467,7 +490,16 @@ export function dayDetailOf(snapshot: CalendarSnapshot, teamId: string, date: st
 
   if (full === null) throw new RangeError(`the date ${date} could not be formatted`);
 
-  const base = { teamId, teamName: team.name, date: `${weekdayOf(date)} ${full}`, isoDate: date, rosterPending };
+  const holidayName = holidayNamesOfCalendar(snapshot).get(date);
+  const base = {
+    teamId,
+    teamName: team.name,
+    date: `${weekdayOf(date)} ${full}`,
+    isoDate: date,
+    rosterPending,
+    // STORY 21.18: the date's holiday name, ABSENT on every other date.
+    ...(holidayName === undefined ? {} : { holiday: holidayName }),
+  };
   // STORY 21.6: the Personal Shifts counted with the team that date.
   const personal = personalShiftsWithOf(snapshot, teamId, date, holidays);
   const scheduledWorking =
@@ -514,6 +546,8 @@ export function dayDetailOf(snapshot: CalendarSnapshot, teamId: string, date: st
       override: null,
       rosterChanges: [],
       rosterInert: inertOf([]),
+      // STORY 21.18: `{team} ne radi na blagdan.` and the projected type the holiday kept.
+      holidayOff: { projectedTypeName },
     };
   }
 
@@ -775,7 +809,7 @@ export function overrideTypeOptionsOf(snapshot: CalendarSnapshot, detail: DayDet
  * works nothing and an override of the projected type is what makes it work
  * the holiday. `null` then, and with no rotation.
  */
-function sameTypeOf(detail: Pick<DayDetail, 'projectedShiftTypeId' | 'shiftTypeId'>): string | null {
+export function sameTypeOf(detail: Pick<DayDetail, 'projectedShiftTypeId' | 'shiftTypeId'>): string | null {
   return detail.shiftTypeId === null ? null : detail.projectedShiftTypeId;
 }
 

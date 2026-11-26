@@ -96,6 +96,70 @@ function guardedFiguresOf(organization: Organization) {
   };
 }
 
+/** Story 21.19: every member and month of {@link guardedFiguresOf} that carries holiday hours, with its minutes. */
+function holidayHoursOf(figures: ReturnType<typeof guardedFiguresOf>): readonly (readonly [string, string, number])[] {
+  return figures.derived.members.flatMap((member) =>
+    member.hours.flatMap((hours, index) =>
+      hours.holidayMinutes === undefined ? [] : [[member.id, MONTHS[index]!, hours.holidayMinutes] as const],
+    ),
+  );
+}
+
+/** The holiday hours of {@link IN_WINDOW} worked by every team (no team off), per fixture. */
+const WORKED_HOLIDAY_HOURS: Readonly<Record<string, readonly (readonly [string, string, number])[]>> = {
+  pilot: [
+    ['pilot-smjena-a-1', '2026-04', 1020],
+    ['pilot-smjena-a-3', '2026-04', 1140],
+    ['pilot-smjena-a-4', '2026-04', 420],
+    ['pilot-smjena-b-1', '2026-04', 720],
+    ['pilot-smjena-b-3', '2026-04', 300],
+    ['pilot-smjena-b-4', '2026-04', 720],
+    ['pilot-smjena-c-1', '2026-03', 300],
+    ['pilot-smjena-c-2', '2026-03', 300],
+    ['pilot-smjena-c-3', '2026-03', 300],
+    ['pilot-smjena-c-3', '2026-04', 720],
+    ['pilot-smjena-c-4', '2026-04', 1020],
+    ['pilot-smjena-d-1', '2026-03', 420],
+    ['pilot-smjena-d-1', '2026-04', 720],
+    ['pilot-smjena-d-2', '2026-03', 420],
+    ['pilot-smjena-d-3', '2026-03', 420],
+    ['pilot-smjena-d-3', '2026-04', 720],
+    ['pilot-smjena-d-4', '2026-03', 420],
+    ['pilot-smjena-d-4', '2026-04', 720],
+  ],
+  'UJ-5': [
+    ['uj5-smjena-a-1', '2026-04', 960],
+    ['uj5-smjena-a-2', '2026-03', 480],
+    ['uj5-smjena-a-3', '2026-03', 480],
+    ['uj5-smjena-a-3', '2026-04', 480],
+    ['uj5-smjena-a-4', '2026-03', 480],
+    ['uj5-smjena-a-4', '2026-04', 600],
+    ['uj5-smjena-b-1', '2026-03', 480],
+    ['uj5-smjena-b-1', '2026-04', 480],
+    ['uj5-smjena-b-3', '2026-04', 480],
+    ['uj5-smjena-b-4', '2026-04', 480],
+    ['uj5-smjena-c-1', '2026-03', 120],
+    ['uj5-smjena-c-2', '2026-03', 120],
+    ['uj5-smjena-c-3', '2026-03', 120],
+    ['uj5-smjena-c-3', '2026-04', 480],
+    ['uj5-smjena-c-4', '2026-04', 360],
+  ],
+};
+
+/** {@link guardedFiguresOf} without story 21.19's holiday hours, the one figure a worked holiday adds (R13.7). */
+function withoutHolidayHours(figures: ReturnType<typeof guardedFiguresOf>) {
+  return {
+    ...figures,
+    derived: {
+      ...figures.derived,
+      members: figures.derived.members.map((member) => ({
+        ...member,
+        hours: member.hours.map(({ holidayMinutes: _holiday, ...hours }) => hours),
+      })),
+    },
+  };
+}
+
 type ParityOrganization = (typeof PARITY_FIXTURES)[number]['organization'];
 
 /** Story 21.16's fixture rows that only a holiday makes meaningful: the override on A's holiday and m2's assignment on B's. */
@@ -169,7 +233,12 @@ describe('R13.5 — with no holiday or no team off on holidays, every derived fi
       const members = plannedMembersOf(fixture);
       for (const holidays of neutralOf(teamIds, '2026-05-30')) {
         const organization = holidays === undefined ? { fixture, members } : { fixture, members, holidays };
-        expect(digestOf(guardedFiguresOf(organization))).toBe(BEFORE_HOLIDAYS[fixture.name]);
+        const figures = guardedFiguresOf(organization);
+        // Story 21.19 (R13.7): a worked holiday adds its own figure, only then; stripped, every other figure is as before.
+        const worked = (holidays?.holidays ?? []).some((date) => IN_WINDOW.includes(date));
+        // Pinned: exactly these members and months carry it, with these minutes.
+        expect(holidayHoursOf(figures)).toEqual(worked ? WORKED_HOLIDAY_HOURS[fixture.name] : []);
+        expect(digestOf(withoutHolidayHours(figures))).toBe(BEFORE_HOLIDAYS[fixture.name]);
       }
     });
   }

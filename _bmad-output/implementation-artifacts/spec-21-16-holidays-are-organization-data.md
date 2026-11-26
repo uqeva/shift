@@ -2,7 +2,7 @@
 title: '21.16 Holidays are organization data'
 type: 'feature'
 created: '2026-11-26'
-status: 'in-review'
+status: 'done'
 baseline_commit: '14b3e58ed2a88b5490a589b798afc5b59a256386'
 review_loop_iteration: 0
 context:
@@ -10,7 +10,7 @@ context:
   - '{project-root}/_bmad-output/specs/spec-shift/engine-rules.md'
 ---
 
-Status: built, CI pending (branch `feat/21-16-21-17-holidays`, no PR yet). Baseline: `main` at `14b3e58` (21.15 merged, PR #378; 21.10 merged, PR #377). Migration `0080` (main is at 0079). Hot file `hr.json` (history labels only); 21.17 follows on the same branch.
+Status: done — merged with 21.17 as PR #380, squash `69ef8fc`, `CI passed` green. CI: run 45756975501 failed on `e2e/tests/calendar/layout.spec.ts`, whose hand-injected team rows lacked `off_on_holidays` (the 21.16 parser requires it), fixed for CI by `523deb7`; run 45758802426 green. Baseline: `main` at `14b3e58` (21.15 merged, PR #378; 21.10 merged, PR #377). Migration `0080` (main is at 0079). Hot file `hr.json` (history labels only); 21.17 was built on the same branch and merged with it (PR #380).
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 
@@ -116,8 +116,8 @@ Status: built, CI pending (branch `feat/21-16-21-17-holidays`, no PR yet). Basel
 - Member write / rename date / truncate -- `rls-isolation.test.ts` (written unrun): member insert 42501, admin `date` update 42501, TRUNCATE 42501 for admin and member; `provisioning.test.ts` pins the column grants and the truncate refusal for every role.
 
 **Residual risks:**
-- Every DB-connecting case above has never run: CI is its first run (the unrun-DB-test review layer applies). The trigger definitions in `provisioning.test.ts` assume `pg_get_triggerdef` prints `BEFORE INSERT OR DELETE OR UPDATE`.
-- An emptied grid cell draws as a cell with no rotation (no name) until 21.18 adds the holiday mark and *blagdan*.
+- SETTLED BY CI (PR #380): every DB-connecting case above (`provisioning`, `rls-isolation`, `name-key`, `concurrent-writes`, the parity scene) passed in run 45758802426, the `pg_get_triggerdef` assumption included. The one CI failure (run 45756975501) was not this story's DB cases: `layout.spec.ts`' injected team rows lacked `off_on_holidays`, fixed by `523deb7`.
+- RESOLVED by 21.18: an emptied cell reads *blagdan* with the star, and each holiday is named on its date.
 
 ## Review Triage Log
 

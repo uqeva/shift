@@ -1,4 +1,4 @@
-import { HOURS_FIGURE_BAND, HOURS_FIGURE_LEAVE, HOURS_FIGURE_TOTAL } from '@shift/domain';
+import { HOURS_FIGURE_BAND, HOURS_FIGURE_HOLIDAY, HOURS_FIGURE_LEAVE, HOURS_FIGURE_TOTAL } from '@shift/domain';
 import { Link } from '@tanstack/react-router';
 import type { ReactNode, RefObject } from 'react';
 
@@ -30,7 +30,8 @@ import type { SortControlColumn } from '@/utils/sort-control';
  * A row is the name (the link to their calendar month, as in the table) with
  * `{team} · {n} smjena` under it, `Ukupno` over the total at the top right,
  * then a grid of three: a cell per band and per leave column (story 13.2), each with its
- * visible label, its hours and, for a band, its shifts. The shifts in
+ * visible label, its hours and, for a band, its shifts, and (story 21.19)
+ * *Sati na blagdan* after the bands while the table has the column. The shifts in
  * unresolved conflict show only above zero, as `⚠` and words, never colour.
  *
  * EVERY VALUE IS A `StackedField`, so each is announced with its column's
@@ -137,6 +138,23 @@ export function OrganizationHoursRows({
                       </span>
                     </StackedField>
                   ))}
+                  {view.holidayColumn === true ? (
+                    <StackedField label={t('sati.holiday')} className="rounded-md bg-muted px-2 py-1.5">
+                      <span className="flex items-center justify-between gap-1">
+                        <span className="font-semibold">
+                          {row.holiday === undefined ? t('sati.noFigure') : t(row.holiday.key, row.holiday.values)}
+                        </span>
+                        {row.holiday === undefined ? null : (
+                          <ExplainButton
+                            figureName={`${t('sati.holiday')}, ${row.name}`}
+                            onPress={() => {
+                              onExplain(row.memberId, { code: HOURS_FIGURE_HOLIDAY });
+                            }}
+                          />
+                        )}
+                      </span>
+                    </StackedField>
+                  ) : null}
                   {row.leave.map((cell) => (
                     <StackedField
                       label={leaveColumnNameOf(cell.column)}

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import { CalendarCellBox } from '@/features/calendar/components/calendar-cell';
 import { CalendarLegend } from '@/features/calendar/components/calendar-legend';
+import { HolidayMark } from '@/features/calendar/components/holiday-mark';
 import { DAY_DETAIL_POPUP } from '@/features/calendar/utils/day-detail';
 import { dayListLabelsOf } from '@/features/calendar/utils/modifiers';
 import type {
@@ -74,6 +75,8 @@ function renderDay(openDay: OpenDay, day: CalendarDay, labels: readonly (string 
       <span className="w-20 shrink-0 text-sm print:w-28 print:text-xs">
         <span className="block tabular-nums print:inline">{day.dayMonth}</span>
         <span className="block text-xs font-normal text-muted-foreground print:ml-1 print:inline">{day.weekday}</span>
+        {/* STORY 21.18 (UX-DR78): the date's holiday, the star and its name. */}
+        {day.holiday === undefined ? null : <HolidayMark name={day.holiday} className="print:ml-1 print:inline-flex" />}
       </span>
       {day.shifts.length === 0 ? (
         <span className="text-sm text-muted-foreground">{t(dayEmptyMessageKey(day))}</span>
@@ -174,6 +177,7 @@ export function CalendarTeamDays({
             <span className="w-20 shrink-0 pt-1 text-sm print:w-28 print:text-xs">
               <span className="block tabular-nums print:inline">{row.dayMonth}</span>
               <span className="block text-xs font-normal text-muted-foreground print:ml-1 print:inline">{row.weekday}</span>
+              {row.holiday === undefined ? null : <HolidayMark name={row.holiday} className="print:ml-1 print:inline-flex" />}
             </span>
             {/* The row's remaining width is a CONTAINER, so a track is
                 never wider than it (`100cqi`) however large the root font. */}

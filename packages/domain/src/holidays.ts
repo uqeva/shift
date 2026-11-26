@@ -41,20 +41,35 @@ export interface HolidayRule {
 export type HolidayOff = (teamId: string, date: string) => boolean;
 
 /**
- * The rule as a predicate, or `null` when it decides nothing: no holiday or
- * no team off (R13.5). Every derivation takes the `null` path exactly as it
- * did before holidays existed. Both lists are checked either way.
+ * The rule's holiday dates as a set, each checked; empty with none. The
+ * rule ({@link holidayOffOf}) and the holiday hours (R13.7, story 21.19) read
+ * the dates through it. Not exported from the package's index.
  *
- * @throws RangeError when a holiday is not a calendar `YYYY-MM-DD`, a team id
- *   is empty or not a string, or a date or a team is given twice.
+ * @internal
+ * @throws RangeError when a holiday is not a calendar `YYYY-MM-DD`, or a date
+ *   is given twice.
  */
-export function holidayOffOf(rule: HolidayRule): HolidayOff | null {
+export function holidayDatesOf(rule: HolidayRule): ReadonlySet<string> {
   const holidays = new Set<string>();
   for (const date of rule.holidays ?? []) {
     checkDate('a holiday', date);
     if (holidays.has(date)) throw new RangeError(`the holiday ${date} is given twice; a date holds at most one`);
     holidays.add(date);
   }
+  return holidays;
+}
+
+/**
+ * The rule as a predicate, or `null` when it decides nothing: no holiday or
+ * no team off (R13.5). Every derivation takes the `null` path exactly as it
+ * did before holidays existed. Both lists are checked either way.
+ *
+ * @throws RangeError on the dates as {@link holidayDatesOf} checks them (not a
+ *   calendar `YYYY-MM-DD`, or given twice), and when a team id is empty or not
+ *   a string, or a team is given twice.
+ */
+export function holidayOffOf(rule: HolidayRule): HolidayOff | null {
+  const holidays = holidayDatesOf(rule);
   const teams = new Set<string>();
   for (const teamId of rule.teamsOffOnHolidays ?? []) {
     if (typeof teamId !== 'string' || teamId === '') {

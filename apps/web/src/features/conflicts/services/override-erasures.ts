@@ -1,6 +1,6 @@
 import { scheduledShiftTypeOn } from '@shift/domain';
 
-import type { CalendarOverride, CalendarSnapshot } from '@/features/calendar/services/snapshot';
+import { holidayRuleOfCalendar, type CalendarOverride, type CalendarSnapshot } from '@/features/calendar/services/snapshot';
 import {
   CHECK_READY,
   CHECK_REFUSED,
@@ -128,21 +128,26 @@ function archivedIn(calendar: CalendarSnapshot, teamId: string, shiftTypeId: str
 }
 
 /**
- * The type the rotation alone projects for `teamId` on `date`, no override
- * applied; `null` where no version governs the date.
+ * The type the team would work on `date` with no override: the rotation's
+ * projection with the holiday rule layered on (story 21.18, the 21.16
+ * deferral; R13.3); `null` where no version governs the date, or where a
+ * holiday the team is off on empties it. So an amend to the projected type on
+ * such a holiday is a real change, allowed as the day detail's form offers it;
+ * on every other date the answer is the projection, as before.
  *
  * @throws RangeError on any precondition of `scheduledShiftTypeOn`.
  */
-function projectedTypeIdOf(calendar: CalendarSnapshot, teamId: string, date: string): string | null {
+export function sameTypeIdOf(calendar: CalendarSnapshot, teamId: string, date: string): string | null {
   const scheduled = scheduledShiftTypeOn(
     calendar.assignments.filter((assignment) => assignment.teamId === teamId),
     calendar.steps,
     [],
     teamId,
     date,
+    holidayRuleOfCalendar(calendar),
   );
 
-  return scheduled === null ? null : scheduled.projectedShiftTypeId;
+  return scheduled?.shiftTypeId ?? null;
 }
 
 /**
@@ -187,7 +192,7 @@ export function overrideChangeSnapshotOf(calendar: CalendarSnapshot, change: Ove
   const shiftTypeId = change.kind === OVERRIDE_CHANGE_AMEND ? change.shiftTypeId : changed.shiftTypeId;
 
   if (archivedIn(calendar, changed.teamId, shiftTypeId)) return { ok: false, code: OVERRIDE_CHANGE_ARCHIVED };
-  if (change.kind === OVERRIDE_CHANGE_AMEND && shiftTypeId === projectedTypeIdOf(calendar, changed.teamId, changed.date)) {
+  if (change.kind === OVERRIDE_CHANGE_AMEND && shiftTypeId === sameTypeIdOf(calendar, changed.teamId, changed.date)) {
     return { ok: false, code: OVERRIDE_CHANGE_SAME_AS_PROJECTED };
   }
 

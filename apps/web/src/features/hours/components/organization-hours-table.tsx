@@ -1,10 +1,10 @@
-import { HOURS_FIGURE_BAND, HOURS_FIGURE_LEAVE, HOURS_FIGURE_TOTAL } from '@shift/domain';
+import { HOURS_FIGURE_BAND, HOURS_FIGURE_HOLIDAY, HOURS_FIGURE_LEAVE, HOURS_FIGURE_TOTAL } from '@shift/domain';
 import { Link } from '@tanstack/react-router';
 import type { ReactNode, RefObject } from 'react';
 
 import type { FilterBarHandle } from '@/components/filter-bar';
 import { SortableHead } from '@/components/sortable-head';
-import { Table, TableBody, TableCaption, TableCell, TableFooter, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCaption, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ExplainButton } from '@/features/hours/components/hours-explanation';
 import { LeaveFigure, TeamName } from '@/features/hours/components/hours-marks';
 import { EmptyResult } from '@/features/hours/components/organization-hours-empty';
@@ -66,7 +66,9 @@ function SortHead({
  * `OrganizationHoursRows` draws the same view as stacked rows (story 7.6),
  * both drawing `EmptyResult` (`./organization-hours-empty`). A footer totals
  * each figure column over the rows shown (story 7.14), and every hours
- * figure above 0 has an ⓘ that asks for its explanation (`onExplain`). Every figure is
+ * figure above 0 has an ⓘ that asks for its explanation (`onExplain`). After
+ * Total, only when the month has a worked holiday, *Sati na blagdan* (story
+ * 21.19): its heading is not sortable, and a row with none reads `—`. Every figure is
  * `@/features/hours/services/organization-hours`'s, in tabular numerals.
  */
 export function OrganizationHoursTable({
@@ -97,6 +99,9 @@ export function OrganizationHoursTable({
               <SortHead key={band.bandId} view={view} sortKey={band.sortKey} label={band.name} numeric onPress={onPress} />
             ))}
             <SortHead view={view} sortKey={SORT_TOTAL} label={t('sati.organization.total')} numeric onPress={onPress} />
+            {view.holidayColumn === true ? (
+              <TableHead className="whitespace-nowrap text-right">{t('sati.holiday')}</TableHead>
+            ) : null}
             {view.leaveColumns.map((column) => (
               <SortHead
                 key={column.key}
@@ -160,6 +165,23 @@ export function OrganizationHoursTable({
                     )}
                   </span>
                 </TableCell>
+                {view.holidayColumn === true ? (
+                  <TableCell className="whitespace-nowrap text-right tabular-nums">
+                    {row.holiday === undefined ? (
+                      t('sati.noFigure')
+                    ) : (
+                      <span className="flex items-center justify-end gap-1">
+                        {t(row.holiday.key, row.holiday.values)}
+                        <ExplainButton
+                          figureName={`${t('sati.holiday')}, ${row.name}`}
+                          onPress={() => {
+                            onExplain(row.memberId, { code: HOURS_FIGURE_HOLIDAY });
+                          }}
+                        />
+                      </span>
+                    )}
+                  </TableCell>
+                ) : null}
                 {row.leave.map((cell) => (
                   <TableCell key={cell.column.key} className="whitespace-nowrap text-right tabular-nums">
                     <span className="flex items-center justify-end gap-1">
@@ -213,6 +235,11 @@ export function OrganizationHoursTable({
               <TableCell className="whitespace-nowrap text-right tabular-nums">
                 {t(view.footer.total.key, view.footer.total.values)}
               </TableCell>
+              {view.footer.holiday === undefined ? null : (
+                <TableCell className="whitespace-nowrap text-right tabular-nums">
+                  {t(view.footer.holiday.key, view.footer.holiday.values)}
+                </TableCell>
+              )}
               {view.footer.leave.map((cell) => (
                 <TableCell key={cell.column.key} className="whitespace-nowrap text-right tabular-nums">
                   <LeaveFigure leave={cell.figure} />

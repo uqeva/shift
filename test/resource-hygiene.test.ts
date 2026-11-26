@@ -1263,6 +1263,16 @@ const SANCTIONED_SCREEN_KEYS = [
   'kalendar.paper.cell.off',
   'kalendar.paper.cell.none',
   'kalendar.paper.cell.inactive',
+  // Story 21.18 (UX-DR78): a holiday shown — the word *blagdan* (an emptied
+  // cell, and after a date in a label), `blagdan {name}` for a screen reader,
+  // a key line `{dayMonth} {name}`, and the day detail's two sentences on an
+  // emptied day.
+  'kalendar.holiday.word',
+  'kalendar.holiday.label',
+  'kalendar.holiday.keyLine',
+  'kalendar.holiday.dayOff',
+  'kalendar.holiday.dayOffGroups',
+  'kalendar.holiday.projected',
   'kalendar.error.unavailable',
   // STORY 3.2a: the mode switch — its label, *Moj raspored* and *Sve smjene*
   // — the notice for a viewer on no team all month, and a day on no team.
@@ -1695,6 +1705,8 @@ const SANCTIONED_SCREEN_KEYS = [
   // named by its stored name, and *Ostala odsutnost* for every type that does
   // not draw, which names no type.
   'sati.total',
+  // Story 21.19 (R13.7): *Sati na blagdan*, the worked hours inside a holiday.
+  'sati.holiday',
   'sati.shifts',
   'sati.bands',
   'sati.otherAbsence',
@@ -3612,6 +3624,8 @@ const SANCTIONED_SCREEN_KEYS = [
   'rucniRaspored.cell.changed',
   'rucniRaspored.cell.separator',
   'rucniRaspored.cell.inactive',
+  // Story 21.18: a cell a holiday emptied, in words.
+  'rucniRaspored.cell.holiday',
   'rucniRaspored.selectionHint',
   'rucniRaspored.legend.heading',
   'rucniRaspored.legend.entry',

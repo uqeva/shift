@@ -92,6 +92,7 @@ import {
 } from '@/features/staffing/staffing.fixture';
 import { datesFrom } from '@/utils/dates';
 import { leaveHalfNamedOf } from '@/features/leave/services/leave-section';
+import { cellName } from '@/features/today/components/week-grid';
 import { initLocalization, t } from '@/lib/i18n';
 import { nextIsoDate } from '@/lib/i18n/format';
 import {
@@ -964,6 +965,39 @@ describe('Ovaj tjedan', () => {
     expect(
       t(weekCellMessageKey(cell), { weekday: day.weekday, date: day.dayMonth, team: 'Smjena D', type: t('kalendar.noRotation') }),
     ).toBe('četvrtak 01.10., Smjena D, Bez rotacije');
+  });
+
+  it('story 21.18: a holiday names its day and the legend; the off team emptied carries `offForHoliday`; none adds no key', () => {
+    const plainWeek = viewOf(pilot, SEVEN).week;
+
+    expect(plainWeek).not.toHaveProperty('holidays');
+    expect(plainWeek.days.some((day) => Object.hasOwn(day, 'holiday'))).toBe(false);
+    expect(plainWeek.rows.flatMap((row) => row.cells).some((cell) => Object.hasOwn(cell, 'offForHoliday'))).toBe(false);
+
+    const holiday: CalendarSnapshot = {
+      ...pilot,
+      holidays: [{ id: 'h-1', date: '2026-10-02', name: 'Blagdan' }],
+      teams: pilot.teams.map((team) => (team.id === A ? { ...team, offOnHolidays: true } : team)),
+    };
+    const { week } = viewOf(holiday, SEVEN);
+    const a = week.rows.find((row) => row.teamId === A);
+
+    expect(week.days.map((day) => day.holiday)).toEqual([undefined, 'Blagdan', undefined, undefined, undefined, undefined, undefined]);
+    expect(week.holidays).toEqual([{ date: '2026-10-02', dayMonth: '02.10.', name: 'Blagdan' }]);
+    expect(a?.cells[1]).toMatchObject({ letter: null, name: null, offForHoliday: true });
+    expect(a?.cells[0]).not.toHaveProperty('offForHoliday');
+    // The cell's name: `blagdan {name}` after the date, `blagdan` in the type's place; a working cell keeps its type.
+    const day = week.days[1];
+    const emptied = a?.cells[1];
+
+    if (day === undefined || emptied === undefined) throw new Error('no cell');
+
+    expect(cellName(emptied, day, 'Smjena A')).toBe('petak 02.10., blagdan Blagdan, Smjena A, blagdan');
+    const { holiday: _name, ...unnamedDay } = day;
+    expect(cellName(emptied, unnamedDay, 'Smjena A')).toBe('petak 02.10., Smjena A, blagdan');
+    expect(week.rows.filter((row) => row.teamId !== A).flatMap((row) => row.cells).some((cell) => Object.hasOwn(cell, 'offForHoliday'))).toBe(
+      false,
+    );
   });
 
   it('crosses a month: from 28.09. it draws September and October', () => {

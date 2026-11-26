@@ -2,7 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 
 import { Card } from '@/components/ui/card';
-import { UsersThreeBold } from '@/components/ui/icon';
+import { Star, UsersThreeBold } from '@/components/ui/icon';
 import {
   GRID_CELL_SELECTOR,
   GRID_ORIGIN,
@@ -13,7 +13,7 @@ import {
   keyModifiersOf,
   type GridPosition,
 } from '@/features/calendar/utils/grid-keys';
-import { CONFLICT_GLYPH, modifierTreatmentOf } from '@/features/calendar/utils/modifiers';
+import { CONFLICT_GLYPH, LABEL_SEPARATOR, modifierTreatmentOf } from '@/features/calendar/utils/modifiers';
 import { MODE_SVE, NO_ROTATION_SHOWN } from '@/features/calendar/utils/month';
 import { weekCellMessageKey, type Week, type WeekCell, type WeekDay } from '@/features/today/services/admin-today';
 import { t } from '@/lib/i18n';
@@ -30,12 +30,14 @@ function clampedStop(stop: GridPosition, rows: number, columns: number): GridPos
  * A cell's full name in words: the day, the team, the type with its range,
  * the conflict, and (story 11.3) `premalo ljudi` when it is short-staffed.
  */
-function cellName(cell: WeekCell, day: WeekDay, teamName: string): string {
+export function cellName(cell: WeekCell, day: WeekDay, teamName: string): string {
   const name = t(weekCellMessageKey(cell), {
     weekday: day.weekday,
-    date: day.dayMonth,
+    // STORY 21.18: `blagdan {name}` after the date, as the calendar's cells.
+    date:
+      day.holiday === undefined ? day.dayMonth : `${day.dayMonth}${LABEL_SEPARATOR}${t('kalendar.holiday.label', { name: day.holiday })}`,
     team: teamName,
-    type: cell.name ?? t('kalendar.noRotation'),
+    type: cell.name ?? (cell.offForHoliday === true ? t('kalendar.holiday.word') : t('kalendar.noRotation')),
     range: cell.range,
   });
 
@@ -102,7 +104,12 @@ export function WeekGrid({ week }: { readonly week: Week }): ReactNode {
           <span className="flex items-center gap-0.5">
             {cell.conflict ? <span className="[font-variant-emoji:text]">{CONFLICT_GLYPH}</span> : null}
             {cell.shortStaffed ? <UsersThreeBold aria-hidden className="size-3 shrink-0" /> : null}
-            <span>{cell.letter ?? NO_ROTATION_SHOWN}</span>
+            {/* STORY 21.18 (UX-DR78): the star where a holiday emptied the cell; its label says *blagdan*. */}
+            {cell.letter === null && cell.offForHoliday === true ? (
+              <Star data-holiday-off className="size-3.5 shrink-0" />
+            ) : (
+              <span>{cell.letter ?? NO_ROTATION_SHOWN}</span>
+            )}
           </span>
         </div>
       </td>
@@ -137,7 +144,13 @@ export function WeekGrid({ week }: { readonly week: Week }): ReactNode {
                     className="p-1 text-center text-xs font-normal tabular-nums"
                   >
                     <span className="block">{day.weekdayShort}</span>
-                    <span className="block font-semibold">{day.dayMonth}</span>
+                    <span className="flex items-center justify-center gap-px font-semibold">
+                      {day.dayMonth}
+                      {day.holiday === undefined ? null : <Star data-holiday className="size-2.5 shrink-0" />}
+                    </span>
+                    {day.holiday === undefined ? null : (
+                      <span className="sr-only">{t('kalendar.holiday.label', { name: day.holiday })}</span>
+                    )}
                   </th>
                 ))}
               </tr>
@@ -173,6 +186,16 @@ export function WeekGrid({ week }: { readonly week: Week }): ReactNode {
                 {t('danas.admin.week.legendConflict', { glyph: CONFLICT_GLYPH })}
               </li>
             ) : null}
+            {/* STORY 21.18 (UX-DR78): each holiday of the week by name, beside the star its head and emptied cells draw. */}
+            {(week.holidays ?? []).map((holiday) => (
+              <li key={holiday.date} data-holiday className="inline-flex items-center gap-1">
+                <Star aria-hidden className="size-3 shrink-0" />
+                <span>
+                  <span className="sr-only">{`${t('kalendar.holiday.word')} `}</span>
+                  {t('kalendar.holiday.keyLine', { dayMonth: holiday.dayMonth, name: holiday.name })}
+                </span>
+              </li>
+            ))}
             {week.anyShortStaffed ? (
               <li className="inline-flex items-center gap-1">
                 <UsersThreeBold aria-hidden className="size-3 shrink-0" />

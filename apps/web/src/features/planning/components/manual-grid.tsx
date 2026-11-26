@@ -7,7 +7,7 @@ import {
   DateGridRowHead,
   DateHead,
 } from '@/components/date-grid';
-import { PencilSimple, Repeat } from '@/components/ui/icon';
+import { PencilSimple, Repeat, Star } from '@/components/ui/icon';
 import { TableBody, TableCell, TableRow } from '@/components/ui/table';
 import { MANUAL_HEADING_ID, manualCellIdOf, type ManualScreen } from '@/features/planning/hooks/use-manual-schedule';
 import {
@@ -45,6 +45,8 @@ export function sourceText(row: ManualRow): string {
 /** What a cell holds, in words: the type's name, *slobodno*, or nothing. */
 function valueText(cell: ManualCell, typeName: (id: string) => string): string {
   if (cell.off) return t('rucniRaspored.cell.off');
+  // STORY 21.18: a holiday emptied the member's team shift.
+  if (cell.holiday === true) return t('rucniRaspored.cell.holiday');
   if (cell.shiftTypeId === null) return t('rucniRaspored.cell.empty');
 
   return typeName(cell.shiftTypeId);
@@ -66,7 +68,11 @@ export function cellLabelOf(
     t('rucniRaspored.cell.label', {
       name,
       weekday: date?.weekday ?? NO_TEXT,
-      date: date?.dayMonth ?? cell.date,
+      // STORY 21.18: `blagdan {name}` after the date, as the calendar's cells.
+      date:
+        date?.holiday === undefined
+          ? (date?.dayMonth ?? cell.date)
+          : `${date.dayMonth}${t('rucniRaspored.cell.separator')}${t('kalendar.holiday.label', { name: date.holiday })}`,
       value: valueText(cell, typeName),
     }),
   ];
@@ -102,7 +108,7 @@ export function CellMark({ cell }: { readonly cell: ManualCell }): ReactNode {
         cell.more && 'underline decoration-2 underline-offset-2',
       )}
     >
-      {cell.off ? t('rucniRaspored.offMark') : cell.letter}
+      {cell.off ? t('rucniRaspored.offMark') : cell.holiday === true ? <Star data-holiday-off className="size-3.5" /> : cell.letter}
       {cell.countedTeamId === null ? null : <span className="text-[0.625rem] leading-none">{t('rucniRaspored.countedMark')}</span>}
       {cell.source === CELL_ASSIGNED ? <PencilSimple className="absolute -right-0.5 -top-0.5 size-2.5" /> : null}
       {cell.source === CELL_ROTATION ? <Repeat className="absolute -right-0.5 -top-0.5 size-2.5" /> : null}

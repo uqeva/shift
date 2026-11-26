@@ -189,6 +189,8 @@ export const FEATURE_PUBLIC = {
     // Story 18.5: the loan mark and notice (UX-DR59), for the directory and *Danas*.
     'utils/loan-marks', // members, today
     'components/loan-notice-line', // today
+    // Story 21.18: the holiday's star and name (UX-DR78), for *Danas* and *Ručni raspored*.
+    'components/holiday-mark', // planning, today
     'hooks/use-loan-teams', // members, teams
     'utils/grid-keys', // today
     'utils/modifiers', // conflicts, hours, today

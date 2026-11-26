@@ -3,6 +3,7 @@ import { useId, type ReactNode } from 'react';
 import { Card } from '@/components/ui/card';
 import { PencilSimple } from '@/components/ui/icon';
 import type { MemberTeam } from '@/features/members/services/list';
+import { HolidayMark, HolidayOffWord } from '@/features/calendar/components/holiday-mark';
 import { LoanNoticeLine } from '@/features/calendar/components/loan-notice-line';
 import { dayEmptyMessageKey } from '@/features/calendar/utils/empty-day';
 import type { LoanNotice } from '@/features/calendar/utils/loan-marks';
@@ -29,7 +30,14 @@ import { t } from '@/lib/i18n';
 function renderShift(shift: TodayShift, index: number): ReactNode {
   return (
     <li key={`${String(index)}-${String(shift.teamId)}`} className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
-      <span className="font-semibold">{shift.name ?? t('kalendar.noRotation')}</span>
+      {/* STORY 21.18: a shift the holiday emptied reads *blagdan*, the star beside it. */}
+      {shift.name === null && shift.offForHoliday === true ? (
+        <span className="font-semibold">
+          <HolidayOffWord />
+        </span>
+      ) : (
+        <span className="font-semibold">{shift.name ?? t('kalendar.noRotation')}</span>
+      )}
       {shift.range === null ? null : <span className="tabular-nums">{shift.range}</span>}
       {shift.fromYesterday ? <span className="text-muted-foreground">{t('danas.today.fromYesterday')}</span> : null}
       {/* STORY 21.6 (UX-DR73): a Personal Shift is marked assigned, the pencil and `ručno`. */}
@@ -112,17 +120,22 @@ export function TodayCard({
   todayCase,
   ownTeam,
   loan,
+  holiday,
 }: {
   readonly todayCase: TodayCase;
   readonly ownTeam: MemberTeam | null;
   /** STORY 18.5: the viewer's loan covering today or ahead, under their team; absent with none. */
   readonly loan?: LoanNotice | undefined;
+  /** STORY 21.18 (UX-DR78): today's holiday name, the star and the name under the heading; absent with none. */
+  readonly holiday?: string | undefined;
 }): ReactNode {
   const headingId = useId();
+  const holidayMark = holiday === undefined ? null : <HolidayMark name={holiday} className="text-sm" />;
 
   if (todayCase.kind === CASE_DUTY) {
     return (
       <DutyBlock duty={todayCase.duty}>
+        {holidayMark}
         {/* STORY 13.7: a half day on a duty is named under the duty-block. */}
         {todayCase.half === undefined ? null : renderHalf(todayCase.half)}
         <OwnTeamLine team={ownTeam} />
@@ -140,6 +153,7 @@ export function TodayCard({
             ? t('danas.today.leave', { type: todayCase.typeName })
             : t(todayCaseMessageKey(todayCase.kind))}
         </h2>
+        {holidayMark}
         {renderDetail(todayCase)}
         <OwnTeamLine team={ownTeam} />
         {loan === undefined ? null : <LoanNoticeLine notice={loan} />}

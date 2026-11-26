@@ -1,4 +1,4 @@
-import { HOURS_FIGURE_BAND, HOURS_FIGURE_LEAVE, HOURS_FIGURE_TOTAL } from '@shift/domain';
+import { HOURS_FIGURE_BAND, HOURS_FIGURE_HOLIDAY, HOURS_FIGURE_LEAVE, HOURS_FIGURE_TOTAL } from '@shift/domain';
 import type { ReactNode } from 'react';
 
 import { StatTile, StatTileLabel, StatTileValue } from '@/components/ui/stat-tile';
@@ -23,7 +23,9 @@ import { t } from '@/lib/i18n';
  * `@/features/hours/services/my-hours`'s, in tabular numerals.
  *
  * Each hours figure that is more than 0 has an ⓘ beside it (story 7.14), which
- * asks for its explanation through `onExplain`.
+ * asks for its explanation through `onExplain`. *Sati na blagdan* (story
+ * 21.19) is a third tile after the shift count (the next row of the tile grid)
+ * only when the month has a worked holiday.
  *
  * Beside the figures, only when there are any, the shifts in unresolved
  * conflict (story 5.3d): `⚠`, hidden from readers, and the words that carry
@@ -59,6 +61,22 @@ export function HoursSummary({
             <StatTileValue>{t('sati.shiftCount', { count: view.shiftCount })}</StatTileValue>
           </div>
         </StatTile>
+        {view.holiday === undefined ? null : (
+          <StatTile>
+            <div className="min-w-0">
+              <StatTileLabel>{t('sati.holiday')}</StatTileLabel>
+              <StatTileValue>{t(view.holiday.key, view.holiday.values)}</StatTileValue>
+            </div>
+            {figureIsEmpty(view.holiday) ? null : (
+              <ExplainButton
+                figureName={t('sati.holiday')}
+                onPress={() => {
+                  onExplain({ code: HOURS_FIGURE_HOLIDAY });
+                }}
+              />
+            )}
+          </StatTile>
+        )}
       </div>
       {view.conflictCount === null ? null : (
         <p className="flex min-w-0 items-center gap-2 font-semibold">

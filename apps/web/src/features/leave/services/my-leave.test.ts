@@ -1,4 +1,4 @@
-import { halfDayShiftOf, leaveBalanceOf, leaveCostOf, leavePreviewOf } from '@shift/domain';
+import { halfDayShiftOf, leaveBalanceOf, leaveCostOf, leavePreviewOf, memberScheduleOfMonth } from '@shift/domain';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { ANNUAL_LEAVE_ID } from '@/features/absence-types/services/list';
@@ -1010,5 +1010,32 @@ describe("the sent line's hand-over (story 9.3)", () => {
     expect(arrived).toEqual({ shown: sent, clear: true, clearing: true });
     expect(leaveRequestSentStepOf(sent, {}, true)).toEqual({ shown: sent, clear: false, clearing: false });
     expect(leaveRequestSentStepOf(sent, {}, false)).toEqual({ shown: null, clear: false, clearing: false });
+  });
+});
+
+describe("the request form's cost over a holiday (story 21.19, R13.4)", () => {
+  it("a date a holiday emptied costs nothing; a 24-hour crew's worked holiday costs a day", () => {
+    const input = memberScheduleInputOf(pilot, pilot.viewer);
+    const working = new Set(input.workingShiftTypeIds);
+    const date = memberScheduleOfMonth(input, '2026-10').find((day) =>
+      day.shifts.some((shift) => shift.shiftTypeId !== null && working.has(shift.shiftTypeId)),
+    )!.date;
+    const team = pilot.viewer.memberships[0]!.teamId;
+    const holidayOn = (offOnHolidays: boolean): CalendarSnapshot => ({
+      ...pilot,
+      holidays: [{ id: 'holiday', date, name: 'Blagdan' }],
+      teams: pilot.teams.map((one) => ({ ...one, offOnHolidays: offOnHolidays && one.id === team })),
+    });
+    const costOn = (snapshot: CalendarSnapshot): number => {
+      const state = myLeaveRequestPreviewOf(readyOf(myLeaveOf(sourcesOf(snapshot), NOW)), date, date, ANNUAL_LEAVE_ID);
+
+      if (state?.kind !== LEAVE_PREVIEW_READY) throw new Error('no preview');
+
+      return state.preview.costInYearDays;
+    };
+
+    expect(costOn(pilot)).toBe(1);
+    expect(costOn(holidayOn(false))).toBe(1);
+    expect(costOn(holidayOn(true))).toBe(0);
   });
 });
