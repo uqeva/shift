@@ -90,6 +90,11 @@ Status: built, CI pending (branch `feat/21-10-member-schedule-versions`, no PR y
 
 No bad_spec loop. One reading of the frozen matrix is recorded here instead of edited: its *Cancel* row says a cancel of a version already in force is "refused (42501)"; a DELETE that RLS filters matches 0 rows and raises nothing, which `writeScheduleChange` reads as refused (`SOURCE_WRITE_REFUSED`) and the database case asserts as `rowCount` 0.
 
+### 2026-11-26 — CI run 1 on the pushed branch
+
+- `42P17` (infinite recursion detected in policy) on `member_schedule_versions`: the insert and delete policies selected from their own table under RLS, so every write and the claimless and suspended sweeps' writes failed (`rls-isolation`, `shift-reminders`, `claimless-account`, `suspended-organization`, and the e2e save downstream). Fixed in 0079 (not yet applied anywhere): the reads are two `private` definers, `member_schedule_version_insertable(organization, member, effective_from, source)` and `member_schedule_version_is_latest(organization, member, effective_from)`, `language sql volatile security definer set search_path = ''`, executable by `authenticated` alone, each answering only for an active admin of the tenant it is given (0064's `team_loan_team_refused` pattern). No policy reads `member_schedule_versions` now (the scaffold test pins it); provisioning's grantees inventory lists both.
+- Rebased onto 21.25 (#376): *Ručni raspored*'s row source keeps 21.25's structure (`teamHasRotationBy`, `jobRoleId`) with 21.10's `rowSourceOf` on top; 21.25's deferred entry owned by 21.10 is answered: `calendarMonthOf`'s person rule reads `scheduleSourceOn`, so a crew member on their own rotation or manual only all month is a person row (RESOLVED in part; a mid-month change stays open).
+
 ## Review Triage Log
 
 ### 2026-11-26 — Review pass 1
@@ -120,6 +125,8 @@ No bad_spec loop. One reading of the frozen matrix is recorded here instead of e
 ## Verification
 
 **Commands:** `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm --filter @shift/domain test`, `pnpm --filter @shift/ics test`, `pnpm --filter ./apps/web test`, and every DB-free root test file by name (`test/resource-hygiene`, `supabase-scaffold`, `localization-applied`, `notify-reminder`, `calendar-feed`, `remind`, `feature-boundaries`, the theme files, …: the 35 files that open no database).
+
+**Run 2026-11-26 (after the CI fix and the rebase onto 21.25):** typecheck and lint clean; build clean; domain 1106; ICS 34; web 198 files, 7202 tests; the 35 DB-free root files, 5496 tests. The DB tests and the e2e spec still run first in CI.
 
 **Run 2026-11-26 (after the review patches):** typecheck and lint clean; build clean; domain 25 files, 1106 tests; ICS 34; web 197 files, 7177 tests (`schedule-source.test.ts` 20); the 35 DB-free root files, 5476 tests.
 

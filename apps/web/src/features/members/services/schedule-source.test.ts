@@ -360,6 +360,21 @@ describe('the readers that follow a schedule source', () => {
     expect(cellOn('2026-10-05')).not.toHaveProperty('groups');
   });
 
+  it("reads a crew member on their own rotation all month as a person row of the paper grid, their days their own (21.25's entry)", async () => {
+    const calendar = await planningSnapshotOf({
+      scheduleVersions: [scheduleVersionRow(ANA, '2026-09-01', 'PERSONAL', PILOT_PATTERN, 'pilot-step-0')],
+    });
+    const people = (snapshot: CalendarSnapshot) =>
+      calendarMonthOf(snapshot, { mjesec: '2026-10' }, TODAY).peopleGroups.flatMap((group) => group.rows);
+
+    expect(people(plain).map((row) => row.memberId)).not.toContain(ANA);
+    const ana = people(calendar).find((row) => row.memberId === ANA);
+    // [Dan, Noć, Slobodno, Slobodno] from 09-01: 10-03 is Dan, 10-04 Noć, 10-05 off.
+    expect(ana?.cells.find((cell) => cell.date === '2026-10-03')?.cell?.shiftTypeId).toBe(DAN);
+    expect(ana?.cells.find((cell) => cell.date === '2026-10-04')?.cell?.shiftTypeId).toBe(NOC);
+    expect(ana?.cells.find((cell) => cell.date === '2026-10-05')?.cell).toBeNull();
+  });
+
   it('keeps the start step while a row edit keeps the pattern\'s length, and resets it otherwise', () => {
     const draft = draftOf({ patternId: NEW_PATTERN, rows: [{ shiftTypeId: DAN, count: '2' }, { shiftTypeId: SLOBODNO, count: '1' }], startStep: 2 });
 
