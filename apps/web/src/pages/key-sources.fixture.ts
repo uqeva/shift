@@ -54,6 +54,7 @@ import {
   MEMBER_LOAN_KEYS,
   MEMBER_SCHEDULE_SOURCE_KEYS,
   MEMBER_FLOATER_KEYS,
+  MEMBER_SEASON_KEYS,
   STAFFING_BLOCK,
   MEMBER_WRITE_KEYS,
   memberListKeys,
@@ -1923,7 +1924,9 @@ export const KEY_SOURCES = [
     file: MEMBER_CREATE,
     keys: translationKeys,
     // STORY 19.4: the level's Odaberi (O3).
-    strings: 20,
+    // 25 SINCE STORY 21.11: the optional season's legend, *Sezona od*, *Sezona do*, its hint, and the
+    // credential step's line for a season that did not land.
+    strings: 25,
   },
   {
     // EIGHTEEN on the edit form: its own heading, five field labels, save,
@@ -2063,7 +2066,10 @@ export const KEY_SOURCES = [
     // and *Timovi i raspored*'s button with its name.
     // 284 SINCE ITS REVIEW: the people rows' button and its name for a floater (*Zamjena · da*).
     // 285 SINCE STORY 21.14: the leave guard's line for a cover's assignment that stays.
-    strings: 285,
+    // 301 SINCE STORY 21.11: *Sezona* — the status card's button and its name, the saved line and the
+    // erased count, and the dialog (heading, close, lede, *Sezona od*, *Sezona do*, the hint, *Sprema se:*,
+    // the closed requests, the unchecked alert, *Odustani*, *Spremi sezonu*, and the erasure dialog's save).
+    strings: 301,
   },
   {
     // THIRTEEN on the member write path's rules: eleven `ljudi.form.error.*`
@@ -2200,6 +2206,15 @@ export const KEY_SOURCES = [
     file: MEMBER_SCHEDULE_SOURCE_KEYS,
     keys: messageKeyUnions,
     strings: 15,
+  },
+  {
+    // STORY 21.11: *Sezona*'s rules — a written row's two lines
+    // (`seasonRowMessageKey`) and the nine refusals' words
+    // (`seasonRefusalMessageKey`).
+    name: 'the season rules',
+    file: MEMBER_SEASON_KEYS,
+    keys: messageKeyUnions,
+    strings: 11,
   },
   {
     // ONE on the lockup: the accessible name it falls back to when the

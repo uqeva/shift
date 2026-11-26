@@ -6,6 +6,7 @@ import { CHECK_READY, CHECK_REFUSED, CHECK_UNAVAILABLE, type ErasureReads } from
 import { erasuresOf, type ErasureRow } from '@/features/conflicts/services/erasures';
 import {
   MEMBER_CHANGE_MOVE,
+  MEMBER_CHANGE_SEASON,
   MEMBER_CHANGE_STATUS,
   MEMBER_CHANGE_STATUS_WITHDRAW,
   MEMBER_CHANGE_TEAM_WITHDRAW,
@@ -205,6 +206,48 @@ describe('Deactivate', () => {
       ['2026-09-10', 'Smjena A', 'Dan'],
       ['2026-09-11', 'Smjena A', 'Noć'],
     ]);
+  });
+});
+
+describe('Season (story 21.11)', () => {
+  /** A season from the 15th to the 20th for the (active) viewer: out from the 5th, back on the 15th, out from the 21st. */
+  const season = (versions = [
+    { active: false, effectiveFrom: '2026-09-05' },
+    { active: true, effectiveFrom: '2026-09-15' },
+    { active: false, effectiveFrom: '2026-09-21' },
+  ]): MemberChange => ({ kind: MEMBER_CHANGE_SEASON, memberId: VIEWER_MEMBER, day: versions[0]?.effectiveFrom ?? TODAY, versions });
+
+  it('lists the conflicts outside the season and none inside it, from its first row on', () => {
+    const rows = rowsOf(plain, season(), [
+      recordOf('record-before', '2026-09-06', '2026-09-08'),
+      recordOf('record-inside', '2026-09-16', '2026-09-18'),
+      recordOf('record-after', '2026-09-22', '2026-09-23'),
+    ]);
+
+    expect(new Set(rows.map((row) => row.date.slice(0, 10)))).toEqual(new Set(['2026-09-06', '2026-09-07', '2026-09-22']));
+    expect(memberChangeSnapshotOf(plain, season(), TODAY)).toMatchObject({ ok: true, from: '2026-09-05', guarded: true });
+  });
+
+  it('appends after a scheduled version, and answers stale for a row on or before the latest one or before today', () => {
+    const scheduled = viewerWith({ statuses: [{ active: false, effectiveFrom: '2026-09-04' }] });
+    const after = [
+      { active: true, effectiveFrom: '2026-09-15' },
+      { active: false, effectiveFrom: '2026-09-21' },
+    ];
+    const applied = memberChangeSnapshotOf(scheduled, season(after), TODAY);
+
+    expect(applied.ok && applied.after.members.find((member) => member.id === VIEWER_MEMBER)?.statuses).toEqual([
+      { active: false, effectiveFrom: '2026-09-04' },
+      ...after,
+    ]);
+    expect(memberChangeSnapshotOf(scheduled, season([{ active: true, effectiveFrom: '2026-09-04' }]), TODAY)).toEqual({
+      ok: false,
+      code: MEMBER_STATUS_STALE,
+    });
+    expect(memberChangeSnapshotOf(plain, season([{ active: false, effectiveFrom: '2026-08-31' }]), TODAY)).toEqual({
+      ok: false,
+      code: MEMBER_STATUS_STALE,
+    });
   });
 });
 

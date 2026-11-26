@@ -3,6 +3,14 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 
 import { MEMBERS_LIST_KEY, MEMBERS_PAGE_HEADING_ID } from '@/features/members/services/list';
 import {
+  SEASON_DATES_MISSING,
+  seasonPlanOf,
+  writeSeason,
+  type SeasonRow,
+  type SeasonTable,
+  type SeasonWriteFailure,
+} from '@/features/members/services/season';
+import {
   MEMBER_ENTRY_EMAIL,
   MEMBER_ENTRY_NAME,
   MEMBER_ENTRY_USERNAME,
@@ -18,6 +26,7 @@ import {
   type IssuedCredential,
   type MemberFunctions,
   type MemberWriteRefusal,
+  MEMBER_STATUS_TABLE,
 } from '@/features/members/services/write';
 import { MEMBER_ADD_CREATED_ID, MEMBER_ADD_DIALOG_HEADING_ID } from '@/features/members/utils/element-ids';
 import { rankEditOf, ranksShownIn } from '@/features/members/utils/rank';
@@ -25,6 +34,7 @@ import {
   organizationTable,
   organizationSnapshotQueryOptions,
 } from '@/features/organization/services/snapshot';
+import { organizationIsoDate } from '@/lib/i18n/format';
 import { supabaseClient } from '@/lib/supabase/client';
 import { focusLater } from '@/utils/focus-later';
 import { trimName } from '@/utils/name';
@@ -81,6 +91,9 @@ export function useMemberCreate(adding: boolean, navigate: MemberAddNavigate) {
   const leaveField = useRef<HTMLInputElement>(null);
   const roleField = useRef<HTMLSelectElement>(null);
   const rankField = useRef<HTMLSelectElement>(null);
+  /** STORY 21.11: *Sezona od* and *Sezona do*, both empty for no season. */
+  const seasonStartField = useRef<HTMLInputElement>(null);
+  const seasonEndField = useRef<HTMLInputElement>(null);
   /** *Dodaj osobu*, where focus returns when the dialog closes. */
   const opener = useRef<HTMLButtonElement>(null);
   // WHETHER THE BUTTON OPENED THE DIALOG. A deep link to `?dodaj=1` did not,
@@ -116,6 +129,10 @@ export function useMemberCreate(adding: boolean, navigate: MemberAddNavigate) {
   // THE NAME AS ENTERED, for the second step's `Račun je izrađen: {name} ·
   // {username}` — the reply carries the username, not the name.
   const [createdName, setCreatedName] = useState(NO_TEXT);
+  /** STORY 21.11: why the entered season was refused before the create, or `null`. */
+  const [seasonRefusal, setSeasonRefusal] = useState<SeasonWriteFailure | null>(null);
+  /** STORY 21.11: the person was created, but their season did not land. */
+  const [seasonUnsaved, setSeasonUnsaved] = useState(false);
 
   // THE CHROME'S OWN READ POLICY, through the one factory the edit screen uses
   // too: a second consumer of one cache entry, not a second policy on it.
@@ -248,9 +265,36 @@ export function useMemberCreate(adding: boolean, navigate: MemberAddNavigate) {
 
     const { role: chosenLevel, leaveAllowanceDays } = choice;
 
+    // STORY 21.11: A SEASON, when either date is entered — both, valid, from
+    // the organization's today on — checked before anything is created.
+    const seasonStart = seasonStartField.current?.value ?? NO_TEXT;
+    const seasonEnd = seasonEndField.current?.value ?? NO_TEXT;
+    let season: { readonly rows: readonly SeasonRow[]; readonly start: string; readonly end: string } | null = null;
+
+    if (seasonStart !== NO_TEXT || seasonEnd !== NO_TEXT) {
+      const zone = snapshot.data?.ok === true ? snapshot.data.snapshot.timezone : null;
+      const planned =
+        zone === null
+          ? ({ ok: false, code: SEASON_DATES_MISSING } as const)
+          : seasonPlanOf([], organizationIsoDate(new Date(), zone), seasonStart, seasonEnd);
+
+      if (!planned.ok) {
+        setFailure(null);
+        setInvalidField(null);
+        setSeasonRefusal(planned.code);
+        seasonStartField.current?.focus();
+
+        return;
+      }
+
+      season = { rows: planned.rows, start: seasonStart, end: seasonEnd };
+    }
+
     issuing.current = true;
     setFailure(null);
     setInvalidField(null);
+    setSeasonRefusal(null);
+    setSeasonUnsaved(false);
     setPending(true);
 
     try {
@@ -278,6 +322,25 @@ export function useMemberCreate(adding: boolean, navigate: MemberAddNavigate) {
       // (`features/teams/services/dependents.test.ts` pins both). The order is
       // kept anyway: the one unrecoverable value in this system is shown before
       // anything else is awaited, so no later step can take it down.
+      // STORY 21.11: THE SEASON, right after the create and as the caller,
+      // through 0085's policy in one insert; a refusal keeps the credential
+      // and says the person was added without it.
+      if (season !== null) {
+        const memberId = outcome.credential.memberId;
+        const written =
+          memberId === null
+            ? ({ ok: false } as const)
+            : await writeSeason(
+                supabaseClient().from(MEMBER_STATUS_TABLE) as unknown as SeasonTable,
+                form.organizationId,
+                memberId,
+                season,
+                null,
+              );
+
+        if (!written.ok) setSeasonUnsaved(true);
+      }
+
       setCredential(outcome.credential);
       setCreatedName(trimName(name.value));
       // THE FORM AND ITS FOCUSED SUBMIT ARE GONE: focus moves to the line
@@ -328,6 +391,8 @@ export function useMemberCreate(adding: boolean, navigate: MemberAddNavigate) {
     setCreatedName(NO_TEXT);
     setFailure(null);
     setInvalidField(null);
+    setSeasonRefusal(null);
+    setSeasonUnsaved(false);
     setFormKey((key) => key + 1);
   }
 
@@ -372,6 +437,10 @@ export function useMemberCreate(adding: boolean, navigate: MemberAddNavigate) {
     leaveField,
     roleField,
     rankField,
+    seasonStartField,
+    seasonEndField,
+    seasonRefusal,
+    seasonUnsaved,
     opener,
     shown,
     formKey,

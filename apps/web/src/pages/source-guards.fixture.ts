@@ -519,6 +519,10 @@ export const MEMBER_EDIT: readonly string[] = [
   // `MEMBER_FLOATER_KEYS`, a key source of its own.
   join(MEMBERS_FEATURE, 'hooks', 'use-member-floater.ts'),
   join(MEMBERS_FEATURE, 'components', 'member-floater-card.tsx'),
+  // STORY 21.11: the status card's *Sezona*, its hook and its dialog. Its
+  // rules are `MEMBER_SEASON_KEYS`, a key source of its own.
+  join(MEMBERS_FEATURE, 'hooks', 'use-member-season.ts'),
+  join(MEMBERS_FEATURE, 'components', 'member-season-dialog.tsx'),
 ];
 
 /** The two team pages, which only compose (source structure B6), and their hooks. */
@@ -900,6 +904,9 @@ export const MEMBER_FLOATER_KEYS = join(srcRoot, 'features', 'members', 'service
 /** Story 21.10: *Raspored osobe*'s rules — a source's name and each refusal's words. */
 export const MEMBER_SCHEDULE_SOURCE_KEYS = join(srcRoot, 'features', 'members', 'services', 'schedule-source.ts');
 
+/** Story 21.11: *Sezona*'s rules — each written row's line and each refusal's words. */
+export const MEMBER_SEASON_KEYS = join(srcRoot, 'features', 'members', 'services', 'season.ts');
+
 /** Story 11.2: the short-staffed block, drawn in every *Što se mijenja* a save that can cause one has. */
 export const STAFFING_BLOCK = join(srcRoot, 'features', 'staffing', 'components', 'short-staffed-block.tsx');
 
@@ -1120,7 +1127,8 @@ export const SCREENS = [
   // ELEVEN SINCE STORY 7.13b, a dialog in two steps: the link back to the list
   // is gone (the dialog's close is the primitive's own), and the second step
   // adds *Dodaj još jednu* and *Otvori stranicu osobe*.
-  { name: 'the member create form', file: MEMBER_CREATE, expectedFields: 6, expectedButtons: 5 },
+  // EIGHT FIELDS SINCE STORY 21.11: the optional *Sezona od* and *Sezona do*.
+  { name: 'the member create form', file: MEMBER_CREATE, expectedFields: 8, expectedButtons: 5 },
   // TWELVE on the edit form: the same eight, plus the admin-issued reset's
   // FOUR `<Button>`s — the offer, the confirm and cancel that replace it, and
   // the dismiss on the shown credential. Four and not one, because the reset is
@@ -1182,7 +1190,9 @@ export const SCREENS = [
   // TWENTY-THREE FIELDS AND FIFTY-FOUR BUTTONS SINCE STORY 21.10: *Raspored osobe*'s *Vrijedi od*, *Uzorak*, a step's type and count, and *Početni korak*; its card's *Promijeni raspored* and *Povuci*, its form's *Ukloni korak*, *Dodaj korak*, *Odustani* and *Dalje*, and its preview's *Natrag na uređivanje* and *Spremi*.
   // 58 SINCE STORY 21.13: *Zamjena*'s card button and its dialog's three, with the one on
   // *Timovi i raspored*'s people rows (the card's file holds both).
-  { name: 'the member edit form', file: MEMBER_EDIT, expectedFields: 23, expectedButtons: 58 },
+  // 25 FIELDS AND 61 BUTTONS SINCE STORY 21.11: *Sezona*'s two dates, the status card's *Sezona*, and its
+  // dialog's *Odustani* and *Spremi sezonu*.
+  { name: 'the member edit form', file: MEMBER_EDIT, expectedFields: 25, expectedButtons: 61 },
   // STORY 1.7a. FOUR on the team list: the link back to `Ljudi`, the one name
   // `<Input>`, the add `<Button>`, and ONE row link written once inside the map
   // over the teams — the same count at zero teams as at nine. SIX on one team:

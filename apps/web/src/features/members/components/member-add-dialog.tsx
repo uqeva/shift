@@ -14,6 +14,7 @@ import { t } from '@/lib/i18n';
 import { useWriteGate } from '@/lib/offline/use-write-gate';
 import { CredentialLine } from '@/features/members/components/credential-line';
 import type { MemberCreate } from '@/features/members/hooks/use-member-create';
+import { seasonRefusalMessageKey } from '@/features/members/services/season';
 import { memberLevelMessageKey } from '@/features/members/services/list';
 import {
   LEAVE_ALLOWANCE_MAX,
@@ -23,6 +24,9 @@ import {
   MEMBER_ADD_CREATED_ID,
   MEMBER_ADD_DIALOG_HEADING_ID,
   MEMBER_ADD_ERROR_ID,
+  MEMBER_ADD_SEASON_ERROR_ID,
+  MEMBER_ADD_SEASON_HINT_AND_ERROR,
+  MEMBER_ADD_SEASON_HINT_ID,
   MEMBER_ADD_USERNAME_HINT_AND_ERROR,
   MEMBER_ADD_USERNAME_HINT_ID,
 } from '@/features/members/utils/element-ids';
@@ -69,6 +73,10 @@ export function MemberAddDialog({ create }: { readonly create: MemberCreate }): 
     leaveField,
     roleField,
     rankField,
+    seasonStartField,
+    seasonEndField,
+    seasonRefusal,
+    seasonUnsaved,
     shown,
     formKey,
     pending,
@@ -110,6 +118,8 @@ export function MemberAddDialog({ create }: { readonly create: MemberCreate }): 
         </div>
         <p className="text-sm font-medium">{t('ljudi.form.credentialOnce')}</p>
         <p className="text-sm text-muted-foreground">{t('ljudi.form.noTeam')}</p>
+        {/* STORY 21.11: the person exists; only the season did not land. */}
+        {seasonUnsaved ? <Notice role="alert">{t('ljudi.season.addUnsaved')}</Notice> : null}
         <DialogFooter>
           {/* A LINK, and only when the reply named the row: a blank id has no
               page to open, and the password above is shown regardless. It
@@ -327,6 +337,46 @@ export function MemberAddDialog({ create }: { readonly create: MemberCreate }): 
             />
           </InputGroup>
         </div>
+        {/* STORY 21.11: an optional season, written right after the create. */}
+        <fieldset className="grid gap-3">
+          <legend className="text-sm font-medium">{t('ljudi.season.addLegend')}</legend>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-2">
+              <Label htmlFor="member-add-season-start">{t('ljudi.season.start')}</Label>
+              <Input
+                ref={seasonStartField}
+                id="member-add-season-start"
+                name="seasonStart"
+                type="date"
+                defaultValue={NO_TEXT}
+                aria-invalid={seasonRefusal !== null}
+                aria-describedby={seasonRefusal === null ? MEMBER_ADD_SEASON_HINT_ID : MEMBER_ADD_SEASON_HINT_AND_ERROR}
+                className="h-11"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="member-add-season-end">{t('ljudi.season.end')}</Label>
+              <Input
+                ref={seasonEndField}
+                id="member-add-season-end"
+                name="seasonEnd"
+                type="date"
+                defaultValue={NO_TEXT}
+                aria-invalid={seasonRefusal !== null}
+                aria-describedby={seasonRefusal === null ? MEMBER_ADD_SEASON_HINT_ID : MEMBER_ADD_SEASON_HINT_AND_ERROR}
+                className="h-11"
+              />
+            </div>
+          </div>
+          <p id={MEMBER_ADD_SEASON_HINT_ID} className="text-sm text-muted-foreground">
+            {t('ljudi.season.addHint')}
+          </p>
+          {seasonRefusal === null ? null : (
+            <Notice id={MEMBER_ADD_SEASON_ERROR_ID} role="alert">
+              {t(seasonRefusalMessageKey(seasonRefusal))}
+            </Notice>
+          )}
+        </fieldset>
         <OfflineWriteNote gate={gate} />
         <DialogFooter>
           <Button className="h-11" type="button" variant="outline" disabled={pending} onClick={close}>

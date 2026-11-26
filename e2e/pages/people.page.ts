@@ -529,6 +529,16 @@ export class PeoplePage extends BasePage {
     return this.page.getByRole('button', { name: fill(hr.ljudi.status.withdrawConfirm, { name }) });
   }
 
+  /** STORY 21.11: *Sezona* in the status card's header, named for the member: it opens the season dialog. */
+  seasonButton(name: string): Locator {
+    return this.page.getByRole('button', { name: fill(hr.ljudi.season.open, { name }), exact: true });
+  }
+
+  /** STORY 21.11: the season dialog. */
+  get seasonDialog(): Locator {
+    return this.page.getByRole('dialog', { name: hr.ljudi.season.heading, exact: true });
+  }
+
   /** Deactivates the open member from the dialog's default date: the header button, then the action. */
   async deactivate(name: string): Promise<void> {
     await this.deactivateButton(name).click();

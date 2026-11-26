@@ -689,11 +689,11 @@ export function memberLatestVersion(member: MemberListRow): MemberStatusVersion 
  * A member's status as at the organization's today, and the change scheduled
  * after it.
  *
- * AT MOST ONE CHANGE IS SCHEDULED. `0008` admits a new version only while the
- * member's latest one is already in effect, so the latest version is the only
- * one that can be dated after today — and when it is, it is the scheduled
- * change. `scheduled` is exactly that: the latest version, when it is dated
- * after today.
+ * SEVERAL CHANGES MAY BE SCHEDULED since story 21.11 (`0085`: a season sets
+ * its start and its end at once), still in date order and alternating.
+ * `upcoming` is every version dated after today, in date order; `scheduled`
+ * is the latest of them, the one change a withdrawal may cancel (only the
+ * latest version is, `0008`'s delete policy).
  */
 export interface MemberStatus {
   readonly activeToday: boolean;
@@ -703,8 +703,10 @@ export interface MemberStatus {
    * yet.
    */
   readonly since: string | null;
-  /** The latest version when it is dated after today, or `null`. */
+  /** The latest version when it is dated after today, or `null`: the cancellable one. */
   readonly scheduled: MemberStatusVersion | null;
+  /** Every version dated after today, in date order: the next change first. Empty for none. */
+  readonly upcoming: readonly MemberStatusVersion[];
 }
 
 export function memberStatusOf(member: MemberListRow, today: string): MemberStatus {
@@ -720,6 +722,7 @@ export function memberStatusOf(member: MemberListRow, today: string): MemberStat
     activeToday: memberActiveOn(member, today),
     since,
     scheduled: latest !== null && latest.effectiveFrom > today ? latest : null,
+    upcoming: member.statusVersions.filter((version) => version.effectiveFrom > today),
   };
 }
 
@@ -1388,22 +1391,23 @@ export const MEMBER_COLUMNS: readonly MemberColumn[] = [
 /** The status column's cell for a member as at `today`, from {@link memberStatusOf}. */
 export function statusCellOf(member: MemberListRow, today: string): StatusCell {
   const status = memberStatusOf(member, today);
+  const next = status.upcoming[0];
 
   return {
     kind: STATUS_CELL,
     activeToday: status.activeToday,
-    scheduled:
-      status.scheduled === null
-        ? null
-        : { active: status.scheduled.active, from: status.scheduled.effectiveFrom },
+    // THE NEXT CHANGE (story 21.11): a season scheduled ahead says when it starts, not when it ends.
+    scheduled: next === undefined ? null : { active: next.active, from: next.effectiveFrom },
   };
 }
 
-/** Where a status sorts: active 0, active with a deactivation scheduled 1, inactive with a reactivation scheduled 2, inactive 3. */
+/** Where a status sorts: active 0, active with a deactivation scheduled 1, inactive with a reactivation scheduled 2, inactive 3 — by the next change. */
 function statusRankOf(status: MemberStatus): number {
-  if (status.activeToday) return status.scheduled === null ? 0 : 1;
+  const scheduled = status.upcoming.length > 0;
 
-  return status.scheduled === null ? 3 : 2;
+  if (status.activeToday) return scheduled ? 1 : 0;
+
+  return scheduled ? 2 : 3;
 }
 
 /**

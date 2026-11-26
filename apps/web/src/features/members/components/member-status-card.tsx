@@ -23,6 +23,7 @@ import { ShortStaffedBlock } from '@/features/staffing/components/short-staffed-
 import { t } from '@/lib/i18n';
 import { formatIsoDayMonth, isIsoDate } from '@/lib/i18n/format';
 import type { MemberEdit } from '@/features/members/hooks/use-member-edit';
+import { MemberSeasonDialog } from '@/features/members/components/member-season-dialog';
 import { memberErasureCopyOf } from '@/features/members/utils/erasure-copy';
 import { type MemberListRow } from '@/features/members/services/list';
 import { deactivationClosedRangesText } from '@/features/members/services/deactivation-requests';
@@ -83,6 +84,7 @@ export function MemberStatusCard({ edit }: { readonly edit: MemberEdit }): React
     armStatus,
     statusErased,
     statusDialog,
+    season,
   } = edit;
 
   /**
@@ -102,17 +104,21 @@ export function MemberStatusCard({ edit }: { readonly edit: MemberEdit }): React
         </p>
         {/* A SCHEDULED CHANGE STANDS OUT (design refresh C): it is the one
             line here about the future, so it sits in a callout of its own. */}
-        {status.scheduled === null ? null : (
+        {/* STORY 21.11: EVERY CHANGE SCHEDULED, in date order (a season sets
+            its start and its end at once); *Poništi* withdraws the latest. */}
+        {status.upcoming.length === 0 ? null : (
           <Callout>
             <CalloutBody>
               <IconTile variant="primary">
                 <ClockCountdown />
               </IconTile>
-              <p className="self-center text-sm font-medium">
-                {t(statusScheduledMessageKey(status.scheduled.active), {
-                  date: shownDate(status.scheduled.effectiveFrom),
-                })}
-              </p>
+              <ul className="grid gap-1 self-center text-sm font-medium">
+                {status.upcoming.map((version) => (
+                  <li key={version.effectiveFrom}>
+                    {t(statusScheduledMessageKey(version.active), { date: shownDate(version.effectiveFrom) })}
+                  </li>
+                ))}
+              </ul>
             </CalloutBody>
           </Callout>
         )}
@@ -137,6 +143,14 @@ export function MemberStatusCard({ edit }: { readonly edit: MemberEdit }): React
             {t(statusOfferMessageKey(WITHDRAW), { name: member.name })}
           </Button>
         ) : null}
+        {season.saved === null ? null : (
+          <Notice role="status">
+            <span className="block">{t('ljudi.season.saved')}</span>
+            {season.saved.erased === 0 ? null : (
+              <span className="mt-2 block">{t('ljudi.erasures.removed', { count: season.saved.erased })}</span>
+            )}
+          </Notice>
+        )}
         {statusConfirmed ? (
           <Notice role="status">
             <span className="block">{t('ljudi.status.saved')}</span>
@@ -165,6 +179,21 @@ export function MemberStatusCard({ edit }: { readonly edit: MemberEdit }): React
               {t('ljudi.status.heading')}
             </h2>
           </CardTitle>
+          <div className="flex flex-wrap items-center gap-2">
+          {/* STORY 21.11: *Sezona* — active from a start to an end, in one step. */}
+          {season.offered ? (
+            <Button
+              ref={season.opener}
+              className="h-11"
+              type="button"
+              variant="outline"
+              aria-label={t('ljudi.season.open', { name: member.name })}
+              disabled={statusPending || season.pending}
+              onClick={season.openDialog}
+            >
+              {t('ljudi.season.action')}
+            </Button>
+          ) : null}
           {/* ITS ACCESSIBLE NAME CARRIES THE MEMBER; its visible word is the action. */}
           {action === null ? null : (
             <Button
@@ -179,12 +208,14 @@ export function MemberStatusCard({ edit }: { readonly edit: MemberEdit }): React
               {t(statusActionMessageKey(action.change))}
             </Button>
           )}
+          </div>
         </CardHeader>
         {renderStatus(member, offer)}
       </Card>
       <MemberStatusDialog edit={edit} />
       <MemberStatusWithdrawal edit={edit} />
       <MemberStatusErasures edit={edit} />
+      <MemberSeasonDialog season={season} name={member.name} />
     </>
   );
 }

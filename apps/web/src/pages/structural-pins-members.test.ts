@@ -1878,7 +1878,8 @@ describe('the two member forms write through the seam and keep nothing back', ()
       name: 'the member create form',
       file: MEMBER_CREATE,
       // B298: the name, the username and the address, refused by the form itself.
-      marked: ['member-leave', 'member-name', 'member-username', 'member-email'],
+      // STORY 21.11: the optional season's two dates, marked by its own refusal.
+      marked: ['member-leave', 'member-name', 'member-username', 'member-email', 'member-add-season-start', 'member-add-season-end'],
       leaveId: "id=\"member-leave\"",
       leaveMark: "aria-invalid={invalidField === 'member-leave'}",
     },

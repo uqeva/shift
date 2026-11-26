@@ -1165,6 +1165,30 @@ export interface StoredScheduleVersion {
   readonly offsetStepId: string | null;
 }
 
+/** One status version as `member_status_versions` holds it (story 21.11). */
+export interface StoredStatusVersion {
+  readonly active: boolean;
+  readonly effectiveFrom: string;
+}
+
+/** Every status version of `memberId`, by date, in SQL (story 21.11's season). */
+export async function statusVersionsOfInSql(slug: string, memberId: string): Promise<StoredStatusVersion[]> {
+  const client = await connect();
+  try {
+    const { rows } = await client.query<StoredStatusVersion>(
+      `select v.active, v.effective_from::text as "effectiveFrom"
+         from member_status_versions v join organizations o on o.id = v.organization_id
+        where o.slug = $1 and v.member_id = $2
+        order by v.effective_from`,
+      [slug, memberId],
+    );
+
+    return rows;
+  } finally {
+    await client.end();
+  }
+}
+
 /** Every schedule version of `memberId`, by date, in SQL (story 21.10). */
 export async function scheduleVersionsOfInSql(slug: string, memberId: string): Promise<StoredScheduleVersion[]> {
   const client = await connect();

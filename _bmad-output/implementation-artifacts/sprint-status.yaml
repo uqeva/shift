@@ -754,7 +754,7 @@ development_status:
   21-8-swaps-give-and-take-personal-shifts: review  # built, CI pending; feat/21-8-personal-swaps (0083, merges after 21.20's 0082), no PR yet
   21-9-the-schedule-source-rule-in-the-domain: done  # PR #373, squash 0163497, CI green
   21-10-an-admin-gives-a-member-their-own-rotation-or-makes-them-man: done  # PR #377, squash 14b3e58, CI green (0079); Ljudi directory label deferred
-  21-11-a-seasonal-member-s-season-is-set-in-one-step: ready-for-dev  # independent
+  21-11-a-seasonal-member-s-season-is-set-in-one-step: review  # built, CI pending; feat/21-11-seasons (0085), no PR yet; independent
   21-12-job-roles-are-organization-data: done  # PR #371, squash e1b6a65, CI green (0078)
   21-13-floaters-are-suggested-for-an-uncovered-shift-by-role: review  # built, CI pending; feat/21-13-21-14-floaters (0084)
   21-14-a-floater-covers-a-whole-leave-in-one-action: review  # built, CI pending; feat/21-13-21-14-floaters (no migration)

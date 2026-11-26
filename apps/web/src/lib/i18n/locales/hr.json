@@ -1464,6 +1464,36 @@
       "cancel": "Odustani od promjene statusa",
       "saved": "Promjena statusa je spremljena."
     },
+    "season": {
+      "heading": "Sezona",
+      "action": "Sezona",
+      "open": "Postavi sezonu osobi {name}",
+      "lede": "Osoba je aktivna samo u sezoni: prije i poslije nje ne ulazi u rasporede i ne može se prijaviti.",
+      "start": "Sezona od",
+      "end": "Sezona do",
+      "hint": "Najranije {date}. Raspored u sezoni postavljaš u kartici Raspored osobe ili u Ručnom rasporedu.",
+      "planHeading": "Sprema se:",
+      "rowActive": "aktivna od {date}",
+      "rowInactive": "neaktivna od {date}",
+      "requests": "{count, plural, one {Zatvara se # zahtjev za odsutnost koji čeka odluku} few {Zatvaraju se # zahtjeva za odsutnost koji čekaju odluku} other {Zatvara se # zahtjeva za odsutnost koji čekaju odluku}}: {ranges}.",
+      "save": "Spremi sezonu",
+      "cancel": "Odustani od sezone",
+      "saved": "Sezona je spremljena.",
+      "addLegend": "Sezona (neobavezno)",
+      "addHint": "Za sezonskog radnika: aktivan je samo od prvog do zadnjeg dana sezone. Prazno: osoba je aktivna od danas.",
+      "addUnsaved": "Osoba je dodana, ali sezona nije spremljena. Postavi je na stranici osobe, u kartici Status.",
+      "error": {
+        "dates": "Upiši prvi i zadnji dan sezone.",
+        "past": "Sezona ne može početi prije današnjeg dana.",
+        "scheduled": "Sezona može početi tek nakon već zakazane promjene statusa.",
+        "order": "Zadnji dan sezone ne može biti prije prvog.",
+        "tooLate": "Zadnji dan sezone mora biti prije 31.12.9999.",
+        "self": "Svoj status ne možeš mijenjati.",
+        "stale": "Status osobe se u međuvremenu promijenio. Pogledaj ga ponovno.",
+        "lastAdmin": "Organizacija bi ostala bez aktivnog administratora.",
+        "unavailable": "Sezona nije spremljena. Pokušaj ponovno."
+      }
+    },
     "erasures": {
       "title": "{count, plural, one {Promjena uklanja # odsutnost u smjeni koja čeka odluku} few {Promjena uklanja # odsutnosti u smjeni koje čekaju odluku} other {Promjena uklanja # odsutnosti u smjeni koje čekaju odluku}}",
       "lede": "{count, plural, one {Ova promjena uklanja uzrok # odsutnosti u smjeni koja čeka odluku.} few {Ova promjena uklanja uzrok # odsutnosti u smjeni koje čekaju odluku.} other {Ova promjena uklanja uzrok # odsutnosti u smjeni koje čekaju odluku.}} Prije potvrde odluči za svaku.",

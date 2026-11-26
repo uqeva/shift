@@ -6185,56 +6185,109 @@ describe('versions append in date order, each one changes something, and a sched
   );
 
   it.skipIf(noDatabase).each(FIXTURES)(
-    'refuses a second $fixture change while one is already scheduled',
+    'schedules a $fixture change after a scheduled one while they alternate (story 21.11), and refuses one that repeats it',
     async ({ slug, admin }) => {
-      // AT MOST ONE VERSION AFTER TODAY. "Inactive from day 7" then "active
-      // from day 14" is in date order and changes something each time, and
-      // still stacks two scheduled changes the surface cannot show and only
-      // the reverse order could cancel.
+      // 0085: A SEASON SCHEDULES SEVERAL CHANGES. "Inactive from day 7" then
+      // "active from day 14" is in date order and changes something each
+      // time, so it is admitted; "inactive from day 20" after it too. A
+      // second inactive version straight after the first changes nothing.
       await inRolledBackTransaction(async (client) => {
         const caller = await memberByUsername(client, slug, admin);
         const target = await addThrowawayMember(client, caller.organizationId);
+        const out = await organizationDay(client, caller.organizationId, 7);
+        const back = await organizationDay(client, caller.organizationId, 14);
+        const again = await organizationDay(client, caller.organizationId, 20);
+        const repeat = await organizationDay(client, caller.organizationId, 25);
 
         await actAs(client, caller.authUserId, caller.organizationId);
-        const first = await insertVersion(client, {
-          organization: caller.organizationId,
-          member: target.id,
-          active: false,
-          from: await organizationDay(client, caller.organizationId, 7),
-        });
-        const second = await refusedThenContinue(client, async () =>
-          insertVersion(client, {
-            organization: caller.organizationId,
-            member: target.id,
-            active: true,
-            from: await organizationDay(client, caller.organizationId, 14),
-          }),
+        const first = await insertVersion(client, { organization: caller.organizationId, member: target.id, active: false, from: out });
+        const second = await insertVersion(client, { organization: caller.organizationId, member: target.id, active: true, from: back });
+        const third = await insertVersion(client, { organization: caller.organizationId, member: target.id, active: false, from: again });
+        const repeated = await refusedThenContinue(client, () =>
+          insertVersion(client, { organization: caller.organizationId, member: target.id, active: false, from: repeat }),
         );
         await actAsOwner(client);
 
-        expect(first.rowCount, 'the first scheduled change was refused').toBe(1);
-        expect(second.code, 'a second change was scheduled on top of the first').toBe('42501');
-        expect(await versionsOf(client, target.id)).toHaveLength(1);
+        expect([first.rowCount, second.rowCount, third.rowCount], 'a change after a scheduled one was refused').toEqual([1, 1, 1]);
+        expect(repeated.code, 'a version repeating the latest state was admitted').toBe('42501');
+        expect((await versionsOf(client, target.id)).map((version) => [version.from, version.active])).toEqual([
+          [out, false],
+          [back, true],
+          [again, false],
+        ]);
+      });
+    },
+  );
 
-        // THE CONTROL: once the first is in effect, the next may be scheduled.
-        const inEffect = await addThrowawayMember(client, caller.organizationId);
-        await ownerVersion(client, {
-          organization: caller.organizationId,
-          member: inEffect.id,
-          active: false,
-          from: await organizationDay(client, caller.organizationId),
-          by: caller.authUserId,
-        });
+  it.skipIf(noDatabase).each(FIXTURES)(
+    "writes a $fixture season in one multi-row insert, cancels only its latest row, and the member is active inside it alone (story 21.11)",
+    async ({ slug, admin }) => {
+      // THE MEMBER PAGE'S *SEZONA*: an active member, a season from day 5 to
+      // day 9 — inactive from today, active from day 5, inactive from day 10 —
+      // as ONE statement, each row judged against the rows before it.
+      await inRolledBackTransaction(async (client) => {
+        const caller = await memberByUsername(client, slug, admin);
+        const target = await addThrowawayMember(client, caller.organizationId);
+        const today = await organizationDay(client, caller.organizationId);
+        const start = await organizationDay(client, caller.organizationId, 5);
+        const after = await organizationDay(client, caller.organizationId, 10);
+
         await actAs(client, caller.authUserId, caller.organizationId);
-        const next = await insertVersion(client, {
-          organization: caller.organizationId,
-          member: inEffect.id,
-          active: true,
-          from: await organizationDay(client, caller.organizationId, 14),
-        });
+        const season = await client.query(
+          `insert into member_status_versions (organization_id, member_id, active, effective_from)
+           values ($1, $2, false, $3::date), ($1, $2, true, $4::date), ($1, $2, false, $5::date)`,
+          [caller.organizationId, target.id, today, start, after],
+        );
+        // ONLY THE LATEST IS CANCELLABLE: the start is refused (0 rows), the end is withdrawn.
+        const notLatest = await cancelVersion(client, { member: target.id, from: start });
         await actAsOwner(client);
 
-        expect(next.rowCount, 'a change after one in effect was refused').toBe(1);
+        expect(season.rowCount, 'the season was refused').toBe(3);
+        expect(notLatest.rowCount, "a season's start was cancelled while its end stood").toBe(0);
+
+        const { rows } = await client.query<{ day: string; active: boolean }>(
+          `select day::date::text as day, public.member_active_on($1, day::date) as active
+             from generate_series(public.organization_today($2) - 1,
+                                  public.organization_today($2) + 12,
+                                  interval '1 day') as day`,
+          [target.id, caller.organizationId],
+        );
+        for (const { day, active } of rows) {
+          expect(active, `${slug} status as at ${day}`).toBe(day < today || (day >= start && day < after));
+        }
+
+        await actAs(client, caller.authUserId, caller.organizationId);
+        const end = await cancelVersion(client, { member: target.id, from: after });
+        await actAsOwner(client);
+
+        expect(end.rowCount, "the season's end was not cancellable").toBe(1);
+        expect((await versionsOf(client, target.id)).map((version) => version.from)).toEqual([today, start]);
+      });
+    },
+  );
+
+  it.skipIf(noDatabase).each(FIXTURES)(
+    'refuses a $fixture multi-row season whose rows do not alternate, writing none of them',
+    async ({ slug, admin }) => {
+      await inRolledBackTransaction(async (client) => {
+        const caller = await memberByUsername(client, slug, admin);
+        const target = await addThrowawayMember(client, caller.organizationId);
+        const start = await organizationDay(client, caller.organizationId, 5);
+        const after = await organizationDay(client, caller.organizationId, 10);
+
+        await actAs(client, caller.authUserId, caller.organizationId);
+        // An ACTIVE member made active from day 5: the first row changes nothing.
+        const refusal = await refusedThenContinue(client, () =>
+          client.query(
+            `insert into member_status_versions (organization_id, member_id, active, effective_from)
+             values ($1, $2, true, $3::date), ($1, $2, false, $4::date)`,
+            [caller.organizationId, target.id, start, after],
+          ),
+        );
+        await actAsOwner(client);
+
+        expect(refusal.code, 'a season that does not alternate was admitted').toBe('42501');
+        expect(await versionsOf(client, target.id)).toEqual([]);
       });
     },
   );

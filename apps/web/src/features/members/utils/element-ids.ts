@@ -61,6 +61,10 @@ export const MEMBER_ADD_CREATED_ID = 'member-add-created';
 /** The username's hint, which describes the field; with the refusal beside it once there is one. */
 export const MEMBER_ADD_USERNAME_HINT_ID = 'member-username-hint';
 export const MEMBER_ADD_USERNAME_HINT_AND_ERROR = `${MEMBER_ADD_USERNAME_HINT_ID} ${MEMBER_ADD_ERROR_ID}`;
+/** STORY 21.11: *Nova osoba*'s optional season. */
+export const MEMBER_ADD_SEASON_HINT_ID = 'member-add-season-hint';
+export const MEMBER_ADD_SEASON_ERROR_ID = 'member-add-season-error';
+export const MEMBER_ADD_SEASON_HINT_AND_ERROR = `${MEMBER_ADD_SEASON_HINT_ID} ${MEMBER_ADD_SEASON_ERROR_ID}`;
 
 /** *Raspored osobe* (story 21.10): the card's heading, its dialogs' titles, its fields and its refusal. */
 export const MEMBER_SCHEDULE_HEADING_ID = 'member-schedule-heading';
@@ -74,6 +78,16 @@ export const MEMBER_SCHEDULE_START_ID = 'member-schedule-start';
 export const MEMBER_SCHEDULE_START_HINT_ID = 'member-schedule-start-hint';
 export const MEMBER_SCHEDULE_ERROR_ID = 'member-schedule-error';
 export const MEMBER_SCHEDULE_ERASURES_ID = 'member-schedule-erasures';
+
+/** STORY 21.11: the status card's *Sezona* dialog. */
+export const MEMBER_SEASON_DIALOG_HEADING_ID = 'member-season-heading';
+export const MEMBER_SEASON_START_ID = 'member-season-start';
+export const MEMBER_SEASON_END_ID = 'member-season-end';
+export const MEMBER_SEASON_HINT_ID = 'member-season-hint';
+export const MEMBER_SEASON_PLAN_ID = 'member-season-plan';
+export const MEMBER_SEASON_ERROR_ID = 'member-season-error';
+export const MEMBER_SEASON_ERASURES_ID = 'member-season-erasures';
+export const MEMBER_SEASON_HINT_AND_ERROR = `${MEMBER_SEASON_HINT_ID} ${MEMBER_SEASON_ERROR_ID}`;
 
 /** A new pattern's step row `index` (0-based): its type. */
 export function memberScheduleRowTypeId(index: number): string {

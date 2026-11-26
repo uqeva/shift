@@ -2115,7 +2115,7 @@ describe('status as at a date, read off the embedded versions (story 1.6)', () =
     expect(memberActiveOn(plain, '1990-01-01')).toBe(true);
     expect(memberActiveOn(plain, TODAY)).toBe(true);
     expect(memberLatestVersion(plain)).toBeNull();
-    expect(memberStatusOf(plain, TODAY)).toEqual({ activeToday: true, since: null, scheduled: null });
+    expect(memberStatusOf(plain, TODAY)).toEqual({ activeToday: true, since: null, scheduled: null, upcoming: [] });
   });
 
   it('reads inactive on exactly [D, D2) after a deactivation and a reactivation', () => {
@@ -2134,6 +2134,7 @@ describe('status as at a date, read off the embedded versions (story 1.6)', () =
       activeToday: false,
       since: '2026-09-25',
       scheduled: { active: true, effectiveFrom: '2026-09-28' },
+      upcoming: [{ active: true, effectiveFrom: '2026-09-28' }],
     });
   });
 
@@ -2145,12 +2146,37 @@ describe('status as at a date, read off the embedded versions (story 1.6)', () =
       activeToday: true,
       since: null,
       scheduled: { active: false, effectiveFrom: '2026-10-01' },
+      upcoming: [{ active: false, effectiveFrom: '2026-10-01' }],
     });
     // ON its date the change is in effect and nothing is scheduled any more.
     expect(memberStatusOf(scheduled, '2026-10-01')).toEqual({
       activeToday: false,
       since: '2026-10-01',
       scheduled: null,
+      upcoming: [],
+    });
+  });
+
+  it('reads every change a season scheduled (story 21.11): the next first, the latest the cancellable one', () => {
+    const season = member({
+      id: 'm',
+      statusVersions: versions([false, '2026-09-20'], [true, '2026-10-01'], [false, '2026-11-01']),
+    });
+
+    expect(memberStatusOf(season, '2026-09-23')).toEqual({
+      activeToday: false,
+      since: '2026-09-20',
+      scheduled: { active: false, effectiveFrom: '2026-11-01' },
+      upcoming: [
+        { active: true, effectiveFrom: '2026-10-01' },
+        { active: false, effectiveFrom: '2026-11-01' },
+      ],
+    });
+    // The list's cell says when the season starts, not when it ends.
+    expect(statusCellOf(season, '2026-09-23')).toEqual({
+      kind: STATUS_CELL,
+      activeToday: false,
+      scheduled: { active: true, from: '2026-10-01' },
     });
   });
 

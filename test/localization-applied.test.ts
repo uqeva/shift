@@ -509,6 +509,8 @@ const SOURCES = [
   join(webRoot, 'src', 'features', 'setup', 'services', 'setup.ts'),
   // Story 21.10: *Raspored osobe*'s rules module, which words its sources and refusals (its card and hook are member screen parts).
   join(webRoot, 'src', 'features', 'members', 'services', 'schedule-source.ts'),
+  // Story 21.11: *Sezona*'s rules module, which words a written row and each refusal (its dialog and hook are member screen parts).
+  join(webRoot, 'src', 'features', 'members', 'services', 'season.ts'),
   join(webRoot, 'src', 'features', 'history', 'hooks', 'use-change-history.ts'),
   join(webRoot, 'src', 'features', 'history', 'components', 'history-body.tsx'),
   join(webRoot, 'src', 'features', 'history', 'components', 'history-filters.tsx'),

@@ -2535,3 +2535,15 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-21-13-floaters-are-suggested-for-an-uncovered-shift-by-role.md`
   summary: OWNER a later polish story. The day detail's roster dialog (story 7.9, `replacementCandidatesOf`) suggests no floater: *Predložene zamjene* is on *Za odluku*'s resolution screen only, where a pick resolves the conflict. A roster change from the calendar still lists every candidate in the three groups.
   evidence: Spec 21.13 Code Map (`resolution-screen.ts` only).
+
+## Deferred from: story 21.11, a seasonal member's season is set in one step (2026-11-26)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-11-a-seasonal-member-s-season-is-set-in-one-step.md`
+  summary: OWNER CI (first run). `0085` was never applied locally (STRICT DATABASE RULE): the provisioning grantees entry for `private.member_status_version_appendable`, the three rls-isolation season cases (a change after a scheduled one, a three-row season with only its latest cancellable, a non-alternating multi-row insert refused) and `e2e/tests/people/member-season.spec.ts` are written unrun. A failure there is the migration's or the case's, settled in CI.
+  evidence: Spec 21.11 § Verification.
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-11-a-seasonal-member-s-season-is-set-in-one-step.md`
+  summary: OWNER a later polish story. The *Sezona* dialog names the versions it writes and the leave requests it closes, but not the deactivation dialog's other two lines: the team's size and the member's duties left that month (7.13c), and the short-staffed block (11.2). Nor does it (or the deactivation dialog) name the open swaps 0049 closes.
+  evidence: Story 21.11 Code Map (`use-member-season.ts` reads the requests only).
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-11-a-seasonal-member-s-season-is-set-in-one-step.md`
+  summary: OWNER a later story, if the pilot meets it. *Nova osoba*'s season is a second request after `admin-auth`'s create, not one transaction: a refused season leaves the new member active from today (the credential step says so, and the member page sets it). Making it atomic means `admin-auth` writing the versions through the caller's client right after the member row, with a compensation it cannot have (no session deletes a member since 0036).
+  evidence: Story 21.11 Design Note 3.
