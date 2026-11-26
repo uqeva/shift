@@ -874,7 +874,9 @@ describe.each(FIXTURES)('the $fixture reminder of a personal rotation (0079)', (
     await inRolledBackTransaction(async (client) => {
       const who = await member(client, slug, memberName);
       const by = await member(client, slug, admin);
-      await remindable(client, who, ['H1', 'H2', 'H3'], true);
+      // 0069 holds at most two leads, in order: the skipped items below use them too, so
+      // only the schedule source and the assignment can be what skips them.
+      await remindable(client, who, ['H1', 'H2'], true);
       const { teamId, shiftTypeId, shiftTypeName } = await teamAndType(client, who.organizationId);
       const today = await todayOf(client, who.organizationId, 0);
       const date = await todayOf(client, who.organizationId, 1);
@@ -910,15 +912,19 @@ describe.each(FIXTURES)('the $fixture reminder of a personal rotation (0079)', (
           // Teamed: the team form's operands, still keyed `:p:`.
           item({ teamId, lead: 'H2' }),
           // Manual only from `later`: no rotation decides it.
-          item({ date: later, lead: 'H3' }),
+          item({ date: later, lead: 'H1' }),
           // An assignment holds the date (R15.3, step 1).
-          item({ date: assigned, lead: 'H3' }),
+          item({ date: assigned, lead: 'H2' }),
         ]),
       ).toBe(2);
       await actAsOwner(client);
 
       const rows = (await remindersOf(client, who)).filter((row) => row.channel === 'email');
-      expect(rows.map((row) => row.operands['lead']).sort()).toEqual(['H1', 'H2']);
+      // Only `date`'s two: nothing on `later` (manual only) or `assigned` (an assignment).
+      expect(rows.map((row) => [row.operands['date'], row.operands['lead']]).sort()).toEqual([
+        [date, 'H1'],
+        [date, 'H2'],
+      ]);
       const h1 = rows.find((row) => row.operands['lead'] === 'H1');
       expect(h1?.operands).toEqual({ date, start: 420, end: 1140, startsAt, lead: 'H1', leadHours: REMINDER_LEAD_HOURS.H1, shiftTypeName });
       const { rows: keys } = await client.query<{ subject: string }>(
