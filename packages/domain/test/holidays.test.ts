@@ -98,9 +98,17 @@ function guardedFiguresOf(organization: Organization) {
 
 type ParityOrganization = (typeof PARITY_FIXTURES)[number]['organization'];
 
-/** R12 for every member of both parity fixtures, over the whole parity window, with `lists` in each assembly. */
+/**
+ * R12 for every member of both parity fixtures, over the whole parity window, with `lists` in each assembly.
+ * Story 21.10 gave the fixtures schedule versions after this file's baseline (b130440) was pinned, so they are
+ * emptied here (`[]` derives exactly as none, R15.6): the digest stays the claim about holidays alone.
+ */
 function atWorkOf(listsOf: (organization: ParityOrganization) => HolidayLists | undefined) {
-  return PARITY_FIXTURES.map(({ fixture, organization }) => {
+  return PARITY_FIXTURES.map(({ fixture, organization: given }) => {
+    const organization = {
+      ...given,
+      members: given.members.map((member) => ({ ...member, scheduleVersions: [] })),
+    } as unknown as ParityOrganization;
     const lists = listsOf(organization);
     return {
       fixture,
