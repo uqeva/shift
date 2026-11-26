@@ -352,14 +352,16 @@ describe('a kept snapshot is restored for its owner alone', () => {
     expect(storage.entries.has(DEVICE_SNAPSHOT_KEY)).toBe(false);
   });
 
-  it('is shape 8: story 21.20 added `minimumMembers` to the teams', () => {
-    // A shape-7 snapshot's teams have no `minimumMembers` (a shape-6 snapshot has no `holidays` and its
-    // teams no `offOnHolidays`, story 21.16; a shape-5 member has no
-    // `scheduleVersions`, story 21.10; a shape-4 one no `jobRole`,
-    // story 21.12; a shape-3 one no `personalAssignments`, story 21.2; a
-    // shape-2 one no `loans`, story 18.2), and every roster derived from it
-    // would ignore a team's own minimum.
-    expect(DEVICE_SNAPSHOT_SHAPE).toBe(8);
+  it('is shape 9: story 21.13 added `isFloater` and `floaterRoleIds` to the member rows', () => {
+    // Each earlier shape lacks what the next one added:
+    // shape 8: member rows lack `isFloater` and `floaterRoleIds` (story 21.13);
+    // shape 7: teams lack `minimumMembers` (story 21.20);
+    // shape 6: no `holidays`, teams lack `offOnHolidays` (story 21.16);
+    // shape 5: members lack `scheduleVersions` (story 21.10);
+    // shape 4: members lack `jobRole` (story 21.12);
+    // shape 3: members lack `personalAssignments` (story 21.2);
+    // shape 2: members lack `loans` (story 18.2).
+    expect(DEVICE_SNAPSHOT_SHAPE).toBe(9);
   });
 
   it.each([

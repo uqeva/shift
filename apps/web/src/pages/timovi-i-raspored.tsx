@@ -8,6 +8,7 @@ import { Plus } from '@/components/ui/icon';
 import { Notice } from '@/components/ui/notice';
 import { PageTitle } from '@/components/ui/page-header';
 import { MemberDialogsHost, type MemberDialogOutcome } from '@/features/members/components/member-dialogs-host';
+import { MemberFloaterButton } from '@/features/members/components/member-floater-card';
 import { MemberJobRolePicker } from '@/features/members/components/member-job-role-picker';
 import { factText, memberScheduleFactsOf } from '@/features/members/components/member-schedule-source-card';
 import { RotationSection } from '@/features/rotation/components/rotation-section';
@@ -101,7 +102,8 @@ function TaskOutcome({ outcome }: { readonly outcome: MemberDialogOutcome | null
  * shift type and team add dialogs (their lists' own hooks), the member
  * page's team dialog and *Raspored osobe* (`MemberDialogsHost`), the team
  * dialog (`TeamEditDialog`) and the rotation builder. *Posao* saves through
- * the member page's write (`MemberJobRolePicker`). This module composes; the
+ * the member page's write (`MemberJobRolePicker`), and *Zamjena* opens the
+ * member page's dialog (`MemberFloaterButton`, story 21.13). This module composes; the
  * reads and the dialog state are `useSetup`, the parts' rules
  * `@/features/setup/services/setup`.
  *
@@ -237,7 +239,13 @@ export function TimoviIRasporedScreen(): ReactNode {
       <SetupPeopleSection
         groups={state.unrotated}
         summaryOf={(fact) => factText(fact, typeName)}
-        role={(member) => <MemberJobRolePicker member={member} />}
+        role={(member) => (
+          <>
+            <MemberJobRolePicker member={member} />
+            {/* STORY 21.13: the member page's *Zamjena* dialog, for this person. */}
+            <MemberFloaterButton member={member} />
+          </>
+        )}
         onSchedule={(memberId, opener) => {
           setOutcome(null);
           state.startTask(memberId, opener, null);

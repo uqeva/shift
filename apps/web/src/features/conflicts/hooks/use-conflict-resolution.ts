@@ -7,6 +7,7 @@ import { useCalendarSnapshot } from '@/features/calendar/hooks/use-calendar-snap
 import { CALENDAR_KEY, calendarSurfaceStateOf } from '@/features/calendar/services/snapshot';
 import { useSnapshotSkewRefresh } from '@/features/calendar/hooks/use-snapshot-skew-refresh';
 import { snapshotSkewOf } from '@/features/calendar/services/snapshot-skew';
+import { useLeaveCover } from '@/features/conflicts/hooks/use-leave-cover';
 import { useReplacementLinkRefresh } from '@/features/conflicts/hooks/use-replacement-link-refresh';
 import {
   OPTION_AMEND_LEAVE,
@@ -131,6 +132,14 @@ import { writesOnline } from '@/lib/offline/use-write-gate';
  * the snapshot is re-read so the candidates drop them, the pick is cleared,
  * and the line names who was taken.
  *
+ * A WHOLE LEAVE (story 21.14): *Pokrij cijelo odsustvo* is its own dialog's
+ * state (`use-leave-cover`), over the same reads, its check and its one write.
+ *
+ * FLOATERS (story 21.13): the member list read already carries who is a
+ * floater and the roles they cover, so the suggestions add no read. A
+ * suggested pick is written by `resolve_with_personal_assignment` with one
+ * item counted with the conflict's team (`replaceWriteOf`).
+ *
  * A KEY STILL HELD (story 5.5d): when a replacement that no longer applies
  * holds the key, a refusal on it is HELD — the screen's own line, "remove it
  * in the calendar, then decide" — and the snapshot is re-read beside the
@@ -251,6 +260,7 @@ export function useConflictResolution(params: ResolutionParams) {
     snapshotSkewOf(calendarState.snapshot, records.data, resolutions.data, requests.data, swaps.data),
   );
 
+  const membersState = membersSurfaceStateOf(members);
   const derived = resolutionScreenOf(
     {
       calendar: calendarState,
@@ -258,7 +268,7 @@ export function useConflictResolution(params: ResolutionParams) {
       resolutions,
       requests,
       swaps,
-      members: membersSurfaceStateOf(members),
+      members: membersState,
       organization,
       // The page's five only: a request or swap refetch never blanks the page.
       refetching: refetchingAfterFailure([calendar, records, resolutions, members, organization]),
@@ -270,6 +280,17 @@ export function useConflictResolution(params: ResolutionParams) {
   // A pick the re-read took away is nobody.
   const replacement = screen.kind === RESOLUTION_READY ? replacementOf(screen.view, picked) : null;
   const candidatesExist = screen.kind === RESOLUTION_READY && hasCandidates(screen.view);
+  // STORY 21.14: *Pokrij cijelo odsustvo*, over the same reads; a landed cover holds the view as a save does.
+  const cover = useLeaveCover({
+    params,
+    leaveRecordId: screen.kind === RESOLUTION_READY ? screen.view.leaveRecordId : null,
+    snapshot: calendarState.snapshot,
+    records: records.data,
+    resolutions: resolutions.data,
+    members: membersState.members,
+    view: screen.kind === RESOLUTION_READY ? screen.view : null,
+    hold: setLanded,
+  });
 
   // After a TAKEN refusal, the next step is another pick: focus goes there once the list is re-read.
   useEffect(() => {
@@ -387,7 +408,8 @@ export function useConflictResolution(params: ResolutionParams) {
       shiftTypeId: view.shiftTypeId,
     };
     const replacing = choice === OPTION_REPLACE_MEMBER && replacement !== null ? replacement : null;
-    const write = replaceWriteOf(view);
+    // STORY 21.13 (R16.3): a suggested floater is covered by assignment, a rotation shift's too.
+    const write = replaceWriteOf(view, replacing?.id ?? null);
 
     saving.current = true;
     setPending(true);
@@ -506,6 +528,8 @@ export function useConflictResolution(params: ResolutionParams) {
     failure,
     save,
     go,
+    /** STORY 21.14: *Pokrij cijelo odsustvo*'s dialog. */
+    cover,
     // STORY 8.2e: "show the read retry now" — the surface is in its
     // retryable unavailable state, and online: offline its re-read would
     // pause until the connection returns.

@@ -1,8 +1,9 @@
-import { personalShiftOn, rosterOn, scheduledShiftTypeOn, type PersonalShift } from '@shift/domain';
+import { PERSONAL_ASSIGNMENT_SHIFT, personalShiftOn, rosterOn, scheduledShiftTypeOn, type PersonalShift } from '@shift/domain';
 
 import {
   holidayRuleOfCalendar,
   type CalendarHolidayRule,
+  type CalendarMember,
   type CalendarRosterOverride,
   type CalendarSnapshot,
 } from '@/features/calendar/services/snapshot';
@@ -341,6 +342,29 @@ export function heldByReplacement(snapshot: CalendarSnapshot, resolution: Confli
   });
 
   return standing.kind === REPLACEMENT_NOT_APPLIED || standing.kind === REPLACEMENT_MISMATCH;
+}
+
+/**
+ * STORY 21.14 (the 21.7 deferral): the cover a SUPERSEDED decision left with
+ * its shift — the member whose live `SHIFT` assignment a replacement by
+ * assignment names, when that decision was made on another shift type than
+ * its key has today (0038), so it decides nothing while the cover still holds
+ * the shift. `null` for every other resolution, and for one whose assignment
+ * the snapshot no longer holds as a `SHIFT`.
+ *
+ * @throws RangeError on any precondition of the domain's derivation.
+ */
+export function supersededCoverOf(snapshot: CalendarSnapshot, resolution: ConflictResolution): CalendarMember | null {
+  if (resolution.kind !== REPLACE_MEMBER || resolution.personalAssignmentId === null) return null;
+  if (!decidedOnAnotherShiftIn(replacementContextOf(snapshot), resolution)) return null;
+
+  const id = resolution.personalAssignmentId;
+
+  return (
+    snapshot.members.find((member) =>
+      member.personalAssignments.some((assignment) => assignment.id === id && assignment.kind === PERSONAL_ASSIGNMENT_SHIFT),
+    ) ?? null
+  );
 }
 
 const KIND_COLUMN = 'kind';

@@ -44,6 +44,8 @@ function member(
     leaveAllowanceDays: 20,
     fireRank: null,
     jobRole: extra.jobRole ?? null,
+    isFloater: false,
+    floaterRoleIds: [],
     authUserId: `auth-${id}`,
     statusVersions: extra.active === false ? [{ active: false, effectiveFrom: '2026-01-01' }] : [],
     teamVersions,

@@ -175,6 +175,8 @@ function member(fields: Partial<MemberListRow> & { readonly id: string }): Membe
     leaveYearStart: { month: 1, day: 1 },
     fireRank: null,
     jobRole: null,
+    isFloater: false,
+    floaterRoleIds: [],
     authUserId: `account-${fields.id}`,
     statusVersions: [],
     teamVersions: [],
@@ -215,7 +217,9 @@ function row(fields: Readonly<Record<string, unknown>>): Record<string, unknown>
     role: 'member_role',
     leave_allowance_days: 20,
     fire_rank: null,
+    is_floater: false,
     job_role: null,
+    floater_roles: [],
     auth_user_id: `account-${String(fields['id'] ?? 'member')}`,
     member_status_versions: [],
     team_membership_versions: [],
@@ -316,8 +320,10 @@ describe('the read asks for exactly what the surface needs, and for the count', 
     // leave-year start, which the leave column resolves today's allowance from.
     // STORY 21.12 embeds the job role by its foreign key's name.
     const role = 'job_role:job_roles!members_job_role_fkey(id,name,archived)';
+    // STORY 21.13 adds the floater flag and the roles a floater covers (0084).
+    const floaterRoles = 'floater_roles!floater_roles_member_fkey(job_role_id)';
 
-    expect(MEMBERS_COLUMNS).toContain(`,fire_rank,${role},`);
+    expect(MEMBERS_COLUMNS).toContain(`,fire_rank,is_floater,${role},${floaterRoles},`);
 
     const embed =
       'member_status_versions(active,effective_from),' +
@@ -326,12 +332,13 @@ describe('the read asks for exactly what the surface needs, and for the count', 
       'organizations(timezone,leave_year_start_month,leave_year_start_day)';
 
     expect(MEMBERS_COLUMNS.endsWith(`,${embed}`)).toBe(true);
-    expect(MEMBERS_COLUMNS.slice(0, -(embed.length + 1)).replace(`,${role}`, '').split(',').sort()).toEqual(
+    expect(MEMBERS_COLUMNS.slice(0, -(embed.length + 1)).replace(`,${role}`, '').replace(`,${floaterRoles}`, '').split(',').sort()).toEqual(
       [
         'auth_user_id',
         'email',
         'fire_rank',
         'id',
+        'is_floater',
         'leave_allowance_days',
         'name',
         'organization_id',
@@ -366,6 +373,8 @@ describe('the read asks for exactly what the surface needs, and for the count', 
       leaveYearStart: { month: 1, day: 1 },
       fireRank: 'officer',
       jobRole: null,
+      isFloater: false,
+      floaterRoleIds: [],
       authUserId: 'account-m1',
       statusVersions: [],
       teamVersions: [],
@@ -2866,6 +2875,24 @@ describe('the job role: shown and filtered on (story 21.12)', () => {
   ];
   const narrow = (role: string, level: LevelFilter = ALL_LEVELS) =>
     narrowMembers(members, NO_TEXT, level, DEFAULT_SORT, TODAY, ALL_TEAMS, STATUS_ALL, role);
+
+  it('parses the floater flag and the roles covered, sorted and once each, and refuses a malformed one (story 21.13)', () => {
+    const floater = memberListRowOf(
+      row({ is_floater: true, floater_roles: [{ job_role_id: 'r2' }, { job_role_id: 'r1' }, { job_role_id: 'r2' }] }),
+    );
+
+    expect(floater?.isFloater).toBe(true);
+    expect(floater?.floaterRoleIds).toEqual(['r1', 'r2']);
+    expect(memberListRowOf(row({}))?.isFloater).toBe(false);
+    expect(memberListRowOf(row({}))?.floaterRoleIds).toEqual([]);
+    expect(memberListRowOf(row({ is_floater: undefined }))).toBeNull();
+    expect(memberListRowOf(row({ is_floater: 'true' }))).toBeNull();
+    expect(memberListRowOf(row({ floater_roles: undefined }))).toBeNull();
+    expect(memberListRowOf(row({ floater_roles: null }))).toBeNull();
+    expect(memberListRowOf(row({ floater_roles: [{ job_role_id: '' }] }))).toBeNull();
+    expect(memberListRowOf(row({ floater_roles: [{ id: 'r1' }] }))).toBeNull();
+    expect(memberListRowOf(row({ floater_roles: ['r1'] }))).toBeNull();
+  });
 
   it('parses the embedded role, none as null, and refuses a malformed one', () => {
     expect(memberListRowOf(row({ job_role: { id: 'r', name: 'Vod', archived: false } }))?.jobRole).toEqual({

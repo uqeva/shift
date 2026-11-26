@@ -106,9 +106,11 @@ describe('the kind of an event', () => {
     ['member_schedule_versions', 'schedule-version'],
     // Story 21.16: an organization's holiday (0080).
     ['organization_holidays', 'holiday'],
+    // Story 21.13: a role a floater may cover (0084).
+    ['floater_roles', 'floater-role'],
   ];
 
-  it('names one record per audited table, all 27, and nothing else', () => {
+  it('names one record per audited table, all 28, and nothing else', () => {
     expect(TABLES.map(([table]) => historyRecordOf(table))).toEqual(TABLES.map(([, record]) => record));
     expect(new Set([...TABLES.map(([, record]) => record), 'other'])).toEqual(new Set(HISTORY_RECORDS));
     expect(historyRecordOf('audit_events')).toBeNull();
@@ -1153,7 +1155,11 @@ describe('every real change names a field (retro A4)', () => {
     );
   });
 
-  /** Every column of the 27 audited tables as 0002–0080 leave them (0067's recorder drops `token_hash` and `last_fetched_at`), with a value of its type. */
+  /**
+   * 28: the 27 tables 0061's shared recorder audits (the root DB tests' lists)
+   * and `calendar_feed_tokens`, audited by its own recorder (0067).
+   */
+  /** Every column of the 28 audited tables as 0002–0084 leave them (0067's recorder drops `token_hash` and `last_fetched_at`), with a value of its type. */
   const AT = '2026-11-10T08:00:00+00:00';
   const BOOKKEEPING = { organization_id: ORG, created_by: ANA_AUTH, created_at: AT };
   const LIVE = { removed_by: null, removed_at: null };
@@ -1197,6 +1203,8 @@ describe('every real change names a field (retro A4)', () => {
       username: 'ana',
       fire_rank: 'vatrogasac',
       job_role_id: 'jr',
+      // Story 21.13 (0084): whether the member is a floater.
+      is_floater: false,
     },
     member_status_versions: { ...BOOKKEEPING, id: 'v', member_id: ANA, active: true, effective_from: '2026-11-01' },
     team_membership_versions: {
@@ -1353,6 +1361,8 @@ describe('every real change names a field (retro A4)', () => {
     },
     // Story 21.16 (0080): an organization's holiday, renamed in place.
     organization_holidays: { ...BOOKKEEPING, id: 'oh', date: '2026-11-18', name: 'Dan sjećanja' },
+    // Story 21.13 (0084): a role a floater may cover; inserted and deleted, never updated.
+    floater_roles: { ...BOOKKEEPING, id: 'fr', member_id: ANA, job_role_id: 'jr' },
   };
 
   /** A different value of the same type. */
@@ -1369,7 +1379,7 @@ describe('every real change names a field (retro A4)', () => {
 
   const LIFECYCLE_AT = new Set(['removed_at', 'confirmed_at', 'closed_at', 'answered_at']);
 
-  it('covers the 27 audited tables', () => {
+  it('covers the 28 audited tables', () => {
     expect(Object.keys(AUDITED).map((table) => historyRecordOf(table))).not.toContain(null);
     expect(new Set(Object.keys(AUDITED).map((table) => historyRecordOf(table)))).toEqual(
       new Set(HISTORY_RECORDS.filter((record) => record !== 'other')),

@@ -155,6 +155,8 @@ export {
 } from '@/features/leave/services/leave-section-preview';
 
 export {
+  type CoverWarning,
+  isCoverWarning,
   leaveUncoversDate,
   NO_REPLACEMENTS,
   type ReplacementGuard,

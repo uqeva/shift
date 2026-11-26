@@ -505,7 +505,7 @@ describe('the access-control migration', () => {
     ).toEqual([]);
   });
 
-  it('declares exactly the seventy-seven policies stories 1.3a, 1.4a, 1.4b, 1.6, 1.7a, 1.7b, 2.1a, 2.2a, 2.3a, 3.5a, 3.6a, 5.1b, 5.4a, 9.2, 10.3, 10.4, 12.1, 13.1, 13.3, 14.1, 17.1, 18.2, 21.2, 21.10, 21.12, 21.16, 0025 and 0036 reviewed, and no seventy-eighth', () => {
+  it('declares exactly the eighty policies stories 1.3a, 1.4a, 1.4b, 1.6, 1.7a, 1.7b, 2.1a, 2.2a, 2.3a, 3.5a, 3.6a, 5.1b, 5.4a, 9.2, 10.3, 10.4, 12.1, 13.1, 13.3, 14.1, 17.1, 18.2, 21.2, 21.10, 21.12, 21.13, 21.16, 0025 and 0036 reviewed, and no eighty-first', () => {
     // EXTENDED BY STORY 1.4a, exactly as this comment asked: `0004_organization
     // _settings.sql` adds `organizations_update_by_own_active_admin`, built by
     // copying `members_update_by_own_active_admin`, and its name is added here
@@ -552,6 +552,13 @@ describe('the access-control migration', () => {
       // re-created leave definer functions.
       'conflict_resolutions_insert_by_own_active_admin',
       'conflict_resolutions_select_own_active_admin',
+      // STORY 21.13 (0084), and THREE: the roles a floater covers are an
+      // admin's working data, read, inserted and deleted by an active admin
+      // alone. No update policy: a row is never changed. None reads its own
+      // table (42P17).
+      'floater_roles_delete_by_own_active_admin',
+      'floater_roles_insert_by_own_active_admin',
+      'floater_roles_select_by_own_active_admin',
       // STORY 2.1a, and FOUR: bands are current-state and any band may be
       // deleted, the last one included, so an active admin holds every write
       // verb. Each is its own policy, never `for all`.
@@ -3674,6 +3681,8 @@ describe('the access-control migration', () => {
     member_schedule_versions: ['organization_id', 'id'],
     // STORY 21.16 (0080), attached in the migration that creates it.
     organization_holidays: ['organization_id', 'id'],
+    // STORY 21.13 (0084), attached in the migration that creates it.
+    floater_roles: ['organization_id', 'id'],
   };
 
   /**
@@ -7987,5 +7996,112 @@ describe('swaps give and take personal shifts (0083, story 21.8)', () => {
       expect(sql()).toContain(`revoke execute on function public.decide_swap_request(uuid, text, text) from ${role};`);
     }
     expect(sql()).toContain('grant execute on function public.decide_swap_request(uuid, text, text) to authenticated;');
+  });
+});
+
+describe('floaters and the roles they cover (0084, story 21.13)', () => {
+  const MIGRATION = '0084_floaters.sql';
+  const sql = (): string => stripLineComments(readFileSync(join(supabaseRoot, 'migrations', MIGRATION), 'utf8'));
+  /** The re-created function's body, from its header to its closing dollar quote. */
+  const rpc = (): string => /create or replace function public\.resolve_with_personal_assignment\(p_items jsonb\)[\s\S]*?\n\$\$;/.exec(sql())?.[0] ?? '';
+
+  it("adds members.is_floater, not null and false by default, writable through members' own update policy", () => {
+    const text = sql();
+    expect(text).toMatch(/alter table public\.members\s+add column is_floater boolean not null default false;/);
+    expect(text).toContain('grant update (is_floater) on table public.members to authenticated;');
+  });
+
+  it("widens 0023's lock and 0035's re-check on members to the flag, same functions and levels", () => {
+    const text = sql();
+    expect(text).toMatch(
+      /create trigger members_serialize_organization_writes\s+before insert or update of is_floater, role or delete on public\.members\s+for each statement\s+execute function public\.serialize_organization_writes\(\);/,
+    );
+    expect(text).toMatch(
+      /create trigger members_refuse_write_by_stale_admin\s+before insert or update of is_floater, role or delete on public\.members\s+for each row\s+execute function public\.refuse_write_by_stale_admin\(\);/,
+    );
+  });
+
+  it('stores floater_roles under composite keys with no cascade, one row per member and role', () => {
+    const text = sql();
+    expect(text).toMatch(/create table floater_roles \(\n\s+organization_id uuid not null references organizations \(id\) on delete cascade,/);
+    expect(text).toMatch(
+      /constraint floater_roles_member_fkey\s+foreign key \(organization_id, member_id\)\s+references members \(organization_id, id\),/,
+    );
+    expect(text).toMatch(
+      /constraint floater_roles_job_role_fkey\s+foreign key \(organization_id, job_role_id\)\s+references job_roles \(organization_id, id\),/,
+    );
+    expect(text).toMatch(/constraint floater_roles_organization_member_role_key unique \(organization_id, member_id, job_role_id\)/);
+    expect(text).not.toMatch(/references (members|job_roles) \([^)]*\)\s+on delete cascade/);
+  });
+
+  it('is admin-only: three policies through current_member_access(), none reading its own table, the insert pinning created_by', () => {
+    const text = sql();
+    const policies = [...text.matchAll(/create policy (floater_roles_\w+) on public\.floater_roles[\s\S]*?\n {2}\);/g)];
+    expect(policies.map((found) => found[1]).sort()).toEqual([
+      'floater_roles_delete_by_own_active_admin',
+      'floater_roles_insert_by_own_active_admin',
+      'floater_roles_select_by_own_active_admin',
+    ]);
+    for (const [policy, name] of policies) {
+      expect(policy, name).toMatch(/public\.current_member_access\(\)/);
+      expect(policy, name).toMatch(/access\.member_role = 'admin'/);
+      expect(policy, name).not.toMatch(/from public\.floater_roles/);
+    }
+    expect(policies.find((found) => found[1] === 'floater_roles_insert_by_own_active_admin')?.[0]).toMatch(
+      /created_by = \(select auth\.uid\(\)\)/,
+    );
+  });
+
+  it('grants select, insert of three columns and delete; no update; TRUNCATE for nobody', () => {
+    const text = sql();
+    expect(text).toContain('alter table floater_roles enable row level security;');
+    expect(text).toMatch(/revoke insert, update, delete, truncate, references, trigger on table public\.floater_roles\s+from anon, authenticated;/);
+    expect(text).toContain('revoke select on table public.floater_roles from anon;');
+    expect(text).toContain('revoke truncate on table public.floater_roles from anon, authenticated, service_role;');
+    expect(text).toContain('grant select on table public.floater_roles to authenticated;');
+    expect(text).toContain('grant insert (organization_id, member_id, job_role_id) on table public.floater_roles to authenticated;');
+    expect(text).toContain('grant delete on table public.floater_roles to authenticated;');
+    expect(text).not.toMatch(/grant update \([^)]*\) on table public\.floater_roles/);
+  });
+
+  it("serializes and re-checks every write of a role, and records it with AD-3's two triggers", () => {
+    const text = sql();
+    expect(text).toMatch(
+      /create trigger floater_roles_serialize_organization_writes\s+before insert or delete on public\.floater_roles\s+for each statement\s+execute function public\.serialize_organization_writes\(\);/,
+    );
+    expect(text).toMatch(
+      /create trigger floater_roles_refuse_write_by_stale_admin\s+before insert or delete on public\.floater_roles\s+for each row\s+execute function public\.refuse_write_by_stale_admin\(\);/,
+    );
+    expect(text).toMatch(/create trigger floater_roles_audit after insert or delete on public\.floater_roles/);
+    expect(text).toMatch(/create trigger floater_roles_audit_update after update on public\.floater_roles/);
+  });
+
+  it("re-creates the cover RPC with the same signature and grants, refusing an inactive cover and a teamless item's cover on a team", () => {
+    const body = rpc();
+    expect(body.length).toBeGreaterThan(1000);
+    expect(body).toMatch(
+      /if not public\.member_active_on\(a_replacement\[i\], a_date\[i\]\) then\s+raise exception using\s+errcode = 'check_violation',\s+message = 'CONFLICT_REPLACEMENT_INACTIVE';/,
+    );
+    expect(body).toMatch(/if a_team\[i\] is null and \(\s+public\.member_team_on\(a_replacement\[i\], a_date\[i\]\) is not null/);
+    expect(body).toMatch(/from public\.team_loans l[\s\S]*?l\.removed_at is null\s+and l\.during @> a_date\[i\]/);
+    expect(body).toMatch(/message = 'CONFLICT_REPLACEMENT_ON_TEAM';/);
+    // Both refusals come before any write, and after 0081's exists and taken checks and the cover's membership.
+    expect(body.indexOf('CONFLICT_REPLACEMENT_ON_TEAM')).toBeLessThan(body.indexOf('perform public.save_personal_assignments(changes);'));
+    expect(body.indexOf("message = 'CONFLICT_REPLACEMENT_INACTIVE'")).toBeGreaterThan(body.indexOf("message = 'CONFLICT_REPLACEMENT_TAKEN'"));
+    expect(body.indexOf("message = 'CONFLICT_REPLACEMENT_TAKEN'")).toBeGreaterThan(body.indexOf("message = 'CONFLICT_RESOLUTION_EXISTS'"));
+    const membership = body.search(/from public\.members m\s+where m\.organization_id = claimed\s+and m\.id = a_replacement\[i\]\s+\) then\s+raise exception using errcode = 'invalid_parameter_value', message = 'CONFLICT_REPLACEMENT_INVALID';/);
+    expect(membership, 'the cover is not checked as the organization\'s member').toBeGreaterThan(body.indexOf("message = 'CONFLICT_REPLACEMENT_TAKEN'"));
+    expect(membership).toBeLessThan(body.indexOf("message = 'CONFLICT_REPLACEMENT_INACTIVE'"));
+    expect(body.match(/perform public\.save_personal_assignments\(changes\);/g)?.length).toBe(1);
+    for (const role of ['public', 'anon', 'service_role']) {
+      expect(sql()).toContain(`revoke execute on function public.resolve_with_personal_assignment(jsonb) from ${role};`);
+    }
+    expect(sql()).toContain('grant execute on function public.resolve_with_personal_assignment(jsonb) to authenticated;');
+  });
+
+  it('seeds nothing, notifies nobody (E-3) and re-creates no assembly', () => {
+    const text = sql();
+    expect(text).not.toMatch(/insert into public\.(floater_roles|members)/);
+    expect(text).not.toMatch(/member_schedule_inputs|notify_members|notification_outbox|enqueue/);
   });
 });

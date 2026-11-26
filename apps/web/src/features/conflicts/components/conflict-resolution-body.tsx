@@ -12,11 +12,13 @@ import { Notice } from '@/components/ui/notice';
 import { PageDescription, PageHeader, PageTitle } from '@/components/ui/page-header';
 import { RadioGroup } from '@/components/ui/radio-group';
 import { CONFLICT_GLYPH } from '@/features/calendar/utils/modifiers';
+import { LeaveCoverDialog } from '@/features/conflicts/components/leave-cover-dialog';
 import { AcceptUncoveredOption, AmendLeaveOption, ReplaceMemberOption } from '@/features/conflicts/components/resolution-option';
 import { ReplacementPicker } from '@/features/conflicts/components/replacement-picker';
 import { ResolutionSkeleton } from '@/features/conflicts/components/resolution-skeleton';
 import type { ConflictResolutionState } from '@/features/conflicts/hooks/use-conflict-resolution';
 import {
+  HELD_BY_ASSIGNMENT,
   NO_OPTION,
   OPTION_REPLACE_MEMBER,
   RESOLUTION_CHOICE_HEADING_ID,
@@ -32,6 +34,7 @@ import {
   type ResolutionLink,
   type ResolutionView,
 } from '@/features/conflicts/services/resolution-screen';
+import { LEAVE_COVER_OPEN_ID } from '@/features/conflicts/services/leave-cover';
 import {
   RESOLUTION_GONE,
   RESOLUTION_HELD,
@@ -144,9 +147,44 @@ function ResolutionFacts({ view }: { readonly view: ResolutionView }): ReactNode
   );
 }
 
+/**
+ * STORY 21.14 (the 21.7 deferral): each cover a decision made on another
+ * shift type left with its shift, one line each, linking *Ručni raspored* on
+ * the cover's cell. A note: nothing here waits on it.
+ */
+function SupersededCovers({ view }: { readonly view: ResolutionView }): ReactNode {
+  if (view.supersededCovers.length === 0) return null;
+
+  return (
+    <Notice role="status">
+      {view.supersededCovers.map((cover) => {
+        const parts = heldHintPartsOf((action) => t('zaOdluku.cover.superseded', { name: cover.name, date: cover.date, action }));
+
+        return (
+          <span key={cover.key} className="block break-words">
+            {parts.before}
+            <Link to="/rucni-raspored" search={cover.manual} className="font-medium text-foreground underline underline-offset-4">
+              {t('zaOdluku.resolution.heldAssignmentAction')}
+            </Link>
+            {parts.after}
+          </span>
+        );
+      })}
+    </Notice>
+  );
+}
+
 /** A refusal's line: the taken one names who was already on the shift (story 5.4c), and is never drawn without the name. */
-function FailureNotice({ failure, taken }: { readonly failure: ResolutionWriteFailure; readonly taken: string | null }): ReactNode {
-  const line = resolutionFailureLineOf(failure, taken);
+function FailureNotice({
+  failure,
+  taken,
+  heldByAssignment,
+}: {
+  readonly failure: ResolutionWriteFailure;
+  readonly taken: string | null;
+  readonly heldByAssignment: boolean;
+}): ReactNode {
+  const line = resolutionFailureLineOf(failure, taken, heldByAssignment);
 
   return <Notice role="alert">{line.values === undefined ? t(line.key) : t(line.key, line.values)}</Notice>;
 }
@@ -158,6 +196,9 @@ function ResolutionReady({ state, view }: { readonly state: ConflictResolutionSt
   const pickedId = replacement?.id ?? null;
   const waiting = !readyToSave(choice, pickedId, view.held);
   const held = heldHintPartsOf((action) => t('zaOdluku.resolution.heldHint', { action }));
+  // STORY 21.13: a cover's assignment holds the key: removed in *Ručni raspored*, on the cover's cell.
+  const heldBy = view.heldBy;
+  const heldManual = heldBy?.kind === HELD_BY_ASSIGNMENT ? heldBy.manual : null;
   const gone = failure === RESOLUTION_GONE;
   // STORY 8.3a: offline, Spremi is gated and the note says why.
   const gate = useWriteGate();
@@ -179,6 +220,7 @@ function ResolutionReady({ state, view }: { readonly state: ConflictResolutionSt
       {/* STORY 8.2c: the as-of note, under the heading, while the cached snapshot is drawn offline. */}
       <OfflineNote offline={state.offline} />
       <ResolutionFacts view={view} />
+      <SupersededCovers view={view} />
       <section className="grid min-w-0 gap-3" aria-labelledby={RESOLUTION_CHOICE_HEADING_ID}>
         <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           <h2 id={RESOLUTION_CHOICE_HEADING_ID} className="text-base font-semibold">
@@ -211,8 +253,26 @@ function ResolutionReady({ state, view }: { readonly state: ConflictResolutionSt
             firstCandidate={firstCandidate}
           />
         ) : null}
+        {/* STORY 21.14 (R16.4): one floater covers the whole leave, in its own dialog; shown only with a floater. */}
+        {view.leaveCover ? (
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+            <Button
+              id={LEAVE_COVER_OPEN_ID}
+              type="button"
+              variant="outline"
+              className="h-11 w-full sm:w-auto"
+              disabled={pending || state.cover.pending}
+              onClick={state.cover.openCover}
+            >
+              {t('zaOdluku.cover.open')}
+            </Button>
+            <span className="min-w-0 break-words text-sm text-muted-foreground">{t('zaOdluku.cover.openHint')}</span>
+          </div>
+        ) : null}
+        {/* Mounted while open, even when a refetch withdraws the offer: the dialog says so rather than vanishing mid-check. */}
+        {view.leaveCover || state.cover.open ? <LeaveCoverDialog cover={state.cover} withdrawn={!view.leaveCover} /> : null}
         {/* A held refusal whose re-read finds the key free again says nothing: saving again may land (story 5.5d). */}
-        {failure === null || (failure === RESOLUTION_HELD && !view.held) ? null : <FailureNotice failure={failure} taken={taken} />}
+        {failure === null || (failure === RESOLUTION_HELD && !view.held) ? null : <FailureNotice failure={failure} taken={taken} heldByAssignment={heldManual !== null} />}
         {/* GONE: nothing left to save, and the header's way back is the one way on. */}
         {gone ? null : <OfflineWriteNote gate={gate} />}
         {gone ? null : (
@@ -221,9 +281,15 @@ function ResolutionReady({ state, view }: { readonly state: ConflictResolutionSt
               // STORY 5.5d: a replacement the snapshot holds pending or inert keeps the key; Spremi waits.
               <p id={RESOLUTION_SAVE_HINT_ID} className="min-w-0 flex-1 break-words text-sm text-muted-foreground">
                 {held.before}
-                <Link to="/kalendar" search={view.heldCalendar} className="font-medium text-foreground underline underline-offset-4">
-                  {t('zaOdluku.resolution.heldAction')}
-                </Link>
+                {heldManual === null ? (
+                  <Link to="/kalendar" search={view.heldCalendar} className="font-medium text-foreground underline underline-offset-4">
+                    {t('zaOdluku.resolution.heldAction')}
+                  </Link>
+                ) : (
+                  <Link to="/rucni-raspored" search={heldManual} className="font-medium text-foreground underline underline-offset-4">
+                    {t('zaOdluku.resolution.heldAssignmentAction')}
+                  </Link>
+                )}
                 {held.after}
               </p>
             ) : (

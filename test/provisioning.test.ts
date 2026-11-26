@@ -702,7 +702,8 @@ describe('every organization table carries row level security, and only its revi
               'push_subscriptions', 'swap_requests', 'swap_request_decisions',
               'absence_types', 'leave_allowances', 'audit_events', 'team_loans',
               'calendar_feed_tokens', 'reminder_settings', 'personal_assignments',
-              'job_roles', 'member_schedule_versions', 'organization_holidays'
+              'job_roles', 'member_schedule_versions', 'organization_holidays',
+              'floater_roles'
             )
           order by relname`,
       );
@@ -725,6 +726,8 @@ describe('every organization table carries row level security, and only its revi
         // STORY 16.3 (0067): the feed tokens, on with no policy and no privilege.
         'calendar_feed_tokens',
         'conflict_resolutions',
+        // STORY 21.13 (0084): the roles a floater covers, an active admin's alone.
+        'floater_roles',
         'hour_bands',
         // STORY 21.12 (0078): an organization's job roles.
         'job_roles',
@@ -993,6 +996,8 @@ describe('every organization table carries row level security, and only its revi
       ).toEqual([
         'authenticated:email',
         'authenticated:fire_rank',
+        // STORY 21.13 (0084): whether the member is a floater, by 0056's rule.
+        'authenticated:is_floater',
         // STORY 21.12 (0078): the member's job role, by 0056's rule.
         'authenticated:job_role_id',
         'authenticated:name',
@@ -2062,6 +2067,78 @@ describe('every organization table carries row level security, and only its revi
     }
   });
 
+  it.skipIf(noDatabase)('holds no privilege on floater_roles but read, a three-column insert and delete, never update or truncate, and attaches the lock and the re-check (story 21.13)', async () => {
+    // `authenticated` reads (an active admin alone, by the policy), inserts the
+    // tenant, the member and the role, and deletes; no session names an id,
+    // `created_by` or `created_at`, updates, truncates, or holds anything as `anon`.
+    const client = await connect();
+    try {
+      const held = await heldPrivileges(client, 'floater_roles', [
+        'organization_id',
+        'id',
+        'member_id',
+        'job_role_id',
+        'created_by',
+        'created_at',
+      ]);
+      expect(held.tables).toEqual(['authenticated:DELETE', 'authenticated:SELECT']);
+      expect(held.columns, 'the writable floater role columns changed, or anon holds one').toEqual([
+        'authenticated:INSERT:job_role_id',
+        'authenticated:INSERT:member_id',
+        'authenticated:INSERT:organization_id',
+      ]);
+
+      const { rows: truncate } = await client.query<{ role: string }>(
+        `select role from unnest(array['anon', 'authenticated', 'service_role']) as role
+          where has_table_privilege(role, 'public.floater_roles', 'TRUNCATE')`,
+      );
+      expect(truncate, 'a role may truncate the audited floater roles').toEqual([]);
+
+      const { rows: keys } = await client.query<{ definition: string }>(
+        `select pg_get_constraintdef(oid) as definition
+           from pg_constraint
+          where contype in ('p', 'f', 'u') and conrelid = 'public.floater_roles'::regclass`,
+      );
+      expect(keys.map((row) => row.definition).sort()).toEqual([
+        'FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE',
+        'FOREIGN KEY (organization_id, job_role_id) REFERENCES job_roles(organization_id, id)',
+        'FOREIGN KEY (organization_id, member_id) REFERENCES members(organization_id, id)',
+        'PRIMARY KEY (id)',
+        'UNIQUE (organization_id, member_id, job_role_id)',
+      ]);
+
+      const { rows: policies } = await client.query<{ policyname: string; cmd: string }>(
+        `select policyname, cmd from pg_policies
+          where schemaname = 'public' and tablename = 'floater_roles'
+          order by policyname`,
+      );
+      expect(policies).toEqual([
+        { policyname: 'floater_roles_delete_by_own_active_admin', cmd: 'DELETE' },
+        { policyname: 'floater_roles_insert_by_own_active_admin', cmd: 'INSERT' },
+        { policyname: 'floater_roles_select_by_own_active_admin', cmd: 'SELECT' },
+      ]);
+
+      const { rows: triggers } = await client.query<{ definition: string }>(
+        `select pg_get_triggerdef(oid) as definition from pg_trigger
+          where tgrelid = 'public.floater_roles'::regclass and not tgisinternal
+            and tgfoid <> 'private.record_audit_event()'::regprocedure
+          order by 1`,
+      );
+      expect(triggers.map((row) => row.definition)).toEqual([
+        'CREATE TRIGGER floater_roles_refuse_write_by_stale_admin BEFORE INSERT OR DELETE ON public.floater_roles FOR EACH ROW EXECUTE FUNCTION refuse_write_by_stale_admin()',
+        'CREATE TRIGGER floater_roles_serialize_organization_writes BEFORE INSERT OR DELETE ON public.floater_roles FOR EACH STATEMENT EXECUTE FUNCTION serialize_organization_writes()',
+      ]);
+
+      const { rows: flag } = await client.query<{ data_type: string; is_nullable: string; column_default: string | null }>(
+        `select data_type, is_nullable, column_default from information_schema.columns
+          where table_schema = 'public' and table_name = 'members' and column_name = 'is_floater'`,
+      );
+      expect(flag).toEqual([{ data_type: 'boolean', is_nullable: 'NO', column_default: 'false' }]);
+    } finally {
+      await client.end();
+    }
+  });
+
   it.skipIf(noDatabase)('holds no privilege on organization_holidays but read, a three-column insert, a rename and delete, never truncate, and attaches the lock and the re-check (story 21.16)', async () => {
     // `authenticated` reads (an active member, by the policy), inserts the
     // tenant, the date and the name, renames (`name` alone) and deletes; no
@@ -2671,7 +2748,10 @@ describe('every organization table carries row level security, and only its revi
   // in 0061, 22 since story 18.2's `team_loans` (0062), 23 since story 21.2's
   // `personal_assignments` (0077), 24 since story 21.12's `job_roles` (0078),
   // 25 since story 21.10's `member_schedule_versions` (0079), 26 since story
-  // 21.16's `organization_holidays` (0080).
+  // 21.16's `organization_holidays` (0080), 27 since story 21.13's
+  // `floater_roles` (0084). The tables recorded by 0061's shared recorder
+  // alone: `calendar_feed_tokens` (0067) has its own recorder and is pinned
+  // apart, which is why the domain's history counts 28 records.
   const AUDITED: Readonly<Record<string, readonly [string, string]>> = {
     organizations: ['id', 'id'],
     members: ['organization_id', 'id'],
@@ -2703,9 +2783,11 @@ describe('every organization table carries row level security, and only its revi
     member_schedule_versions: ['organization_id', 'id'],
     // STORY 21.16 (0080), attached in the migration that creates it.
     organization_holidays: ['organization_id', 'id'],
+    // STORY 21.13 (0084), attached in the migration that creates it.
+    floater_roles: ['organization_id', 'id'],
   };
 
-  it.skipIf(noDatabase)('keeps the change history append-only, read by authenticated alone, and records each of the 26 audited tables through exactly its two triggers (story 14.1; personal_assignments since 21.2, job_roles since 21.12, member_schedule_versions since 21.10, organization_holidays since 21.16)', async () => {
+  it.skipIf(noDatabase)('keeps the change history append-only, read by authenticated alone, and records each of the 27 audited tables through exactly its two triggers (story 14.1; personal_assignments since 21.2, job_roles since 21.12, member_schedule_versions since 21.10, organization_holidays since 21.16, floater_roles since 21.13)', async () => {
     const client = await connect();
     try {
       // APPEND-ONLY BY PRIVILEGE: `authenticated` SELECT, and nothing else for

@@ -116,6 +116,14 @@ export const MEMBER_SAVE_DEPENDENTS: readonly QueryKey[] = [
 export const MEMBER_JOB_ROLE_SAVE_DEPENDENTS: readonly QueryKey[] = [...MEMBER_SAVE_DEPENDENTS, CALENDAR_KEY];
 
 /**
+ * A member's floater flag or the roles they cover saved (story 21.13, 0084):
+ * the member list alone, which embeds both and which *Za odluku*'s
+ * suggestions read. Nothing else reads either: no roster, rotation, name,
+ * level or calendar answer carries them.
+ */
+export const MEMBER_FLOATER_SAVE_DEPENDENTS: readonly QueryKey[] = [MEMBERS_LIST_KEY];
+
+/**
  * A job role added, renamed, archived or restored (story 21.12): the member
  * list, which embeds each member's role beside the name, and the calendar
  * snapshot, whose day detail names it. Nothing derives from a role.

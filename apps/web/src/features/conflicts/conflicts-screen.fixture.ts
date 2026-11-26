@@ -30,6 +30,9 @@ export const CONFLICT_RESOLUTION_PARTS = {
   option: ['features', 'conflicts', 'components', 'resolution-option.tsx'],
   picker: ['features', 'conflicts', 'components', 'replacement-picker.tsx'],
   skeleton: ['features', 'conflicts', 'components', 'resolution-skeleton.tsx'],
+  // STORY 21.14: *Pokrij cijelo odsustvo* — its dialog's state, check and write, and the dialog.
+  coverHook: ['features', 'conflicts', 'hooks', 'use-leave-cover.ts'],
+  coverDialog: ['features', 'conflicts', 'components', 'leave-cover-dialog.tsx'],
 } as const;
 
 /**
@@ -87,6 +90,10 @@ export const CONFLICTS_SCREEN_EXEMPT: readonly { readonly file: string; readonly
     why: 'every rule of the resolution screen (story 5.4b) — its place in the queue, facts, strip and status line; a key source of its own, executed by resolution-screen.test.ts',
   },
   {
+    file: 'services/leave-cover.ts',
+    why: 'every rule of *Pokrij cijelo odsustvo* (story 21.14) — the record\'s dates, the floaters offered, the draft, the items, the check and its lines; a key source of its own, executed by leave-cover.test.ts',
+  },
+  {
     file: 'services/erasures.ts',
     why: 'the surface-neutral erasure diff, rows and decisions (stories 5.5a, 5.5b, 5.5e); renders nothing and declares no key, executed by erasures.test.ts',
   },
@@ -125,6 +132,10 @@ export const CONFLICTS_SCREEN_EXEMPT: readonly { readonly file: string; readonly
   {
     file: 'services/resolution-write.ts',
     why: 'the two resolution writes (stories 5.4b, 5.4c) and their refusals; a key source of its own, executed by resolution-write.test.ts',
+  },
+  {
+    file: 'services/floater-suggestions.ts',
+    why: 'the floaters suggested for a conflict (story 21.13, R16.2): the adapter from the member list, the snapshot and the leave to the domain\'s floaterSuggestionsOf, narrowed to the cover candidates; renders nothing and declares no key, executed by floater-suggestions.test.ts',
   },
   {
     file: 'services/surface-keys.ts',

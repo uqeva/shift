@@ -20,6 +20,8 @@ function member(fields: Partial<MemberListRow> = {}): MemberListRow {
     leaveYearStart: { month: 1, day: 1 },
     fireRank: 'nco',
     jobRole: null,
+    isFloater: false,
+    floaterRoleIds: [],
     authUserId: 'account-1',
     statusVersions: [],
     teamVersions: [{ team: { id: 'team-a', name: 'Smjena A' }, position: 'driver', effectiveFrom: '2020-01-01' }],

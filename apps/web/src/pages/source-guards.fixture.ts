@@ -461,6 +461,9 @@ export const RESOLUTION_SCREEN_KEYS = join(CONFLICTS_FEATURE, 'services', 'resol
 /** Story 7.9: the replacement candidates' three group headings, off `candidateGroupMessageKey`. */
 export const REPLACEMENT_CANDIDATE_KEYS = join(srcRoot, 'features', 'calendar', 'utils', 'replacement-candidates.ts');
 
+/** Story 21.14: *Pokrij cijelo odsustvo*'s rules — a date's line and a refused check's, off `\w*MessageKey` unions. */
+export const LEAVE_COVER_KEYS = join(CONFLICTS_FEATURE, 'services', 'leave-cover.ts');
+
 /** Story 5.4b's write: its three refusals, off `resolutionFailureMessageKey`. */
 export const RESOLUTION_WRITE_KEYS = join(CONFLICTS_FEATURE, 'services', 'resolution-write.ts');
 
@@ -511,6 +514,11 @@ export const MEMBER_EDIT: readonly string[] = [
   // `MEMBER_SCHEDULE_SOURCE_KEYS`, a key source of its own.
   join(MEMBERS_FEATURE, 'hooks', 'use-member-schedule-source.ts'),
   join(MEMBERS_FEATURE, 'components', 'member-schedule-source-card.tsx'),
+  // STORY 21.13: *Zamjena*, its hook and its card (its dialog, and the
+  // button *Timovi i raspored*'s people rows open it with). Its rules are
+  // `MEMBER_FLOATER_KEYS`, a key source of its own.
+  join(MEMBERS_FEATURE, 'hooks', 'use-member-floater.ts'),
+  join(MEMBERS_FEATURE, 'components', 'member-floater-card.tsx'),
 ];
 
 /** The two team pages, which only compose (source structure B6), and their hooks. */
@@ -886,6 +894,9 @@ export const MEMBER_MOVE_PREVIEW_KEYS = join(srcRoot, 'features', 'members', 'se
 /** Story 18.3: the loan dialog's refusals, shift lines and inert-override lines, off `\w*MessageKey` unions. */
 export const MEMBER_LOAN_KEYS = join(srcRoot, 'features', 'members', 'services', 'loan.ts');
 
+/** Story 21.13: *Zamjena*'s rules — the card's facts lines and each refusal's words. */
+export const MEMBER_FLOATER_KEYS = join(srcRoot, 'features', 'members', 'services', 'floater.ts');
+
 /** Story 21.10: *Raspored osobe*'s rules — a source's name and each refusal's words. */
 export const MEMBER_SCHEDULE_SOURCE_KEYS = join(srcRoot, 'features', 'members', 'services', 'schedule-source.ts');
 
@@ -1169,7 +1180,9 @@ export const SCREENS = [
   // the amend dialog's *Završi danas*. *Ukloni posudbu* is the shared Switch.
   // EIGHTEEN FIELDS AND FORTY-SIX BUTTONS SINCE STORY 21.6: *Dodaj smjenu*'s card opener and its dialog's date, *Odustani* and *Odaberi smjenu*.
   // TWENTY-THREE FIELDS AND FIFTY-FOUR BUTTONS SINCE STORY 21.10: *Raspored osobe*'s *Vrijedi od*, *Uzorak*, a step's type and count, and *Početni korak*; its card's *Promijeni raspored* and *Povuci*, its form's *Ukloni korak*, *Dodaj korak*, *Odustani* and *Dalje*, and its preview's *Natrag na uređivanje* and *Spremi*.
-  { name: 'the member edit form', file: MEMBER_EDIT, expectedFields: 23, expectedButtons: 54 },
+  // 58 SINCE STORY 21.13: *Zamjena*'s card button and its dialog's three, with the one on
+  // *Timovi i raspored*'s people rows (the card's file holds both).
+  { name: 'the member edit form', file: MEMBER_EDIT, expectedFields: 23, expectedButtons: 58 },
   // STORY 1.7a. FOUR on the team list: the link back to `Ljudi`, the one name
   // `<Input>`, the add `<Button>`, and ONE row link written once inside the map
   // over the teams — the same count at zero teams as at nine. SIX on one team:
@@ -1375,7 +1388,9 @@ export const SCREENS = [
   // bulk action exist, which is what the count keeps true.
   // STILL SIX SINCE STORY 5.4c: the second card and the candidate picker's
   // rows are radio items of their own groups, never a `<Button>`.
-  { name: 'the conflict resolution screen', file: RESOLUTION, expectedFields: 0, expectedButtons: 6 },
+  // ELEVEN SINCE STORY 21.14: *Pokrij cijelo odsustvo*'s opener, and its dialog's *Odustani*,
+  // *Provjeri*, *Natrag* and *Spremi*.
+  { name: 'the conflict resolution screen', file: RESOLUTION, expectedFields: 0, expectedButtons: 11 },
   // STORY 9.4. On one leave request's decision screen: *Natrag na Za odluku*
   // (written once, drawn in every state), the unavailable alert's retry, and
   // *Odbij* and *Odobri*. No confirmation, no reason field (Epic 9 has none)

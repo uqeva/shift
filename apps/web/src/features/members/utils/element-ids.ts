@@ -94,3 +94,19 @@ export function memberJobRolePickerId(memberId: string): string {
 export function memberJobRoleErrorId(memberId: string): string {
   return `member-job-role-error-${memberId}`;
 }
+
+/** STORY 21.13: the *Zamjena* card's heading, and its dialog's. */
+export const MEMBER_FLOATER_HEADING_ID = 'member-floater-heading';
+export const MEMBER_FLOATER_DIALOG_HEADING_ID = 'member-floater-dialog-heading';
+/** STORY 21.13: the dialog's *Uskače kao zamjena* box and its hint. */
+export const MEMBER_FLOATER_FLAG_ID = 'member-floater-flag';
+export const MEMBER_FLOATER_FLAG_HINT_ID = 'member-floater-flag-hint';
+/** STORY 21.13: the roles fieldset's hint. */
+export const MEMBER_FLOATER_ROLES_HINT_ID = 'member-floater-roles-hint';
+/** STORY 21.13: the dialog's refusal. */
+export const MEMBER_FLOATER_ERROR_ID = 'member-floater-error';
+
+/** STORY 21.13: one role's box in the *Zamjena* dialog. */
+export function memberFloaterRoleId(roleId: string): string {
+  return `member-floater-role-${roleId}`;
+}

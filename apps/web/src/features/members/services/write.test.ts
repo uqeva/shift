@@ -203,6 +203,8 @@ function member(fields: Partial<MemberListRow> = {}): MemberListRow {
     leaveYearStart: { month: 1, day: 1 },
     fireRank: null,
     jobRole: null,
+    isFloater: false,
+    floaterRoleIds: [],
     authUserId: 'account-1',
     statusVersions: [],
     teamVersions: [],

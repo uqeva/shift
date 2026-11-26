@@ -2114,6 +2114,10 @@ describe('every write verb 0023, 0035 and 0036 name waits on the lock', () => {
           order by 1, 2`,
       );
       expect(rows).toEqual([
+        // 0084 (story 21.13): a floater's role takes the lock and the caller's
+        // re-check on its two writes, insert and delete (no update is granted).
+        { table: 'floater_roles', trigger: 'floater_roles_refuse_write_by_stale_admin', type: 1 | 2 | 4 | 8, columns: null },
+        { table: 'floater_roles', trigger: 'floater_roles_serialize_organization_writes', type: 2 | 4 | 8, columns: null },
         // 0040: a request over live leave, ROW level and BEFORE, so it answers
         // the member before the exclusion does; and the lock, as 0023's.
         { table: 'leave_requests', trigger: 'leave_requests_refuse_over_leave', type: 1 | 2 | 4, columns: null },
@@ -2129,9 +2133,10 @@ describe('every write verb 0023, 0035 and 0036 name waits on the lock', () => {
         { table: 'member_status_versions', trigger: 'member_status_versions_serialize_organization_writes', type: 2 | 4 | 8 | 16, columns: null },
         { table: 'members', trigger: 'members_refuse_truncate', type: 2 | 32, columns: null },
         // 0035's re-check of the caller is ROW level and BEFORE: after the
-        // statement's lock, before the row is written.
-        { table: 'members', trigger: 'members_refuse_write_by_stale_admin', type: 1 | 2 | 4 | 8 | 16, columns: ['role'] },
-        { table: 'members', trigger: 'members_serialize_organization_writes', type: 2 | 4 | 8 | 16, columns: ['role'] },
+        // statement's lock, before the row is written. 0084 (story 21.13)
+        // widens both to the floater flag; the columns are read by name.
+        { table: 'members', trigger: 'members_refuse_write_by_stale_admin', type: 1 | 2 | 4 | 8 | 16, columns: ['is_floater', 'role'] },
+        { table: 'members', trigger: 'members_serialize_organization_writes', type: 2 | 4 | 8 | 16, columns: ['is_floater', 'role'] },
         // 0080 (story 21.16): a holiday takes the lock and the caller's re-check
         // on every write: insert, rename (update) and delete.
         { table: 'organization_holidays', trigger: 'organization_holidays_refuse_write_by_stale_admin', type: 1 | 2 | 4 | 8 | 16, columns: null },
