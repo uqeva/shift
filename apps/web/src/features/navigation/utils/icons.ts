@@ -10,6 +10,7 @@ import {
   Rows,
   TreePalm,
   Users,
+  UsersThree,
   type IconComponent,
 } from '@/components/ui/icon';
 import type { NavigationKey } from '@/features/navigation/utils/destinations';
@@ -60,6 +61,8 @@ const DESTINATION_ICONS: Record<NavigationKey, IconComponent> = {
   'nav.ljudi': Users,
   // STORY 14.2: *Povijest promjena*.
   'nav.povijestPromjena': ClockCounterClockwise,
+  // STORY 21.26: a team of people, the setup's subject.
+  'nav.timoviIRaspored': UsersThree,
   'nav.postavkeRotacije': Repeat,
   'nav.organizacija': Buildings,
 };

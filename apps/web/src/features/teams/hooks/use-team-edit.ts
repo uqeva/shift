@@ -86,7 +86,7 @@ import { NO_TEXT } from '@/utils/text';
  * `@/features/teams/services/write` and `@/features/holidays/services/*`,
  * which the node suite executes; this hook holds state and wiring only.
  */
-export function useTeamEdit(id: string) {
+export function useTeamEdit(id: string, onClose?: () => void) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const nameField = useRef<HTMLInputElement>(null);
@@ -144,7 +144,16 @@ export function useTeamEdit(id: string) {
   /** The archive is being asked about, or is in flight. */
   const confirming = stage === ARCHIVE_ARMED || stage === ARCHIVE_BUSY;
 
+  /**
+   * Every way the dialog closes: back to the list it is drawn over — or,
+   * STORY 21.26, the caller's own close when *Timovi i raspored* opens it.
+   */
   function close(): void {
+    if (onClose !== undefined) {
+      onClose();
+
+      return;
+    }
     void navigate({ to: '/ljudi/smjene' });
   }
 

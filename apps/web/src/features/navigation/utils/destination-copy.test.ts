@@ -49,8 +49,15 @@ describe('Više names the current place under its label', () => {
     expect(messageAt(destinationPlaceMessageKey('nav.postavkeRotacije'))).toBe('Rotacija');
   });
 
+  // STORY 21.26: *Timovi i raspored* is the second name too long for a fifth of the bar.
+  it('shortens Timovi i raspored to Timovi', () => {
+    expect(messageAt(destinationPlaceMessageKey('nav.timoviIRaspored'))).toBe('Timovi');
+  });
+
   it('names every other destination by its own label', () => {
-    for (const { key } of DESTINATIONS.filter((destination) => destination.key !== 'nav.postavkeRotacije')) {
+    for (const { key } of DESTINATIONS.filter(
+      (destination) => destination.key !== 'nav.postavkeRotacije' && destination.key !== 'nav.timoviIRaspored',
+    )) {
       expect(destinationPlaceMessageKey(key)).toBe(key);
     }
   });

@@ -59,6 +59,10 @@ export const TEAM_ROSTER_PARTS = {
  */
 export const TEAM_SCREENS_EXEMPT: readonly { readonly file: string; readonly why: string }[] = [
   {
+    file: 'components/team-edit-dialog.tsx',
+    why: 'the team dialog drawn over *Timovi i raspored* (story 21.26), part of that page\'s TIMOVI_I_RASPORED set in the sign-in suite, so it is counted once',
+  },
+  {
     file: 'team-screens.fixture.ts',
     why: 'this file: the three sets themselves, read by two suites and rendered by nothing',
   },

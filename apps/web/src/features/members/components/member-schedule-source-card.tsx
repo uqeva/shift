@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Notice } from '@/components/ui/notice';
 import { RadioGroup, RadioRow } from '@/components/ui/radio-group';
 import { Select } from '@/components/ui/select';
+import type { CalendarSnapshot } from '@/features/calendar/services/snapshot';
 import { ErasureDialog } from '@/features/conflicts/components/erasure-dialog';
 import type { MemberEdit } from '@/features/members/hooks/use-member-edit';
 import type { MemberScheduleSource } from '@/features/members/hooks/use-member-schedule-source';
@@ -18,10 +19,12 @@ import {
   CHANGE_SET,
   NO_CHOICE,
   changeFromOf,
+  scheduleSourceFactsOf,
   scheduleSourceMessageKey,
   scheduleSourceRefusalMessageKey,
   type PatternRun,
   type ScheduleSourceFact,
+  type ScheduleSourceFacts,
 } from '@/features/members/services/schedule-source';
 import { memberErasureCopyOf } from '@/features/members/utils/erasure-copy';
 import {
@@ -45,6 +48,15 @@ import { t } from '@/lib/i18n';
 import { useWriteGate } from '@/lib/offline/use-write-gate';
 import { shownDate } from '@/utils/text';
 
+/**
+ * A member's schedule source today and the change scheduled after it, as
+ * this card states them. STORY 21.26: *Timovi i raspored*'s *Ljudi bez
+ * turnusa* lists the people on a personal rotation or manual only with it.
+ */
+export function memberScheduleFactsOf(calendar: CalendarSnapshot, memberId: string, today: string): ScheduleSourceFacts | null {
+  return scheduleSourceFactsOf(calendar, memberId, today);
+}
+
 /** The sources in the order the dialog offers them. */
 const SOURCES: readonly ScheduleSource[] = [SCHEDULE_SOURCE_TEAM, SCHEDULE_SOURCE_PERSONAL, SCHEDULE_SOURCE_MANUAL];
 
@@ -65,8 +77,11 @@ function runsText(runs: readonly PatternRun[], typeName: (id: string) => string)
   return runs.map((run) => t('rasporedOsobe.run', { type: typeName(run.shiftTypeId), count: run.count })).join(t('rasporedOsobe.runSeparator'));
 }
 
-/** One fact line: the source, its date, and a personal rotation's pattern and start. */
-function factText(fact: ScheduleSourceFact, typeName: (id: string) => string): string {
+/**
+ * One fact line: the source, its date, and a personal rotation's pattern and
+ * start. STORY 21.26: *Ljudi bez turnusa* says each person's with it too.
+ */
+export function factText(fact: ScheduleSourceFact, typeName: (id: string) => string): string {
   const source = t(scheduleSourceMessageKey(fact.source));
   const base = fact.effectiveFrom === null ? source : t('rasporedOsobe.since', { source, date: shownDate(fact.effectiveFrom) });
 
@@ -147,10 +162,23 @@ export function MemberScheduleSourceCard({ edit }: { readonly edit: MemberEdit }
           {dialogsOpen || !source.unchecked ? null : <Notice role="alert">{t('rasporedOsobe.error.unchecked')}</Notice>}
         </CardContent>
       </section>
+      <MemberScheduleSourceDialogs source={source} />
+    </Card>
+  );
+}
+
+/**
+ * *Raspored osobe*'s three dialogs — the form, *Što se mijenja* and the
+ * erasure confirmation — with no card. STORY 21.26: *Timovi i raspored*
+ * opens the same dialogs for one person, with every rule the card's.
+ */
+export function MemberScheduleSourceDialogs({ source }: { readonly source: MemberScheduleSource }): ReactNode {
+  return (
+    <>
       <ScheduleSourceForm source={source} />
       <ScheduleSourcePreview source={source} />
       <ScheduleSourceErasures source={source} />
-    </Card>
+    </>
   );
 }
 

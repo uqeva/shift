@@ -25,6 +25,8 @@ const DESCRIPTIONS: Readonly<Record<NavigationKey, ReturnType<typeof destination
   'nav.rucniRaspored': 'shell.description.rucniRaspored',
   'nav.ljudi': 'shell.description.ljudi',
   'nav.povijestPromjena': 'shell.description.povijestPromjena',
+  // STORY 21.26.
+  'nav.timoviIRaspored': 'shell.description.timoviIRaspored',
   'nav.postavkeRotacije': 'shell.description.postavkeRotacije',
   'nav.organizacija': 'shell.description.organizacija',
 };
@@ -41,6 +43,7 @@ export function destinationDescriptionMessageKey(
   | 'shell.description.rucniRaspored'
   | 'shell.description.ljudi'
   | 'shell.description.povijestPromjena'
+  | 'shell.description.timoviIRaspored'
   | 'shell.description.postavkeRotacije'
   | 'shell.description.organizacija' {
   return DESCRIPTIONS[key];
@@ -49,11 +52,14 @@ export function destinationDescriptionMessageKey(
 /**
  * The place *Više* names under its own label while a destination it holds is
  * open (frame D: "Rotacija" on Postavke rotacije). The destination's own label
- * unless that is too long for a fifth of a 320 px bar, which only
- * *Postavke rotacije* is today.
+ * unless that is too long for a fifth of a 320 px bar: *Postavke rotacije*,
+ * and since story 21.26 *Timovi i raspored* ("Timovi").
  */
-export function destinationPlaceMessageKey(key: NavigationKey): NavigationKey | 'shell.place.postavkeRotacije' {
+export function destinationPlaceMessageKey(
+  key: NavigationKey,
+): NavigationKey | 'shell.place.postavkeRotacije' | 'shell.place.timoviIRaspored' {
   if (key === 'nav.postavkeRotacije') return 'shell.place.postavkeRotacije';
+  if (key === 'nav.timoviIRaspored') return 'shell.place.timoviIRaspored';
 
   return key;
 }

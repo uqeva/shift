@@ -1500,6 +1500,7 @@
     "rucniRaspored": "Ručni raspored",
     "ljudi": "Ljudi",
     "povijestPromjena": "Povijest promjena",
+    "timoviIRaspored": "Timovi i raspored",
     "postavkeRotacije": "Postavke rotacije",
     "organizacija": "Organizacija"
   },
@@ -2152,11 +2153,13 @@
       "rucniRaspored": "Mjesec po osobama, kao na papiru",
       "ljudi": "Osobe i njihovi timovi",
       "povijestPromjena": "Tko je što promijenio i kada",
+      "timoviIRaspored": "Timovi, ljudi, rotacija i tipovi smjena na jednom mjestu",
       "postavkeRotacije": "Tipovi smjena, uzorak, pomaci",
       "organizacija": "Naziv, godina godišnjeg, satni pojasevi"
     },
     "place": {
-      "postavkeRotacije": "Rotacija"
+      "postavkeRotacije": "Rotacija",
+      "timoviIRaspored": "Timovi"
     },
     "identity": "{role} · {organization}",
     "theme": {
@@ -3297,6 +3300,116 @@
       "stale": "Podaci su se u međuvremenu promijenili. Provjeri i pokušaj ponovno.",
       "failed": "Raspored osobe trenutačno nije moguće spremiti. Pokušaj ponovno.",
       "unchecked": "Promjenu trenutačno nije moguće provjeriti. Pokušaj ponovno."
+    }
+  },
+  "postaviRaspored": {
+    "loading": "Učitavam timove i raspored…",
+    "failed": "Timovi i raspored trenutačno nisu dostupni.",
+    "retry": "Pokušaj ponovno",
+    "types": {
+      "heading": "Tipovi smjena",
+      "add": "Dodaj tip",
+      "empty": "Još nema tipova smjena.",
+      "notWorking": "ne radi",
+      "noTimes": "bez vremena",
+      "chip": "{letter} · {name} · {times}",
+      "unknown": "Nepoznat tip"
+    },
+    "teams": {
+      "heading": "Timovi",
+      "add": "Dodaj tim",
+      "empty": "Još nema timova."
+    },
+    "team": {
+      "members": "Članovi",
+      "noMembers": "U timu još nema nikoga.",
+      "addMember": "Dodaj člana",
+      "addMemberNamed": "Dodaj člana u tim {team}",
+      "remove": "Ukloni osobu {name} iz tima {team}",
+      "joins": "od {date}",
+      "leaves": "do {date}",
+      "rotation": "Rotacija",
+      "rotationLabel": "Rotacija tima {team}",
+      "rotationFrom": "Od {date}",
+      "rotationToday": "Od danas",
+      "noRotation": "Bez rotacije",
+      "editRotation": "Uredi rotaciju",
+      "editRotationNamed": "Uredi rotaciju tima {team}",
+      "holidaysOn": "Ne radi na blagdane",
+      "holidaysOff": "Radi i na blagdane",
+      "minimumOwn": "Najmanje ljudi: {count}",
+      "minimumOrganization": "Najmanje ljudi: {count} (organizacija)",
+      "minimumNone": "Najmanje ljudi: nije postavljeno",
+      "edit": "Uredi tim",
+      "editNamed": "Uredi tim {team}"
+    },
+    "people": {
+      "heading": "Ljudi bez turnusa",
+      "lede": "Osobe s vlastitom rotacijom ili samo ručnim rasporedom, po poslu.",
+      "empty": "Svi rade po rotaciji svog tima.",
+      "noRole": "Bez posla",
+      "schedule": "Raspored osobe",
+      "scheduleNamed": "Raspored osobe {name}",
+      "set": "Postavi raspored osobe",
+      "roleNamed": "Posao osobe {name}",
+      "roleNone": "Bez posla",
+      "roleSaved": "Posao osobe {name} je spremljen.",
+      "scheduled": "Zakazano: {fact}"
+    },
+    "pick": {
+      "teamTitle": "Dodaj člana u tim {team}",
+      "teamLede": "Odaberi osobu, a zatim od kojeg datuma je u timu.",
+      "scheduleTitle": "Postavi raspored osobe",
+      "scheduleLede": "Odaberi osobu, a zatim radi li po rotaciji tima, po svojoj ili samo ručno.",
+      "label": "Osoba",
+      "choose": "Odaberi osobu",
+      "currentTeam": "{name} · {team}",
+      "none": "Nema osoba koje bi se mogle dodati.",
+      "newPerson": "Nova osoba",
+      "next": "Dalje",
+      "cancel": "Odustani",
+      "close": "Zatvori",
+      "unpicked": "Odaberi osobu."
+    },
+    "host": {
+      "scheduled": "{name} već ima zakazanu promjenu tima. Najprije je poništi na stranici osobe.",
+      "openMember": "Otvori stranicu osobe {name}",
+      "unavailable": "Podaci o osobi trenutačno nisu dostupni. Pokušaj ponovno.",
+      "saved": "Promjena za osobu {name} je spremljena.",
+      "someone": "osoba"
+    },
+    "rotationDialog": {
+      "title": "Rotacija",
+      "lede": "Uzorak tipova smjena i korak svakog tima. Spremanje vrijedi za sve timove od odabranog datuma.",
+      "close": "Zatvori rotaciju"
+    },
+    "firstRun": {
+      "heading": "Prvi koraci",
+      "lede": "Raspored se postavlja ovim redom.",
+      "listLabel": "Koraci postavljanja",
+      "stepTitle": "{n}. {title}",
+      "done": "Gotovo",
+      "waiting": "Nakon prethodnog koraka",
+      "types": {
+        "title": "Tipovi smjena",
+        "hint": "Npr. Dan, Noć i Slobodno, s vremenima.",
+        "action": "Dodaj tip"
+      },
+      "team": {
+        "title": "Tim",
+        "hint": "Tim je skupina ljudi koja radi po istoj rotaciji.",
+        "action": "Dodaj tim"
+      },
+      "people": {
+        "title": "Ljudi",
+        "hint": "Dodaj osobe u tim ili im postavi vlastiti raspored.",
+        "action": "Dodaj člana"
+      },
+      "rotation": {
+        "title": "Rotacija",
+        "hint": "Redoslijed tipova smjena i korak na kojem je svaki tim.",
+        "action": "Uredi rotaciju"
+      }
     }
   }
 }

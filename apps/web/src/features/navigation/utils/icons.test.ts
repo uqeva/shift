@@ -20,13 +20,13 @@ import { destinationIcon } from '@/features/navigation/utils/icons';
  */
 
 describe('every destination is drawn with its own icon', () => {
-  it('resolves an icon for all ten, and never the same one twice (story 21.4)', () => {
+  it('resolves an icon for all eleven, and never the same one twice (story 21.26)', () => {
     // Read off the shipped table rather than a list written here: a ninth
     // destination joins this assertion by existing, which is the whole reason
     // `@/features/navigation/utils/destinations` is data.
     const icons = DESTINATIONS.map((destination) => destinationIcon(destination.key));
 
-    expect(icons).toHaveLength(10);
+    expect(icons).toHaveLength(11);
     expect(icons, 'a destination resolves to no icon at all').not.toContain(undefined);
     expect(new Set(icons).size, 'two destinations are drawn with the same icon').toBe(icons.length);
   });

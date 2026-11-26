@@ -84,3 +84,13 @@ export function memberScheduleRowTypeId(index: number): string {
 export function memberScheduleRowCountId(index: number): string {
   return `member-schedule-row-${String(index)}-count`;
 }
+
+/** STORY 21.26: one member's inline *Posao* picker on *Timovi i raspored*. */
+export function memberJobRolePickerId(memberId: string): string {
+  return `member-job-role-${memberId}`;
+}
+
+/** STORY 21.26: that picker's refusal. */
+export function memberJobRoleErrorId(memberId: string): string {
+  return `member-job-role-error-${memberId}`;
+}

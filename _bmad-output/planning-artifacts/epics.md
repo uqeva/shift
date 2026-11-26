@@ -23,7 +23,7 @@ Epics 16–19 were added on 2026-11-20 by `sprint-change-proposal-2026-11-20-v2-
 
 Epic 20 was added on 2026-11-20 by `sprint-change-proposal-2026-11-20-self-hosting.md`: Shift is hosted on our own server through Coolify, with no Supabase cloud and no Cloudflare Pages. It changes no product behaviour. Its later stories wait for the founder decisions H-1 to H-15 and the inputs that proposal lists.
 
-Epic 21 was added on 2026-11-25 by `sprint-change-proposal-2026-11-25-pilot-readiness.md`, on the founder's approval of the first production pilot's scope and the founder's additions the same day. It covers personal scheduling (a manual grid, a pattern fill, personal rotations, seasons), job roles and floater cover, organization holidays, a minimum per team, a public product page and a label rename. Its requirements are CAP-29 to CAP-32, CAP-21 as amended, Q31 and UX-DR71 to UX-DR83 below, from PRD FR-102 to FR-116 and NFR-35, and engine rules R13 to R16. Production (20.9) stays after it.
+Epic 21 was added on 2026-11-25 by `sprint-change-proposal-2026-11-25-pilot-readiness.md`, on the founder's approval of the first production pilot's scope and the founder's additions the same day. It covers personal scheduling (a manual grid, a pattern fill, personal rotations, seasons), job roles and floater cover, organization holidays, a minimum per team, a public product page and a label rename. Its requirements are CAP-29 to CAP-32, CAP-21 as amended, Q31 and UX-DR71 to UX-DR84 below, from PRD FR-102 to FR-116 and NFR-35, and engine rules R13 to R16. Production (20.9) stays after it.
 
 **Requirements basis:** the SPEC package is canonical. `prd.md` is a fully-absorbed source and is deliberately not an input — it retains a retired rotation table, a pre-narrowing FR-16, and pre-architecture conflict framing. The PRD **addendum** is an adopted companion and is an input, for the pilot seed configuration and the epic seed.
 
@@ -244,6 +244,7 @@ From `DESIGN.md` (visual) and `EXPERIENCE.md` (behavioural). Both are binding an
 - **UX-DR81** The product's name and mark (story 21.24; the founder's decisions of 2026-11-25). The name a user sees is *Smjenko* everywhere: the page title, the installed app, the sign-in panel and the setup header, Auth mail and its sender, the calendar feed and the month download, the PDF's metadata and a push without a title. The mark is concept C, *Predaja smjene*: an S of two 290° clock arcs meeting at a seam, accent blue `#3FA0FA` over white, on an ink-navy `#0F172A` tile (rx 112 of 512), its colours fixed in both themes, a white 16 % hairline on dark glass, and kept under forced colours. The wordmark is text in Outfit 600, never an image. Internal identifiers (`@shift/*`, the repository, env var names, databases, URLs, UID domains) stay.
 - **UX-DR82** The compact toolbar (story 21.23). On every filtered or exporting list (*Kalendar*, *Ljudi*, *Godišnji*, *Povijest promjena*): one row of the title, the search (`Traži…`), `Filtri` with its count, `Prikaz ▾`, `Izvoz ▾` and the primary action; under it the result count and the removable chips with `Očisti sve`. On a phone two rows at most, the buttons icon-only (their names unchanged). `Filtri` opens a dropdown panel from 1024 px and a bottom sheet below it, with `Očisti` and `Primijeni`.
 - **UX-DR83** *Kalendar kao papir* (story 21.25, founder request 2026-11-25). *Svi timovi* from 640 px reads like the paper roster: the dates of the month are the columns, the rows are first the teams (a turnus team its type per date, a team with no rotation `—` or its staffing groups) and then the people on a personal or manual schedule (active in the month and on no team with a rotation on any date they are active), grouped by job role by name with *Bez posla* last. A cell draws the type's letter in its fill, with the marks' rings, hatches and glyphs and the assigned pencil; its accessible name says the date, the team or person, the type, its times and every mark. A key of letters sits above the grid. Sticky date strip and name column, the page scrolls and the grid only sideways (UX-DR71), shared with *Ručni raspored*. A cell opens the day detail. The phone keeps the day list of every shown team. *Filtri* adds *Posao* (`?posao=`, *Ljudi*'s semantics), which narrows the people to the role and the teams to those someone holding it is on; *Ručni raspored*'s toolbar gets the same *Posao* filter.
+- **UX-DR84** *Timovi i raspored* (story 21.26, founder request 2026-11-26). One admin screen under *Postavke* where a team, a shift and a person are linked: a *Tipovi smjena* strip at the top (each type a chip with its times, and *Dodaj tip*); one card per active team with its members as chips (*Dodaj člana*: pick a person, then *Vrijedi od*; a chip's ✕ ends the membership from a date), its rotation as a strip of shift-type chips from today's step (*Uredi rotaciju* opens the rotation builder in a dialog), and its *Ne radi na blagdane* and *Najmanje ljudi* facts (*Uredi tim* opens the team dialog); and *Ljudi bez turnusa*, the active people on a personal rotation or manual only, grouped by job role with *Bez posla* last, each with their schedule's summary, *Raspored osobe* (the member page's dialog) and *Posao* editable inline. An empty organization sees *Prvi koraci* in order: types, team, people, rotation. Every change goes through the dialog and the write path it has elsewhere, *Što se mijenja* and the erasure check included. The page uses the compact toolbar (UX-DR82), the glass surfaces, 44 px targets and a phone layout of one column.
 
 ### FR Coverage Map
 
@@ -3599,7 +3600,7 @@ The admin of a fire department with mixed teams opens *Ručni raspored*. The fou
 
 Added 2026-11-25 by `sprint-change-proposal-2026-11-25-pilot-readiness.md`, on the founder's approval of the first production pilot's scope. That approval covers two organizations, a fire department on 24-hour duty and a department that mixes 24-hour crews with day workers, floater students and leave, and it was widened the same day by the founder's additions recorded in the proposal (§1). The source is modelling a real month on staging with the operator script `supabase/operator/demo-mladost.sql` (DEPLOY §7.6), whose workarounds this epic retires. **Production (20.9) stays after this epic.**
 
-**Capabilities:** CAP-29, CAP-30, CAP-31, CAP-32, CAP-21 (amended) · **Governed by:** AD-2, AD-4, AD-5, AD-7, AD-11, AD-13, AD-18, AD-19, AD-20, and AD-26 to AD-28 (added 2026-11-25) · **Engine rules:** R14, R15, R16, R13, R10.2 (amended) · **Proves:** Q2, Q9, Q11, Q12, Q21, Q22, Q25, Q27, Q31 · **UX:** UX-DR71–UX-DR83 · **Decisions:** E-1 to E-8 (proposal §6; each story names its own), all accepted at the recommended defaults by the founder on 2026-11-25
+**Capabilities:** CAP-29, CAP-30, CAP-31, CAP-32, CAP-21 (amended) · **Governed by:** AD-2, AD-4, AD-5, AD-7, AD-11, AD-13, AD-18, AD-19, AD-20, and AD-26 to AD-28 (added 2026-11-25) · **Engine rules:** R14, R15, R16, R13, R10.2 (amended) · **Proves:** Q2, Q9, Q11, Q12, Q21, Q22, Q25, Q27, Q31 · **UX:** UX-DR71–UX-DR84 · **Decisions:** E-1 to E-8 (proposal §6; each story names its own), all accepted at the recommended defaults by the founder on 2026-11-25
 
 **Planning status (2026-11-25):** every story is `ready-for-dev` in `sprint-status.yaml` until it is built (`sprint-status.yaml` holds each story's current status). Each story's spec is written by `bmad-create-story` when it starts. 21.22 is unblocked: the founder chose *Timovi* (E-6, 2026-11-25). 21.24 (the *Smjenko* name and mark) was added the same day by the founder's decisions reversing E-5's default; it is built together with 21.22 on one branch (`feat/smjenko-brand`), since both rewrite `hr.json`'s copy. 21.21 waits for the founder's contact address only to publish (E-4), not to build. The order below is the build order. 21.3, 21.12, 21.20 and 21.21 touch no other story's files and may run in parallel worktrees; 21.22 is built with 21.24 on one branch. There is no 21.23: the number was left unassigned when 21.24 was named by the founder.
 
@@ -4135,3 +4136,40 @@ So that the crews, the dispatchers, the cleaners and the students are read on on
 **When** this ships
 **Then** *Moj raspored* is unchanged, the month prints as one table, and the e2e and perf specs that read the 21.3 grid read the transposed one
 
+### Story 21.26: Set the schedule up in one place (*Postavi raspored na jednom mjestu*)
+
+As an admin setting up or changing who works what,
+I want the teams, their people, their rotation and the shift types on one screen,
+So that I can link a team, a shift and a person without visiting five screens.
+
+**Depends on:** 21.10, 21.12, 21.17, 21.20, 21.23. **Blocked on:** nothing. Added on the founder's request of 2026-11-26 ("I still can't quickly link a team, a shift and a person"). Applies UX-DR84. No migration and no new server function: every write is an existing one, through its existing dialog. The first lazily loaded route.
+
+**Acceptance Criteria:**
+
+**Given** an admin
+**When** they open *Postavke → Timovi i raspored* (`/timovi-i-raspored`)
+**Then** one page shows the compact toolbar (21.23), a *Tipovi smjena* strip of every active type as a chip with its times and *Dodaj tip* (the existing add dialog: name, from–to, working or not), and one card per active team (UX-DR84); a member is sent away by the admin guard
+
+**Given** a team's card
+**When** it is drawn
+**Then** it shows the team's members today as chips (a scheduled joiner or leaver marked with the date), its rotation as a strip of shift-type chips starting at the team's step today (or *Bez rotacije*), and its *Ne radi na blagdane* and *Najmanje ljudi* (own, or the organization's)
+
+**Given** *Dodaj člana* on a card, or a chip's ✕
+**When** the admin picks a person (or removes one)
+**Then** the member page's team dialog opens for that person with the team (or *bez tima*) chosen and *Vrijedi od*, and saves through the same membership write, *Što se mijenja*, short-staffed check and erasure confirmation
+
+**Given** *Uredi rotaciju* or *Uredi tim*
+**When** it is pressed
+**Then** the existing rotation builder opens in a dialog, and the existing team dialog (*Ne radi na blagdane* with its check, *Najmanje ljudi* with its preview, rename) opens over the page; closing either returns focus to its button
+
+**Given** members on a personal rotation or manual only today
+**When** the page is drawn
+**Then** *Ljudi bez turnusa* lists them grouped by job role (*Bez posla* last), each with their schedule's summary, *Raspored osobe* opening the member page's dialog, and *Posao* a picker that saves on change through the member write
+
+**Given** an organization with no shift type, no team, no other person or no rotation
+**When** the page opens
+**Then** *Prvi koraci* lists types → team → people → rotation in that order, the first unfinished step's action enabled and marked as next
+
+**Given** the page at 360 px and from 640 px, by keyboard alone
+**When** it is used
+**Then** nothing scrolls sideways, every target is 44 px, every chip and action is reachable and named, focus returns to the opener after every dialog, and the route's code is loaded only when it is first opened

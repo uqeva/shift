@@ -34,6 +34,7 @@ import { rootRoute } from '@/pages/__root';
 import { RoutePending } from '@/pages/pending';
 import { satiRoute } from '@/pages/sati';
 import { smjenaRoute } from '@/pages/smjene.$id';
+import { timoviIRasporedRoute } from '@/pages/timovi-i-raspored.route';
 import { zaOdlukuCollisionRoute } from '@/pages/za-odluku.$memberId.$date.$teamId';
 import { zaOdlukuRequestRoute } from '@/pages/za-odluku.zahtjev.$requestId';
 import { zaOdlukuSwapRoute } from '@/pages/za-odluku.zamjena.$requestId';
@@ -115,6 +116,8 @@ const appDestinations = appLayoutRoute.addChildren([
   ljudiSmjenaRoute,
   ljudiMemberRoute,
   povijestPromjenaRoute,
+  // STORY 21.26: *Timovi i raspored*, admin only; the first lazily loaded screen.
+  timoviIRasporedRoute,
   postavkeRotacijeRoute,
   // STORY 2.2b: one shift type, on 1.7a's terms — nested under the layout,
   // absent from the destinations (the `Postavke rotacije` tab lights for it),

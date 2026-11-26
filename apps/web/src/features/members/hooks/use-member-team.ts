@@ -229,8 +229,13 @@ export function useMemberTeam(screen: MemberScreen) {
     focusLater([() => teamOpener.current, () => teamWithdrawButton.current], byId(MEMBER_TEAM_HEADING_ID));
   }
 
-  /** `Promijeni`: the team dialog opens EMPTY — no team chosen (story 7.11). */
-  function openTeam(): void {
+  /**
+   * `Promijeni`: the team dialog opens EMPTY — no team chosen (story 7.11).
+   * STORY 21.26: *Timovi i raspored* opens it with `preset` already picked —
+   * a team id, or `NO_TEAM_VALUE` — when the offer holds that choice; any
+   * other preset opens it empty, as the member page does.
+   */
+  function openTeam(preset?: string): void {
     const member = form.member;
 
     if (teaming.current || teamMoveOffer === null || member === null) return;
@@ -240,7 +245,11 @@ export function useMemberTeam(screen: MemberScreen) {
     setTeamErased(null);
     setTeamUnchecked(null);
     setTeamDateMark(null);
-    setTeamPick(null);
+    setTeamPick(
+      preset === undefined || chosenTeam(preset, teamMoveOffer) === undefined
+        ? null
+        : { member: id, raised: { value: preset, history: teamPickHistory(member, teamMoveOffer) } },
+    );
     setTeamDay({ member: id, raised: teamMoveOffer.minimum });
     openings.current += 1;
     setTeamOpen({
@@ -707,7 +716,11 @@ export function useMemberTeam(screen: MemberScreen) {
       preview: movePreview,
       shortStaffed,
       enterDay: enterTeamDay,
-      open: openTeam,
+      open: () => {
+        openTeam();
+      },
+      /** STORY 21.26: the dialog opened with a team (or no team) already picked. */
+      openWith: openTeam,
       close: closeTeam,
       save: saveTeam,
     },

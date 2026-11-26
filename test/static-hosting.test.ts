@@ -367,10 +367,16 @@ describe('the build is an installable PWA', () => {
     const stylesheets = tags('link')
       .filter((attributes) => attributes.get('rel') === 'stylesheet')
       .map((attributes) => attributes.get('href') ?? '');
+    // STORY 21.26: the first lazy route splits the code the entry shares with
+    // it into a chunk the entry imports statically and the page preloads; the
+    // shell boots on it, so it is precached as the entry is.
+    const preloads = tags('link')
+      .filter((attributes) => attributes.get('rel') === 'modulepreload')
+      .map((attributes) => attributes.get('href') ?? '');
 
     expect(entry, 'expected exactly one module script on the built page').toHaveLength(1);
     expect(stylesheets.length, 'expected at least one stylesheet on the built page').toBeGreaterThan(0);
-    for (const src of [...entry, ...stylesheets]) {
+    for (const src of [...entry, ...stylesheets, ...preloads]) {
       const path = src.replace(/^\.?\//, '');
 
       expect(path).toMatch(/^assets\//);

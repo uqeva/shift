@@ -132,6 +132,10 @@ export const DESTINATIONS: readonly [Destination, ...Destination[]] = [
   // STORY 14.2: the change history. ADMIN-ONLY (D4) and read, never set up,
   // so it sits under *Pregled* after Ljudi; on a phone it is in *Više*.
   { key: 'nav.povijestPromjena', path: '/povijest-promjena', roles: ADMIN_ONLY, group: 'overview' },
+  // STORY 21.26 (UX-DR84): *Timovi i raspored*, the teams, their people, their
+  // rotation and the shift types on one page. ADMIN-ONLY set-up, so the first
+  // of *Postavke*; on a phone it is in *Više*.
+  { key: 'nav.timoviIRaspored', path: '/timovi-i-raspored', roles: ADMIN_ONLY, group: 'settings' },
   { key: 'nav.postavkeRotacije', path: '/postavke-rotacije', roles: ADMIN_ONLY, group: 'settings' },
   { key: 'nav.organizacija', path: '/organizacija', roles: ADMIN_ONLY, group: 'settings' },
 ];
