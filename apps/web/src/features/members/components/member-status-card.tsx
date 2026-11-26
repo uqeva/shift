@@ -135,7 +135,7 @@ export function MemberStatusCard({ edit }: { readonly edit: MemberEdit }): React
             className="h-11 w-full sm:w-auto sm:justify-self-start"
             type="button"
             variant="outline"
-            disabled={statusPending}
+            disabled={statusPending || season.pending}
             onClick={() => {
               armStatus(member, offered);
             }}
@@ -180,34 +180,34 @@ export function MemberStatusCard({ edit }: { readonly edit: MemberEdit }): React
             </h2>
           </CardTitle>
           <div className="flex flex-wrap items-center gap-2">
-          {/* STORY 21.11: *Sezona* — active from a start to an end, in one step. */}
-          {season.offered ? (
-            <Button
-              ref={season.opener}
-              className="h-11"
-              type="button"
-              variant="outline"
-              aria-label={t('ljudi.season.open', { name: member.name })}
-              disabled={statusPending || season.pending}
-              onClick={season.openDialog}
-            >
-              {t('ljudi.season.action')}
-            </Button>
-          ) : null}
-          {/* ITS ACCESSIBLE NAME CARRIES THE MEMBER; its visible word is the action. */}
-          {action === null ? null : (
-            <Button
-              ref={statusDialog.opener}
-              className="h-11"
-              type="button"
-              variant="outline"
-              aria-label={t(statusOfferMessageKey(action.change), { name: member.name })}
-              disabled={statusPending}
-              onClick={statusDialog.open}
-            >
-              {t(statusActionMessageKey(action.change))}
-            </Button>
-          )}
+            {/* STORY 21.11: *Sezona* — active from a start to an end, in one step. */}
+            {season.offered ? (
+              <Button
+                ref={season.opener}
+                className="h-11"
+                type="button"
+                variant="outline"
+                aria-label={t('ljudi.season.open', { name: member.name })}
+                disabled={statusPending || season.pending}
+                onClick={season.openDialog}
+              >
+                {t('ljudi.season.action')}
+              </Button>
+            ) : null}
+            {/* ITS ACCESSIBLE NAME CARRIES THE MEMBER; its visible word is the action. */}
+            {action === null ? null : (
+              <Button
+                ref={statusDialog.opener}
+                className="h-11"
+                type="button"
+                variant="outline"
+                aria-label={t(statusOfferMessageKey(action.change), { name: member.name })}
+                disabled={statusPending || season.pending}
+                onClick={statusDialog.open}
+              >
+                {t(statusActionMessageKey(action.change))}
+              </Button>
+            )}
           </div>
         </CardHeader>
         {renderStatus(member, offer)}

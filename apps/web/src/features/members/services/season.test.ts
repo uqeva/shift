@@ -7,6 +7,7 @@ import {
   SEASON_END_TOO_LATE,
   SEASON_START_BEFORE_SCHEDULED,
   SEASON_START_PAST,
+  seasonAskOf,
   seasonClosedRequestsOf,
   seasonEarliestOf,
   seasonFailureOf,
@@ -137,9 +138,8 @@ describe('the rows a season writes (the I/O matrix)', () => {
         expect(all[index]?.active).not.toBe(all[index - 1]?.active);
         expect((all[index]?.effectiveFrom ?? '') > (all[index - 1]?.effectiveFrom ?? '')).toBe(true);
       }
-      expect(history.length === 0 ? true : all[0]?.active).not.toBe(undefined);
-      // A member with no version is active: the first written row is a deactivation.
-      if (history.length === 0) expect(plan.rows[0]?.active).toBe(false);
+      // The first written row changes the latest state (a member with no version is active).
+      expect(plan.rows[0]?.active).toBe(!(history[history.length - 1]?.active ?? true));
     }
   });
 });
@@ -157,6 +157,52 @@ describe('the last admin', () => {
     expect(seasonLeavesNoAdmin(admin, [leaving, admin], rows)).toBe(true);
     // A non-admin target never consults the rule.
     expect(seasonLeavesNoAdmin(member(), [leaving, member()], rows)).toBe(false);
+  });
+});
+
+describe("the save's ask", () => {
+  const shown = [inactive(TODAY), active('2026-12-01'), inactive('2027-01-01')];
+  const entered = { start: '2026-12-01', end: '2026-12-31', shown };
+
+  it('builds the rows and the guarded change from the first row on', () => {
+    expect(seasonAskOf(member(), [CALLER, member()], CALLER.authUserId, TODAY, entered)).toEqual({
+      ok: true,
+      ask: {
+        rows: shown,
+        change: { kind: 'season', memberId: 'member-1', day: TODAY, versions: shown },
+      },
+    });
+  });
+
+  it('refuses before anything is checked: today or the caller unknown, the own row, the entry, the last admin', () => {
+    expect(seasonAskOf(member(), [], CALLER.authUserId, null, entered)).toEqual({ ok: false, code: MEMBER_WRITE_UNAVAILABLE });
+    expect(seasonAskOf(member(), [], null, TODAY, entered)).toEqual({ ok: false, code: MEMBER_WRITE_UNAVAILABLE });
+    expect(seasonAskOf(member({ authUserId: CALLER.authUserId }), [], CALLER.authUserId, TODAY, entered)).toEqual({
+      ok: false,
+      code: MEMBER_STATUS_SELF,
+    });
+    expect(seasonAskOf(member(), [], CALLER.authUserId, TODAY, { ...entered, end: '2026-11-30' })).toEqual({
+      ok: false,
+      code: SEASON_END_BEFORE_START,
+    });
+    const admin = member({ role: 'admin' });
+    const leaving = { ...CALLER, statusVersions: [inactive('2026-12-15')] };
+    expect(seasonAskOf(admin, [leaving, admin], CALLER.authUserId, TODAY, entered)).toEqual({
+      ok: false,
+      code: ORGANIZATION_WOULD_HAVE_NO_ADMIN,
+    });
+  });
+
+  it('answers stale when the rows to write are not the ones the dialog listed (a midnight, a re-read)', () => {
+    // The next day, "inactive from today" moves: never written past what was shown.
+    expect(seasonAskOf(member(), [CALLER, member()], CALLER.authUserId, '2026-11-27', entered)).toEqual({
+      ok: false,
+      code: MEMBER_STATUS_STALE,
+    });
+    expect(seasonAskOf(member(), [CALLER, member()], CALLER.authUserId, TODAY, { ...entered, shown: null })).toEqual({
+      ok: false,
+      code: MEMBER_STATUS_STALE,
+    });
   });
 });
 

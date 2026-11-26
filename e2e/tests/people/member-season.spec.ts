@@ -14,7 +14,7 @@ import {
   type SeededRotation,
 } from '../../utils/database-helper.ts';
 import { addDays, fullDate } from '../../utils/dates.ts';
-import { fill, hr } from '../../utils/i18n.ts';
+import { escapeRegExp, fill, hr } from '../../utils/i18n.ts';
 import { ADMIN_STATE } from '../../utils/run-fixture.ts';
 import { expect, test } from '../../utils/custom-fixtures.ts';
 
@@ -106,7 +106,8 @@ test('sets an active member\'s season in one step, and withdraws only its latest
     fill(words.rowActive, { date: fullDate(start) }),
     fill(words.rowInactive, { date: fullDate(after) }),
   ]) {
-    await expect(dialog).toContainText(line);
+    // EXACT, per line: `aktivna od …` is a substring of `neaktivna od …`.
+    await expect(dialog.getByRole('listitem').filter({ hasText: new RegExp(`^${escapeRegExp(line)}$`) })).toHaveCount(1);
   }
   expect(await statusVersionsOfInSql(fixture.slug, person.id)).toEqual([]);
 

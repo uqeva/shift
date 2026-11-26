@@ -6,17 +6,13 @@ import { CHECK_REFUSED, CHECK_UNAVAILABLE } from '@/features/conflicts/services/
 import { organizationLeaveRequestsReadOptions } from '@/features/leave/hooks/use-organization-leave-requests';
 import type { MemberScreen } from '@/features/members/hooks/member-edit-context';
 import { MEMBERS_LIST_KEY, membersTodayOf, type MemberListRow } from '@/features/members/services/list';
-import {
-  MEMBER_CHANGE_SEASON,
-  memberErasureCheckOf,
-  type MemberChange,
-} from '@/features/members/services/member-erasures';
+import { memberErasureCheckOf, type MemberChange } from '@/features/members/services/member-erasures';
 import {
   SEASON_END_BEFORE_START,
   SEASON_END_TOO_LATE,
   seasonClosedRequestsOf,
+  seasonAskOf,
   seasonEarliestOf,
-  seasonLeavesNoAdmin,
   seasonPlanOf,
   seasonRefusalIsDates,
   writeSeason,
@@ -24,12 +20,7 @@ import {
   type SeasonTable,
   type SeasonWriteFailure,
 } from '@/features/members/services/season';
-import {
-  MEMBER_STATUS_SELF,
-  MEMBER_STATUS_STALE,
-  MEMBER_WRITE_UNAVAILABLE,
-  ORGANIZATION_WOULD_HAVE_NO_ADMIN,
-} from '@/features/members/services/wire';
+import { MEMBER_STATUS_STALE, MEMBER_WRITE_UNAVAILABLE } from '@/features/members/services/wire';
 import { MEMBER_STATUS_TABLE, statusBlockKey } from '@/features/members/services/write';
 import { MEMBERSHIP_WRITE_DEPENDENTS, NO_DEPENDENTS, refreshAfterWrite } from '@/features/teams/services/dependents';
 import { writesOnline } from '@/lib/offline/use-write-gate';
@@ -186,42 +177,23 @@ export function useMemberSeason(screen: MemberScreen) {
     );
   }
 
-  /** The subject of `member`'s season as entered, as at the organization's today now, or the refusal it earns. */
+  /** The subject of `member`'s season as entered and listed, as at the organization's today now, or the refusal it earns. */
   function subjectOf(
     target: MemberListRow,
     members: readonly MemberListRow[],
   ):
     { readonly ok: true; readonly subject: SeasonSubject } | { readonly ok: false; readonly code: SeasonWriteFailure } {
-    const on = membersTodayOf(members, new Date()) ?? today;
+    const asked = seasonAskOf(target, members, callerAuthUserId, membersTodayOf(members, new Date()), {
+      start,
+      end,
+      shown: plan !== null && plan.ok ? plan.rows : null,
+    });
 
-    if (on === null) return { ok: false, code: MEMBER_WRITE_UNAVAILABLE };
-    if (target.authUserId === callerAuthUserId) return { ok: false, code: MEMBER_STATUS_SELF };
-
-    const planned = seasonPlanOf(target.statusVersions, on, start, end);
-
-    if (!planned.ok) return planned;
-    if (seasonLeavesNoAdmin(target, members, planned.rows))
-      return { ok: false, code: ORGANIZATION_WOULD_HAVE_NO_ADMIN };
-
-    const first = planned.rows[0];
-
-    if (first === undefined) return { ok: false, code: MEMBER_WRITE_UNAVAILABLE };
+    if (!asked.ok) return asked;
 
     return {
       ok: true,
-      subject: {
-        memberId: target.id,
-        start,
-        end,
-        rows: planned.rows,
-        history: statusBlockKey(target),
-        change: {
-          kind: MEMBER_CHANGE_SEASON,
-          memberId: target.id,
-          day: first.effectiveFrom,
-          versions: planned.rows,
-        },
-      },
+      subject: { memberId: target.id, start, end, rows: asked.ask.rows, history: statusBlockKey(target), change: asked.ask.change },
     };
   }
 

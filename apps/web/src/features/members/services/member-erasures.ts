@@ -239,15 +239,18 @@ export function memberChangeSnapshotOf(
       // APPENDED AFTER THE LATEST (0085): a scheduled change is no refusal,
       // but a row on or before the fresh history's latest version is — the
       // history moved since the dialog planned the season.
-      const latest = member.statuses.reduce<string | null>(
-        (last, version) => (last === null || version.effectiveFrom > last ? version.effectiveFrom : last),
+      // AND STILL ALTERNATING: the first row changes the fresh latest state
+      // (none is active), as 0085's `member_status_version_appendable` asks.
+      const latest = member.statuses.reduce<StatusVersion | null>(
+        (last, version) => (last === null || version.effectiveFrom > last.effectiveFrom ? version : last),
         null,
       );
 
       if (change.versions.some((version) => version.effectiveFrom < today)) return { ok: false, code: MEMBER_STATUS_STALE };
-      if (latest !== null && change.versions.some((version) => version.effectiveFrom <= latest)) {
+      if (latest !== null && change.versions.some((version) => version.effectiveFrom <= latest.effectiveFrom)) {
         return { ok: false, code: MEMBER_STATUS_STALE };
       }
+      if (change.versions[0]?.active === (latest?.active ?? true)) return { ok: false, code: MEMBER_STATUS_STALE };
 
       return applied({ ...member, statuses: [...member.statuses, ...change.versions] });
     }

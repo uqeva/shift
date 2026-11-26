@@ -3,7 +3,8 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 
 import { MEMBERS_LIST_KEY, MEMBERS_PAGE_HEADING_ID } from '@/features/members/services/list';
 import {
-  SEASON_DATES_MISSING,
+  SEASON_END_BEFORE_START,
+  SEASON_END_TOO_LATE,
   seasonPlanOf,
   writeSeason,
   type SeasonRow,
@@ -275,14 +276,17 @@ export function useMemberCreate(adding: boolean, navigate: MemberAddNavigate) {
       const zone = snapshot.data?.ok === true ? snapshot.data.snapshot.timezone : null;
       const planned =
         zone === null
-          ? ({ ok: false, code: SEASON_DATES_MISSING } as const)
+          ? ({ ok: false, code: MEMBER_WRITE_UNAVAILABLE } as const)
           : seasonPlanOf([], organizationIsoDate(new Date(), zone), seasonStart, seasonEnd);
 
       if (!planned.ok) {
         setFailure(null);
         setInvalidField(null);
         setSeasonRefusal(planned.code);
-        seasonStartField.current?.focus();
+        (planned.code === SEASON_END_BEFORE_START || planned.code === SEASON_END_TOO_LATE
+          ? seasonEndField
+          : seasonStartField
+        ).current?.focus();
 
         return;
       }
@@ -322,30 +326,38 @@ export function useMemberCreate(adding: boolean, navigate: MemberAddNavigate) {
       // (`features/teams/services/dependents.test.ts` pins both). The order is
       // kept anyway: the one unrecoverable value in this system is shown before
       // anything else is awaited, so no later step can take it down.
-      // STORY 21.11: THE SEASON, right after the create and as the caller,
-      // through 0085's policy in one insert; a refusal keeps the credential
-      // and says the person was added without it.
-      if (season !== null) {
-        const memberId = outcome.credential.memberId;
-        const written =
-          memberId === null
-            ? ({ ok: false } as const)
-            : await writeSeason(
-                supabaseClient().from(MEMBER_STATUS_TABLE) as unknown as SeasonTable,
-                form.organizationId,
-                memberId,
-                season,
-                null,
-              );
-
-        if (!written.ok) setSeasonUnsaved(true);
-      }
-
       setCredential(outcome.credential);
       setCreatedName(trimName(name.value));
       // THE FORM AND ITS FOCUSED SUBMIT ARE GONE: focus moves to the line
       // that says what was created, never to the page body.
       focusLater([byId(MEMBER_ADD_CREATED_ID)], byId(MEMBER_ADD_DIALOG_HEADING_ID));
+
+      // STORY 21.11: THE SEASON, once the credential is on screen, as the
+      // caller through 0085's policy in one insert; a refusal (or a reply with
+      // no member id) keeps the credential and says the person was added
+      // without it. Never throws: `writeSeason` reads every fault as a code.
+      if (season !== null) {
+        const memberId = outcome.credential.memberId;
+        let written = false;
+
+        if (memberId !== null) {
+          try {
+            written = (
+              await writeSeason(
+                supabaseClient().from(MEMBER_STATUS_TABLE) as unknown as SeasonTable,
+                form.organizationId,
+                memberId,
+                season,
+                null,
+              )
+            ).ok;
+          } catch (cause) {
+            console.error(MEMBER_WRITE_UNAVAILABLE, cause);
+          }
+        }
+
+        if (!written) setSeasonUnsaved(true);
+      }
 
       // REFETCHED rather than patched into the cache, so the list shows what the
       // database holds — including anything a shape on the table normalized. The

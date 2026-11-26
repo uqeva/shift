@@ -2,14 +2,14 @@
 title: "21.11 A seasonal member's season is set in one step"
 type: 'feature'
 created: '2026-11-26'
-status: 'in-progress'
+status: 'in-review'
 baseline_commit: 'b1959e02e3b9fcba605b7a4a677fa61310decd7e'
 review_loop_iteration: 0
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-21-context.md'
 ---
 
-Status: draft. Baseline: `main` at `b1959e0` (21.13/21.14 merged, `0084`). Migration `0085`. Touches `hr.json` (hot): branched from the latest merge; rebase on conflict.
+Status: in review, built on `feat/21-11-seasons`, CI pending (no PR yet). Baseline: `main` at `b1959e0` (21.13/21.14 merged, `0084`). Migration `0085`. Touches `hr.json` (hot): branched from the latest merge; rebase on conflict.
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 
@@ -57,27 +57,45 @@ Status: draft. Baseline: `main` at `b1959e0` (21.13/21.14 merged, `0084`). Migra
 
 - `supabase/migrations/0085_member_seasons.sql` -- NEW: the helper and the altered policy (0008:437-477 is the policy re-stated).
 - `supabase/migrations/0008_member_status.sql` -- read-only: readers, delete policy, Q6. `0023:198-265` re-check (multi-row: sees every row; unchanged). `0041:120-170`, `0049:786-830` close only what no later version governs; `0067:520-555` revokes on an in-effect inactive or any reactivation — all already handle a later version.
-- `test/supabase-scaffold.test.ts:1055-1090,4845-4880` -- the 0008 policy pins: count stays 3 (an `alter`, not a second `create`); the insert pins read the latest `alter`. `test/provisioning.test.ts:3409` -- grantees entry. `test/rls-isolation.test.ts:6187-6240` -- "refuses a second change while one is scheduled" becomes the season's cases.
+- `test/supabase-scaffold.test.ts:1055-1090,4845-4880` -- the 0008 policy pins: count stays 3 (an `alter`, not a second `create`); 0008's pins stay on its declaration (commented) and a new describe pins 0085's `alter` and helper. `test/provisioning.test.ts:3409` -- grantees entry. `test/rls-isolation.test.ts:6187-6240` -- "refuses a second change while one is scheduled" becomes the season's cases.
 - `apps/web/src/features/members/services/list.ts:689-724` -- `MemberStatus.upcoming`; `statusCellOf`/`statusRankOf` (1388-1407) read the next one.
 - `apps/web/src/features/members/services/season.ts` -- NEW: the plan, refusals, closed requests, the one insert and its failure.
 - `apps/web/src/features/members/services/member-erasures.ts` -- `MEMBER_CHANGE_SEASON` (append every row).
 - `apps/web/src/features/members/hooks/use-member-season.ts`, `components/member-season-dialog.tsx` -- NEW (the schedule-source hook's latch/check/erasure shape). `components/member-status-card.tsx` -- *Sezona* button, every scheduled line. `hooks/use-member-edit.ts` -- `season`.
 - `apps/web/src/features/members/components/member-add-dialog.tsx`, `hooks/use-member-create.ts` -- the two optional dates and the post-create insert.
-- `apps/web/src/i18n/hr.json` -- `ljudi.season.*`, `ljudi.add.season*`.
+- `apps/web/src/lib/i18n/locales/hr.json` -- `ljudi.season.*` (the dialog's, and *Nova osoba*'s `addLegend`, `addHint`, `addUnsaved`).
 - `e2e/tests/people/member-season.spec.ts` NEW; `e2e/utils/database-helper.ts` `statusVersionsOfInSql`; `e2e/pages/people.page.ts` getters.
 
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `0085` and the DB-test catalogs (scaffold, provisioning, rls-isolation cases unrun).
-- [ ] `list.ts` upcoming; `season.ts` and its tests; `member-erasures.ts` and its test.
-- [ ] Hook, dialog, card, page wiring; *Nova osoba*; `hr.json`; the key and localization catalogs.
-- [ ] E2E spec and helper.
-- [ ] Spine AD-26 *Seasons* `Amended 2026-11-26 (story 21.11)`; EXPERIENCE/DESIGN (UX-DR76's *Sezona od–do*); epic context; `sprint-status.yaml` 21.11 `review`.
+- [x] `0085` and the DB-test catalogs (scaffold, provisioning, rls-isolation cases unrun).
+- [x] `list.ts` upcoming; `season.ts` and its tests; `member-erasures.ts` and its test.
+- [x] Hook, dialog, card, page wiring; *Nova osoba*; `hr.json`; the key and localization catalogs.
+- [x] E2E spec and helper.
+- [x] Spine AD-26 *Seasons* `Amended 2026-11-26 (story 21.11)`; EXPERIENCE/DESIGN (UX-DR76's *Sezona od–do*); epic context; `sprint-status.yaml` 21.11 `review`.
 
 **Acceptance Criteria:**
 - Given the matrix, when the season service tests run, then each row's rows or refusal are as stated.
 - Given typecheck, lint, build, the domain/ICS/web suites and the DB-free root tests, when run, then they pass.
+
+## Spec Change Log
+
+No bad_spec loop.
+
+## Review Triage Log
+
+### 2026-11-26 — Review pass 1
+
+- Layers: blind, edge-case, verification-gap, epic AC, unrun DB test (5 of 5), each a context-free subagent over the diff at `3ca1520`.
+- intent_gap: 0. bad_spec: 0. Epic AC: AC 1 and AC 2 met (AC 1's "inactive until the start" under the listed reading); one unlisted gap noted, *Nova osoba*'s create and season being two requests, which the AC's "the status versions are written in one request" does not forbid (Design Note 3, deferred-work).
+- patch (applied in the second commit):
+  - `[high]` `[patch]` *Nova osoba* awaited the season insert before showing the one-time credential, and a throw building its client lost the credential of a created member: the credential is shown first, the season written after it inside its own `try` (blind, edge-case, verification gap).
+  - `[medium]` `[patch]` The season's erasure snapshot checked dates only: a first row repeating the fresh latest state (planned over a change since withdrawn) is now stale, as 0085 refuses it (blind, edge-case).
+  - `[medium]` `[patch]` The rows written could differ from the rows listed (a midnight, a re-read): the save's subject is `seasonAskOf` in `season.ts`, which answers stale unless its rows are the ones shown, and is unit-tested with the last-admin and own-row refusals (blind, verification gap).
+  - `[low]` `[patch]` *Nova osoba*: an unread organization zone reads as unavailable, not "enter both dates"; an end refusal focuses *Sezona do*. The status card's action and *Poništi* wait for a season write too; the card header re-indented. The requests line says cancelling a season does not reopen them. A stale cross-reference in `list.ts`, a test assertion that could not fail, the e2e's substring match of `aktivna od` inside `neaktivna od`, and a mid-statement non-alternating case in rls-isolation; the spec's paths, tasks and status.
+- defer: 4 (deferred-work.md, "Deferred from: story 21.11"): 0067's revocation at insert for a reactivation behind a scheduled deactivation; no whole-season cancel (and the day-D-alone and today's-row cases); the e2e and hook coverage gaps and *Nova osoba*'s last-admin check; plus the planning-time entries (CI, the dialog's other consequence lines, *Nova osoba* not atomic).
+- reject: the lingering *Sezona je spremljena.* beside a later status line (both are true), per-field `aria-invalid` in the dialog (the alert names the field and focus moves to it), the cleanup-order comment (the 21.10 spec's order, which runs), the code-specific *Nova osoba* unsaved line (one action fixes every cause: set it on the member page).
 
 ## Design Notes
 
@@ -88,3 +106,9 @@ Status: draft. Baseline: `main` at `b1959e0` (21.13/21.14 merged, `0084`). Migra
 ## Verification
 
 **Commands:** `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm --filter @shift/domain test`, `pnpm --filter ./apps/web test`, and the DB-free root files by name (`resource-hygiene`, `supabase-scaffold`, `localization-applied`, `localization-guard`, `feature-boundaries`, …).
+
+**Run 2026-11-26 (after the review patches):** typecheck and lint clean; build clean; domain 28 files, 1219 tests; ICS 35; web 212 files, 7549 tests (`season.test.ts`, the erasure and list cases); the 33 DB-free root files by name (`supabase-scaffold`, `resource-hygiene`, `localization-applied`, the theme files after `pnpm build`, …), 5739 tests. No CSS or token changed.
+
+**Not run locally (STRICT DATABASE RULE):** `0085` was never applied; `test/provisioning.test.ts` (the grantees entry), `test/rls-isolation.test.ts` (three season cases) and `e2e/tests/people/member-season.spec.ts` run first in CI. A local failure caused by the unapplied migration would be expected.
+
+**Process:** the implementation ran in this session (21.1's, 21.9's and 21.10's precedent), not a context-free subagent: the story spans a migration, the member page's guarded status machinery and eight test catalogs whose pins needed the investigation's context.

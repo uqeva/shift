@@ -545,8 +545,9 @@ export function memberTeamLatestVersion(member: MemberListRow): MemberTeamVersio
 
 /**
  * A member's team as at the organization's today, and the move scheduled after
- * it. AT MOST ONE IS SCHEDULED, for the reason {@link MemberStatus} gives:
- * `0010` admits a version only while the latest one is in effect.
+ * it. AT MOST ONE IS SCHEDULED: `0010` admits a membership version only while
+ * the latest one is in effect (status versions, since story 21.11's `0085`,
+ * may schedule several; membership versions may not).
  */
 export interface MemberTeamState {
   /** The team today, or `null` for no team. */

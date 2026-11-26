@@ -1475,7 +1475,7 @@
       "planHeading": "Sprema se:",
       "rowActive": "aktivna od {date}",
       "rowInactive": "neaktivna od {date}",
-      "requests": "{count, plural, one {Zatvara se # zahtjev za odsutnost koji čeka odluku} few {Zatvaraju se # zahtjeva za odsutnost koji čekaju odluku} other {Zatvara se # zahtjeva za odsutnost koji čekaju odluku}}: {ranges}.",
+      "requests": "{count, plural, one {Zatvara se # zahtjev za odsutnost koji čeka odluku} few {Zatvaraju se # zahtjeva za odsutnost koji čekaju odluku} other {Zatvara se # zahtjeva za odsutnost koji čekaju odluku}}: {ranges}. Poništavanje sezone ne vraća zatvorene zahtjeve.",
       "save": "Spremi sezonu",
       "cancel": "Odustani od sezone",
       "saved": "Sezona je spremljena.",

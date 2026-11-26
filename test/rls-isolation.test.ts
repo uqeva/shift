@@ -6277,16 +6277,25 @@ describe('versions append in date order, each one changes something, and a sched
 
         await actAs(client, caller.authUserId, caller.organizationId);
         // An ACTIVE member made active from day 5: the first row changes nothing.
-        const refusal = await refusedThenContinue(client, () =>
+        const first = await refusedThenContinue(client, () =>
           client.query(
             `insert into member_status_versions (organization_id, member_id, active, effective_from)
              values ($1, $2, true, $3::date), ($1, $2, false, $4::date)`,
             [caller.organizationId, target.id, start, after],
           ),
         );
+        // MID-STATEMENT: the first row is admitted, the second repeats it, and the whole statement goes.
+        const second = await refusedThenContinue(client, () =>
+          client.query(
+            `insert into member_status_versions (organization_id, member_id, active, effective_from)
+             values ($1, $2, false, $3::date), ($1, $2, false, $4::date)`,
+            [caller.organizationId, target.id, start, after],
+          ),
+        );
         await actAsOwner(client);
 
-        expect(refusal.code, 'a season that does not alternate was admitted').toBe('42501');
+        expect(first.code, 'a season whose first row changes nothing was admitted').toBe('42501');
+        expect(second.code, 'a season whose second row repeats the first was admitted').toBe('42501');
         expect(await versionsOf(client, target.id)).toEqual([]);
       });
     },

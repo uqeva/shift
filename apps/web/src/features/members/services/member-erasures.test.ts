@@ -249,6 +249,16 @@ describe('Season (story 21.11)', () => {
       code: MEMBER_STATUS_STALE,
     });
   });
+
+  it('answers stale for a first row that repeats the fresh latest state (planned over a change since withdrawn)', () => {
+    // Planned over a scheduled deactivation, so the season starts "active"; the deactivation is gone now.
+    expect(memberChangeSnapshotOf(plain, season([{ active: true, effectiveFrom: '2026-09-15' }]), TODAY)).toEqual({
+      ok: false,
+      code: MEMBER_STATUS_STALE,
+    });
+    const out = viewerWith({ statuses: [{ active: false, effectiveFrom: '2026-08-01' }] });
+    expect(memberChangeSnapshotOf(out, season(), TODAY)).toEqual({ ok: false, code: MEMBER_STATUS_STALE });
+  });
 });
 
 describe('No team', () => {

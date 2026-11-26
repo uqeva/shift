@@ -17,6 +17,7 @@ import {
   ORGANIZATION_WOULD_HAVE_NO_ADMIN,
   type PostgrestFailure,
 } from '@/features/members/services/wire';
+import { MEMBER_CHANGE_SEASON, type MemberChange } from '@/features/members/services/member-erasures';
 import { isIsoDate, nextIsoDate } from '@/lib/i18n/format';
 
 /**
@@ -184,6 +185,53 @@ export function seasonClosedRequestsOf(
         return following === undefined || request.from < following.effectiveFrom;
       }),
   );
+}
+
+/** What a season's save checks and writes: its rows, and the guarded change they make. */
+export interface SeasonAsk {
+  readonly rows: readonly SeasonRow[];
+  readonly change: MemberChange;
+}
+
+/**
+ * The season `[start, end]` of `target` as *Spremi sezonu* sends it, judged at
+ * the organization's `today` as at the save, or the refusal it earns first:
+ * an unknown today, the caller's own row, the entry's refusals, the last-admin
+ * rule — and rows other than the `shown` ones the dialog listed (a midnight or
+ * a re-read moved them: the admin is told, never written past).
+ */
+export function seasonAskOf(
+  target: MemberListRow,
+  members: readonly MemberListRow[],
+  callerAuthUserId: string | null,
+  today: string | null,
+  entered: { readonly start: string; readonly end: string; readonly shown: readonly SeasonRow[] | null },
+): { readonly ok: true; readonly ask: SeasonAsk } | { readonly ok: false; readonly code: SeasonWriteFailure } {
+  if (today === null || callerAuthUserId === null) return { ok: false, code: MEMBER_WRITE_UNAVAILABLE };
+  if (target.authUserId === callerAuthUserId) return { ok: false, code: MEMBER_STATUS_SELF };
+
+  const planned = seasonPlanOf(target.statusVersions, today, entered.start, entered.end);
+
+  if (!planned.ok) return planned;
+
+  const first = planned.rows[0];
+  const same =
+    entered.shown !== null &&
+    entered.shown.length === planned.rows.length &&
+    entered.shown.every(
+      (row, index) => row.active === planned.rows[index]?.active && row.effectiveFrom === planned.rows[index]?.effectiveFrom,
+    );
+
+  if (first === undefined || !same) return { ok: false, code: MEMBER_STATUS_STALE };
+  if (seasonLeavesNoAdmin(target, members, planned.rows)) return { ok: false, code: ORGANIZATION_WOULD_HAVE_NO_ADMIN };
+
+  return {
+    ok: true,
+    ask: {
+      rows: planned.rows,
+      change: { kind: MEMBER_CHANGE_SEASON, memberId: target.id, day: first.effectiveFrom, versions: planned.rows },
+    },
+  };
 }
 
 /** The rows as the insert sends them: the four columns a session may name. */
