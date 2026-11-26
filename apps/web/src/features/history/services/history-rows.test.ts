@@ -279,6 +279,13 @@ describe('a job role (story 21.12)', () => {
     expect(historyOperandText({ type: 'job-role', id: 'r-gone' }, names)).toBe(t('history.value.unknownJobRole'));
     expect(historyRecordMessageKey('job-role')).toBe('history.record.jobRole');
   });
+
+  it('names a holiday and a team\'s off-on-holidays flag (story 21.16, 0080)', () => {
+    expect(historyRecordMessageKey('holiday')).toBe('history.record.holiday');
+    expect(t(historyRecordMessageKey('holiday'))).toBe('Blagdan');
+    expect(historyFieldMessageKey('offOnHolidays')).toBe('history.field.offOnHolidays');
+    expect(t(historyFieldMessageKey('offOnHolidays'))).toBe('Ne radi na blagdane');
+  });
 });
 
 describe('an operand never breaks the rows (story 14.2 review)', () => {

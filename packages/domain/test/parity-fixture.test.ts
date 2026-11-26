@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { ScheduleInputs } from '../src/index.js';
+import { scheduledShiftTypeOn, type ScheduleInputs } from '../src/index.js';
 import { PARITY_FIXTURES, PARITY_MONTHS, PARITY_WINDOW, PARITY_VECTOR, inputsOf } from '../parity/fixtures.js';
 import {
   PILOT_ROTATION_ASSIGNMENTS,
@@ -81,6 +81,52 @@ describe('the parity fixture', () => {
     );
     expect(personal.some((member) => member.memberships.length === 0)).toBe(true);
     expect(personal.some((member) => member.memberships.length > 0)).toBe(true);
+  });
+
+  it('holds, in each fixture, a team off on holidays and a holiday that team would work (story 21.16, AD-19)', () => {
+    for (const { fixture, organization } of PARITY_FIXTURES) {
+      const teamIds = new Set(organization.teams.map((team) => team.id));
+      // By date and by id, each once, as the assembly carries them; inside the parity window.
+      expect(organization.holidays, fixture).toEqual([...new Set(organization.holidays)].sort());
+      expect(organization.teamsOffOnHolidays, fixture).toEqual([...new Set(organization.teamsOffOnHolidays)].sort());
+      expect(organization.holidays.every((date) => date >= PARITY_WINDOW.from && date <= PARITY_WINDOW.to)).toBe(true);
+      expect(organization.teamsOffOnHolidays.length, fixture).toBeGreaterThan(0);
+      expect(organization.teamsOffOnHolidays.every((id) => teamIds.has(id))).toBe(true);
+      // A team works its projection on a holiday when that team is not off; with the rule, the off team works nothing.
+      const worked = organization.holidays.some((date) =>
+        organization.teamsOffOnHolidays.some((teamId) => {
+          const versions = organization.assignments.filter((one) => one.teamId === teamId);
+          const plain = scheduledShiftTypeOn(versions, organization.steps, [], teamId, date);
+          const working = organization.shiftTypes.find((entry) => entry.type.id === plain?.shiftTypeId)?.type.isWorking === true;
+          const ruled = scheduledShiftTypeOn(versions, organization.steps, [], teamId, date, organization);
+          return working && ruled?.shiftTypeId === null && ruled.projectedShiftTypeId === plain?.shiftTypeId;
+        }),
+      );
+      expect(worked, fixture).toBe(true);
+      // And a holiday some team not off works, so the rule is seen to keep a working team's shift.
+      const kept = organization.holidays.some((date) =>
+        organization.teams
+          .filter((team) => !organization.teamsOffOnHolidays.includes(team.id))
+          .some((team) => {
+            const versions = organization.assignments.filter((one) => one.teamId === team.id);
+            const ruled = scheduledShiftTypeOn(versions, organization.steps, [], team.id, date, organization);
+            return organization.shiftTypes.find((entry) => entry.type.id === ruled?.shiftTypeId)?.type.isWorking === true;
+          }),
+      );
+      expect(kept, fixture).toBe(true);
+    }
+    // The two rows a holiday never empties: an override on the pilot's off team's holiday (R13.3), and a
+    // Personal Assignment on UJ-5's off team's holiday (R14.4).
+    const [pilotOrganization, uj5Organization] = PARITY_FIXTURES.map((one) => one.organization);
+    expect(
+      pilotOrganization!.overrides.some(
+        (one) => pilotOrganization!.teamsOffOnHolidays.includes(one.teamId) && pilotOrganization!.holidays.includes(one.date),
+      ),
+    ).toBe(true);
+    const assignedOnHoliday = uj5Organization!.members.flatMap((member) =>
+      member.personalAssignments.filter((one) => uj5Organization!.holidays.includes(one.date)).map(() => member.memberships.at(-1)?.teamId),
+    );
+    expect(assignedOnHoliday.some((teamId) => teamId !== undefined && uj5Organization!.teamsOffOnHolidays.includes(teamId))).toBe(true);
   });
 
   it('spans both transitions of both years', () => {

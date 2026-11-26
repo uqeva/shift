@@ -29,11 +29,13 @@ import {
   weekdayOf,
   workingShiftTypeIdsOf,
 } from '@/features/calendar/utils/month';
-import type {
-  CalendarOverride,
-  CalendarRosterOverride,
-  CalendarSnapshot,
-  CalendarViewer,
+import {
+  holidayRuleOfCalendar,
+  type CalendarHolidayRule,
+  type CalendarOverride,
+  type CalendarRosterOverride,
+  type CalendarSnapshot,
+  type CalendarViewer,
 } from '@/features/calendar/services/snapshot';
 import {
   CANDIDATE_GROUPS,
@@ -333,7 +335,13 @@ export function holdsPersonalShifts(member: Pick<CalendarSnapshot['members'][num
  *
  * @throws RangeError on any precondition of `personalShiftOn`.
  */
-function personalShiftsWithOf(snapshot: CalendarSnapshot, teamId: string, date: string): readonly PersonalShiftWith[] {
+function personalShiftsWithOf(
+  snapshot: CalendarSnapshot,
+  teamId: string,
+  date: string,
+  // STORY 21.16 (R15.4): a personal rotation counted with a team off on a holiday works nothing that date.
+  holidays: CalendarHolidayRule,
+): readonly PersonalShiftWith[] {
   const holding = snapshot.members.filter(holdsPersonalShifts);
 
   if (holding.length === 0) return [];
@@ -341,7 +349,7 @@ function personalShiftsWithOf(snapshot: CalendarSnapshot, teamId: string, date: 
   const working = new Set(workingShiftTypeIdsOf(snapshot));
 
   return holding.flatMap((member) => {
-    const shift = personalShiftOn(member, date, working, snapshot.steps);
+    const shift = personalShiftOn(member, date, working, snapshot.steps, holidays);
 
     return shift === null || shift.teamId !== teamId
       ? []
@@ -433,12 +441,16 @@ export function dayDetailOf(snapshot: CalendarSnapshot, teamId: string, date: st
   if (team === undefined) return null;
 
   const standing = overrideStandingOfCalendar(snapshot);
+  // STORY 21.16 (R13.3): with the holiday rule, built once for the call, a team off on a holiday answers no
+  // type, its projected one kept.
+  const holidays = holidayRuleOfCalendar(snapshot);
   const scheduled = scheduledShiftTypeOn(
     snapshot.assignments.filter((assignment) => assignment.teamId === teamId),
     snapshot.steps,
     standing.inForce,
     teamId,
     date,
+    holidays,
   );
   const waiting = standing.pending.find((one) => one.teamId === teamId && one.date === date);
   const rosterStanding = rosterStandingOfCalendar(snapshot);
@@ -457,9 +469,11 @@ export function dayDetailOf(snapshot: CalendarSnapshot, teamId: string, date: st
 
   const base = { teamId, teamName: team.name, date: `${weekdayOf(date)} ${full}`, isoDate: date, rosterPending };
   // STORY 21.6: the Personal Shifts counted with the team that date.
-  const personal = personalShiftsWithOf(snapshot, teamId, date);
+  const personal = personalShiftsWithOf(snapshot, teamId, date, holidays);
   const scheduledWorking =
-    scheduled !== null && workingShiftTypeIdsOf(snapshot).includes(scheduled.shiftTypeId) ? scheduled.shiftTypeId : null;
+    scheduled !== null && scheduled.shiftTypeId !== null && workingShiftTypeIdsOf(snapshot).includes(scheduled.shiftTypeId)
+      ? scheduled.shiftTypeId
+      : null;
   const groups = groupsFieldOf(snapshot, teamId, personal, scheduledWorking, date);
 
   if (scheduled === null) {
@@ -486,6 +500,22 @@ export function dayDetailOf(snapshot: CalendarSnapshot, teamId: string, date: st
     shiftTypeId: scheduled.shiftTypeId,
     pending: waiting === undefined ? null : pendingOf(snapshot, waiting, projectedTypeName, date),
   };
+
+  // STORY 21.16 (R13.2): a holiday the team is off on empties the day: no type, the projected one kept, no
+  // roster. No override applies (one would have won, R13.3), so there is none to show.
+  if (scheduled.shiftTypeId === null) {
+    return {
+      ...groups,
+      ...projected,
+      kind: DAY_OFF,
+      typeName: null,
+      range: null,
+      roster: [],
+      override: null,
+      rosterChanges: [],
+      rosterInert: inertOf([]),
+    };
+  }
 
   const type = typeOf(snapshot, scheduled.shiftTypeId, date);
   const override = scheduled.overridden ? overrideOf(snapshot, standing.inForce, teamId, date, projectedTypeName) : null;
@@ -731,9 +761,22 @@ export function overrideTypeOptionsOf(snapshot: CalendarSnapshot, detail: DayDet
 
   if (projectedShiftTypeId === null || detail.override !== null || detail.pending !== null) return [];
 
+  const same = sameTypeOf(detail);
+
   return snapshot.types
-    .filter((type) => !type.archived && type.id !== projectedShiftTypeId)
+    .filter((type) => !type.archived && type.id !== same)
     .map((type) => ({ id: type.id, name: type.name }));
+}
+
+/**
+ * The type an override of `detail` may not name because the team already
+ * works it: the projected type, except on a day a holiday emptied (story
+ * 21.16, R13.3: `shiftTypeId` null, the projected type kept), where the team
+ * works nothing and an override of the projected type is what makes it work
+ * the holiday. `null` then, and with no rotation.
+ */
+function sameTypeOf(detail: Pick<DayDetail, 'projectedShiftTypeId' | 'shiftTypeId'>): string | null {
+  return detail.shiftTypeId === null ? null : detail.projectedShiftTypeId;
 }
 
 /** The reason's bounds once surrounding white space is trimmed, as 0019's check reads them. */
@@ -773,7 +816,7 @@ export type OverrideEntry =
  */
 export function overrideEntryOf(detail: DayDetail, shiftTypeId: string, reason: string): OverrideEntry {
   if (shiftTypeId === OVERRIDE_NO_TYPE) return { ok: false, code: OVERRIDE_REFUSED_TYPE };
-  if (shiftTypeId === detail.projectedShiftTypeId) return { ok: false, code: OVERRIDE_REFUSED_SAME };
+  if (shiftTypeId === sameTypeOf(detail)) return { ok: false, code: OVERRIDE_REFUSED_SAME };
 
   const trimmed = reason.trim();
   const length = [...trimmed].length;

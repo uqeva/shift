@@ -352,12 +352,13 @@ describe('a kept snapshot is restored for its owner alone', () => {
     expect(storage.entries.has(DEVICE_SNAPSHOT_KEY)).toBe(false);
   });
 
-  it('is shape 6: story 21.10 added `scheduleVersions` to the calendar snapshot\'s members and viewer', () => {
-    // A shape-5 member has no `scheduleVersions` (a shape-4 one no `jobRole`,
+  it('is shape 7: story 21.16 added `holidays` to the calendar snapshot, and `offOnHolidays` to its teams', () => {
+    // A shape-6 snapshot has no `holidays` and its teams no `offOnHolidays` (a shape-5 member has no
+    // `scheduleVersions`, story 21.10; a shape-4 one no `jobRole`,
     // story 21.12; a shape-3 one no `personalAssignments`, story 21.2; a
     // shape-2 one no `loans`, story 18.2), and every roster derived from it
-    // would ignore a personal rotation the database holds.
-    expect(DEVICE_SNAPSHOT_SHAPE).toBe(6);
+    // would ignore a holiday a team is off on.
+    expect(DEVICE_SNAPSHOT_SHAPE).toBe(7);
   });
 
   it.each([
@@ -365,7 +366,8 @@ describe('a kept snapshot is restored for its owner alone', () => {
     ['an older', '2:member-a'],
     ['an earlier still', '3:member-a'],
     ['one before the previous', '4:member-a'],
-    ['the previous', '5:member-a'],
+    ['one before the last', '5:member-a'],
+    ['the previous', '6:member-a'],
     ['a later', `${String(DEVICE_SNAPSHOT_SHAPE + 1)}:member-a`],
   ])('restores nothing the same user saved in %s shape, and deletes the copy', async (_, buster) => {
     const storage = memoryStorage();

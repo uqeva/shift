@@ -32,6 +32,7 @@ import {
   calendarQueryOptions,
   calendarRetryStateOf,
   calendarSurfaceStateOf,
+  holidayRuleOfCalendar,
   readCalendar,
   type CalendarAnswer,
   type CalendarMembersRpc,
@@ -63,6 +64,7 @@ import {
   calendarOrganizationRow,
   calendarOverrideRow,
   calendarTableOf,
+  holidayRow,
   memberMembershipRow,
   membershipRow,
   membersAnswerOf,
@@ -202,7 +204,8 @@ describe('the read', () => {
   });
 
   it('selects what a member may read and nothing more', () => {
-    expect(CALENDAR_COLUMNS).toContain('teams(organization_id,id,name,archived)');
+    // STORY 21.16: each team says whether it is off on holidays.
+    expect(CALENDAR_COLUMNS).toContain('teams(organization_id,id,name,archived,off_on_holidays)');
     expect(CALENDAR_COLUMNS).toContain('shift_types(');
     expect(CALENDAR_COLUMNS).toContain('shift_type_versions(');
     expect(CALENDAR_COLUMNS).toContain('rotation_steps(');
@@ -220,11 +223,13 @@ describe('the read', () => {
     // on which team when — and STORY 3.4a: in which position, and when each
     // member was active. Nothing about the person beyond that.
     // STORY 21.10: and from when each member follows which schedule source.
+    // STORY 21.16: and the organization's holidays: a date and a name, nothing else.
     expect(
       CALENDAR_COLUMNS.endsWith(
         ',team_membership_versions(organization_id,member_id,team_id,position,effective_from),' +
           'member_status_versions(organization_id,member_id,active,effective_from),' +
-          'member_schedule_versions(organization_id,member_id,effective_from,source,pattern_id,offset_step_id)',
+          'member_schedule_versions(organization_id,member_id,effective_from,source,pattern_id,offset_step_id),' +
+          'organization_holidays(organization_id,id,date,name)',
       ),
     ).toBe(true);
     expect([...CALENDAR_COLUMNS.matchAll(/team_membership_versions\(([^)]*)\)/g)].map((found) => found[1])).toEqual([
@@ -1239,6 +1244,92 @@ describe('the read', () => {
     const { member_schedule_versions: _versions, ...noEmbed } = calendarOrganizationRow(PILOT);
     expect(await read(tableOf({ data: [noEmbed], error: null, count: 1 }))).toEqual(REFUSED);
     expect(logged.mock.calls).toEqual([[CALENDAR_UNAVAILABLE, 'scheduleVersion']]);
+  });
+
+  it("reads the organization's holidays by date, and each team's holiday flag (story 21.16)", async () => {
+    const teams = PILOT.teams.map((team, index) =>
+      index === 3 ? { ...team, off_on_holidays: true } : team,
+    );
+    const organization = calendarOrganizationRow(
+      { ...PILOT, teams },
+      {
+        holidays: [
+          holidayRow('h2', '2026-12-25', 'Božić'),
+          holidayRow('h1', '2026-11-18', 'Dan sjećanja'),
+        ],
+      },
+    );
+    const outcome = await read(tableOf({ data: [organization], error: null, count: 1 }));
+
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.snapshot.holidays).toEqual([
+      { id: 'h1', date: '2026-11-18', name: 'Dan sjećanja' },
+      { id: 'h2', date: '2026-12-25', name: 'Božić' },
+    ]);
+    expect(outcome.snapshot.teams.map((team) => team.offOnHolidays)).toEqual([false, false, false, true]);
+    // The one recipe: the dates by date, the off teams by id; names never.
+    expect(holidayRuleOfCalendar(outcome.snapshot)).toEqual({
+      holidays: ['2026-11-18', '2026-12-25'],
+      teamsOffOnHolidays: ['pilot-smjena-d'],
+    });
+  });
+
+  it('reads no holiday as `[]`, every team not off, and the recipe as `{}` (story 21.16, R13.5)', async () => {
+    const outcome = await read(tableOf({ data: [calendarOrganizationRow(PILOT)], error: null, count: 1 }));
+
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.snapshot.holidays).toEqual([]);
+    expect(outcome.snapshot.teams.every((team) => !team.offOnHolidays)).toBe(true);
+    expect(holidayRuleOfCalendar(outcome.snapshot)).toStrictEqual({});
+    // A holiday with no team off, or a team off with no holiday, decides nothing: `{}` too.
+    const holiday = { id: 'h', date: '2026-11-18', name: 'Dan sjećanja' };
+    expect(holidayRuleOfCalendar({ ...outcome.snapshot, holidays: [holiday] })).toStrictEqual({});
+    const offTeams = outcome.snapshot.teams.map((team) => ({ ...team, offOnHolidays: true }));
+    expect(holidayRuleOfCalendar({ teams: offTeams, holidays: [] })).toStrictEqual({});
+    // A snapshot with no list at all (cached before shape 7) reads as none.
+    expect(holidayRuleOfCalendar({ teams: offTeams } as unknown as CalendarSnapshot)).toStrictEqual({});
+    // An archived team off on holidays is carried too (the assembly carries archived teams).
+    const archivedOff = offTeams.map((team) => ({ ...team, archived: true }));
+    expect(holidayRuleOfCalendar({ teams: archivedOff, holidays: [holiday] }).teamsOffOnHolidays).toHaveLength(4);
+  });
+
+  it('refuses every bad holiday, and a team without its flag, as unavailable (story 21.16)', async () => {
+    const logged = quiet();
+    const good = holidayRow('h1', '2026-11-18', 'Dan sjećanja');
+    const { date: _date, ...noDate } = good;
+
+    for (const rows of [
+      [null],
+      [{ ...good, organization_id: 'another' }],
+      [noDate],
+      [{ ...good, date: null }],
+      [{ ...good, date: '2026-02-30' }],
+      [{ ...good, id: '' }],
+      [{ ...good, name: 7 }],
+      [{ ...good, name: '   ' }],
+      // One id twice; two holidays on one date (0080's key).
+      [good, { ...good, date: '2026-12-25' }],
+      [good, { ...good, id: 'h2', name: 'Drugi' }],
+    ]) {
+      logged.mockClear();
+      const organization = calendarOrganizationRow(PILOT, { holidays: rows as readonly Record<string, unknown>[] });
+      expect(await read(tableOf({ data: [organization], error: null, count: 1 })), JSON.stringify(rows)).toEqual(REFUSED);
+      expect(logged.mock.calls, JSON.stringify(rows)).toEqual([[CALENDAR_UNAVAILABLE, 'holiday']]);
+    }
+    logged.mockClear();
+    const { organization_holidays: _holidays, ...noEmbed } = calendarOrganizationRow(PILOT);
+    expect(await read(tableOf({ data: [noEmbed], error: null, count: 1 }))).toEqual(REFUSED);
+    expect(logged.mock.calls).toEqual([[CALENDAR_UNAVAILABLE, 'holiday']]);
+    // A team row without the flag (a read before 0080), or with one that is not a boolean.
+    for (const flag of [undefined, null, 'false']) {
+      logged.mockClear();
+      const teams = PILOT.teams.map((team, index) => (index === 0 ? { ...team, off_on_holidays: flag } : team));
+      const organization = calendarOrganizationRow({ ...PILOT, teams });
+      expect(await read(tableOf({ data: [organization], error: null, count: 1 })), String(flag)).toEqual(REFUSED);
+      expect(logged.mock.calls).toEqual([[CALENDAR_UNAVAILABLE, 'team']]);
+    }
   });
 
   it('refuses every bad loans answer with its own refusal (story 18.2)', async () => {

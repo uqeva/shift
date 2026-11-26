@@ -1248,7 +1248,8 @@ export const KEY_SOURCES = [
     // and the unknown type twice and team once more inside those values.
     // 169 SINCE STORY 21.12: the job role record, its field label and the unknown role.
     // 174 SINCE STORY 21.10: the schedule version record, its source field and the three sources.
-    strings: 174,
+    // 176 SINCE STORY 21.16: the holiday record, `Blagdan`, and a team's field, `Ne radi na blagdane`.
+    strings: 176,
   },
   {
     // STORY 21.4: *Ručni raspored* — the page, the grid and its legend, the

@@ -425,6 +425,7 @@
       "personalAssignment": "Ručni raspored",
       "jobRole": "Posao",
       "scheduleVersion": "Raspored osobe",
+      "holiday": "Blagdan",
       "other": "Zapis"
     },
     "action": {
@@ -483,6 +484,7 @@
       "stepPosition": "Redni broj koraka",
       "assignmentKind": "Vrsta",
       "archived": "Arhivirano",
+      "offOnHolidays": "Ne radi na blagdane",
       "isWorking": "Radni",
       "shiftType": "Tip smjene",
       "rotationPattern": "Uzorak rotacije",

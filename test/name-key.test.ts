@@ -166,6 +166,19 @@ const BLANK_TABLES = [
     write: (client: Client, admin: Admin, name: string) =>
       attempt(client, 'insert into job_roles (organization_id, name) values ($1, $2)', [admin.organizationId, name]),
   },
+  // STORY 21.16 (0080): a holiday's name follows the same rules, control characters included. It is never
+  // unique (two dates may share a name), so it is not among UNIQUE_TABLES; each write takes its own date.
+  {
+    table: 'organization_holidays',
+    constraint: 'organization_holidays_name_not_blank',
+    characters: 'organization_holidays_name_characters',
+    write: (client: Client, admin: Admin, name: string, index = 0) =>
+      attempt(client, 'insert into organization_holidays (organization_id, date, name) values ($1, $2, $3)', [
+        admin.organizationId,
+        `2049-06-${String(1 + index).padStart(2, '0')}`,
+        name,
+      ]),
+  },
 ];
 
 const UNIQUE_TABLES = BLANK_TABLES.filter((entry) =>
@@ -376,7 +389,7 @@ describe('name_key is no RPC, and trims in linear time (0024)', () => {
         const { rowCount } = await client.query(`update ${table} set name = name where id = $1`, [id]);
         expect(rowCount, `${table} was not updated`).toBe(1);
       }
-      for (const table of ['teams', 'hour_bands', 'shift_types', 'absence_types', 'job_roles']) {
+      for (const table of ['teams', 'hour_bands', 'shift_types', 'absence_types', 'job_roles', 'organization_holidays']) {
         await client.query(`update ${table} set name = name where organization_id = $1`, [admin.organizationId]);
       }
       const { rowCount } = await client.query(
@@ -581,6 +594,8 @@ describe('the database and the client share one maximum name length (0036)', () 
         // STORY 21.12 (0078).
         'job_roles_name_length',
         'members_name_length',
+        // STORY 21.16 (0080).
+        'organization_holidays_name_length',
         'organizations_name_length',
         'shift_types_name_length',
         'teams_name_length',
@@ -624,6 +639,17 @@ describe('a team or a type name refuses a control character inside it (0076)', (
       write: (client: Client, admin: Admin, name: string) =>
         attempt(client, 'insert into job_roles (organization_id, name) values ($1, $2)', [admin.organizationId, name]),
     },
+    // STORY 21.16 (0080): a holiday's name, the same class. Only the last write is stored, so one date serves.
+    {
+      table: 'organization_holidays',
+      constraint: 'organization_holidays_name_characters',
+      write: (client: Client, admin: Admin, name: string) =>
+        attempt(client, 'insert into organization_holidays (organization_id, date, name) values ($1, $2, $3)', [
+          admin.organizationId,
+          '2049-07-01',
+          name,
+        ]),
+    },
   ];
 
   it.skipIf(noDatabase).each(CHARACTER_TABLES)('$table, as the admin a request writes as', async ({ constraint, write }) => {
@@ -652,6 +678,8 @@ describe('a team or a type name refuses a control character inside it (0076)', (
       expect(definitions.map((row) => row.name)).toEqual([
         // STORY 21.12 (0078).
         'job_roles_name_characters',
+        // STORY 21.16 (0080).
+        'organization_holidays_name_characters',
         'shift_types_name_characters',
         'teams_name_characters',
       ]);

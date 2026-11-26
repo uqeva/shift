@@ -218,3 +218,16 @@ describe('story 21.2: the ASSIGNMENT item form (AD-18 as amended)', () => {
     expect(Object.hasOwn(due[0] ?? {}, 'personalAssignmentId')).toBe(false);
   });
 });
+
+describe('a holiday-off shift has no reminder (story 21.16, AD-27)', () => {
+  it("the pilot's A is off on 2027-08-05: m1's Noć there is due without the rule and never with it", () => {
+    // A works Noć 19:00 local (17:00Z, CEST) on 2027-08-05; H2 is due 15:00Z.
+    const window = { from: '2027-08-04', to: '2027-08-06' };
+    const now = at('2027-08-05T15:00:00Z');
+    const m1 = pilotOf('pilot-m1');
+    expect(shiftRemindersDueOf({ ...m1, holidays: [] }, ['H2'], window, now).map(line)).toEqual([
+      '2027-08-05 a H2 1140 1860 2027-08-05T17:00:00Z',
+    ]);
+    expect(shiftRemindersDueOf(m1, ['H2'], window, now)).toEqual([]);
+  });
+});

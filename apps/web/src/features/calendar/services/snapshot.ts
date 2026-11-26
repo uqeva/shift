@@ -155,6 +155,14 @@ import {
  * whole. None anywhere is `scheduleVersions: []`, which derives exactly as
  * before (R15.6).
  *
+ * THE HOLIDAYS (story 21.16). Every holiday of the organization
+ * (`organization_holidays`, 0080: a date and a name), embedded beside the
+ * teams, whose rows carry whether each is off on holidays. Every active member
+ * reads both. Names never enter derivation: {@link holidayRuleOfCalendar} is
+ * the one recipe that turns the dates and the off teams into the domain's
+ * `HolidayRule`, and every schedule input built from this snapshot spreads it.
+ * No holiday, or no team off, is `{}`, which derives exactly as before (R13.5).
+ *
  * `select` AND FIVE `rpc`s, AND NOTHING ELSE.
  */
 
@@ -180,7 +188,8 @@ export const CALENDAR_COLUMNS =
   'members(organization_id,id,role,team_membership_versions(organization_id,team_id,effective_from)),' +
   'team_membership_versions(organization_id,member_id,team_id,position,effective_from),' +
   'member_status_versions(organization_id,member_id,active,effective_from),' +
-  'member_schedule_versions(organization_id,member_id,effective_from,source,pattern_id,offset_step_id)';
+  'member_schedule_versions(organization_id,member_id,effective_from,source,pattern_id,offset_step_id),' +
+  'organization_holidays(organization_id,id,date,name)';
 
 /** The function every member is read through (0018): id, name and fire rank only. */
 export const CALENDAR_MEMBERS_FUNCTION = 'calendar_members';
@@ -330,6 +339,17 @@ export interface CalendarMember {
   readonly scheduleVersions: readonly ScheduleVersion[];
 }
 
+/**
+ * One holiday of the organization (0080, story 21.16): a civil date, at most
+ * one per date, and its name. The name is shown (story 21.18), never derived
+ * from (R13.1).
+ */
+export interface CalendarHoliday {
+  readonly id: string;
+  readonly date: string;
+  readonly name: string;
+}
+
 /** The signed-in member reading the calendar. */
 export interface CalendarViewer {
   readonly memberId: string;
@@ -374,8 +394,17 @@ export interface CalendarSnapshot {
    * staffing report (`@/features/staffing/services/short-staffed`) reads it.
    */
   readonly minimumMembers: number | null;
-  /** Every team, archived ones included; the month shows the active ones. */
+  /**
+   * Every team, archived ones included; the month shows the active ones. Each
+   * says whether it is off on holidays (story 21.16).
+   */
   readonly teams: readonly TeamRow[];
+  /**
+   * Every holiday of the organization, by date (story 21.16); at most one per
+   * date. None is `[]`. Read through {@link holidayRuleOfCalendar} by every
+   * derivation, never directly.
+   */
+  readonly holidays: readonly CalendarHoliday[];
   /** Every shift type, archived ones included, in creation order. */
   readonly types: readonly ShiftTypeRow[];
   /**
@@ -470,7 +499,8 @@ type CalendarRefusal =
   | 'rosterOverride'
   | 'loan'
   | 'personalAssignment'
-  | 'scheduleVersion';
+  | 'scheduleVersion'
+  | 'holiday';
 
 function unavailable(reason: CalendarRefusal, detail?: unknown): CalendarOutcome {
   if (detail === undefined) console.error(CALENDAR_UNAVAILABLE, reason);
@@ -628,6 +658,7 @@ export async function readCalendar(
   const membershipRows = embedded(organization, 'team_membership_versions');
   const statusRows = embedded(organization, 'member_status_versions');
   const scheduleVersionRows = embedded(organization, 'member_schedule_versions');
+  const holidayRows = embedded(organization, 'organization_holidays');
 
   if (organizationId === null || organizationName === null || timeZone === null) return unavailable('organization');
   if (typeof usesFireRanks !== 'boolean') return unavailable('organization');
@@ -639,6 +670,7 @@ export async function readCalendar(
   if (membershipRows === null) return unavailable('memberships');
   if (statusRows === null) return unavailable('statuses');
   if (scheduleVersionRows === null) return unavailable('scheduleVersion');
+  if (holidayRows === null) return unavailable('holiday');
 
   const teams: TeamRow[] = [];
 
@@ -787,6 +819,10 @@ export async function readCalendar(
 
   if (rosterOverrides === null) return unavailable('rosterOverride');
 
+  const holidays = holidaysOf(holidayRows, organizationId);
+
+  if (holidays === null) return unavailable('holiday');
+
   types.sort(compareCreation);
 
   return {
@@ -798,6 +834,7 @@ export async function readCalendar(
       usesFireRanks,
       minimumMembers,
       teams,
+      holidays,
       types,
       bands,
       absenceTypes: orderedAbsenceTypes(absenceTypes),
@@ -810,6 +847,81 @@ export async function readCalendar(
       rosterOverrides,
     },
   };
+}
+
+/**
+ * The organization's holidays as embedded (story 21.16), by date, or `null`:
+ * a row that is not an object, of another tenant, without a text id, with a
+ * date that is not a calendar date, or a name that is not text or is blank;
+ * one id twice, or two holidays on one date (0080's key). Only the three
+ * columns are carried off a row.
+ */
+function holidaysOf(rows: readonly unknown[], organizationId: string): CalendarHoliday[] | null {
+  const holidays: CalendarHoliday[] = [];
+
+  for (const row of rows) {
+    if (!isRecord(row) || textAt(row, 'organization_id') !== organizationId) return null;
+
+    const id = textAt(row, 'id');
+    const date = textAt(row, 'date');
+    const name = row['name'];
+
+    if (id === null || date === null || !isIsoDate(date)) return null;
+    if (typeof name !== 'string' || name.trim() === '') return null;
+
+    holidays.push({ id, date, name });
+  }
+
+  if (new Set(holidays.map((holiday) => holiday.id)).size !== holidays.length) return null;
+  if (new Set(holidays.map((holiday) => holiday.date)).size !== holidays.length) return null;
+
+  return holidays.sort((left, right) => (left.date < right.date ? -1 : left.date > right.date ? 1 : 0));
+}
+
+/**
+ * THE ONE RECIPE (story 21.16, AD-27): the snapshot's holiday rule, as every
+ * schedule input built from it carries it. `{}` when there is no holiday or no
+ * team off on holidays, so an input built from such a snapshot is key for key
+ * what it was before holidays existed (R13.5). Otherwise the holidays' dates,
+ * by date, and the ids of the teams off on holidays, archived ones too, by id.
+ * Names never enter it. A snapshot without the list (one cached before shape
+ * 7, which the persister discards) reads as none.
+ */
+export function holidayRuleOfCalendar(calendar: Pick<CalendarSnapshot, 'holidays' | 'teams'>): CalendarHolidayRule {
+  // MEMOIZED per snapshot object (a snapshot is never mutated: an AD-5 "after" is a new object), so a
+  // caller that asks per resolution, erasure or member builds the rule once.
+  const known = HOLIDAY_RULES.get(calendar);
+
+  if (known !== undefined) return known;
+
+  const rule = holidayRuleBuiltOf(calendar);
+
+  HOLIDAY_RULES.set(calendar, rule);
+
+  return rule;
+}
+
+/** The domain's `HolidayRule` as the snapshot gives it: `{}`, or both lists. */
+export interface CalendarHolidayRule {
+  readonly holidays?: readonly string[];
+  readonly teamsOffOnHolidays?: readonly string[];
+}
+
+const NO_HOLIDAY_RULE: CalendarHolidayRule = Object.freeze({});
+
+const HOLIDAY_RULES = new WeakMap<object, CalendarHolidayRule>();
+
+function holidayRuleBuiltOf(calendar: Pick<CalendarSnapshot, 'holidays' | 'teams'>): CalendarHolidayRule {
+  const listed = (calendar as { readonly holidays?: unknown }).holidays;
+  const holidays = Array.isArray(listed) ? (listed as readonly CalendarHoliday[]).map((holiday) => holiday.date).sort() : [];
+  const teamsOffOnHolidays = calendar.teams
+    .filter((team) => team.offOnHolidays === true)
+    .map((team) => team.id)
+    .sort();
+
+  if (holidays.length === 0 || teamsOffOnHolidays.length === 0) return NO_HOLIDAY_RULE;
+
+  return Object.freeze({ holidays, teamsOffOnHolidays });
 }
 
 /**

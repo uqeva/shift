@@ -18,11 +18,12 @@ import type { CalendarSnapshot } from '@/features/calendar/services/snapshot';
  * WINDOWED AS THE SERVER WINDOWS: versioned rules whole; the live overrides
  * of either kind dated in the window, in force or pending alike, each with
  * its `writtenAt` (`confirmedAt ?? createdAt`, µs, by `instantMicrosOf`);
- * loans and leave overlapping it. Every list in one canonical order, so two
+ * loans and leave overlapping it; the holidays dated in it (story 21.16), and
+ * the teams off on holidays whole. Every list in one canonical order, so two
  * equal assemblies are equal as written.
  *
  * NOTHING IS PROJECTED HERE (AD-7), and no name of a member, no reason, no
- * author and no absence type's name is carried.
+ * author, no absence type's name and no holiday's name is carried.
  */
 
 /** A live leave record of the viewer as `my_leave_records()` parses (`LeaveRecord`), as much as the assembly reads. */
@@ -148,6 +149,16 @@ export function scheduleInputsOfCalendar(
         writtenAt: writtenAtOf(override),
       }))
       .sort((left, right) => byText(left.id, right.id)),
+    // Story 21.16 (AD-19 as amended): the holidays' dates in the window, by date, and every team off on
+    // holidays, archived ones too, by id, as 0080's assembly. `[]` for none. Names are never carried.
+    holidays: snapshot.holidays
+      .filter((holiday) => inWindow(holiday.date))
+      .map((holiday) => holiday.date)
+      .sort(byText),
+    teamsOffOnHolidays: snapshot.teams
+      .filter((team) => team.offOnHolidays)
+      .map((team) => team.id)
+      .sort(byText),
     leave: ownLeave
       .filter((record) => overlaps(record, window))
       .map((record) => ({ id: record.id, ...leaveSpanOf(record), absenceTypeId: record.absenceTypeId }))

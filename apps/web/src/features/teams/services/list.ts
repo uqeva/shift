@@ -32,7 +32,7 @@ export const TEAMS_LIST_KEY = ['teams'] as const;
  * The columns this read selects. `organization_id` renders nowhere and is the
  * tripwire {@link readTeams} uses to refuse an answer spanning two tenants.
  */
-export const TEAMS_COLUMNS = 'organization_id,id,name,archived';
+export const TEAMS_COLUMNS = 'organization_id,id,name,archived,off_on_holidays';
 
 /** The exact count, so a truncated answer is caught rather than rendered. */
 export const TEAMS_COUNT: TeamsCountOptions = { count: 'exact' };
@@ -87,6 +87,11 @@ export interface TeamRow {
   readonly name: string;
   /** One-way (`0009`): an archived team is read and shown, never written. */
   readonly archived: boolean;
+  /**
+   * Off on holidays (story 21.16, 0080, R13.2): a current-state setting, off
+   * by default. On an organization's holiday the team works no shift.
+   */
+  readonly offOnHolidays: boolean;
 }
 
 function textAt(row: Record<string, unknown>, column: string): string | null {
@@ -108,11 +113,13 @@ export function teamRowOf(row: unknown): TeamRow | null {
   const organizationId = textAt(fields, 'organization_id');
   const name = textAt(fields, 'name');
   const archived = fields['archived'];
+  const offOnHolidays = fields['off_on_holidays'];
 
   if (id === null || organizationId === null || name === null) return null;
   if (typeof archived !== 'boolean') return null;
+  if (typeof offOnHolidays !== 'boolean') return null;
 
-  return { id, organizationId, name, archived };
+  return { id, organizationId, name, archived, offOnHolidays };
 }
 
 /**

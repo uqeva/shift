@@ -505,7 +505,7 @@ describe('the access-control migration', () => {
     ).toEqual([]);
   });
 
-  it('declares exactly the seventy-three policies stories 1.3a, 1.4a, 1.4b, 1.6, 1.7a, 1.7b, 2.1a, 2.2a, 2.3a, 3.5a, 3.6a, 5.1b, 5.4a, 9.2, 10.3, 10.4, 12.1, 13.1, 13.3, 14.1, 17.1, 18.2, 21.2, 21.10, 21.12, 0025 and 0036 reviewed, and no seventy-fourth', () => {
+  it('declares exactly the seventy-seven policies stories 1.3a, 1.4a, 1.4b, 1.6, 1.7a, 1.7b, 2.1a, 2.2a, 2.3a, 3.5a, 3.6a, 5.1b, 5.4a, 9.2, 10.3, 10.4, 12.1, 13.1, 13.3, 14.1, 17.1, 18.2, 21.2, 21.10, 21.12, 21.16, 0025 and 0036 reviewed, and no seventy-eighth', () => {
     // EXTENDED BY STORY 1.4a, exactly as this comment asked: `0004_organization
     // _settings.sql` adds `organizations_update_by_own_active_admin`, built by
     // copying `members_update_by_own_active_admin`, and its name is added here
@@ -609,6 +609,13 @@ describe('the access-control migration', () => {
       'notification_settings_insert_own',
       'notification_settings_select_own',
       'notification_settings_update_own',
+      // STORY 21.16 (0080), and FOUR: every active member reads the holidays;
+      // an active admin inserts, renames (the column grant admits `name`
+      // alone) and deletes. None reads its own table (42P17).
+      'organization_holidays_delete_by_own_active_admin',
+      'organization_holidays_insert_by_own_active_admin',
+      'organization_holidays_select_own_organization',
+      'organization_holidays_update_by_own_active_admin',
       // STORY 1.4b, on `storage.objects` rather than on a table in `public`,
       // and the three are named here for the reason the six above are: this is
       // the only bound on WHICH policies exist that needs no running stack, and
@@ -3665,6 +3672,8 @@ describe('the access-control migration', () => {
     job_roles: ['organization_id', 'id'],
     // STORY 21.10 (0079), attached in the migration that creates it.
     member_schedule_versions: ['organization_id', 'id'],
+    // STORY 21.16 (0080), attached in the migration that creates it.
+    organization_holidays: ['organization_id', 'id'],
   };
 
   /**
@@ -7727,5 +7736,107 @@ describe("a member's schedule source is versioned (0079, story 21.10)", () => {
       /from public\.member_schedule_versions v\s+where v\.organization_id = v_organization\s+and v\.member_id = v_member\s+and v\.effective_from <= v_date/,
     );
     expect(enqueue).toMatch(/\), 'TEAM'\) <> 'PERSONAL'/);
+  });
+});
+
+describe('holidays are organization data (0080, story 21.16)', () => {
+  const MIGRATION = '0080_organization_holidays.sql';
+  const raw = (name: string): string => readFileSync(join(supabaseRoot, 'migrations', name), 'utf8');
+  const sql = (): string => stripLineComments(raw(MIGRATION));
+  const definitionOf = (text: string, name: string): string => {
+    const lines = text.split('\n');
+    const start = lines.findIndex((line) => new RegExp(`^create (or replace )?function ${name.replace('.', '\\.')}\\(`).test(line));
+    if (start < 0) return '';
+    const end = lines.findIndex((line, index) => index > start && line === '$$;');
+    return lines.slice(start, end + 1).join('\n');
+  };
+
+  it('holds one holiday per organization and date, a finite date and a name by 0076 and 0078', () => {
+    const text = sql();
+    expect(text).toMatch(/create table organization_holidays \(\n\s+organization_id uuid not null references organizations \(id\) on delete cascade,/);
+    expect(text).toMatch(/constraint organization_holidays_organization_date_key unique \(organization_id, date\)/);
+    expect(text).toMatch(/constraint organization_holidays_date_finite\s+check \(isfinite\(date\) and date >= date '0001-01-01' and date < date '10000-01-01'\)/);
+    expect(text).toMatch(/constraint organization_holidays_name_not_blank check \(private\.name_key\(name\) <> ''\)/);
+    expect(text).toMatch(/constraint organization_holidays_name_length check \(char_length\(name\) <= 100\)/);
+    expect(text).toContain(
+      "constraint organization_holidays_name_characters check (name !~ '[\\u0001-\\u001F\\u007F-\\u009F\\u2028\\u2029]')",
+    );
+    expect(text).toMatch(/created_by uuid not null default auth\.uid\(\),\s+created_at timestamptz not null default now\(\),/);
+    // The name is never unique: two dates may share one.
+    expect(text).not.toMatch(/unique index organization_holidays/);
+  });
+
+  it('enables RLS, revokes TRUNCATE from every role and anon from all of it, and grants a three-column insert, a rename and a delete', () => {
+    const text = sql();
+    expect(text).toContain('alter table organization_holidays enable row level security;');
+    expect(text).toMatch(/revoke insert, update, delete, truncate, references, trigger on table public\.organization_holidays\s+from anon, authenticated;/);
+    expect(text).toContain('revoke select on table public.organization_holidays from anon;');
+    expect(text).toContain('revoke truncate on table public.organization_holidays from anon, authenticated, service_role;');
+    expect(text).toContain('grant insert (organization_id, date, name) on table public.organization_holidays to authenticated;');
+    expect(text).toContain('grant update (name) on table public.organization_holidays to authenticated;');
+    expect(text).toContain('grant delete on table public.organization_holidays to authenticated;');
+    expect(text).not.toMatch(/grant update \([^)]*\bdate\b[^)]*\) on table public\.organization_holidays/);
+  });
+
+  it('reads by every active member, writes by an active admin, and no policy reads its own table (42P17)', () => {
+    const text = sql();
+    const policies = [...text.matchAll(/create policy (organization_holidays_\w+) on public\.organization_holidays[\s\S]*?\n {2}\);/g)];
+    expect(policies.map((found) => found[1]).sort()).toEqual([
+      'organization_holidays_delete_by_own_active_admin',
+      'organization_holidays_insert_by_own_active_admin',
+      'organization_holidays_select_own_organization',
+      'organization_holidays_update_by_own_active_admin',
+    ]);
+    for (const [policy, name] of policies) {
+      expect(policy, name).not.toMatch(/from public\.organization_holidays/);
+      expect(policy, name).toMatch(/organization_id = nullif\(\(\(select auth\.jwt\(\)\) ->> 'organization_id'\), ''\)::uuid/);
+      if (name !== 'organization_holidays_select_own_organization') expect(policy, name).toMatch(/access\.member_role = 'admin'/);
+    }
+    expect(policies.find((found) => found[1] === 'organization_holidays_insert_by_own_active_admin')?.[0]).toMatch(
+      /and created_by = \(select auth\.uid\(\)\)/,
+    );
+  });
+
+  it("attaches 0023's lock, 0035's re-check on every write, and AD-3's two audit triggers; nothing notifies (E-3)", () => {
+    const text = sql();
+    expect(text).toMatch(
+      /create trigger organization_holidays_serialize_organization_writes\s+before insert or update or delete on public\.organization_holidays\s+for each statement\s+execute function public\.serialize_organization_writes\(\);/,
+    );
+    expect(text).toMatch(
+      /create trigger organization_holidays_refuse_write_by_stale_admin\s+before insert or update or delete on public\.organization_holidays\s+for each row\s+execute function public\.refuse_write_by_stale_admin\(\);/,
+    );
+    expect(text).toMatch(/create trigger organization_holidays_audit after insert or delete on public\.organization_holidays/);
+    expect(text).toMatch(/create trigger organization_holidays_audit_update after update on public\.organization_holidays/);
+    expect(text).not.toMatch(/notify_members|notification_outbox|enqueue/);
+    // No new function at all besides the re-created assembly.
+    expect([...text.matchAll(/create (or replace )?function ([\w.]+)\(/g)].map((found) => found[2])).toEqual(['private.member_schedule_inputs']);
+  });
+
+  it("gives teams an off-on-holidays flag, false by default, writable through teams' own update policy", () => {
+    const text = sql();
+    expect(text).toMatch(/alter table public\.teams\s+add column off_on_holidays boolean not null default false;/);
+    expect(text).toContain('grant update (off_on_holidays) on table public.teams to authenticated;');
+    // The flag write takes 0035's lock and re-check, as an archive does.
+    expect(text).toMatch(
+      /create trigger teams_serialize_organization_writes\s+before update of archived, off_on_holidays on public\.teams\s+for each statement\s+execute function public\.serialize_organization_writes\(\);/,
+    );
+    expect(text).toMatch(
+      /create trigger teams_refuse_write_by_stale_admin\s+before update of archived, off_on_holidays on public\.teams\s+for each row\s+execute function public\.refuse_write_by_stale_admin\(\);/,
+    );
+  });
+
+  it("re-creates the assembly from 0079, only adding the window's holiday dates and the off teams, never a name", () => {
+    const before = definitionOf(raw('0079_member_schedule_versions.sql'), 'private.member_schedule_inputs').split('\n');
+    const after = definitionOf(raw(MIGRATION), 'private.member_schedule_inputs');
+    const kept = new Set(after.split('\n'));
+    expect(before.filter((line) => !kept.has(line))).toEqual([]);
+    expect(after).toMatch(
+      /'holidays', coalesce\(\(\s+select jsonb_agg\(h\.date order by h\.date\)\s+from public\.organization_holidays h\s+where h\.organization_id = v_organization\s+and h\.date between p_from and p_to\s+\), '\[\]'::jsonb\)/,
+    );
+    expect(after).toMatch(
+      /'teamsOffOnHolidays', coalesce\(\(\s+select jsonb_agg\(t\.id order by t\.id\)\s+from public\.teams t\s+where t\.organization_id = v_organization\s+and t\.off_on_holidays\s+\), '\[\]'::jsonb\)/,
+    );
+    expect(stripLineComments(after)).not.toMatch(/h\.name/);
+    expect(sql()).toContain('revoke execute on function private.member_schedule_inputs(uuid, date, date) from public, anon, authenticated, service_role;');
   });
 });

@@ -1012,6 +1012,12 @@ describe('the access-control layer is present, so nothing below passes vacuously
         'notification_settings_insert_own',
         'notification_settings_select_own',
         'notification_settings_update_own',
+        // STORY 21.16 (0080): every active member reads the holidays; an
+        // active admin inserts, renames (`name` alone) and deletes.
+        'organization_holidays_delete_by_own_active_admin',
+        'organization_holidays_insert_by_own_active_admin',
+        'organization_holidays_select_own_organization',
+        'organization_holidays_update_by_own_active_admin',
         'organizations_select_own_organization',
         'organizations_update_by_own_active_admin',
         // STORY 21.2 (0077): one, an active admin's read (the table holds the
@@ -25879,6 +25885,301 @@ describe('job roles are organization data (story 21.12)', () => {
   });
 });
 
+// ------------------------------------------------- story 21.16: holidays
+
+/**
+ * STORY 21.16 (`0080`). An organization's holidays are a date and a name, at
+ * most one per date. Every active member reads them; an active admin adds,
+ * renames (`name` alone, by the column grant) and deletes one; no role
+ * truncates them, and `anon` holds nothing. A team's `off_on_holidays` is
+ * written through `teams`' own update policy. A holiday notifies nobody (E-3).
+ * Every case runs in a rolled-back transaction; every scene that writes past a
+ * policy is built as the owner before `actAs`. Each expected code and
+ * constraint name is 0080's own.
+ */
+describe('holidays are organization data (story 21.16)', () => {
+  const HOLIDAY = '2049-05-01';
+  const OTHER_DATE = '2049-05-02';
+
+  it.skipIf(noDatabase).each(FIXTURES)(
+    'lets the $fixture admin add, rename and delete a holiday, and refuses a second one on its date, a blank, long or broken name, a date change and a truncate',
+    async ({ slug, admin }) => {
+      await inRolledBackTransaction(async (client) => {
+        const caller = await memberByUsername(client, slug, admin);
+        const { rows: outboxBefore } = await client.query<{ count: number }>(
+          'select count(*)::int as count from notification_outbox where organization_id = $1',
+          [caller.organizationId],
+        );
+        await actAs(client, caller.authUserId, caller.organizationId);
+
+        const { rows } = await client.query<{ id: string; createdBy: string }>(
+          `insert into organization_holidays (organization_id, date, name)
+           values ($1, $2, $3) returning id, created_by::text as "createdBy"`,
+          [caller.organizationId, HOLIDAY, `${THROWAWAY} Praznik rada`],
+        );
+        const holiday = rows[0]?.id;
+        if (holiday === undefined) throw new Error('the holiday insert returned no id');
+        expect(rows[0]?.createdBy, `${slug}: the holiday is not attributed to its author`).toBe(caller.authUserId);
+
+        const second = await refusedThenContinue(client, () =>
+          client.query('insert into organization_holidays (organization_id, date, name) values ($1, $2, $3)', [
+            caller.organizationId,
+            HOLIDAY,
+            `${THROWAWAY} drugi`,
+          ]),
+        );
+        const blank = await refusedThenContinue(client, () =>
+          client.query('insert into organization_holidays (organization_id, date, name) values ($1, $2, $3)', [
+            caller.organizationId,
+            OTHER_DATE,
+            '   ',
+          ]),
+        );
+        const long = await refusedThenContinue(client, () =>
+          client.query('insert into organization_holidays (organization_id, date, name) values ($1, $2, $3)', [
+            caller.organizationId,
+            OTHER_DATE,
+            'đ'.repeat(101),
+          ]),
+        );
+        const broken = await refusedThenContinue(client, () =>
+          client.query('insert into organization_holidays (organization_id, date, name) values ($1, $2, $3)', [
+            caller.organizationId,
+            OTHER_DATE,
+            `${THROWAWAY}\nBlagdan`,
+          ]),
+        );
+        expect(second.code, `${slug}: a date holds two holidays`).toBe('23505');
+        expect(second.message).toContain('organization_holidays_organization_date_key');
+        expect(blank.code).toBe('23514');
+        expect(blank.message).toContain('organization_holidays_name_not_blank');
+        expect(long.code).toBe('23514');
+        expect(long.message).toContain('organization_holidays_name_length');
+        expect(broken.code).toBe('23514');
+        expect(broken.message).toContain('organization_holidays_name_characters');
+
+        const renamed = await client.query('update organization_holidays set name = $1 where id = $2', [
+          `${THROWAWAY} Blagdan rada`,
+          holiday,
+        ]);
+        expect(renamed.rowCount, `${slug}: a holiday cannot be renamed`).toBe(1);
+        // The date is never rewritten: a moved holiday is a delete and an insert.
+        const moved = await refusedThenContinue(client, () =>
+          client.query('update organization_holidays set date = $1 where id = $2', [OTHER_DATE, holiday]),
+        );
+        expect(moved.code, `${slug}: an admin changed a holiday's date`).toBe('42501');
+        const truncated = await refusedThenContinue(client, () => client.query('truncate organization_holidays'));
+        expect(truncated.code, `${slug}: a session truncated the holidays`).toBe('42501');
+
+        const deleted = await client.query('delete from organization_holidays where id = $1', [holiday]);
+        expect(deleted.rowCount, `${slug}: a holiday cannot be deleted`).toBe(1);
+
+        // E-3: a holiday notifies nobody.
+        await actAsOwner(client);
+        const { rows: outboxAfter } = await client.query<{ count: number }>(
+          'select count(*)::int as count from notification_outbox where organization_id = $1',
+          [caller.organizationId],
+        );
+        expect(outboxAfter[0]?.count, `${slug}: a holiday enqueued a notification`).toBe(outboxBefore[0]?.count);
+      });
+    },
+  );
+
+  it.skipIf(noDatabase).each(FIXTURES)(
+    'lets every $fixture member read the holidays, and refuses a member-role account every write',
+    async ({ slug, admin, member }) => {
+      await inRolledBackTransaction(async (client) => {
+        const caller = await memberByUsername(client, slug, admin);
+        const memberRole = await memberByUsername(client, slug, member);
+        // The holiday, built as the owner before any `actAs`.
+        const { rows: built } = await client.query<{ id: string }>(
+          `insert into organization_holidays (organization_id, date, name, created_by)
+           values ($1, $2, $3, $4) returning id`,
+          [caller.organizationId, HOLIDAY, `${THROWAWAY} Blagdan`, caller.authUserId],
+        );
+        const holiday = built[0]?.id;
+        if (holiday === undefined) throw new Error('the holiday insert returned no id');
+
+        await actAs(client, memberRole.authUserId, memberRole.organizationId);
+        const { rows: read } = await client.query<{ id: string; date: string }>(
+          `select id, to_char(date, 'YYYY-MM-DD') as date from organization_holidays where id = $1`,
+          [holiday],
+        );
+        expect(read, `${slug}: a member does not read the holidays`).toEqual([{ id: holiday, date: HOLIDAY }]);
+        const memberInsert = await refusedThenContinue(client, () =>
+          client.query('insert into organization_holidays (organization_id, date, name) values ($1, $2, $3)', [
+            memberRole.organizationId,
+            OTHER_DATE,
+            `${THROWAWAY} member`,
+          ]),
+        );
+        const memberRename = await client.query('update organization_holidays set name = $1 where id = $2', [
+          `${THROWAWAY} x`,
+          holiday,
+        ]);
+        const memberDelete = await client.query('delete from organization_holidays where id = $1', [holiday]);
+        const memberTruncate = await refusedThenContinue(client, () => client.query('truncate organization_holidays'));
+        expect(memberInsert.code, `${slug}: a member-role account added a holiday`).toBe('42501');
+        expect(memberRename.rowCount, `${slug}: a member-role account renamed a holiday`).toBe(0);
+        expect(memberDelete.rowCount, `${slug}: a member-role account deleted a holiday`).toBe(0);
+        expect(memberTruncate.code).toBe('42501');
+        await actAsOwner(client);
+      });
+    },
+  );
+
+  it.skipIf(noDatabase).each(FIXTURES)(
+    'lets the $fixture admin mark a team off on holidays and back, and refuses a member-role account',
+    async ({ slug, admin, member }) => {
+      await inRolledBackTransaction(async (client) => {
+        const caller = await memberByUsername(client, slug, admin);
+        const memberRole = await memberByUsername(client, slug, member);
+        const { rows: teams } = await client.query<{ id: string; off: boolean }>(
+          `select id, off_on_holidays as off from teams
+            where organization_id = $1 and not archived order by id limit 1`,
+          [caller.organizationId],
+        );
+        const team = teams[0]?.id;
+        if (team === undefined) throw new Error(`${slug} has no active team`);
+        expect(teams[0]?.off, `${slug}: a team is off on holidays by default`).toBe(false);
+
+        await actAs(client, caller.authUserId, caller.organizationId);
+        const marked = await client.query('update teams set off_on_holidays = true where id = $1', [team]);
+        expect(marked.rowCount, `${slug}: an admin cannot mark a team off on holidays`).toBe(1);
+        const cleared = await client.query('update teams set off_on_holidays = false where id = $1', [team]);
+        expect(cleared.rowCount, `${slug}: an admin cannot clear the flag`).toBe(1);
+
+        await actAs(client, memberRole.authUserId, memberRole.organizationId);
+        const memberMark = await client.query('update teams set off_on_holidays = true where id = $1', [team]);
+        expect(memberMark.rowCount, `${slug}: a member-role account marked a team`).toBe(0);
+        await actAsOwner(client);
+      });
+    },
+  );
+
+  it.skipIf(noDatabase).each(CROSS_TENANT)(
+    "refuses the $fixture admin $otherFixture's holidays: unread and unwritable",
+    async ({ slug, admin, otherSlug }) => {
+      await inRolledBackTransaction(async (client) => {
+        const other = await organizationId(client, otherSlug);
+        const caller = await memberByUsername(client, slug, admin);
+        // The other tenant's holiday, built as the owner before any `actAs`.
+        const { rows: foreignRows } = await client.query<{ id: string }>(
+          `insert into organization_holidays (organization_id, date, name, created_by)
+           values ($1, $2, $3, $4) returning id`,
+          [other, HOLIDAY, `${THROWAWAY} foreign`, caller.authUserId],
+        );
+        const foreign = foreignRows[0]?.id;
+        if (foreign === undefined) throw new Error('the foreign holiday insert returned no id');
+
+        await actAs(client, caller.authUserId, caller.organizationId);
+        const { rows: seen } = await client.query<{ organizationId: string }>(
+          'select organization_id::text as "organizationId" from organization_holidays',
+        );
+        expect(seen.map((row) => row.organizationId), `${slug}: ${otherSlug}'s holidays leaked`).not.toContain(other);
+        const insert = await refusedThenContinue(client, () =>
+          client.query('insert into organization_holidays (organization_id, date, name) values ($1, $2, $3)', [
+            other,
+            OTHER_DATE,
+            `${THROWAWAY} x`,
+          ]),
+        );
+        const rename = await client.query('update organization_holidays set name = $1 where id = $2', [`${THROWAWAY} y`, foreign]);
+        const remove = await client.query('delete from organization_holidays where id = $1', [foreign]);
+        expect(insert.code).toBe('42501');
+        expect(rename.rowCount, `${slug}: an admin renamed ${otherSlug}'s holiday`).toBe(0);
+        expect(remove.rowCount, `${slug}: an admin deleted ${otherSlug}'s holiday`).toBe(0);
+        await actAsOwner(client);
+      });
+    },
+  );
+
+  it.skipIf(noDatabase).each(FIXTURES)(
+    "records the $fixture admin's holiday insert, rename and delete, and a team's flag change, in the change history (AD-3)",
+    async ({ slug, admin }) => {
+      await inRolledBackTransaction(async (client) => {
+        const caller = await memberByUsername(client, slug, admin);
+        const { rows: teams } = await client.query<{ id: string }>(
+          'select id from teams where organization_id = $1 and not archived order by id limit 1',
+          [caller.organizationId],
+        );
+        const team = teams[0]?.id;
+        if (team === undefined) throw new Error(`${slug} has no active team`);
+
+        await actAs(client, caller.authUserId, caller.organizationId);
+        const { rows } = await client.query<{ id: string }>(
+          'insert into organization_holidays (organization_id, date, name) values ($1, $2, $3) returning id',
+          [caller.organizationId, HOLIDAY, `${THROWAWAY} Blagdan`],
+        );
+        const holiday = rows[0]?.id;
+        if (holiday === undefined) throw new Error('the holiday insert returned no id');
+        await client.query('update organization_holidays set name = $1 where id = $2', [`${THROWAWAY} Drugi`, holiday]);
+        await client.query('delete from organization_holidays where id = $1', [holiday]);
+        const marked = await client.query('update teams set off_on_holidays = true where id = $1', [team]);
+        expect(marked.rowCount, `${slug}: the flag was not written`).toBe(1);
+
+        await actAsOwner(client);
+        const events = await auditEventsOf(client, 'organization_holidays', holiday);
+        expect(
+          events.map((event) => [event.tableName, event.operation, event.organizationId, event.actor]),
+          `${slug}: the holiday's three writes are not each one event`,
+        ).toEqual([
+          ['organization_holidays', 'INSERT', caller.organizationId, caller.authUserId],
+          ['organization_holidays', 'UPDATE', caller.organizationId, caller.authUserId],
+          ['organization_holidays', 'DELETE', caller.organizationId, caller.authUserId],
+        ]);
+        expect(events[1]?.oldRow?.['name']).toBe(`${THROWAWAY} Blagdan`);
+        expect(events[1]?.newRow?.['name']).toBe(`${THROWAWAY} Drugi`);
+        const flagEvents = (await auditEventsOf(client, 'teams', team)).filter(
+          (event) => event.operation === 'UPDATE' && event.newRow?.['off_on_holidays'] === true,
+        );
+        expect(
+          flagEvents.map((event) => [event.oldRow?.['off_on_holidays'], event.actor]),
+          `${slug}: the flag change is not recorded through the teams trigger`,
+        ).toEqual([[false, caller.authUserId]]);
+      });
+    },
+  );
+
+  it.skipIf(noDatabase).each(CROSS_TENANT)(
+    "refuses the $fixture admin $otherFixture's team flag, and a team insert naming the flag",
+    async ({ slug, admin, otherSlug }) => {
+      await inRolledBackTransaction(async (client) => {
+        const other = await organizationId(client, otherSlug);
+        const caller = await memberByUsername(client, slug, admin);
+        const { rows: foreignTeams } = await client.query<{ id: string }>(
+          'select id from teams where organization_id = $1 order by id limit 1',
+          [other],
+        );
+        const foreignTeam = foreignTeams[0]?.id;
+        if (foreignTeam === undefined) throw new Error(`${otherSlug} has no team`);
+
+        await actAs(client, caller.authUserId, caller.organizationId);
+        const foreign = await client.query('update teams set off_on_holidays = true where id = $1', [foreignTeam]);
+        expect(foreign.rowCount, `${slug}: an admin marked ${otherSlug}'s team`).toBe(0);
+        // 0080 grants UPDATE on the flag alone: the insert grant (0009) names no such column.
+        const named = await refusedThenContinue(client, () =>
+          client.query('insert into teams (organization_id, name, off_on_holidays) values ($1, $2, true)', [
+            caller.organizationId,
+            `${THROWAWAY} tim`,
+          ]),
+        );
+        expect(named.code, `${slug}: a team was inserted naming its flag`).toBe('42501');
+        await actAsOwner(client);
+      });
+    },
+  );
+
+  it.skipIf(noDatabase)('gives anon nothing on organization_holidays', async () => {
+    await inRolledBackTransaction(async (client) => {
+      await client.query('set local role anon');
+      const read = await refusedThenContinue(client, () => client.query('select id from organization_holidays'));
+      expect(read.code).toBe('42501');
+      await client.query('reset role');
+    });
+  });
+});
+
 // ------------------------------------------------- story 13.1: absence types
 
 /**
@@ -27801,13 +28102,13 @@ describe('a loan is amended, ended early or removed (story 18.4, 0064)', () => {
  * backfill block is run again here, DML only, in a rolled-back transaction.
  */
 
-/** The 25 audited tables (AD-11; `team_loans` since story 18.2, `personal_assignments` since 21.2, `job_roles` since 21.12, `member_schedule_versions` since 21.10). */
+/** The 26 audited tables (AD-11; `team_loans` since story 18.2, `personal_assignments` since 21.2, `job_roles` since 21.12, `member_schedule_versions` since 21.10, `organization_holidays` since 21.16). */
 const AUDITED_TABLES = [
   'organizations', 'members', 'member_status_versions', 'team_membership_versions', 'teams', 'hour_bands',
   'shift_types', 'shift_type_versions', 'rotation_patterns', 'rotation_steps', 'rotation_assignments',
   'shift_type_overrides', 'roster_overrides', 'leave_records', 'conflict_resolutions', 'leave_requests',
   'leave_request_decisions', 'swap_requests', 'swap_request_decisions', 'absence_types', 'leave_allowances',
-  'team_loans', 'personal_assignments', 'job_roles', 'member_schedule_versions',
+  'team_loans', 'personal_assignments', 'job_roles', 'member_schedule_versions', 'organization_holidays',
 ] as const;
 
 interface AuditEvent {

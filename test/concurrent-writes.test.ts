@@ -2124,6 +2124,10 @@ describe('every write verb 0023, 0035 and 0036 name waits on the lock', () => {
         // statement's lock, before the row is written.
         { table: 'members', trigger: 'members_refuse_write_by_stale_admin', type: 1 | 2 | 4 | 8 | 16, columns: ['role'] },
         { table: 'members', trigger: 'members_serialize_organization_writes', type: 2 | 4 | 8 | 16, columns: ['role'] },
+        // 0080 (story 21.16): a holiday takes the lock and the caller's re-check
+        // on every write: insert, rename (update) and delete.
+        { table: 'organization_holidays', trigger: 'organization_holidays_refuse_write_by_stale_admin', type: 1 | 2 | 4 | 8 | 16, columns: null },
+        { table: 'organization_holidays', trigger: 'organization_holidays_serialize_organization_writes', type: 2 | 4 | 8 | 16, columns: null },
         // 0036's named archived refusal, ROW level and BEFORE, so it answers
         // an active admin before the insert policy's WITH CHECK does.
         { table: 'roster_overrides', trigger: 'roster_overrides_refuse_write_while_archived', type: 1 | 2 | 4, columns: null },
@@ -2151,8 +2155,9 @@ describe('every write verb 0023, 0035 and 0036 name waits on the lock', () => {
         { table: 'team_membership_versions', trigger: 'team_membership_versions_refuse_truncate', type: 2 | 32, columns: null },
         { table: 'team_membership_versions', trigger: 'team_membership_versions_refuse_write_by_stale_admin', type: 1 | 2 | 4 | 8 | 16, columns: null },
         { table: 'team_membership_versions', trigger: 'team_membership_versions_serialize_organization_writes', type: 2 | 4 | 8 | 16, columns: null },
-        { table: 'teams', trigger: 'teams_refuse_write_by_stale_admin', type: 1 | 2 | 16, columns: ['archived'] },
-        { table: 'teams', trigger: 'teams_serialize_organization_writes', type: 2 | 16, columns: ['archived'] },
+        // 0080 (story 21.16): widened to the off-on-holidays flag, same functions and levels.
+        { table: 'teams', trigger: 'teams_refuse_write_by_stale_admin', type: 1 | 2 | 16, columns: ['archived', 'off_on_holidays'] },
+        { table: 'teams', trigger: 'teams_serialize_organization_writes', type: 2 | 16, columns: ['archived', 'off_on_holidays'] },
       ]);
     } finally {
       await client.end();

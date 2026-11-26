@@ -2788,6 +2788,9 @@ const SANCTIONED_SCREEN_KEYS = [
   'history.record.jobRole',
   // STORY 21.10 (0079): a member's schedule version.
   'history.record.scheduleVersion',
+  // STORY 21.16 (0080): an organization's holiday, and a team's off-on-holidays flag.
+  'history.record.holiday',
+  'history.field.offOnHolidays',
   'history.field.jobRole',
   'history.value.unknownJobRole',
   // STORY 14.2: *Povijest promjena* — its lede, columns, chips, period

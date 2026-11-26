@@ -409,3 +409,25 @@ describe('the calendar of R12 over both parity fixtures (AD-15)', () => {
     );
   });
 });
+
+describe('a holiday-off shift has no event (story 21.16, AD-27)', () => {
+  it("the pilot's A is off on 2027-08-05: m1's Noć there has an event without the rule and none with it; A's override on 2027-08-15 keeps one", () => {
+    const pilot = PARITY_FIXTURES[0]?.organization;
+    if (pilot === undefined) throw new Error('no pilot fixture');
+    const window = { from: '2027-08-01', to: '2027-08-31' };
+    const uidsOf = (inputs: ScheduleInputs): readonly string[] => {
+      const shifts = atWorkShiftsOf(inputs, window.from, window.to);
+      return lines(calendarOf({ inputs, shifts, window, stamp: STAMP, uidDomain: FEED_UID_DOMAIN })).filter((line) =>
+        line.startsWith('UID:'),
+      );
+    };
+    const inputs = inputsOf(pilot, 'pilot-m1') as unknown as ScheduleInputs;
+    const plain = uidsOf({ ...inputs, holidays: [] });
+    const ruled = uidsOf(inputs);
+
+    expect(plain.some((uid) => uid.startsWith('UID:2027-08-05'))).toBe(true);
+    expect(ruled.some((uid) => uid.startsWith('UID:2027-08-05'))).toBe(false);
+    expect(ruled.some((uid) => uid.startsWith('UID:2027-08-15'))).toBe(true);
+    expect(ruled).toEqual(plain.filter((uid) => !uid.startsWith('UID:2027-08-05')));
+  });
+});

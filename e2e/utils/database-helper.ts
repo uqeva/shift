@@ -1523,6 +1523,38 @@ export async function cleanUpJobRolesInSql(slug: string, names: readonly string[
 }
 
 /**
+ * Deletes every holiday of the run organization and sets every one of its
+ * teams back to working on holidays (story 21.16, `0080`), in one
+ * transaction, as the owner. `organization_holidays` references
+ * `organizations` alone (cascading) and notifies nobody (E-3), so nothing
+ * else references a holiday and no outbox row names one; a team's flag is a
+ * column, reset in place. For a spec that adds holidays or marks a team (story
+ * 21.17 on), from its `afterEach`. Idempotent.
+ */
+export async function cleanUpHolidaysInSql(slug: string): Promise<void> {
+  const client = await connect();
+  try {
+    await client.query('begin');
+    await client.query(
+      'delete from organization_holidays h using organizations o where h.organization_id = o.id and o.slug = $1',
+      [slug],
+    );
+    await client.query(
+      `update teams t set off_on_holidays = false
+         from organizations o
+        where t.organization_id = o.id and o.slug = $1 and t.off_on_holidays`,
+      [slug],
+    );
+    await client.query('commit');
+  } catch (cause) {
+    await client.query('rollback').catch(() => undefined);
+    throw cause;
+  } finally {
+    await client.end();
+  }
+}
+
+/**
  * A session-level advisory lock on `key`, polled for at most
  * {@link ROTATION_LOCK_WAIT_MS}, with `onHeld` run once it is held. The hold is
  * returned synchronously; see {@link holdRotation}.

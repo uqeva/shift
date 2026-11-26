@@ -2,7 +2,7 @@
 title: '21.15 The holiday rule in the domain'
 type: 'feature'
 created: '2026-11-26'
-status: 'in-review'
+status: 'done'
 baseline_commit: 'b130440313e475fbb52252785b82ec2298a9c532'
 review_loop_iteration: 0
 context:
@@ -10,7 +10,7 @@ context:
   - '{project-root}/_bmad-output/specs/spec-shift/engine-rules.md'
 ---
 
-Status: built, CI pending (branch `feat/21-15-holiday-rule`, no PR yet). Baseline: `main` at `b130440` (21.6, 21.9 and 21.25 merged). Domain and documents only, no hot file, no migration (21.16 adds the table). 21.10 (migration 0079) may merge first; rebase and keep it.
+Status: merged as PR #378 (squash `cdf4fd1`, one commit `26735d1`), `CI passed` green on its first run (2026-11-26). Baseline: `main` at `b130440` (21.6, 21.9 and 21.25 merged). Domain and documents only, no hot file, no migration (21.16 adds the table). 21.10 (migration 0079) may merge first; rebase and keep it.
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 
@@ -130,7 +130,7 @@ Status: built, CI pending (branch `feat/21-15-holiday-rule`, no PR yet). Baselin
 - `pnpm --filter ./apps/web test` -- 197 files, 7172 tests passed.
 - `pnpm exec vitest run test/resource-hygiene.test.ts test/supabase-scaffold.test.ts` -- 2682 tests passed.
 - Digest provenance: `BEFORE_HOLIDAYS` was computed by `holidays.test.ts` with `packages/domain/src` untouched at `b130440` (only `test/derivation.ts`'s optional spread added, which the baseline engine ignores). The at-work digest equals 21.9's `BEFORE_SCHEDULE_SOURCE['at-work']`.
-- Not run locally: the DB-connecting root tests, read and runtime parity, and e2e (STRICT DATABASE RULE). No migration, parity fixture, assembly or surface changed. CI is their gate.
+- Not run locally: the DB-connecting root tests, read and runtime parity, and e2e (STRICT DATABASE RULE). No migration, parity fixture, assembly or surface changed. CI was their gate: on PR #378 every job passed on the first run (`Test (Vitest, local Supabase)`, `Runtime parity (Node and edge-runtime)`, the four e2e shards, `Build`, `Quality`, the three images, and `CI passed`), with no fix pushed for CI (`gh pr view 378 --json statusCheckRollup`, read 2026-11-26 by story 21.16).
 
 **Residual risks:**
 - R13.9's readings were taken unattended and are listed for the founder in `deferred-work.md`: the cell marks are absent on a team that works the holiday; the Croatian list has a 2020 floor and holds a shared Corpus Christi date once; and a personal rotation is emptied even when its off team has no rotation or is overridden to work.

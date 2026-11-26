@@ -473,6 +473,7 @@ describe('Rasporedi ravnomjerno spreads the teams evenly over the cycle', () => 
       organizationId: 'org',
       name: `Smjena ${String(index)}`,
       archived: false,
+      offOnHolidays: false,
     }));
   const draftOf = (length: number, teams: readonly { id: string }[]): RotationDraft => ({
     steps: Array.from({ length }, (_, index) => `type-${String(index)}`),

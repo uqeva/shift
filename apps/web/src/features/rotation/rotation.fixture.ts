@@ -72,8 +72,13 @@ export function memberRow(
   return { organization_id: organization, id: memberId, auth_user_id: authUserId, name };
 }
 
-export function teamRow(id: string, name: string, { archived = false, organization = ORGANIZATION } = {}): Row {
-  return { organization_id: organization, id, name, archived };
+export function teamRow(
+  id: string,
+  name: string,
+  { archived = false, organization = ORGANIZATION, offOnHolidays = false as unknown } = {},
+): Row {
+  // STORY 21.16 (0080): every team carries whether it is off on holidays; by default not.
+  return { organization_id: organization, id, name, archived, off_on_holidays: offOnHolidays };
 }
 
 /** A type with, for a working one, one version from `SEEDED` unless `times` is `null`. */
@@ -328,7 +333,8 @@ export const FIXTURE_ORGANIZATION_NAME = 'DVD Fixture';
  * default none (story 3.4a). Its `name` is `name`, by default
  * {@link FIXTURE_ORGANIZATION_NAME} (story 4.3). The
  * `member_schedule_versions` embed is `scheduleVersions`, by default none
- * (story 21.10).
+ * (story 21.10). The `organization_holidays` embed is `holidays`, by default
+ * none (story 21.16).
  */
 export function calendarOrganizationRow(
   rows: FixtureRows,
@@ -346,6 +352,8 @@ export function calendarOrganizationRow(
     absenceTypes = null as readonly Row[] | null,
     // STORY 21.10: the schedule versions embed; by default none.
     scheduleVersions = [] as readonly Row[],
+    // STORY 21.16: the holidays embed; by default none.
+    holidays = [] as readonly Row[],
   } = {},
 ): Row {
   const first = rows.teams[0]?.['id'];
@@ -371,7 +379,13 @@ export function calendarOrganizationRow(
     team_membership_versions: versions ?? stamped,
     member_status_versions: statuses,
     member_schedule_versions: scheduleVersions,
+    organization_holidays: holidays,
   };
+}
+
+/** One row of the `organization_holidays` embed (0080, story 21.16). */
+export function holidayRow(id: string, date: string, name: unknown = 'Blagdan', organizationId: string = ORGANIZATION): Row {
+  return { organization_id: organizationId, id, date, name };
 }
 
 /** One row of the `member_schedule_versions` embed (0079, story 21.10). */

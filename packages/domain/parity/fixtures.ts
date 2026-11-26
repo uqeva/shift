@@ -11,7 +11,15 @@
  * Since story 21.10, schedule versions too (R15): a personal rotation on a
  * pattern no team uses, teamless in the pilot and counted with a team in
  * UJ-5, and a manual-only spell ended by a return to the team's rotation, all
- * in spring 2027, outside the same window and clocks.
+ * in spring 2027, outside the same window and clocks. Since story 21.16, the
+ * holiday rule too (R13, AD-27): each fixture holds two holidays in summer
+ * 2027 and one team off on holidays, which works its projection on one of
+ * them (so the holiday empties it) and is off on the other, while the other
+ * teams work theirs. In UJ-5 the off team is B, which m2's personal rotation
+ * counts with, so the holiday empties that shift too (R15.4). The pilot also
+ * holds a shift-type override making A work its second holiday (R13.3), and
+ * UJ-5 a Personal Assignment of m2 on B's first one (R14.4): neither is
+ * emptied.
  *
  * PLAIN DATA, AND IT IMPORTS NOTHING, so the runtime-parity probe
  * (`probe.ts`) loads it unchanged under Node and under the pinned
@@ -183,6 +191,8 @@ const PILOT = {
     { id: 'pilot-override-1', teamId: 'pilot-smjena-a', date: '2026-03-29', shiftTypeId: 'pilot-dan', writtenAt: IN_FORCE },
     // Pending review: D keeps its projected type.
     { id: 'pilot-override-2', teamId: 'pilot-smjena-d', date: '2027-10-31', shiftTypeId: 'pilot-noc', writtenAt: PENDING },
+    // Story 21.16: A, off on holidays, is made to work Noć on its holiday 2027-08-15 (an override wins, R13.3).
+    { id: 'pilot-holiday-override', teamId: 'pilot-smjena-a', date: '2027-08-15', shiftTypeId: 'pilot-noc', writtenAt: IN_FORCE },
   ],
   rosterOverrides: [
     // m2 is put on A's night across the autumn transition: in force.
@@ -192,6 +202,10 @@ const PILOT = {
     // Pending review: m5 stays on B's night.
     roster('pilot-roster-3', 'pilot-smjena-b', '2027-10-31', 'pilot-m5', null, PENDING),
   ],
+  // Story 21.16: A, off on holidays, projects Noć on 2027-08-05 (emptied: m1 works nothing) and a day off on
+  // 2027-08-15, where B works its Dan (m5, back on B's rotation since 2027-06-07). By date; by id.
+  holidays: ['2027-08-05', '2027-08-15'],
+  teamsOffOnHolidays: ['pilot-smjena-a'],
 };
 
 const UJ5 = {
@@ -259,7 +273,10 @@ const UJ5 = {
       statuses: [],
       // Lent to C across the autumn transition.
       loans: [{ id: 'uj5-loan-1', teamId: 'uj5-smjena-c', from: '2026-10-24', to: '2026-10-25' }],
-      personalAssignments: [] as PersonalAssignmentRow[],
+      personalAssignments: [
+        // Story 21.16: Jutarnja on B's holiday 2027-06-22, counted with B: an assignment is never emptied (R14.4).
+        assignment('uj5-holiday-assignment', '2027-06-22', 'SHIFT', 'uj5-jutarnja', null),
+      ],
       scheduleVersions: [
         // Their own rotation, counted with their team B.
         version('2027-04-12', 'PERSONAL', 'uj5-personal', 'uj5-personal-0'),
@@ -301,6 +318,10 @@ const UJ5 = {
     // Pending review: m3 stays on C's night.
     roster('uj5-roster-2', 'uj5-smjena-c', '2027-10-27', 'uj5-m3', null, PENDING),
   ],
+  // Story 21.16: B, off on holidays, projects Jutarnja on 2027-06-22 (emptied; C works its Popodnevna) and a
+  // day off on 2027-08-15, where m2's personal rotation, counted with B, would work Jutarnja (emptied, R15.4).
+  holidays: ['2027-06-22', '2027-08-15'],
+  teamsOffOnHolidays: ['uj5-smjena-b'],
 };
 
 /**

@@ -99,11 +99,26 @@ function guardedFiguresOf(organization: Organization) {
 
 type ParityOrganization = (typeof PARITY_FIXTURES)[number]['organization'];
 
+/** Story 21.16's fixture rows that only a holiday makes meaningful: the override on A's holiday and m2's assignment on B's. */
+const HOLIDAY_ROWS = new Set(['pilot-holiday-override', 'uj5-holiday-assignment']);
+
+
 /** R12 for every member of both parity fixtures (their Personal Assignments included), over the whole parity window. */
 function atWorkOf(organizationOf: (organization: ParityOrganization) => object) {
-  return PARITY_FIXTURES.map(({ fixture, organization }) => {
+  return PARITY_FIXTURES.map(({ fixture, organization: given }) => {
+    // Story 21.16 gave the fixtures holidays after this file's baseline was pinned: stripped, so the digest stays
+    // the claim about schedule sources alone.
+    const { holidays: _holidays, teamsOffOnHolidays: _off, ...stripped } = given;
+    const organization = {
+      ...stripped,
+      overrides: stripped.overrides.filter((one) => !HOLIDAY_ROWS.has(one.id)),
+      members: stripped.members.map((member) => ({
+        ...member,
+        personalAssignments: member.personalAssignments.filter((one) => !HOLIDAY_ROWS.has(one.id)),
+      })),
+    };
     // The fixtures' own row types are narrower than a changed member's versions; the assembly is the same shape.
-    const changed = organizationOf(organization) as ParityOrganization;
+    const changed = organizationOf(organization as ParityOrganization) as ParityOrganization;
     return {
       fixture,
       atWork: changed.members.map((member) => atWorkShiftsOf(inputsOf(changed, member.id), PARITY_WINDOW.from, PARITY_WINDOW.to)),

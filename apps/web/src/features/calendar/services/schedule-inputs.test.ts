@@ -14,6 +14,7 @@ import {
   calendarPersonalAssignmentRow,
   calendarMemberRow,
   calendarOrganizationRow,
+  holidayRow,
   calendarOverrideRow,
   calendarRosterOverrideRow,
   calendarTableOf,
@@ -45,18 +46,33 @@ type Row = Record<string, unknown>;
 
 async function snapshotOf(
   rows: FixtureRows,
-  extra: { overrides?: readonly Row[]; rosterOverrides?: readonly Row[]; loans?: readonly Row[]; personalAssignments?: readonly Row[] } = {},
+  extra: {
+    overrides?: readonly Row[];
+    rosterOverrides?: readonly Row[];
+    loans?: readonly Row[];
+    personalAssignments?: readonly Row[];
+    // STORY 21.16: the holidays embed, and the ids of the teams off on holidays.
+    holidays?: readonly Row[];
+    offTeams?: readonly string[];
+  } = {},
 ): Promise<CalendarSnapshot> {
   const first = rows.teams[0]?.['id'] as string;
   const second = rows.teams[1]?.['id'] as string;
   const source = calendarTableOf(
     {
       data: [
-        calendarOrganizationRow(rows, {
+        calendarOrganizationRow(
+          {
+            ...rows,
+            teams: rows.teams.map((team) => ({ ...team, off_on_holidays: (extra.offTeams ?? []).includes(team['id'] as string) })),
+          },
+          {
+          holidays: extra.holidays ?? [],
           viewers: [viewerRow([membershipRow(first, SEEDED)])],
           versions: [memberMembershipRow(VIEWER_MEMBER, first, SEEDED), memberMembershipRow(COLLEAGUE, second, SEEDED, ORGANIZATION, 'vozač')],
           statuses: [statusRow(COLLEAGUE, false, '2026-12-01')],
-        }),
+          },
+        ),
       ],
       error: null,
       count: 1,
@@ -185,6 +201,55 @@ describe('scheduleInputsOfCalendar', () => {
     ]);
     expect(inputs.members.find((member) => member.id === VIEWER_MEMBER)?.personalAssignments).toEqual([]);
     expect(JSON.stringify(inputs)).not.toMatch(/never carried/);
+  });
+
+  it('keeps the holidays dated in the window by date, and every team off on holidays by id, no name (story 21.16)', async () => {
+    const inputs = scheduleInputsOfCalendar(
+      await snapshotOf(PILOT, {
+        holidays: [
+          holidayRow('h-after', '2026-11-01', 'Svi sveti'),
+          holidayRow('h-last', '2026-10-31', 'Zadnji'),
+          holidayRow('h-before', '2026-09-30', 'Prije'),
+          holidayRow('h-first', '2026-10-01', 'Prvi'),
+        ],
+        offTeams: ['pilot-smjena-d', 'pilot-smjena-a'],
+      }),
+      [],
+      WINDOW,
+    );
+
+    expect(inputs.holidays).toEqual(['2026-10-01', '2026-10-31']);
+    expect(inputs.teamsOffOnHolidays).toEqual(['pilot-smjena-a', 'pilot-smjena-d']);
+    // The teams carry no flag of their own: the list is the assembly's one key.
+    expect(inputs.teams.every((team) => Object.keys(team).sort().join() === 'archived,id,name')).toBe(true);
+    expect(JSON.stringify(inputs)).not.toMatch(/Svi sveti|Zadnji|Prije|Prvi/);
+  });
+
+  it('answers `[]` for both holiday lists with none stored and no team off (story 21.16)', async () => {
+    const inputs = scheduleInputsOfCalendar(await snapshotOf(PILOT), [], WINDOW);
+
+    expect(inputs.holidays).toEqual([]);
+    expect(inputs.teamsOffOnHolidays).toEqual([]);
+  });
+
+  it("drops the off team's shift on a holiday from R12, and keeps every other (story 21.16)", async () => {
+    const holiday = '2026-10-01';
+    const plain = atWorkShiftsOf(scheduleInputsOfCalendar(await snapshotOf(PILOT), [], WINDOW), WINDOW.from, WINDOW.to);
+    const withHoliday = atWorkShiftsOf(
+      scheduleInputsOfCalendar(await snapshotOf(PILOT, { holidays: [holidayRow('h', holiday)], offTeams: ['pilot-smjena-a'] }), [], WINDOW),
+      WINDOW.from,
+      WINDOW.to,
+    );
+    // The working team (not off) is unchanged: the viewer is on A, so a holiday with B off changes nothing.
+    const workingTeamOff = atWorkShiftsOf(
+      scheduleInputsOfCalendar(await snapshotOf(PILOT, { holidays: [holidayRow('h', holiday)], offTeams: ['pilot-smjena-b'] }), [], WINDOW),
+      WINDOW.from,
+      WINDOW.to,
+    );
+
+    expect(plain.some((shift) => shift.date === holiday)).toBe(true);
+    expect(withHoliday).toEqual(plain.filter((shift) => shift.date !== holiday));
+    expect(workingTeamOff).toEqual(plain);
   });
 
   it('is what R12 projects the viewer\'s at-work shifts from', async () => {
