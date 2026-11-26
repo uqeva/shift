@@ -2556,3 +2556,15 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-21-11-a-seasonal-member-s-season-is-set-in-one-step.md`
   summary: OWNER a later e2e sweep. 21.11's e2e drives an active member's season from the status card only: *Nova osoba* with a season (the rows for the new id, a refused range before the create, the unsaved line), a season with a leave conflict to erase, and the last-admin refusal are covered by unit tests of `seasonPlanOf`, `seasonAskOf` and `memberChangeSnapshotOf` but not end to end, and no hook test runs `useMemberSeason` or `useMemberCreate`'s season path. *Nova osoba* also does not run the last-admin rule before the create for a new admin with a season (the season is then refused after it, with the unsaved line).
   evidence: Story 21.11 review (verification gap, edge-case hunter).
+
+## Deferred from: story 21.27, emails look like Smjenko (2026-11-26)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-27-emails-look-like-smjenko.md`
+  summary: OWNER a later story, if the founder wants it. The three GoTrue emails (confirmation and its resend, recovery, email change) have an HTML part only: GoTrue's mailer sends the template it fetches as `text/html`, and a plain-text part needs GoTrue's send-email hook (a new server function that renders and sends Auth mail itself). Every `notify` email and reminder has both parts since 21.27.
+  evidence: Spec 21.27 § Epic AC Deviations.
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-27-emails-look-like-smjenko.md`
+  summary: FOUNDER DECISION. The email mark (`/email-mark.png`) is served by `location /` with `no-cache`, so a mail client that fetches images itself (not through a proxy) revalidates it on each open and the web image's access log records the request (IP, time, user agent). Nothing per recipient is in the URL, so it is no per-person open tracking, but the logs show that emails are being opened. The option: an exact `location = /email-mark.png` with a long cache and `access_log off` (changes `test/web-image.test.ts`'s single-access-log and location pins).
+  evidence: Story 21.27 review (blind hunter).
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-27-emails-look-like-smjenko.md`
+  summary: OWNER a later story. `notify` sends no `List-Unsubscribe` / `List-Unsubscribe-Post` header; the footer links to *Obavijesti*, but large mailbox providers expect the header on notification mail. One-click unsubscribe needs an unauthenticated endpoint (a signed token per member), a new server surface.
+  evidence: Story 21.27 review (blind hunter).

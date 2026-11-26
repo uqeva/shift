@@ -107,7 +107,7 @@ const linkTo = (path: string): string => `${APP_URL}/prijava/dvd-kastel-novi?pov
 /** Retro 10 A6: the same sign-in link with no origin, as a push carries it. */
 const pathTo = (path: string): string => `/prijava/dvd-kastel-novi?povratak=${encodeURIComponent(path)}`;
 /** Story 10.3: the line every email ends with, after a blank line, linking to the settings. */
-const FOOTER = `\n\nObavijesti e-poštom možeš isključiti u aplikaciji, pod Obavijesti: ${linkTo('/obavijesti')}`;
+const FOOTER = `\n\nOvu poruku primaš jer su ti u organizaciji ${ORGANIZATION_NAME} uključene obavijesti e-poštom.\nObavijesti e-poštom isključuješ u aplikaciji, pod Obavijesti: ${linkTo('/obavijesti')}`;
 
 const ENVIRONMENT: Readonly<Record<string, string>> = {
   SUPABASE_URL: 'http://127.0.0.1:54321',
@@ -240,7 +240,7 @@ describe('notify renders from a pinned copy of the obavijesti namespace', () => 
     expect(halfVariants).toHaveLength(12);
     for (const key of [...Object.values(MESSAGE_OF_CODE), ...variants, ...halfVariants]) {
       expect(OBAVIJESTI[key], key).toBeDefined();
-      for (const message of [OBAVIJESTI[key].subject, OBAVIJESTI[key].body]) {
+      for (const message of [OBAVIJESTI[key].subject, OBAVIJESTI[key].body, OBAVIJESTI[key].action]) {
         // Plain interpolation only: no ICU argument a `{name}` renderer would
         // print raw.
         expect(message, key).not.toMatch(/\{[^}]*,/);
@@ -272,14 +272,18 @@ describe('notify renders from a pinned copy of the obavijesti namespace', () => 
     expect(approved).toEqual({
       ok: true,
       subject: 'Zahtjev za odsutnost 02.03.2046–06.03.2046 je odobren',
-      text: `${ORGANIZATION_NAME}: tvoj zahtjev za odsutnost 02.03.2046–06.03.2046 je odobren. Pogledaj ga u aplikaciji: ${linkTo('/godisnji')}${FOOTER}`,
+      text: `${ORGANIZATION_NAME}: tvoj zahtjev za odsutnost 02.03.2046–06.03.2046 je odobren. Otvori Godišnji: ${linkTo('/godisnji')}${FOOTER}`,
     });
     expect(rejected).toMatchObject({ ok: true, subject: 'Zahtjev za odsutnost 02.03.2046–06.03.2046 je odbijen' });
     expect(rejected.ok && rejected.text).toContain(linkTo('/godisnji'));
   });
 
   it('ends every email with the settings line, linking through the sign-in to /obavijesti (story 10.3)', () => {
-    expect(OBAVIJESTI.footer).toBe('Obavijesti e-poštom možeš isključiti u aplikaciji, pod Obavijesti: {link}');
+    // Story 21.27: a reason naming the organization, then the settings line.
+    expect(OBAVIJESTI.footer).toEqual({
+      reason: 'Ovu poruku primaš jer su ti u organizaciji {organizationName} uključene obavijesti e-poštom.',
+      settings: 'Obavijesti e-poštom isključuješ u aplikaciji, pod Obavijesti',
+    });
     expect(SETTINGS_PATH).toBe('/obavijesti');
     for (const code of Object.keys(MESSAGE_OF_CODE)) {
       const rendered = render(
@@ -353,105 +357,105 @@ const EVERY_CODE: readonly {
     operands: { startDate: '2046-03-02', endDate: '2046-03-06' },
     path: '/godisnji',
     subject: 'Upisana ti je odsutnost 02.03.2046–06.03.2046',
-    text: `${ORGANIZATION_NAME}: upisana ti je odsutnost 02.03.2046–06.03.2046. Pogledaj je u aplikaciji: {link}`,
+    text: `${ORGANIZATION_NAME}: upisana ti je odsutnost 02.03.2046–06.03.2046. Otvori Godišnji: {link}`,
   },
   {
     code: 'LEAVE_RECORD_CHANGED',
     operands: { startDate: '2046-03-02', endDate: '2046-03-06' },
     path: '/godisnji',
     subject: 'Izmijenjena ti je odsutnost, sada 02.03.2046–06.03.2046',
-    text: `${ORGANIZATION_NAME}: tvoja odsutnost izmijenjena je na 02.03.2046–06.03.2046. Pogledaj je u aplikaciji: {link}`,
+    text: `${ORGANIZATION_NAME}: tvoja odsutnost izmijenjena je na 02.03.2046–06.03.2046. Otvori Godišnji: {link}`,
   },
   {
     code: 'LEAVE_RECORD_REMOVED',
     operands: { startDate: '2046-03-02', endDate: '2046-03-06' },
     path: '/godisnji',
     subject: 'Uklonjena ti je odsutnost 02.03.2046–06.03.2046',
-    text: `${ORGANIZATION_NAME}: uklonjena ti je odsutnost 02.03.2046–06.03.2046. Pogledaj u aplikaciji: {link}`,
+    text: `${ORGANIZATION_NAME}: uklonjena ti je odsutnost 02.03.2046–06.03.2046. Otvori Godišnji: {link}`,
   },
   {
     code: 'ROSTER_PUT_ON',
     operands: { date: '2046-03-02' },
     path: '/kalendar',
     subject: 'Promjena rasporeda 02.03.2046: na rasporedu si',
-    text: `${ORGANIZATION_NAME}: upisana je promjena rasporeda koja te stavlja na raspored 02.03.2046. Pogledaj kalendar: {link}`,
+    text: `${ORGANIZATION_NAME}: upisana je promjena rasporeda koja te stavlja na raspored 02.03.2046. Otvori kalendar: {link}`,
   },
   {
     code: 'ROSTER_PUT_ON_CHANGED',
     operands: { date: '2046-03-02' },
     path: '/kalendar',
     subject: 'Izmijenjena promjena rasporeda 02.03.2046',
-    text: `${ORGANIZATION_NAME}: izmijenjena je promjena rasporeda koja te stavlja na raspored 02.03.2046. Pogledaj kalendar: {link}`,
+    text: `${ORGANIZATION_NAME}: izmijenjena je promjena rasporeda koja te stavlja na raspored 02.03.2046. Otvori kalendar: {link}`,
   },
   {
     code: 'ROSTER_PUT_ON_REMOVED',
     operands: { date: '2046-03-02' },
     path: '/kalendar',
     subject: 'Uklonjena promjena rasporeda 02.03.2046',
-    text: `${ORGANIZATION_NAME}: uklonjena je promjena rasporeda koja te stavila na raspored 02.03.2046. Pogledaj kalendar: {link}`,
+    text: `${ORGANIZATION_NAME}: uklonjena je promjena rasporeda koja te stavila na raspored 02.03.2046. Otvori kalendar: {link}`,
   },
   {
     code: 'ROSTER_TAKEN_OFF',
     operands: { date: '2046-03-02' },
     path: '/kalendar',
     subject: 'Promjena rasporeda 02.03.2046: nisi na rasporedu',
-    text: `${ORGANIZATION_NAME}: upisana je promjena rasporeda koja te miče s rasporeda 02.03.2046. Pogledaj kalendar: {link}`,
+    text: `${ORGANIZATION_NAME}: upisana je promjena rasporeda koja te miče s rasporeda 02.03.2046. Otvori kalendar: {link}`,
   },
   {
     code: 'ROSTER_TAKEN_OFF_CHANGED',
     operands: { date: '2046-03-02' },
     path: '/kalendar',
     subject: 'Izmijenjena promjena rasporeda 02.03.2046',
-    text: `${ORGANIZATION_NAME}: izmijenjena je promjena rasporeda koja te miče s rasporeda 02.03.2046. Pogledaj kalendar: {link}`,
+    text: `${ORGANIZATION_NAME}: izmijenjena je promjena rasporeda koja te miče s rasporeda 02.03.2046. Otvori kalendar: {link}`,
   },
   {
     code: 'ROSTER_TAKEN_OFF_REMOVED',
     operands: { date: '2046-03-02' },
     path: '/kalendar',
     subject: 'Uklonjena promjena rasporeda 02.03.2046',
-    text: `${ORGANIZATION_NAME}: uklonjena je promjena rasporeda koja te maknula s rasporeda 02.03.2046. Pogledaj kalendar: {link}`,
+    text: `${ORGANIZATION_NAME}: uklonjena je promjena rasporeda koja te maknula s rasporeda 02.03.2046. Otvori kalendar: {link}`,
   },
   {
     code: 'TEAM_SHIFT_TYPE_SET',
     operands: { date: '2046-03-02', shiftTypeName: 'Noć' },
     path: '/kalendar',
     subject: 'Promjena rasporeda 02.03.2046',
-    text: `${ORGANIZATION_NAME}: za 02.03.2046 vrijedi Noć umjesto rasporeda po rotaciji. Pogledaj kalendar: {link}`,
+    text: `${ORGANIZATION_NAME}: za 02.03.2046 vrijedi Noć umjesto rasporeda po rotaciji. Otvori kalendar: {link}`,
   },
   {
     code: 'TEAM_SHIFT_TYPE_CHANGED',
     operands: { date: '2046-03-02', shiftTypeName: 'Dan' },
     path: '/kalendar',
     subject: 'Izmijenjena promjena rasporeda 02.03.2046',
-    text: `${ORGANIZATION_NAME}: za 02.03.2046 sada vrijedi Dan umjesto rasporeda po rotaciji. Pogledaj kalendar: {link}`,
+    text: `${ORGANIZATION_NAME}: za 02.03.2046 sada vrijedi Dan umjesto rasporeda po rotaciji. Otvori kalendar: {link}`,
   },
   {
     code: 'TEAM_SHIFT_TYPE_REMOVED',
     operands: { date: '2046-03-02' },
     path: '/kalendar',
     subject: 'Uklonjena promjena rasporeda 02.03.2046',
-    text: `${ORGANIZATION_NAME}: za 02.03.2046 ponovno vrijedi raspored po rotaciji. Pogledaj kalendar: {link}`,
+    text: `${ORGANIZATION_NAME}: za 02.03.2046 ponovno vrijedi raspored po rotaciji. Otvori kalendar: {link}`,
   },
   {
     code: 'ROTATION_CHANGES',
     operands: { effectiveFrom: '2046-03-02' },
     path: '/kalendar',
     subject: 'Nova rotacija od 02.03.2046',
-    text: `${ORGANIZATION_NAME}: od 02.03.2046 vrijedi nova rotacija. Pogledaj kalendar: {link}`,
+    text: `${ORGANIZATION_NAME}: od 02.03.2046 vrijedi nova rotacija. Otvori kalendar: {link}`,
   },
   {
     code: 'ROTATION_CHANGE_CANCELLED',
     operands: { effectiveFrom: '2046-03-02' },
     path: '/kalendar',
     subject: 'Otkazana promjena rotacije od 02.03.2046',
-    text: `${ORGANIZATION_NAME}: promjena rotacije zakazana od 02.03.2046 je otkazana. Pogledaj kalendar: {link}`,
+    text: `${ORGANIZATION_NAME}: promjena rotacije zakazana od 02.03.2046 je otkazana. Otvori kalendar: {link}`,
   },
   {
     code: 'LEAVE_REQUEST_CREATED',
     operands: { requestId: REQUEST_ID, memberName: 'Ana Kovač', startDate: '2046-03-02', endDate: '2046-03-06' },
     path: `/za-odluku/zahtjev/${REQUEST_ID}`,
     subject: 'Novi zahtjev za odsutnost: Ana Kovač',
-    text: `${ORGANIZATION_NAME}: Ana Kovač traži odsutnost 02.03.2046–06.03.2046. Zahtjev čeka tvoju odluku: {link}`,
+    text: `${ORGANIZATION_NAME}: Ana Kovač traži odsutnost 02.03.2046–06.03.2046. Odluči o zahtjevu: {link}`,
   },
   // Story 12.3b (0050): a swap proposed to the addressee, and its answer to
   // the proposer. The date only: no name, no team, no shift type (Q5).
@@ -460,21 +464,21 @@ const EVERY_CODE: readonly {
     operands: { date: '2046-03-02' },
     path: '/danas',
     subject: 'Predložena ti je zamjena 02.03.2046',
-    text: `${ORGANIZATION_NAME}: predložena ti je zamjena smjene 02.03.2046. Odgovori u aplikaciji: {link}`,
+    text: `${ORGANIZATION_NAME}: predložena ti je zamjena smjene 02.03.2046. Odgovori na prijedlog: {link}`,
   },
   {
     code: 'SWAP_REQUEST_ACCEPTED',
     operands: { date: '2046-03-02' },
     path: '/danas',
     subject: 'Zamjena 02.03.2046 je prihvaćena',
-    text: `${ORGANIZATION_NAME}: tvoj prijedlog zamjene smjene 02.03.2046 je prihvaćen i čeka odluku. Pogledaj u aplikaciji: {link}`,
+    text: `${ORGANIZATION_NAME}: tvoj prijedlog zamjene smjene 02.03.2046 je prihvaćen i čeka odluku. Pogledaj zamjenu: {link}`,
   },
   {
     code: 'SWAP_REQUEST_DECLINED',
     operands: { date: '2046-03-02' },
     path: '/danas',
     subject: 'Zamjena 02.03.2046 je odbijena',
-    text: `${ORGANIZATION_NAME}: tvoj prijedlog zamjene smjene 02.03.2046 je odbijen. Pogledaj u aplikaciji: {link}`,
+    text: `${ORGANIZATION_NAME}: tvoj prijedlog zamjene smjene 02.03.2046 je odbijen. Pogledaj zamjenu: {link}`,
   },
   // Story 12.4b (0051): an accepted swap waits for every admin, with both
   // names (admins only, as LEAVE_REQUEST_CREATED); its decision goes to both
@@ -484,21 +488,21 @@ const EVERY_CODE: readonly {
     operands: { requestId: REQUEST_ID, proposerName: 'Ana Kovač', addresseeName: 'Ivo Babić', date: '2046-03-02' },
     path: `/za-odluku/zamjena/${REQUEST_ID}`,
     subject: 'Nova zamjena za odluku: Ana Kovač → Ivo Babić',
-    text: `${ORGANIZATION_NAME}: zamjena smjene 02.03.2046, Ana Kovač → Ivo Babić. Čeka tvoju odluku: {link}`,
+    text: `${ORGANIZATION_NAME}: zamjena smjene 02.03.2046, Ana Kovač → Ivo Babić. Odluči o zamjeni: {link}`,
   },
   {
     code: 'SWAP_REQUEST_APPROVED',
     operands: { date: '2046-03-02' },
     path: '/danas',
     subject: 'Zamjena 02.03.2046 je odobrena',
-    text: `${ORGANIZATION_NAME}: zamjena smjene 02.03.2046 je odobrena. Pogledaj u aplikaciji: {link}`,
+    text: `${ORGANIZATION_NAME}: zamjena smjene 02.03.2046 je odobrena. Pogledaj zamjenu: {link}`,
   },
   {
     code: 'SWAP_REQUEST_REJECTED',
     operands: { date: '2046-03-02' },
     path: '/danas',
     subject: 'Zamjena 02.03.2046 nije odobrena',
-    text: `${ORGANIZATION_NAME}: zamjena smjene 02.03.2046 nije odobrena. Pogledaj u aplikaciji: {link}`,
+    text: `${ORGANIZATION_NAME}: zamjena smjene 02.03.2046 nije odobrena. Pogledaj zamjenu: {link}`,
   },
   // STORY 18.3 (0063): the lent member, told of the loan; the team name is text.
   {
@@ -506,7 +510,7 @@ const EVERY_CODE: readonly {
     operands: { startDate: '2046-03-02', endDate: '2046-03-06', teamName: 'Smjena C' },
     path: '/kalendar',
     subject: 'Od 02.03.2046 do 06.03.2046 radiš u timu Smjena C',
-    text: `${ORGANIZATION_NAME}: od 02.03.2046 do 06.03.2046 radiš u timu Smjena C. Pogledaj kalendar: {link}`,
+    text: `${ORGANIZATION_NAME}: od 02.03.2046 do 06.03.2046 radiš u timu Smjena C. Otvori kalendar: {link}`,
   },
   // STORY 18.4 (0064): one notice for an amend (the replacement's dates and
   // team), one for a removal (the removed loan's).
@@ -515,14 +519,14 @@ const EVERY_CODE: readonly {
     operands: { startDate: '2046-03-02', endDate: '2046-03-04', teamName: 'Smjena D' },
     path: '/kalendar',
     subject: 'Posudba je izmijenjena: od 02.03.2046 do 04.03.2046 radiš u timu Smjena D',
-    text: `${ORGANIZATION_NAME}: tvoja posudba je izmijenjena. Od 02.03.2046 do 04.03.2046 radiš u timu Smjena D. Pogledaj kalendar: {link}`,
+    text: `${ORGANIZATION_NAME}: tvoja posudba je izmijenjena. Od 02.03.2046 do 04.03.2046 radiš u timu Smjena D. Otvori kalendar: {link}`,
   },
   {
     code: 'LOAN_REMOVED',
     operands: { startDate: '2046-03-02', endDate: '2046-03-06', teamName: 'Smjena C' },
     path: '/kalendar',
     subject: 'Posudba u timu Smjena C je uklonjena',
-    text: `${ORGANIZATION_NAME}: posudba u timu Smjena C od 02.03.2046 do 06.03.2046 je uklonjena. Pogledaj kalendar: {link}`,
+    text: `${ORGANIZATION_NAME}: posudba u timu Smjena C od 02.03.2046 do 06.03.2046 je uklonjena. Otvori kalendar: {link}`,
   },
   // Story 21.2 (0077, E-3): one notice per member per personal-assignment save.
   {
@@ -530,7 +534,7 @@ const EVERY_CODE: readonly {
     operands: { from: '2046-03-02', to: '2046-03-31', days: 12 },
     path: '/kalendar',
     subject: 'Raspored ti je izmijenjen od 02.03.2046 do 31.03.2046',
-    text: `${ORGANIZATION_NAME}: raspored ti je izmijenjen od 02.03.2046 do 31.03.2046 (izmijenjenih dana: 12). Pogledaj kalendar: {link}`,
+    text: `${ORGANIZATION_NAME}: raspored ti je izmijenjen od 02.03.2046 do 31.03.2046 (izmijenjenih dana: 12). Otvori kalendar: {link}`,
   },
   // Story 21.10 (0079, E-3): the member's schedule source from a date, worded by `source`.
   {
@@ -538,7 +542,7 @@ const EVERY_CODE: readonly {
     operands: { effectiveFrom: '2046-03-02', source: 'PERSONAL' },
     path: '/kalendar',
     subject: 'Od 02.03.2046 radiš po osobnoj rotaciji',
-    text: `${ORGANIZATION_NAME}: od 02.03.2046 radiš po svojoj osobnoj rotaciji, neovisno o rotaciji tima. Pogledaj kalendar: {link}`,
+    text: `${ORGANIZATION_NAME}: od 02.03.2046 radiš po svojoj osobnoj rotaciji, neovisno o rotaciji tima. Otvori kalendar: {link}`,
   },
 ];
 
@@ -601,7 +605,7 @@ describe("notify renders every 10.2 code with the organization's name and its si
       ];
 
       for (const { message, names } of checked) {
-        const placeholders = [...`${message.subject} ${message.body}`.matchAll(/\{(\w+)\}/g)].map((match) => match[1]);
+        const placeholders = [...`${message.subject} ${message.body} ${message.action}`.matchAll(/\{(\w+)\}/g)].map((match) => match[1]);
 
         expect(placeholders.filter((name) => !names.includes(name ?? ''))).toEqual([]);
       }
@@ -627,27 +631,27 @@ describe("notify renders every 10.2 code with the organization's name and its si
     {
       code: 'SWAP_REQUEST_PROPOSED',
       subject: 'Predložena ti je zamjena 02.03.2046 (zauzvrat 09.03.2046)',
-      text: `${ORGANIZATION_NAME}: predložena ti je zamjena smjene 02.03.2046 (zauzvrat 09.03.2046). Odgovori u aplikaciji: {link}`,
+      text: `${ORGANIZATION_NAME}: predložena ti je zamjena smjene 02.03.2046 (zauzvrat 09.03.2046). Odgovori na prijedlog: {link}`,
     },
     {
       code: 'SWAP_REQUEST_ACCEPTED',
       subject: 'Zamjena 02.03.2046 (zauzvrat 09.03.2046) je prihvaćena',
-      text: `${ORGANIZATION_NAME}: tvoj prijedlog zamjene smjene 02.03.2046 (zauzvrat 09.03.2046) je prihvaćen i čeka odluku. Pogledaj u aplikaciji: {link}`,
+      text: `${ORGANIZATION_NAME}: tvoj prijedlog zamjene smjene 02.03.2046 (zauzvrat 09.03.2046) je prihvaćen i čeka odluku. Pogledaj zamjenu: {link}`,
     },
     {
       code: 'SWAP_REQUEST_DECLINED',
       subject: 'Zamjena 02.03.2046 (zauzvrat 09.03.2046) je odbijena',
-      text: `${ORGANIZATION_NAME}: tvoj prijedlog zamjene smjene 02.03.2046 (zauzvrat 09.03.2046) je odbijen. Pogledaj u aplikaciji: {link}`,
+      text: `${ORGANIZATION_NAME}: tvoj prijedlog zamjene smjene 02.03.2046 (zauzvrat 09.03.2046) je odbijen. Pogledaj zamjenu: {link}`,
     },
     {
       code: 'SWAP_REQUEST_APPROVED',
       subject: 'Zamjena 02.03.2046 (zauzvrat 09.03.2046) je odobrena',
-      text: `${ORGANIZATION_NAME}: zamjena smjene 02.03.2046 (zauzvrat 09.03.2046) je odobrena. Pogledaj u aplikaciji: {link}`,
+      text: `${ORGANIZATION_NAME}: zamjena smjene 02.03.2046 (zauzvrat 09.03.2046) je odobrena. Pogledaj zamjenu: {link}`,
     },
     {
       code: 'SWAP_REQUEST_REJECTED',
       subject: 'Zamjena 02.03.2046 (zauzvrat 09.03.2046) nije odobrena',
-      text: `${ORGANIZATION_NAME}: zamjena smjene 02.03.2046 (zauzvrat 09.03.2046) nije odobrena. Pogledaj u aplikaciji: {link}`,
+      text: `${ORGANIZATION_NAME}: zamjena smjene 02.03.2046 (zauzvrat 09.03.2046) nije odobrena. Pogledaj zamjenu: {link}`,
     },
   ])('renders $code with a return shift naming both dates, by email and by push (12.3b, 12.4b; retro 12 R6)', ({ code, subject, text }) => {
     const operands = { date: '2046-03-02', returnDate: '2046-03-09' };
@@ -698,7 +702,7 @@ describe("notify renders every 10.2 code with the organization's name and its si
       operands: { startDate: '2026-10-01', endDate: '2026-10-01', half: 'FIRST' },
       path: '/godisnji',
       subject: 'Upisana ti je odsutnost 01.10.2026–01.10.2026 (prvi dio smjene)',
-      text: `${ORGANIZATION_NAME}: upisana ti je odsutnost 01.10.2026–01.10.2026 (prvi dio smjene). Pogledaj je u aplikaciji: {link}`,
+      text: `${ORGANIZATION_NAME}: upisana ti je odsutnost 01.10.2026–01.10.2026 (prvi dio smjene). Otvori Godišnji: {link}`,
     },
     {
       scenario: 'a half-only amend, FIRST to SECOND',
@@ -706,7 +710,7 @@ describe("notify renders every 10.2 code with the organization's name and its si
       operands: { startDate: '2026-10-01', endDate: '2026-10-01', half: 'SECOND' },
       path: '/godisnji',
       subject: 'Izmijenjena ti je odsutnost, sada 01.10.2026–01.10.2026 (drugi dio smjene)',
-      text: `${ORGANIZATION_NAME}: tvoja odsutnost izmijenjena je na 01.10.2026–01.10.2026 (drugi dio smjene). Pogledaj je u aplikaciji: {link}`,
+      text: `${ORGANIZATION_NAME}: tvoja odsutnost izmijenjena je na 01.10.2026–01.10.2026 (drugi dio smjene). Otvori Godišnji: {link}`,
     },
     {
       scenario: 'a half removed',
@@ -714,7 +718,7 @@ describe("notify renders every 10.2 code with the organization's name and its si
       operands: { startDate: '2026-10-01', endDate: '2026-10-01', half: 'FIRST' },
       path: '/godisnji',
       subject: 'Uklonjena ti je odsutnost 01.10.2026–01.10.2026 (prvi dio smjene)',
-      text: `${ORGANIZATION_NAME}: uklonjena ti je odsutnost 01.10.2026–01.10.2026 (prvi dio smjene). Pogledaj u aplikaciji: {link}`,
+      text: `${ORGANIZATION_NAME}: uklonjena ti je odsutnost 01.10.2026–01.10.2026 (prvi dio smjene). Otvori Godišnji: {link}`,
     },
     {
       scenario: 'a half request created',
@@ -722,7 +726,7 @@ describe("notify renders every 10.2 code with the organization's name and its si
       operands: { requestId: REQUEST_ID, memberName: 'Ana Kovač', startDate: '2026-10-01', endDate: '2026-10-01', half: 'SECOND' },
       path: `/za-odluku/zahtjev/${REQUEST_ID}`,
       subject: 'Novi zahtjev za odsutnost: Ana Kovač',
-      text: `${ORGANIZATION_NAME}: Ana Kovač traži odsutnost 01.10.2026–01.10.2026 (drugi dio smjene). Zahtjev čeka tvoju odluku: {link}`,
+      text: `${ORGANIZATION_NAME}: Ana Kovač traži odsutnost 01.10.2026–01.10.2026 (drugi dio smjene). Odluči o zahtjevu: {link}`,
     },
     {
       scenario: 'a half request approved',
@@ -730,7 +734,7 @@ describe("notify renders every 10.2 code with the organization's name and its si
       operands: { startDate: '2026-10-01', endDate: '2026-10-01', half: 'SECOND' },
       path: '/godisnji',
       subject: 'Zahtjev za odsutnost 01.10.2026–01.10.2026 (drugi dio smjene) je odobren',
-      text: `${ORGANIZATION_NAME}: tvoj zahtjev za odsutnost 01.10.2026–01.10.2026 (drugi dio smjene) je odobren. Pogledaj ga u aplikaciji: {link}`,
+      text: `${ORGANIZATION_NAME}: tvoj zahtjev za odsutnost 01.10.2026–01.10.2026 (drugi dio smjene) je odobren. Otvori Godišnji: {link}`,
     },
     {
       scenario: 'a half request rejected',
@@ -738,7 +742,7 @@ describe("notify renders every 10.2 code with the organization's name and its si
       operands: { startDate: '2026-10-01', endDate: '2026-10-01', half: 'SECOND' },
       path: '/godisnji',
       subject: 'Zahtjev za odsutnost 01.10.2026–01.10.2026 (drugi dio smjene) je odbijen',
-      text: `${ORGANIZATION_NAME}: tvoj zahtjev za odsutnost 01.10.2026–01.10.2026 (drugi dio smjene) je odbijen. Pogledaj ga u aplikaciji: {link}`,
+      text: `${ORGANIZATION_NAME}: tvoj zahtjev za odsutnost 01.10.2026–01.10.2026 (drugi dio smjene) je odbijen. Otvori Godišnji: {link}`,
     },
   ])('renders $code for $scenario naming the half, by email and by push (13.7b)', ({ code, operands, path, subject, text }) => {
     expect(render(code, 'hr', operands, TARGET)).toEqual({
@@ -780,14 +784,14 @@ describe("notify renders every 10.2 code with the organization's name and its si
         operands: { startDate: '2046-03-02', endDate: '2046-03-06' },
         path: '/godisnji',
         subject: 'Zahtjev za odsutnost 02.03.2046–06.03.2046 je odobren',
-        text: `${ORGANIZATION_NAME}: tvoj zahtjev za odsutnost 02.03.2046–06.03.2046 je odobren. Pogledaj ga u aplikaciji: {link}`,
+        text: `${ORGANIZATION_NAME}: tvoj zahtjev za odsutnost 02.03.2046–06.03.2046 je odobren. Otvori Godišnji: {link}`,
       },
       {
         code: 'LEAVE_REQUEST_REJECTED',
         operands: { startDate: '2046-03-02', endDate: '2046-03-06' },
         path: '/godisnji',
         subject: 'Zahtjev za odsutnost 02.03.2046–06.03.2046 je odbijen',
-        text: `${ORGANIZATION_NAME}: tvoj zahtjev za odsutnost 02.03.2046–06.03.2046 je odbijen. Pogledaj ga u aplikaciji: {link}`,
+        text: `${ORGANIZATION_NAME}: tvoj zahtjev za odsutnost 02.03.2046–06.03.2046 je odbijen. Otvori Godišnji: {link}`,
       },
     ];
     const entry = [...EVERY_CODE, ...decisions].find((candidate) => candidate.code === code);
@@ -1087,7 +1091,9 @@ describe("notify's matrix against a fake client: one send per row, settled by th
       from: ENVIRONMENT['NOTIFY_EMAIL_FROM'],
       to: ['ana@example.org'],
       subject: 'Zahtjev za odsutnost 02.03.2046–06.03.2046 je odobren',
-      text: `${ORGANIZATION_NAME}: tvoj zahtjev za odsutnost 02.03.2046–06.03.2046 je odobren. Pogledaj ga u aplikaciji: ${linkTo('/godisnji')}${FOOTER}`,
+      text: `${ORGANIZATION_NAME}: tvoj zahtjev za odsutnost 02.03.2046–06.03.2046 je odobren. Otvori Godišnji: ${linkTo('/godisnji')}${FOOTER}`,
+      // Story 21.27: the HTML part beside the text (test/email-layout.test.ts pins its content).
+      html: expect.stringContaining(`href="${linkTo('/godisnji')}"`) as unknown,
     });
     expect(settles).toEqual([{ p_id: claimed.id, p_result: 'sent', p_failure_code: null }]);
     expect(tokens).toEqual([claimed.claimed_at]);
@@ -1321,9 +1327,10 @@ describe('notify may not think: it reaches the database through its four RPCs al
     .filter((name) => name.endsWith('.ts'))
     .map((name) => ({ name, source: readFileSync(join(notifyRoot, name), 'utf8') }));
 
-  it('holds the files the specs name (story 12.3b split handler.ts into handler, email, push and run)', () => {
+  it('holds the files the specs name (story 12.3b split handler.ts into handler, email, push and run; 21.27 added the email layout)', () => {
     expect(sources.map(({ name }) => name).sort()).toEqual([
       'deno-runtime.d.ts',
+      'email-layout.ts',
       'email.ts',
       'handler.ts',
       'index.ts',
@@ -1347,7 +1354,9 @@ describe('notify may not think: it reaches the database through its four RPCs al
         ),
       ].sort();
 
-    expect(imports('messages.ts')).toEqual([]);
+    // Story 21.27: the messages draw their HTML part in the layout, which imports nothing.
+    expect(imports('email-layout.ts')).toEqual([]);
+    expect(imports('messages.ts')).toEqual(['email-layout.ts']);
     expect(imports('handler.ts')).toEqual([]);
     expect(imports('email.ts')).toEqual(['handler.ts', 'messages.ts']);
     expect(imports('push.ts')).toEqual(['handler.ts', 'messages.ts']);
@@ -1951,7 +1960,7 @@ describe("notify's push matrix against a fake client and a fake web-push (story 
     expect(payloads.map((payload) => JSON.parse(payload) as unknown)).toEqual([
       {
         title: 'Zahtjev za odsutnost 02.03.2046–06.03.2046 je odobren',
-        body: `${ORGANIZATION_NAME}: tvoj zahtjev za odsutnost 02.03.2046–06.03.2046 je odobren. Pogledaj ga u aplikaciji: ${linkTo('/godisnji')}`,
+        body: `${ORGANIZATION_NAME}: tvoj zahtjev za odsutnost 02.03.2046–06.03.2046 je odobren. Otvori Godišnji: ${linkTo('/godisnji')}`,
         url: pathTo('/godisnji'),
         // One notification per fact on a device: a re-send replaces it.
         tag: `LEAVE_REQUEST_APPROVED:${SUBJECT_ID}`,

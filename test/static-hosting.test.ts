@@ -52,6 +52,9 @@ const PERMITTED_DIST_ENTRIES = new Set([
   // STORY 19.1. The Auth email templates GoTrue fetches from the app origin,
   // built from hr.json (`src/lib/auth-email.ts`); never precached.
   'auth-email',
+  // STORY 21.27 (UX-DR85). The mark every email loads from the app origin,
+  // copied from public/; never precached.
+  'email-mark.png',
 ]);
 
 /** Workbox's runtime, which `sw.js` imports; its name carries a content hash. */
@@ -407,6 +410,15 @@ describe('the build is an installable PWA', () => {
     // No fetch handler and no cache: the runtime-cache pins above still hold.
     expect(push).not.toMatch(/addEventListener\(\s*['"]fetch['"]/);
     expect(push).not.toMatch(/\bcaches\.|registerRoute|workbox\./);
+  });
+
+  it.skipIf(notBuilt)('emits the email mark as a small PNG and never precaches it (story 21.27)', () => {
+    const mark = readFileSync(join(dist, 'email-mark.png'));
+    // The PNG signature, then IHDR's width and height: 96 x 96, drawn at 40 (sharp on dense screens).
+    expect(mark.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+    expect([mark.readUInt32BE(16), mark.readUInt32BE(20)]).toEqual([96, 96]);
+    expect(mark.length).toBeLessThan(8 * 1024);
+    expect(read('sw.js')).not.toContain('email-mark.png');
   });
 
   it.skipIf(notBuilt)('never precaches the PDF writer or its fonts: the export is online only (story 14.3)', () => {

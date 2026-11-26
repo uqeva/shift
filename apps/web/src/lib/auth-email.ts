@@ -13,9 +13,20 @@
  * ever in a URL and a mail scanner's GET consumes nothing. GoTrue's
  * `{{ .ConfirmationURL }}` (a GET on `/auth/v1/verify`) is never used.
  *
+ * Story 21.27 (UX-DR85): drawn in the one email layout (`email-layout.ts`,
+ * a copy of `notify`'s): the *Smjenko* mark from `{{ .SiteURL }}/email-mark.png`
+ * (the app origin, the same URL for everyone), the heading, the body, the
+ * button and the link written out, the expiry and the "not yours" line, and a
+ * footer saying why the mail came (`signup.email.reason`). GoTrue sends the
+ * template as HTML only: it has no plain-text part (spec 21.27's deviation).
+ *
  * Pure: no `node:` import, no I/O. The build reads the resource and emits the
  * files. Kept out of the service worker's precache (`globIgnores`).
  */
+
+import { EMAIL_MARK_FILE, emailHtml, escapeHtml } from './email-layout.ts';
+
+export { escapeHtml };
 
 /** The three templates, by the file name GoTrue fetches and the `type` its link carries. */
 export const AUTH_EMAIL_TEMPLATES = [
@@ -38,19 +49,11 @@ interface TemplateCopy {
 }
 
 interface EmailCopy {
+  readonly brand: string;
   readonly expiry: string;
   readonly fallback: string;
+  readonly reason: string;
   readonly templates: Readonly<Record<AuthEmailKey, TemplateCopy>>;
-}
-
-/** Escapes text for an HTML text node or a double-quoted attribute. */
-export function escapeHtml(text: string): string {
-  return text
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
 }
 
 function stringAt(node: unknown, path: readonly string[]): string {
@@ -86,48 +89,48 @@ export function emailCopyOf(resource: unknown): EmailCopy {
     ]),
   ) as Record<AuthEmailKey, TemplateCopy>;
   return {
+    brand: stringAt(resource, ['auth', 'brand', 'name']),
     expiry: stringAt(resource, [...base, 'expiry']),
     fallback: stringAt(resource, [...base, 'fallback']),
+    reason: stringAt(resource, [...base, 'reason']),
     templates,
   };
 }
 
-/** AD-12's link, as GoTrue's template syntax; `&` written as an HTML attribute needs it. */
+/**
+ * AD-12's link, as GoTrue's template syntax. Plain: the layout writes its `&`
+ * as `&amp;` in the attribute and the text, which escaping leaves the Go
+ * template actions (`{{ .SiteURL }}`, `{{ .TokenHash }}`) untouched by.
+ */
 export function linkOf(type: string): string {
-  return `{{ .SiteURL }}/potvrda?token_hash={{ .TokenHash }}&amp;type=${type}`;
+  return `{{ .SiteURL }}/potvrda?token_hash={{ .TokenHash }}&type=${type}`;
 }
 
+/** The mark, on the origin GoTrue's `SiteURL` names (the app's). */
+export const AUTH_EMAIL_MARK_URL = `{{ .SiteURL }}/${EMAIL_MARK_FILE}`;
+
 /**
- * Each template's file name (under `auth-email/`) and its HTML. Inline styles
- * only, and no image, script or remote resource: a mail client loads nothing.
+ * Each template's file name (under `auth-email/`) and its HTML, in the one
+ * email layout: inline styles, one image (the mark, from the app origin), no
+ * script, no stylesheet link and no remote font. Its only links are AD-12's.
  */
 export function authEmailTemplates(resource: unknown): { readonly file: string; readonly html: string }[] {
   const copy = emailCopyOf(resource);
   return AUTH_EMAIL_TEMPLATES.map(({ key, file, type }) => {
     const text = copy.templates[key];
-    const link = linkOf(type);
-    const html = [
-      '<!doctype html>',
-      '<html lang="hr">',
-      '<head>',
-      '<meta charset="utf-8">',
-      '<meta name="viewport" content="width=device-width, initial-scale=1">',
-      `<title>${escapeHtml(text.subject)}</title>`,
-      '</head>',
-      '<body style="margin:0;padding:24px 16px;background:#e8edf5;color:#18202b;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.5">',
-      '<div style="max-width:520px;margin:0 auto;padding:24px;background:#ffffff;border-radius:12px">',
-      `<h1 style="margin:0 0 16px;font-size:22px;line-height:1.3">${escapeHtml(text.heading)}</h1>`,
-      `<p style="margin:0 0 24px">${escapeHtml(text.body)}</p>`,
-      `<p style="margin:0 0 24px"><a href="${link}" style="display:inline-block;padding:12px 20px;background:#1f3a5f;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:bold">${escapeHtml(text.action)}</a></p>`,
-      `<p style="margin:0 0 8px;font-size:14px">${escapeHtml(copy.fallback)}</p>`,
-      `<p style="margin:0 0 24px;font-size:14px;word-break:break-all"><a href="${link}" style="color:#1f3a5f">${link}</a></p>`,
-      `<p style="margin:0 0 8px;font-size:14px">${escapeHtml(copy.expiry)}</p>`,
-      `<p style="margin:0;font-size:14px">${escapeHtml(text.ignore)}</p>`,
-      '</div>',
-      '</body>',
-      '</html>',
-      '',
-    ].join('\n');
+    const html = emailHtml({
+      lang: 'hr',
+      title: text.subject,
+      preheader: text.body,
+      brand: copy.brand,
+      markUrl: AUTH_EMAIL_MARK_URL,
+      heading: text.heading,
+      paragraphs: [text.body],
+      action: { label: text.action, href: linkOf(type) },
+      fallback: copy.fallback,
+      notes: [copy.expiry, text.ignore],
+      footer: { lines: [copy.reason] },
+    });
     return { file, html };
   });
 }

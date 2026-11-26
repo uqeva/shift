@@ -231,7 +231,9 @@ test('one lead on: exactly one reminder per channel on a fake clock, each openin
   const mail = render(REMINDER_CODE, emailRow.locale, emailRow.operands, target);
   expect(mail).toMatchObject({ ok: true, subject });
   expect(mail.ok && mail.text).toContain(`povratak=${encodeURIComponent(day)}`);
-  expect(mail.ok && mail.text).toContain(copy.notice.footer.replace(': {link}', ''));
+  // Story 21.27: the footer is a reason naming the organization, then the settings line.
+  expect(mail.ok && mail.text).toContain(copy.notice.footer.reason.replace('{organizationName}', () => emailRow.organizationName.trim()));
+  expect(mail.ok && mail.text).toContain(`${copy.notice.footer.settings}: `);
   const push = renderPush(REMINDER_CODE, pushRow.locale, pushRow.operands, target);
   if (!push.ok) throw new Error(`E2E: the push did not render (${push.code})`);
   expect(push.title).toBe(subject);

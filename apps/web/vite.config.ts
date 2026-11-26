@@ -198,13 +198,15 @@ export default defineConfig({
         // contents and proves `sw.js` lists neither.
         //
         // STORY 19.1. The Auth email templates GoTrue fetches are no part of
-        // the app, and never precached.
+        // the app, and never precached. STORY 21.27: nor is the mark every
+        // email loads from the app origin (`public/email-mark.png`).
         globIgnores: [
           '**/node_modules/**/*',
           'push-sw.js',
           'assets/pdfmake-*.js',
           'assets/vfs_fonts-*.js',
           'auth-email/**',
+          'email-mark.png',
         ],
         importScripts: ['push-sw.js'],
         // STORY 21.17. The entry chunk passed Workbox's default 2 MiB with the

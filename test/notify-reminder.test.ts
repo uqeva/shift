@@ -53,7 +53,7 @@ const TEAM_ID = '3f2c8a5e-1b7d-4c9e-9a3f-5d6e7f8a9b0c';
 const linkTo = (path: string): string => `${APP_URL}/prijava/dvd-kastel-novi?povratak=${encodeURIComponent(path)}`;
 const pathTo = (path: string): string => `/prijava/dvd-kastel-novi?povratak=${encodeURIComponent(path)}`;
 const DAY = `/kalendar?mjesec=2026-11&dan=2026-11-23&danSmjena=${TEAM_ID}`;
-const FOOTER = `\n\nPodsjetnike e-poštom možeš isključiti u aplikaciji, pod Obavijesti → Podsjetnici: ${linkTo('/obavijesti')}`;
+const FOOTER = `\n\nOvaj podsjetnik primaš jer su ti u organizaciji ${ORGANIZATION_NAME} uključeni podsjetnici e-poštom.\nPodsjetnike e-poštom isključuješ u aplikaciji, pod Obavijesti → Podsjetnici: ${linkTo('/obavijesti')}`;
 
 /** A row's operands as 0070's `enqueue_shift_reminders` writes them. */
 function operands(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -86,8 +86,8 @@ describe('notify renders reminders from a pinned copy of reminders.notice (story
   });
 
   it('never calls a team "tim" nor the shift a "smjena": a team is its own name', () => {
-    const words: string[] = [PODSJETNICI.hours, PODSJETNICI.eveningBefore].flatMap((message) => [message.subject, message.body]);
-    words.push(PODSJETNICI.footer);
+    const words: string[] = [PODSJETNICI.hours, PODSJETNICI.eveningBefore].flatMap((message) => [message.subject, message.body, message.action]);
+    words.push(PODSJETNICI.footer.reason, PODSJETNICI.footer.settings);
     const texts = words.map((text) => text.replace(/\{\w+\}/g, ''));
     for (const text of texts) {
       expect(text).not.toMatch(/\btim(?:a|u|om|ovi)?\b/iu);
@@ -111,7 +111,7 @@ describe('notify renders reminders from a pinned copy of reminders.notice (story
     expect(render(REMINDER_CODE, 'hr', operands(), TARGET)).toEqual({
       ok: true,
       subject: 'Za 2 h radiš: Dnevna 07:00–19:00, Smjena A',
-      text: `${ORGANIZATION_NAME}: za 2 h, 23.11.2026, radiš: Dnevna 07:00–19:00, Smjena A. Pogledaj dan u kalendaru: ${linkTo(DAY)}${FOOTER}`,
+      text: `${ORGANIZATION_NAME}: za 2 h, 23.11.2026, radiš: Dnevna 07:00–19:00, Smjena A. Otvori dan u kalendaru: ${linkTo(DAY)}${FOOTER}`,
     });
   });
 
@@ -124,7 +124,7 @@ describe('notify renders reminders from a pinned copy of reminders.notice (story
     expect(render(REMINDER_CODE, 'hr', evening(), TARGET)).toEqual({
       ok: true,
       subject: 'Sutra radiš: Dnevna 07:00–19:00, Smjena A',
-      text: `${ORGANIZATION_NAME}: sutra, 23.11.2026, radiš: Dnevna 07:00–19:00, Smjena A. Pogledaj dan u kalendaru: ${linkTo(DAY)}${FOOTER}`,
+      text: `${ORGANIZATION_NAME}: sutra, 23.11.2026, radiš: Dnevna 07:00–19:00, Smjena A. Otvori dan u kalendaru: ${linkTo(DAY)}${FOOTER}`,
     });
   });
 
@@ -151,7 +151,7 @@ describe('notify renders reminders from a pinned copy of reminders.notice (story
     expect(renderPush(REMINDER_CODE, 'hr', operands(), TARGET)).toEqual({
       ok: true,
       title: 'Za 2 h radiš: Dnevna 07:00–19:00, Smjena A',
-      body: `${ORGANIZATION_NAME}: za 2 h, 23.11.2026, radiš: Dnevna 07:00–19:00, Smjena A. Pogledaj dan u kalendaru: ${linkTo(DAY)}`,
+      body: `${ORGANIZATION_NAME}: za 2 h, 23.11.2026, radiš: Dnevna 07:00–19:00, Smjena A. Otvori dan u kalendaru: ${linkTo(DAY)}`,
       url: pathTo(DAY),
     });
   });
@@ -173,7 +173,7 @@ describe('notify renders reminders from a pinned copy of reminders.notice (story
     expect(rendered.text.endsWith(FOOTER)).toBe(true);
     const footerLink = new URL(/https?:\/\/\S+$/.exec(rendered.text)?.[0] ?? '');
     expect(footerLink.searchParams.get('povratak')).toBe('/obavijesti');
-    expect(rendered.text).not.toContain('Obavijesti e-poštom možeš isključiti u aplikaciji, pod Obavijesti:');
+    expect(rendered.text).not.toContain('Obavijesti e-poštom isključuješ u aplikaciji, pod Obavijesti:');
   });
 
   it.each([
@@ -208,13 +208,13 @@ describe('notify renders reminders from a pinned copy of reminders.notice (story
     expect(render('LOAN_MADE', 'hr', { startDate: '2046-03-02', endDate: '2046-03-06', teamName: 'Smjena C' }, TARGET)).toEqual({
       ok: true,
       subject: 'Od 02.03.2046 do 06.03.2046 radiš u timu Smjena C',
-      text: `${ORGANIZATION_NAME}: od 02.03.2046 do 06.03.2046 radiš u timu Smjena C. Pogledaj kalendar: ${linkTo('/kalendar')}\n\nObavijesti e-poštom možeš isključiti u aplikaciji, pod Obavijesti: ${linkTo('/obavijesti')}`,
+      text: `${ORGANIZATION_NAME}: od 02.03.2046 do 06.03.2046 radiš u timu Smjena C. Otvori kalendar: ${linkTo('/kalendar')}\n\nOvu poruku primaš jer su ti u organizaciji ${ORGANIZATION_NAME} uključene obavijesti e-poštom.\nObavijesti e-poštom isključuješ u aplikaciji, pod Obavijesti: ${linkTo('/obavijesti')}`,
     });
   });
 
   it('names no other member, no absence and no conflict: only its own operands', () => {
     for (const message of [PODSJETNICI.hours, PODSJETNICI.eveningBefore]) {
-      const names = [...`${message.subject} ${message.body}`.matchAll(/\{(\w+)\}/g)].map((match) => match[1]);
+      const names = [...`${message.subject} ${message.body} ${message.action}`.matchAll(/\{(\w+)\}/g)].map((match) => match[1]);
       expect(new Set(names)).toEqual(
         new Set([
           'organizationName',
@@ -223,7 +223,6 @@ describe('notify renders reminders from a pinned copy of reminders.notice (story
           'start',
           'end',
           'teamName',
-          'link',
           ...(message === PODSJETNICI.hours ? ['leadHours'] : []),
         ]),
       );
@@ -338,7 +337,7 @@ describe('notify sends a claimed reminder by email and by push (story 17.3)', ()
     expect(email?.body).toMatchObject({
       to: ['ana@example.org'],
       subject: 'Za 2 h radiš: Dnevna 07:00–19:00, Smjena A',
-      text: `${ORGANIZATION_NAME}: za 2 h, 23.11.2026, radiš: Dnevna 07:00–19:00, Smjena A. Pogledaj dan u kalendaru: ${linkTo(DAY)}${FOOTER}`,
+      text: `${ORGANIZATION_NAME}: za 2 h, 23.11.2026, radiš: Dnevna 07:00–19:00, Smjena A. Otvori dan u kalendaru: ${linkTo(DAY)}${FOOTER}`,
     });
     expect(encrypted).toHaveLength(1);
     // Ten minutes left of its 15 past the due instant: 600 s, under the start and the cap.
@@ -405,7 +404,7 @@ describe('story 21.2: a reminder of a Personal Shift with no team, and the batch
     expect(render(REMINDER_CODE, 'hr', teamless(), TARGET)).toEqual({
       ok: true,
       subject: 'Za 2 h radiš: Dnevna 07:00–19:00',
-      text: `${ORGANIZATION_NAME}: za 2 h, 23.11.2026, radiš: Dnevna 07:00–19:00. Pogledaj dan u kalendaru: ${linkTo(DAY_ALONE)}${FOOTER}`,
+      text: `${ORGANIZATION_NAME}: za 2 h, 23.11.2026, radiš: Dnevna 07:00–19:00. Otvori dan u kalendaru: ${linkTo(DAY_ALONE)}${FOOTER}`,
     });
     const { leadHours: _hours, ...eveningTeamless } = teamless({ lead: 'EVENING_BEFORE' });
     expect(render(REMINDER_CODE, 'hr', eveningTeamless, TARGET)).toMatchObject({ ok: true, subject: 'Sutra radiš: Dnevna 07:00–19:00' });
@@ -424,7 +423,7 @@ describe('story 21.2: a reminder of a Personal Shift with no team, and the batch
 
   it('names no team in the no-team variants, and nothing but its own operands', () => {
     for (const message of [PODSJETNICI.hoursNoTeam, PODSJETNICI.eveningBeforeNoTeam]) {
-      const names = [...`${message.subject} ${message.body}`.matchAll(/\{(\w+)\}/g)].map((match) => match[1]);
+      const names = [...`${message.subject} ${message.body} ${message.action}`.matchAll(/\{(\w+)\}/g)].map((match) => match[1]);
       expect(new Set(names)).toEqual(
         new Set([
           'organizationName',
@@ -432,11 +431,10 @@ describe('story 21.2: a reminder of a Personal Shift with no team, and the batch
           'shiftTypeName',
           'start',
           'end',
-          'link',
           ...(message === PODSJETNICI.hoursNoTeam ? ['leadHours'] : []),
         ]),
       );
-      for (const text of [message.subject, message.body].map((one) => one.replace(/\{\w+\}/g, ''))) {
+      for (const text of [message.subject, message.body, message.action].map((one) => one.replace(/\{\w+\}/g, ''))) {
         expect(text).not.toMatch(/\btim(?:a|u|om|ovi)?\b/iu);
         expect(text).not.toMatch(/smjen/iu);
       }
@@ -448,18 +446,18 @@ describe('story 21.2: a reminder of a Personal Shift with no team, and the batch
     expect(render('SCHEDULE_ASSIGNED', 'hr', { from: '2046-03-02', to: '2046-03-31', days: 12 }, TARGET)).toEqual({
       ok: true,
       subject: 'Raspored ti je izmijenjen od 02.03.2046 do 31.03.2046',
-      text: `${ORGANIZATION_NAME}: raspored ti je izmijenjen od 02.03.2046 do 31.03.2046 (izmijenjenih dana: 12). Pogledaj kalendar: ${linkTo('/kalendar')}\n\nObavijesti e-poštom možeš isključiti u aplikaciji, pod Obavijesti: ${linkTo('/obavijesti')}`,
+      text: `${ORGANIZATION_NAME}: raspored ti je izmijenjen od 02.03.2046 do 31.03.2046 (izmijenjenih dana: 12). Otvori kalendar: ${linkTo('/kalendar')}\n\nOvu poruku primaš jer su ti u organizaciji ${ORGANIZATION_NAME} uključene obavijesti e-poštom.\nObavijesti e-poštom isključuješ u aplikaciji, pod Obavijesti: ${linkTo('/obavijesti')}`,
     });
     expect(render('SCHEDULE_ASSIGNED', 'hr', { from: '2046-02-30', to: '2046-03-31', days: 1 }, TARGET)).toEqual({ ok: false, code: OPERANDS_INVALID });
     expect(render('SCHEDULE_ASSIGNED', 'hr', { from: '2046-03-02', to: '2046-03-31' }, TARGET)).toEqual({ ok: false, code: OPERANDS_INVALID });
   });
 
   it('renders SCHEDULE_SOURCE_CHANGED by its source, linking to Kalendar, and refuses any other source (story 21.10)', () => {
-    const footer = `\n\nObavijesti e-poštom možeš isključiti u aplikaciji, pod Obavijesti: ${linkTo('/obavijesti')}`;
+    const footer = `\n\nOvu poruku primaš jer su ti u organizaciji ${ORGANIZATION_NAME} uključene obavijesti e-poštom.\nObavijesti e-poštom isključuješ u aplikaciji, pod Obavijesti: ${linkTo('/obavijesti')}`;
     expect(render('SCHEDULE_SOURCE_CHANGED', 'hr', { effectiveFrom: '2046-03-02', source: 'TEAM' }, TARGET)).toEqual({
       ok: true,
       subject: 'Od 02.03.2046 radiš po rotaciji tima',
-      text: `${ORGANIZATION_NAME}: od 02.03.2046 raspored ti slijedi rotaciju tima u kojem si. Pogledaj kalendar: ${linkTo('/kalendar')}${footer}`,
+      text: `${ORGANIZATION_NAME}: od 02.03.2046 raspored ti slijedi rotaciju tima u kojem si. Otvori kalendar: ${linkTo('/kalendar')}${footer}`,
     });
     expect(render('SCHEDULE_SOURCE_CHANGED', 'hr', { effectiveFrom: '2046-03-02', source: 'PERSONAL' }, TARGET)).toMatchObject({
       ok: true,
@@ -468,7 +466,7 @@ describe('story 21.2: a reminder of a Personal Shift with no team, and the batch
     expect(render('SCHEDULE_SOURCE_CHANGED', 'hr', { effectiveFrom: '2046-03-02', source: 'MANUAL' }, TARGET)).toEqual({
       ok: true,
       subject: 'Od 02.03.2046 raspored ti se slaže ručno',
-      text: `${ORGANIZATION_NAME}: od 02.03.2046 radiš samo dane koje ti administrator dodijeli u rasporedu. Pogledaj kalendar: ${linkTo('/kalendar')}${footer}`,
+      text: `${ORGANIZATION_NAME}: od 02.03.2046 radiš samo dane koje ti administrator dodijeli u rasporedu. Otvori kalendar: ${linkTo('/kalendar')}${footer}`,
     });
     for (const operands of [{ effectiveFrom: '2046-03-02' }, { effectiveFrom: '2046-03-02', source: 'ROTATION' }, { effectiveFrom: '2046-02-30', source: 'TEAM' }]) {
       expect(render('SCHEDULE_SOURCE_CHANGED', 'hr', operands, TARGET), JSON.stringify(operands)).toEqual({ ok: false, code: OPERANDS_INVALID });

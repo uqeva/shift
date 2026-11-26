@@ -416,6 +416,8 @@ describe('the shift-web image (story 20.3): CI builds and probes it, never pushe
       'expect /auth-email/email-change.html 200 text/html no-cache token_hash',
       'expect /auth-email/nope.html 404 text/plain no-cache',
       'expect /auth-email/ 404 text/plain no-cache',
+      // Story 21.27: the mark every email loads, served as an image with the headers.
+      'expect /email-mark.png 200 image/png no-cache',
     ]) {
       expect(probe, line).toContain(line);
     }
