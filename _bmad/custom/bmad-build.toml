@@ -43,6 +43,22 @@ persistent_facts = [
   "CSS OR TOKEN CHANGES RUN THE THEME ROOT FILES LOCALLY. A story or review fix that changes `apps/web/src/index.css`, a theme token, or a print or forced-colours block runs the DB-free theme root files before the commit: `pnpm exec vitest run test/theme-tokens.test.ts test/theme-contrast.test.ts test/theme-fidelity.test.ts test/theme-applied.test.ts` (after `pnpm build`: `theme-applied` reads `apps/web/dist`), and the spec's Verification lists them with their result.",
   # Epic 17 retro A6 (I2): worktree subagents have no gitleaks; the repository is public.
   "GITLEAKS IS THE ORCHESTRATOR'S, BEFORE EVERY PUSH. The repository is public. Worktree subagents cannot run gitleaks, so the orchestrator scans each branch before its first push and before every later push, and records that it did (the branch, the commit scanned and the result) in its report or the spec's Verification. A subagent's \"ready to push\" is never read as \"scanned\". No absolute local path (a scratchpad under `/tmp/…`, a home directory) is written into a committed file: describe it instead.",
+  # Epic 21 retro A3: layout.spec's hand-injected team rows lacked a new column twice and the parser refused the whole calendar read.
+  "INJECTED E2E ROWS FOLLOW THE PARSER. A story that adds a column a web parser requires greps `e2e/`, `smoke/` and `perf/` for every hand-built row of that table (`page.route`/`fulfill` bodies, helpers such as `widenWithTeams`) and adds the column there in the same change.",
+  # Epic 21 retro A4: 0079's policies read their own table (42P17 infinite recursion).
+  "NO RLS POLICY READS ITS OWN TABLE. A check that needs other rows of the same table goes through a `private` SECURITY DEFINER helper with `set search_path = ''` that answers false unless the caller is an active admin of that organization, listed in the provisioning grantees inventory.",
+  # Epic 21 retro A5: 0081 aliased a table as `old` inside a trigger function (42702 ambiguous).
+  "PLPGSQL NAMES NO ALIAS `old` OR `new` AND NO VARIABLE AFTER A COLUMN. The scaffold guard in `test/supabase-scaffold.test.ts` checks this; keep it passing and widen it when a new pattern appears.",
+  # Epic 21 retro A6: catalog inventories pinned in the wrong order or missed (concurrent-writes, provisioning, name-key, FK lists).
+  "CATALOG INVENTORIES ARE WRITTEN IN THE CATALOG'S ORDER AND ALL UPDATED IN ONE CHANGE. Before pinning a list a root test reads from the catalog, read that test's query: `concurrent-writes` sorts trigger columns by name, provisioning lists keys and grants in its own order. A new table, column, trigger, check or function updates provisioning (RLS, AUDITED, grantees, column privileges, FKs), rls-isolation AUDITED_TABLES, concurrent-writes and name-key together.",
+  # Epic 21 retro A7: StrictMode's effect replay closed 21.26's dialog in the dev server only.
+  "STRICTMODE REPLAYS MOUNT EFFECTS. The e2e runs the dev server under `<StrictMode>`. A host that opens a dialog from an effect opens it on the commit after mount, after the opened component's own mount effects; an effect that resets state on mount must not be able to cancel an opening queued in the same commit.",
+  # Epic 21 retro A8: #374 merged after #373 changed a signature; main stopped typechecking.
+  "MERGE ONLY ON A GREEN RUN OF A BRANCH REBASED ON CURRENT MAIN. When another PR merged after a branch's last green run, the orchestrator rebases or re-runs CI before merging, even when GitHub reports no conflict.",
+  # Epic 21 retro A9: the shared e2e organization's history passed the 2,000-row export limit.
+  "E2E CASES READ ONLY THEIR OWN FIXTURE. A case that exports, counts or lists organization-wide data (history, hours, exports) narrows to its own team, member or date range, because the shared e2e organization grows with every run.",
+  # Epic 21 retro A10 (and epic 19 A8 a): 14 merged stories still read `review`.
+  "A STORY IS SET `done` RIGHT AFTER ITS PR MERGES GREEN. The next change the orchestrator ships (or a status chore) sets each merged-green story to `done` with its PR, squash and run, and rewrites its spec's Status line.",
 ]
 
 [[workflow.review_layers]]
