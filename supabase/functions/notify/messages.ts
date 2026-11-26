@@ -200,7 +200,7 @@ export const OBAVIJESTI = {
   },
   scheduleSourceTeam: {
     subject: 'Od {effectiveFrom} radiš po rotaciji tima',
-    body: '{organizationName}: od {effectiveFrom} tvoj raspored opet slijedi rotaciju tvog tima. Pogledaj kalendar: {link}',
+    body: '{organizationName}: od {effectiveFrom} raspored ti slijedi rotaciju tima u kojem si. Pogledaj kalendar: {link}',
   },
   scheduleSourcePersonal: {
     subject: 'Od {effectiveFrom} radiš po osobnoj rotaciji',

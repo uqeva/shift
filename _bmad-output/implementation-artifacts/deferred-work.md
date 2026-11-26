@@ -2427,3 +2427,18 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-21-10-an-admin-gives-a-member-their-own-rotation-or-makes-them-manual-only.md`
   summary: A pattern defined in *Raspored osobe* is written in three calls (the pattern, its steps, the version), as the rotation builder's: a version insert that throws (its outcome unknown) leaves the new pattern unremoved, an orphan 0025's cleanup admits. Patterns are also never named, so the *Uzorak* list reads each by its runs (`Dan ×5, Slobodno ×2`); two organizations' worth of similar patterns may read alike once there are many.
   evidence: Story 21.10 implementation; `members/services/schedule-source.ts` `writeScheduleChange`.
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-10-an-admin-gives-a-member-their-own-rotation-or-makes-them-manual-only.md`
+  summary: No component or hook test renders *Raspored osobe* (`useMemberScheduleSource`, `MemberScheduleSourceCard`): the latch, the focus after a refusal, a changed preview shown again, the erasure follow-through, the offline gate and a member switch mid-check are covered only by reading and by the e2e spec, whose one case never defines a *Novi uzorak* (the three-write path and its clean-up), sets *Samo ručno*, or reaches the erasure confirmation.
+  evidence: 21.10 review (blind hunter, verification gap).
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-10-an-admin-gives-a-member-their-own-rotation-or-makes-them-manual-only.md`
+  summary: A `PERSONAL` version on the pattern already in force, at the step the rotation already stands on that date, changes nothing yet is written and notified; neither the dialog nor 0079 calls it unchanged (only a `TEAM`/`MANUAL` repeat is). Telling it apart needs the projected step at *Vrijedi od* (`personalRotationShiftTypeOf`'s position), in the web and in the policy alike.
+  evidence: 21.10 review (blind hunter, edge-case hunter).
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-10-an-admin-gives-a-member-their-own-rotation-or-makes-them-manual-only.md`
+  summary: *Raspored osobe* says it is loading (`rasporedOsobe.unknown`) for as long as the calendar snapshot or today is unknown, a failed calendar read included, with *Promijeni raspored* disabled; a read failure could say so and offer the retry the other cards do.
+  evidence: 21.10 review (edge-case hunter).
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-10-an-admin-gives-a-member-their-own-rotation-or-makes-them-manual-only.md`
+  summary: In *Ručni raspored* a *Samo ručno* row and a row whose team has no rotation both read `ručno`; the member page tells them apart (*Samo ručno*), the grid does not.
+  evidence: 21.10 review (blind hunter).
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-10-an-admin-gives-a-member-their-own-rotation-or-makes-them-manual-only.md`
+  summary: The new database cases (written unrun, CI first) do not cover: cancelling a version that is ahead but not the latest, an admin of another organization, a deactivated admin through 0035's re-check, a `PERSONAL` over `PERSONAL` insert, or a member reading but not deleting; a member-role insert is refused by 0035's re-check trigger before the insert policy's admin clause is reached (the same 42501).
+  evidence: 21.10 review (blind hunter, unrun DB test auditor).

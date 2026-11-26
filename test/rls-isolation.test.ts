@@ -28973,9 +28973,9 @@ describe("a member's schedule source is versioned (story 21.10, 0079)", () => {
           pattern: pattern.id,
           step: pattern.steps[1]!,
         });
-        const manual = await insertScheduleVersion(client, { organization, member: member.id, from: later, source: 'MANUAL' });
-        // The version in force today is no cancel's: its delete matches no row.
+        // The version in force today is no cancel's, while it is still the latest: its delete matches no row.
         const { rowCount: inForce } = await client.query('delete from member_schedule_versions where id = $1', [personal]);
+        const manual = await insertScheduleVersion(client, { organization, member: member.id, from: later, source: 'MANUAL' });
         const { rowCount: cancelled } = await client.query('delete from member_schedule_versions where id = $1', [manual]);
         await actAsOwner(client);
 

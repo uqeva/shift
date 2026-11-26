@@ -7680,7 +7680,7 @@ describe("a member's schedule source is versioned (0079, story 21.10)", () => {
     expect(notify.match(/'SCHEDULE_SOURCE_CHANGED'/g)).toHaveLength(2);
     expect(notify.match(/'effectiveFrom', pg_catalog\.to_char\((new|old)\.effective_from, 'YYYY-MM-DD'\)/g)).toHaveLength(2);
     expect(notify).toMatch(/pg_catalog\.md5\('SCHEDULE_SOURCE_CANCELLED:' \|\| old\.id::text\)::uuid/);
-    expect(notify).toMatch(/pg_catalog\.pg_trigger_depth\(\) > 1/);
+    expect(notify).toMatch(/pg_catalog\.pg_trigger_depth\(\) > 1\s+or pg_catalog\.current_setting\('role'\) <> 'authenticated'/);
     expect(sql()).toContain('revoke execute on function private.notify_schedule_version() from public, anon, authenticated, service_role;');
   });
 

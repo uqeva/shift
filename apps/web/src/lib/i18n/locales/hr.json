@@ -2407,7 +2407,7 @@
     },
     "scheduleSourceTeam": {
       "subject": "Od {effectiveFrom} radiš po rotaciji tima",
-      "body": "{organizationName}: od {effectiveFrom} tvoj raspored opet slijedi rotaciju tvog tima. Pogledaj kalendar: {link}"
+      "body": "{organizationName}: od {effectiveFrom} raspored ti slijedi rotaciju tima u kojem si. Pogledaj kalendar: {link}"
     },
     "scheduleSourcePersonal": {
       "subject": "Od {effectiveFrom} radiš po osobnoj rotaciji",
@@ -3096,7 +3096,7 @@
     "hint": {
       "team": "Radi po rotaciji svog tima.",
       "personal": "Radi po svom uzorku koji se ponavlja, neovisno o rotaciji tima.",
-      "manual": "Radi samo ono što mu dodijeliš u Ručnom rasporedu."
+      "manual": "Radi samo ono što dodijeliš u Ručnom rasporedu."
     },
     "sourceHeading": "Kako se raspoređuje",
     "from": "Vrijedi od",

@@ -466,6 +466,8 @@ const FIELD_OF_COLUMN: Readonly<Record<string, readonly [HistoryField, FieldType
   absence_type_id: ['absenceType', 'absence-type'],
   draws_allowance: ['drawsAllowance', 'boolean'],
   kind: ['kind', 'enum'],
+  // Story 21.10: `member_schedule_versions.source`, today the one audited `source` column; a later audited
+  // table with a `source` of another vocabulary needs its own field here (the migration-parsing test lists every column).
   source: ['scheduleSource', 'enum'],
   reason: ['reason', 'text'],
   note: ['note', 'text'],

@@ -597,7 +597,11 @@ describe('read parity: the server assembly equals the browser\'s read (AD-19)', 
         const rotated = bystanderShifts.filter((shift) => shift.personalRotation === true);
         expect(rotated.length, `${one.fixture}: the personal rotation's shifts`).toBeGreaterThan(0);
         expect(rotated.every((shift) => shift.date >= dates.personalFrom && shift.date < dates.manualFrom), one.fixture).toBe(true);
-        expect(bystanderShifts.filter((shift) => shift.date >= dates.manualFrom && shift.personalAssignmentId === undefined), `${one.fixture}: manual only`).toEqual([]);
+        // Manual only: no shift of their own (a roster override the scene puts them on still applies, R15.8).
+        expect(
+          bystanderShifts.filter((shift) => shift.date >= dates.manualFrom && shift.personalAssignmentId === undefined && !shift.viaOverride),
+          `${one.fixture}: manual only`,
+        ).toEqual([]);
       }
     } finally {
       await client.end();

@@ -459,7 +459,7 @@ describe('story 21.2: a reminder of a Personal Shift with no team, and the batch
     expect(render('SCHEDULE_SOURCE_CHANGED', 'hr', { effectiveFrom: '2046-03-02', source: 'TEAM' }, TARGET)).toEqual({
       ok: true,
       subject: 'Od 02.03.2046 radiš po rotaciji tima',
-      text: `${ORGANIZATION_NAME}: od 02.03.2046 tvoj raspored opet slijedi rotaciju tvog tima. Pogledaj kalendar: ${linkTo('/kalendar')}${footer}`,
+      text: `${ORGANIZATION_NAME}: od 02.03.2046 raspored ti slijedi rotaciju tima u kojem si. Pogledaj kalendar: ${linkTo('/kalendar')}${footer}`,
     });
     expect(render('SCHEDULE_SOURCE_CHANGED', 'hr', { effectiveFrom: '2046-03-02', source: 'PERSONAL' }, TARGET)).toMatchObject({
       ok: true,

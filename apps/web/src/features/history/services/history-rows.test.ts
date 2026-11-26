@@ -81,6 +81,11 @@ describe('every code has its words', () => {
     expect(historyEnumMessageKey('outcome', 'deactivated')).toBe('history.enum.outcomeDeactivated');
     expect(historyEnumMessageKey('half', 'SECOND')).toBe('history.enum.halfSecond');
     expect(historyEnumMessageKey('kind', 'amend_leave')).toBe('history.enum.kindAmendLeave');
+    // Story 21.10 (0079): a schedule version's three sources.
+    expect(historyEnumMessageKey('scheduleSource', 'TEAM')).toBe('history.enum.scheduleSourceTeam');
+    expect(historyEnumMessageKey('scheduleSource', 'PERSONAL')).toBe('history.enum.scheduleSourcePersonal');
+    expect(historyEnumMessageKey('scheduleSource', 'MANUAL')).toBe('history.enum.scheduleSourceManual');
+    expect(historyEnumMessageKey('scheduleSource', 'PERSONAL_ROTATION')).toBeNull();
     expect(historyEnumMessageKey('answer', 'maybe')).toBeNull();
     expect(historyEnumMessageKey('role', 'toString')).toBeNull();
     expect(historyAuthorMessageKey('service')).toBe('history.author.service');

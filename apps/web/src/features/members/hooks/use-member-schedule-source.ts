@@ -26,6 +26,7 @@ import {
   scheduleSourceFactsOf,
   scheduleSourcePreviewKeyOf,
   scheduleSourceTablesOf,
+  draftWithRow,
   writeScheduleChange,
   type PatternOption,
   type ScheduleSourceAsk,
@@ -85,9 +86,14 @@ export function useMemberScheduleSource(screen: MemberScreen) {
     erasureDialog.current = erasures;
   });
 
+  /** The member the page shows now: an answer for another one, after an await, is dropped. */
+  const shownMember = useRef(id);
+
   // ANOTHER MEMBER: nothing raised for the last one stands over this one.
   useEffect(() => {
+    shownMember.current = id;
     erasureDialog.current.drop();
+    setDraft(EMPTY_SCHEDULE_DRAFT);
     setFormOpen(false);
     setChecked(null);
     setAsked(null);
@@ -117,10 +123,10 @@ export function useMemberScheduleSource(screen: MemberScreen) {
 
   // ------------------------------------------------------------- the form
 
+  /** *Promijeni raspored*: the form on the draft as it was left (empty after a landed save). */
   function openForm(): void {
     if (working.current) return;
 
-    setDraft(EMPTY_SCHEDULE_DRAFT);
     setRefusal(null);
     setUnchecked(false);
     setSaved(null);
@@ -147,14 +153,25 @@ export function useMemberScheduleSource(screen: MemberScreen) {
     setEffectiveFrom: (effectiveFrom: string) => change({ effectiveFrom }),
     setPattern: (patternId: string | null) => change({ patternId, startStep: 0 }),
     setStartStep: (startStep: number) => change({ startStep }),
-    setRow: (index: number, row: { readonly shiftTypeId?: string; readonly count?: string }) =>
-      change({ rows: draft.rows.map((one, at) => (at === index ? { ...one, ...row } : one)), startStep: 0 }),
+    // Functional updates: two edits in one tick each see the other.
+    setRow: (index: number, row: { readonly shiftTypeId?: string; readonly count?: string }) => {
+      setRefusal(null);
+      setUnchecked(false);
+      setDraft((current) => draftWithRow(current, index, row));
+    },
     addRow: () => {
-      change({ rows: [...draft.rows, EMPTY_PATTERN_ROW] });
+      setRefusal(null);
+      setUnchecked(false);
+      setDraft((current) => ({ ...current, rows: [...current.rows, EMPTY_PATTERN_ROW] }));
       focusLater([() => scheduleCountField.current], () => null);
     },
-    removeRow: (index: number) =>
-      change({ rows: draft.rows.length === 1 ? draft.rows : draft.rows.filter((_, at) => at !== index), startStep: 0 }),
+    removeRow: (index: number) => {
+      setRefusal(null);
+      setUnchecked(false);
+      setDraft((current) =>
+        current.rows.length === 1 ? current : { ...current, rows: current.rows.filter((_, at) => at !== index), startStep: 0 },
+      );
+    },
   };
 
   // ------------------------------------------------------------ the check
@@ -164,9 +181,18 @@ export function useMemberScheduleSource(screen: MemberScreen) {
 
   /** The fresh check of `ask`; a refusal or an unavailable check is said where `ask` was made. */
   async function check(ask: ScheduleSourceAsk): Promise<ScheduleSourceReady | null> {
-    if (today === null) return null;
+    // Today unknown (the members read not settled): nothing can be checked, and the alert says so.
+    if (today === null) {
+      lastRefusal.current = null;
+      setUnchecked(true);
+
+      return null;
+    }
 
     const result = await scheduleSourceCheckOf(readErasures.readAndShare, ask, today, onlineManager.isOnline());
+
+    // The page moved to another member meanwhile: this answer is not theirs.
+    if (shownMember.current !== ask.memberId) return null;
 
     if (result.kind === CHECK_UNAVAILABLE) {
       lastRefusal.current = null;
@@ -263,7 +289,9 @@ export function useMemberScheduleSource(screen: MemberScreen) {
 
     const outcome = await writeScheduleChange(scheduleSourceTablesOf(supabaseClient()), organizationId, change);
 
-    if (outcome.ok) {
+    if (shownMember.current !== change.memberId) {
+      // Written for the member the dialog was about; the page shows another now, so nothing is said here.
+    } else if (outcome.ok) {
       setSaved(change.kind);
       setAsked(null);
       setDraft(EMPTY_SCHEDULE_DRAFT);
@@ -298,18 +326,26 @@ export function useMemberScheduleSource(screen: MemberScreen) {
         return;
       }
 
-      if (ready.rows.length > 0) erasures.show(ready.rows, ready.change);
-      else if (scheduleSourcePreviewKeyOf(ready) !== scheduleSourcePreviewKeyOf(shown)) setChecked(ready);
+      // THE PREVIEW CHANGED SINCE IT WAS SHOWN: the new one is shown first, and
+      // only its own *Spremi* goes on to the erasures or the write.
+      if (scheduleSourcePreviewKeyOf(ready) !== scheduleSourcePreviewKeyOf(shown)) setChecked(ready);
+      else if (ready.rows.length > 0) erasures.show(ready.rows, ready.change);
       else await write(ready.change);
     });
   }
 
-  /** *Što se mijenja* closed without saving: the draft stays for the form. */
+  /**
+   * *Natrag na uređivanje*: a version's preview goes back to its form, the
+   * draft as it was; a cancel's back to the card.
+   */
   function closePreview(): void {
     if (working.current) return;
 
+    const back = checked?.change.kind === CHANGE_SET;
+
     setChecked(null);
-    focusLater([() => opener.current], () => null);
+    if (back) setFormOpen(true);
+    else focusLater([() => cancelOpener.current], () => opener.current);
   }
 
   /** The erasure confirmation's save: checked afresh, followed through the one order. */

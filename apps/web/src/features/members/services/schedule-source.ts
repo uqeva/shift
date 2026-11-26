@@ -243,6 +243,14 @@ export interface ScheduleSourceDraft {
   readonly startStep: number;
 }
 
+/** A draft with one step row changed: the start step kept while the pattern keeps its length, else the first. */
+export function draftWithRow(draft: ScheduleSourceDraft, index: number, row: Partial<PatternRowDraft>): ScheduleSourceDraft {
+  const rows = draft.rows.map((one, at) => (at === index ? { ...one, ...row } : one));
+  const sameLength = row.count === undefined || row.count === draft.rows[index]?.count;
+
+  return { ...draft, rows, startStep: sameLength ? draft.startStep : 0 };
+}
+
 /** The dialog's opening draft: a personal rotation (the card's common case), no date, no pattern, one empty row. */
 export const EMPTY_SCHEDULE_DRAFT: ScheduleSourceDraft = {
   source: SCHEDULE_SOURCE_PERSONAL,
@@ -648,8 +656,19 @@ export function scheduleSourceTablesOf(client: { from(table: string): unknown })
 const RETURNED = 'id';
 const STEPS_RETURNED = 'id,position';
 
-/** A refusal as this card's own failure. */
-export function scheduleSourceWriteFailureOf(error: { readonly code?: string | undefined }): ScheduleSourceWriteFailure {
+/** 0039's named refusal of a version onto a pattern with an archived type. */
+const ARCHIVED_TYPE_REFUSAL = 'ROTATION_PATTERN_ARCHIVED_TYPE';
+
+/**
+ * A refusal as this card's own failure: 42501 and 23503 are the screen behind
+ * (a policy, a deleted pattern), 23505 the date taken, and 23514 the archived
+ * type only by 0039's message — any other check (0079's named ones) is a
+ * write this card should never send, so it is the service.
+ */
+export function scheduleSourceWriteFailureOf(error: {
+  readonly code?: string | undefined;
+  readonly message?: string | undefined;
+}): ScheduleSourceWriteFailure {
   switch (error.code) {
     case '42501':
     case '23503':
@@ -657,7 +676,7 @@ export function scheduleSourceWriteFailureOf(error: { readonly code?: string | u
     case '23505':
       return SOURCE_WRITE_TAKEN;
     case '23514':
-      return SOURCE_WRITE_ARCHIVED;
+      return error.message === ARCHIVED_TYPE_REFUSAL ? SOURCE_WRITE_ARCHIVED : SOURCE_WRITE_FAILED;
     default:
       return SOURCE_WRITE_FAILED;
   }

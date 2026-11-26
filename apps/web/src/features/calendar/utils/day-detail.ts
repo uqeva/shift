@@ -7,6 +7,7 @@ import {
   MINUTES_PER_DAY,
   memberScheduleOfMonth,
   monthOf,
+  personalAssignmentOn,
   personalShiftOn,
   rosterOn,
   scheduleSourceOn,
@@ -970,10 +971,18 @@ export function rosterOffersOf(
     // STORY 18.5: the team they are WITH that day — a loan team on a loan.
     const own = effectiveTeamOn(member, isoDate);
 
-    // STORY 21.10 (R15.8): a member whose own rotation counts with this team
-    // that date is never offered: putting them on would be inert. The admin
-    // changes their day with a Personal Assignment (*Ručni raspored*).
-    if (own?.teamId === teamId && scheduleSourceOn(member.scheduleVersions, isoDate).source === SCHEDULE_SOURCE_PERSONAL) continue;
+    // STORY 21.10 (R15.8, the domain's `countsWithOn`): a member whose own
+    // rotation decides the date and counts with this team is never offered:
+    // putting them on would be inert. The admin changes their day with a
+    // Personal Assignment (*Ručni raspored*). One an assignment holds that
+    // date (a day off, another team) is the assignment's, and may be put on.
+    if (
+      own?.teamId === teamId &&
+      personalAssignmentOn(member.personalAssignments, isoDate) === null &&
+      scheduleSourceOn(member.scheduleVersions, isoDate).source === SCHEDULE_SOURCE_PERSONAL
+    ) {
+      continue;
+    }
 
     put.push({
       id: member.id,

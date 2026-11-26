@@ -126,7 +126,10 @@ test('gives a member their own rotation from tomorrow, refuses a repeat, and can
   await expect.poll(() => scheduleVersionsOfInSql(fixture.slug, person.id)).toEqual([
     expect.objectContaining({ effectiveFrom: tomorrow, source: 'PERSONAL', patternId: rotation.patternId }),
   ]);
-  await expect(card).toContainText(fill(words.scheduled, { fact: '' }).trim());
+  // The card says the scheduled version: its source and its date.
+  await expect(card).toContainText(
+    fill(words.scheduled, { fact: fill(words.since, { source: words.source.personal, date: fullDate(tomorrow) }) }),
+  );
 
   // A SECOND CHANGE WHILE ONE IS SCHEDULED: refused in the form, nothing written.
   await card.getByRole('button', { name: words.change, exact: true }).click();

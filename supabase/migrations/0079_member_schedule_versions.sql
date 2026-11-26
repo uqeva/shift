@@ -249,8 +249,9 @@ create trigger member_schedule_versions_audit_update after update on public.memb
 
 -- E-3: the member hears of a change to how they are scheduled, once per
 -- version. An insert says the version's own source from its date. A cancel
--- (ONLY A DIRECT DELETE, of a version still ahead: an organization delete
--- cascades one trigger level deeper, as 0043's rotation cancel guards) says
+-- (ONLY A REQUEST SESSION'S DIRECT DELETE, of a version still ahead: an
+-- organization delete cascades one trigger level deeper, as 0043's rotation
+-- cancel guards, and a service or owner clean-up is no admin's cancel) says
 -- the source then in force from that date, under a subject of its own so the
 -- outbox's once-key never swallows it. `notify_members` skips the actor, a
 -- member with no address and one not active today.
@@ -277,6 +278,7 @@ begin
   end if;
 
   if pg_catalog.pg_trigger_depth() > 1
+     or pg_catalog.current_setting('role') <> 'authenticated'
      or old.effective_from <= public.organization_today(old.organization_id) then
     return null;
   end if;

@@ -4,6 +4,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { CalendarSnapshot } from '@/features/calendar/services/snapshot';
 import { memberScheduleInputOf } from '@/features/calendar/utils/month';
 import { dayDetailOf, rosterOffersOf } from '@/features/calendar/utils/day-detail';
+import { calendarMonthOf } from '@/features/calendar/utils/month';
 import { replacementCandidatesOf } from '@/features/calendar/utils/replacement-candidates';
 import { CHECK_READY, CHECK_REFUSED } from '@/features/conflicts/services/erasure-check';
 import {
@@ -36,6 +37,7 @@ import {
   scheduleSourceRefusalMessageKey,
   scheduleSourceRefusalOf,
   scheduleSourceWriteFailureOf,
+  draftWithRow,
   writeScheduleChange,
   type ScheduleSourceDraft,
   type ScheduleSourceTables,
@@ -45,10 +47,13 @@ import {
   ANA,
   ARCHIVED_TYPE,
   DAN,
+  DAY_TEAM,
+  DORA,
   IVA,
   NOC,
   SLOBODNO,
   TODAY,
+  calendarPersonalAssignmentRow,
   calendarRosterOverrideRow,
   leaveRowOf,
   planningSnapshotOf,
@@ -324,6 +329,45 @@ describe('the readers that follow a schedule source', () => {
     expect(rosterOffersOf(plain, dayDetailOf(plain, A, '2026-10-08')).out.map((one) => one.id)).toContain(ANA);
   });
 
+  it("never offers a personal-rotation member to put on their counted team's shift on their own day off, unless an assignment holds the date (R15.8)", async () => {
+    // From step 2 on 09-01: 10-08 is Slobodno for Ana, a Dan of Smjena A's own rotation.
+    const version = scheduleVersionRow(ANA, '2026-09-01', 'PERSONAL', PILOT_PATTERN, 'pilot-step-1');
+    const calendar = await planningSnapshotOf({ scheduleVersions: [version] });
+    const inOf = (snapshot: CalendarSnapshot) => rosterOffersOf(snapshot, dayDetailOf(snapshot, A, '2026-10-08')).in.map((one) => one.id);
+
+    expect(dayDetailOf(calendar, A, '2026-10-08')?.roster.map((member) => member.id)).not.toContain(ANA);
+    expect(inOf(calendar)).not.toContain(ANA);
+    // An assignment (a day off) holds the date: the override applies (the domain's countsWithOn), so she is offered.
+    const assigned = await planningSnapshotOf({
+      scheduleVersions: [version],
+      assignments: [calendarPersonalAssignmentRow('pa-ana-off', ANA, '2026-10-08', 'OFF')],
+    });
+    expect(inOf(assigned)).toContain(ANA);
+  });
+
+  it("draws a personal rotation's staffing group in its counted team's cell on a date with no assignment", async () => {
+    // Dora on *Dnevni* (no rotation) works Dan from step 1 on 10-03, and nothing before her version.
+    const calendar = await planningSnapshotOf({
+      scheduleVersions: [scheduleVersionRow(DORA, '2026-10-03', 'PERSONAL', PILOT_PATTERN, 'pilot-step-0')],
+    });
+    const month = calendarMonthOf(calendar, { mjesec: '2026-10' }, TODAY);
+    const column = month.columns.findIndex((team) => team.id === DAY_TEAM);
+    const cellOn = (date: string) => month.rows.find((one) => one.date === date)?.cells[column];
+
+    expect(cellOn('2026-10-03')?.groups?.map((group) => group.shiftTypeId)).toEqual([DAN]);
+    expect(cellOn('2026-10-04')?.groups?.map((group) => group.shiftTypeId)).toEqual([NOC]);
+    expect(cellOn('2026-10-02')).not.toHaveProperty('groups');
+    expect(cellOn('2026-10-05')).not.toHaveProperty('groups');
+  });
+
+  it('keeps the start step while a row edit keeps the pattern\'s length, and resets it otherwise', () => {
+    const draft = draftOf({ patternId: NEW_PATTERN, rows: [{ shiftTypeId: DAN, count: '2' }, { shiftTypeId: SLOBODNO, count: '1' }], startStep: 2 });
+
+    expect(draftWithRow(draft, 0, { shiftTypeId: NOC }).startStep).toBe(2);
+    expect(draftWithRow(draft, 0, { count: '2' }).startStep).toBe(2);
+    expect(draftWithRow(draft, 0, { count: '3' })).toMatchObject({ startStep: 0, rows: [{ shiftTypeId: DAN, count: '3' }, { shiftTypeId: SLOBODNO, count: '1' }] });
+  });
+
   it('never offers a member whose own rotation counts with the team as a replacement (R15.8)', async () => {
     const calendar = await planningSnapshotOf({
       scheduleVersions: [scheduleVersionRow(ANA, '2026-09-01', 'PERSONAL', PILOT_PATTERN, 'pilot-step-2')],
@@ -433,7 +477,11 @@ describe('the writes', () => {
     expect(scheduleSourceWriteFailureOf({ code: '42501' })).toBe(SOURCE_WRITE_REFUSED);
     expect(scheduleSourceWriteFailureOf({ code: '23503' })).toBe(SOURCE_WRITE_REFUSED);
     expect(scheduleSourceWriteFailureOf({ code: '23505' })).toBe(SOURCE_WRITE_TAKEN);
-    expect(scheduleSourceWriteFailureOf({ code: '23514' })).toBe(SOURCE_WRITE_ARCHIVED);
+    expect(scheduleSourceWriteFailureOf({ code: '23514', message: 'ROTATION_PATTERN_ARCHIVED_TYPE' })).toBe(SOURCE_WRITE_ARCHIVED);
+    // Any other check is a write this card should never send: the service, not "archived".
+    expect(
+      scheduleSourceWriteFailureOf({ code: '23514', message: 'new row for relation "member_schedule_versions" violates check constraint "member_schedule_versions_pattern_by_source"' }),
+    ).toBe(SOURCE_WRITE_FAILED);
     expect(scheduleSourceWriteFailureOf({ code: '57014' })).toBe(SOURCE_WRITE_FAILED);
     for (const code of [
       SOURCE_UNCHOSEN,

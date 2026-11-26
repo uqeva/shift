@@ -86,6 +86,30 @@ Status: built, CI pending (branch `feat/21-10-member-schedule-versions`, no PR y
 - Given the matrix, when the service tests run, then each row's refusal or applied snapshot is as stated.
 - Given typecheck, lint, build, the domain/ICS/web suites and the DB-free root tests, when run, then they pass.
 
+## Spec Change Log
+
+No bad_spec loop. One reading of the frozen matrix is recorded here instead of edited: its *Cancel* row says a cancel of a version already in force is "refused (42501)"; a DELETE that RLS filters matches 0 rows and raises nothing, which `writeScheduleChange` reads as refused (`SOURCE_WRITE_REFUSED`) and the database case asserts as `rowCount` 0.
+
+## Review Triage Log
+
+### 2026-11-26 — Review pass 1
+
+- Layers: blind, edge-case, verification-gap, epic AC, unrun DB test (5 of 5), each a context-free subagent over the diff at `2a437b7`.
+- intent_gap: 0. bad_spec: 0. Epic AC: AC 1 and 2 met, AC 3 partly, listed and deferred.
+- patch (applied in the second commit):
+  - `[high]` `[patch]` Read parity's "manual only" assertion would fail on about half of CI's dates: the scene's roster override puts the bystander on `home`'s shift, which applies to a manual-only member (R15.8). It now leaves out `viaOverride` shifts (unrun DB test auditor).
+  - `[medium]` `[patch]` Swaps still offered a personal-rotation member on *Sastav*: `swap-proposal.ts` `works()` now leaves out `personalRotation` as it leaves out `assigned` (blind).
+  - `[medium]` `[patch]` The R15.8 offer filters were wider than the domain's `countsWithOn`: a member an assignment holds that date (a day off, another team) is the assignment's, and is offered again (`rosterOffersOf`, `replacementCandidatesOf`) (edge-case).
+  - `[medium]` `[patch]` *Natrag na uređivanje* dropped the draft: it reopens the form on the draft as left, and *Promijeni raspored* no longer resets it (only a landed save or another member does) (blind, edge-case).
+  - `[medium]` `[patch]` The step rows' edits read the render's draft: now functional updates; a type-only edit keeps the start step (`draftWithRow`) (blind, edge-case).
+  - `[medium]` `[patch]` Every 23514 read as "archived type": only 0039's message is; any other check is the service (blind, edge-case).
+  - `[medium]` `[patch]` A changed preview could be written after the erasure confirmation unseen: the changed preview is shown first (edge-case).
+  - `[medium]` `[patch]` A service or owner delete of a future version wrote a cancel notice, which the e2e clean-ups' order then leaked: 0079's cancel notice now needs a request session (`role = 'authenticated'`) (blind, edge-case, unrun DB test).
+  - `[medium]` `[patch]` Tests that could not fail: the R15.8 put-on filter on the member's own day off (and its assignment exception), a personal rotation's staffing group in a calendar cell, the history's three source words, and the in-force cancel tried while it is the latest (verification gap, unrun DB test).
+  - `[low]` `[patch]` An answer for a member the page no longer shows is dropped; `today` unknown says the check is unavailable; the TEAM notice no longer says "opet … tvog tima" (a teamless member, a cancel); `hint.manual` is ungendered; staffing groups are asked from the earliest personal version on, not every date; the reminder case writes a real `TEAM` version; the e2e asserts the scheduled fact; the spine records the reminder re-check's accepted limit; history's global `source` field is commented.
+- defer: 5 (deferred-work.md, "Deferred from: story 21.10"): UI hook and card tests and a wider e2e; a `PERSONAL` no-op version; the card's endless loading on a failed read; `ručno` for both *Samo ručno* and no rotation in the grid; the database refusal paths not covered.
+- reject: the e2e page-object and focus-on-the-bad-row nits, the 56 written in copy (the same constant's value, as other limits in `hr.json`), the patterns reused across teams (intended: R15.5 shares patterns), the hotfix overlap (resolved by the rebase, below).
+
 ## Design Notes
 
 1. **Patterns.** A personal rotation names a `rotation_patterns` row (R15.5). The dialog offers each distinct step sequence among the organization's patterns with no archived type, and *Novi uzorak* step rows (a shift type, working or not, × a count; at most 56 days). An unsaved sequence equal to an offered one reuses it; otherwise the save writes a pattern, its steps, then the version (rotation's three writes, not atomic; a definite version failure removes the new pattern, as `discardUnassignedPattern`).
@@ -96,6 +120,8 @@ Status: built, CI pending (branch `feat/21-10-member-schedule-versions`, no PR y
 ## Verification
 
 **Commands:** `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm --filter @shift/domain test`, `pnpm --filter @shift/ics test`, `pnpm --filter ./apps/web test`, and every DB-free root test file by name (`test/resource-hygiene`, `supabase-scaffold`, `localization-applied`, `notify-reminder`, `calendar-feed`, `remind`, `feature-boundaries`, the theme files, …: the 35 files that open no database).
+
+**Run 2026-11-26 (after the review patches):** typecheck and lint clean; build clean; domain 25 files, 1106 tests; ICS 34; web 197 files, 7177 tests (`schedule-source.test.ts` 20); the 35 DB-free root files, 5476 tests.
 
 **Run 2026-11-26 (before review):** typecheck and lint clean; build clean; domain 25 files, 1106 tests; ICS 34; web 197 files, 7174 tests (the new `schedule-source.test.ts` 17); the 35 DB-free root files, 5476 tests. No CSS or token changed, so the theme files ran only as part of the 35.
 

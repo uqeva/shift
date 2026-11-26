@@ -845,7 +845,7 @@ describe.each(FIXTURES)('the $fixture reminder of a Personal Assignment (0077)',
  * date; its subject is keyed `:p:`. Every scene is built as the owner before
  * the service role acts.
  */
-describe.each(FIXTURES)('the $fixture reminder of a personal rotation (0079)', ({ slug, admin, member: memberName }) => {
+describe.each(FIXTURES)('the $fixture reminder of a personal rotation (0079)', ({ slug, admin, member: memberName, bystander }) => {
   /** Owner scene: a version of `who` from `from`, attributed to `by` (0079's policy is a session's). */
   async function versionOf(client: Client, who: Member, by: Member, from: string, source: string, pattern: { id: string; step: string } | null): Promise<void> {
     await client.query(
@@ -930,18 +930,30 @@ describe.each(FIXTURES)('the $fixture reminder of a personal rotation (0079)', (
     });
   });
 
-  it.skipIf(noDatabase)('skips a PERSONAL_ROTATION item of a member on their team\'s rotation (no version, or TEAM)', async () => {
+  it.skipIf(noDatabase)('skips a PERSONAL_ROTATION item of a member on their team\'s rotation (no version, or a TEAM one)', async () => {
     await inRolledBackTransaction(async (client) => {
       const who = await member(client, slug, memberName);
-      await remindable(client, who, ['H1'], true);
+      const by = await member(client, slug, admin);
+      await remindable(client, who, ['H1', 'H2'], true);
       const { teamId, shiftTypeId } = await teamAndType(client, who.organizationId);
+      const today = await todayOf(client, who.organizationId, 0);
       const date = await todayOf(client, who.organizationId, 1);
+      const later = await todayOf(client, who.organizationId, 2);
+      const pattern = await patternOf(client, by, shiftTypeId);
+      // A personal rotation from today, then the team's rotation again from the day after `date`.
+      await versionOf(client, who, by, today, 'PERSONAL', pattern);
+      await versionOf(client, who, by, later, 'TEAM', null);
       const startsAt = await isoFromNow(client, '1 day');
+      const item = { memberId: who.id, teamId, shiftTypeId, start: 420, end: 1140, startsAt, source: 'PERSONAL_ROTATION' };
+      // A bystander with no version at all.
+      const other = await member(client, slug, bystander);
+      await remindable(client, other, ['H1'], true);
 
       await actAsService(client);
       expect(
         await enqueue(client, [
-          { memberId: who.id, date, teamId, shiftTypeId, lead: 'H1', start: 420, end: 1140, startsAt, source: 'PERSONAL_ROTATION' },
+          { ...item, date: later, lead: 'H1' },
+          { ...item, memberId: other.id, date, lead: 'H1' },
         ]),
       ).toBe(0);
       await actAsOwner(client);
