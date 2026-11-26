@@ -136,6 +136,7 @@ test.describe('an admin', () => {
 
   test('a PDF writer that cannot load shows the failure, and the action is usable again (story 14.3)', async ({
     page,
+    fixture,
   }) => {
     // The writer's own modules, whichever server serves them: Vite's
     // optimized dependency in development, the lazily split chunks in a build.
@@ -147,7 +148,11 @@ test.describe('an admin', () => {
 
     const historyPage = new HistoryPage(page);
 
-    await historyPage.goto('?razdoblje=365-dana');
+    // NARROWED TO THE FIXTURE'S TEAM: the run's organization gathers every
+    // spec's history, and past `HISTORY_EXPORT_LIMIT` (2000) the export
+    // refuses with its own line before it ever loads the writer, so the whole
+    // organization's year is not a stable subject (PR #387's CI: 2078 rows).
+    await historyPage.goto(`?smjena=${fixture.team.id}&razdoblje=365-dana`);
     await expect(historyPage.table).toBeVisible();
     await expect(historyPage.exportFailed).toHaveCount(0);
     await historyPage.openExport();
