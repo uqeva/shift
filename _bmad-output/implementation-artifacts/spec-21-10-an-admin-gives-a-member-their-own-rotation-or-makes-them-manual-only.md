@@ -2,7 +2,7 @@
 title: '21.10 An admin gives a member their own rotation, or makes them manual only'
 type: 'feature'
 created: '2026-11-25'
-status: 'in-review'
+status: 'done'
 baseline_commit: 'd09fffb90f0bb967be10b4a08e3588e44050c640'
 review_loop_iteration: 0
 context:
@@ -10,7 +10,7 @@ context:
   - '{project-root}/_bmad-output/implementation-artifacts/spec-21-9-the-schedule-source-rule-in-the-domain.md'
 ---
 
-Status: built, CI pending (branch `feat/21-10-member-schedule-versions`, no PR yet). Baseline: `main` at `d09fffb` (21.6 merged; 21.9 merged at `0163497`). Migration `0079`. Touches `hr.json` (hot): no other in-flight story touches it except 21.25 (UI only; rebase on conflict).
+Status: done. PR #377, squash `14b3e58`, merged with `CI passed` green (run 45736197701 at `95f801c`). Baseline: `main` at `d09fffb` (21.6 merged; 21.9 merged at `0163497`). Migration `0079`. Touches `hr.json` (hot): no other in-flight story touches it except 21.25 (UI only; rebase on conflict).
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 
@@ -132,6 +132,6 @@ No bad_spec loop. One reading of the frozen matrix is recorded here instead of e
 
 **Run 2026-11-26 (before review):** typecheck and lint clean; build clean; domain 25 files, 1106 tests; ICS 34; web 197 files, 7174 tests (the new `schedule-source.test.ts` 17); the 35 DB-free root files, 5476 tests. No CSS or token changed, so the theme files ran only as part of the 35.
 
-**Not run locally (STRICT DATABASE RULE; CI is their first run):** `test/provisioning.test.ts` (RLS and audited lists, the table's privileges, keys and triggers, `notify_schedule_version` in the grantees inventory), `test/rls-isolation.test.ts` (the policy list, `AUDITED_TABLES`, three new cases), `test/concurrent-writes.test.ts` (the trigger inventory), `test/notify-boundary.test.ts` (the new code), `test/schedule-inputs-parity.test.ts` (a bystander's versions per fixture), `test/shift-reminders.test.ts` (the form, and a stale expectation that `PERSONAL_ROTATION` with eight keys is refused), runtime parity, and the e2e spec. The migration was never applied locally.
+**Not run locally (STRICT DATABASE RULE); what CI showed (rewritten by story 21.16, 2026-11-26):** run 45729190376 at `a898ecb` failed the Vitest database job and e2e shard 4, and run 45731672725 at `3f462da` failed the Vitest database job: 0079's policies read their own table (42P17, fixed by `e2066ff` with two `private` definers) and the personal-rotation reminder case (fixed by `97c2d71`). Run 45733499403 at `27ca788` was green, and after the rebase onto 21.15 (`95f801c`, the R12 holiday digest), run 45736197701 was green. The cases listed here have all run green in CI: `test/provisioning.test.ts` (RLS and audited lists, the table's privileges, keys and triggers, `notify_schedule_version` in the grantees inventory), `test/rls-isolation.test.ts` (the policy list, `AUDITED_TABLES`, three new cases), `test/concurrent-writes.test.ts` (the trigger inventory), `test/notify-boundary.test.ts` (the new code), `test/schedule-inputs-parity.test.ts` (a bystander's versions per fixture), `test/shift-reminders.test.ts` (the form, and a stale expectation that `PERSONAL_ROTATION` with eight keys is refused), runtime parity, and the e2e spec. The migration was never applied locally.
 
 **Process:** the implementation ran in this session (21.1's and 21.9's precedent), not a context-free subagent: the story spans a migration, two packages, the web app and nine test catalogs whose pins needed the investigation's context. Main at `d09fffb` did not typecheck (`day-detail.ts` called `personalShiftOn` without 21.9's `steps`); this branch passes `snapshot.steps`, as the coordinator's hotfix does.

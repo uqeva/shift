@@ -577,6 +577,20 @@ export const JOB_ROLE_LIST_KEYS = join(srcRoot, 'features', 'job-roles', 'servic
 
 export const JOB_ROLE_WRITE_KEYS = join(srcRoot, 'features', 'job-roles', 'services', 'write.ts');
 
+/**
+ * Story 21.17: the holidays' rules — the official names of the import's codes
+ * (`nationalHolidayMessageKey`), and the refusals and confirmations of the
+ * *Blagdani* card and of the team dialog's *Ne radi na blagdane*, each a
+ * `\w*MessageKey` union.
+ */
+export const HOLIDAY_KEYS: readonly string[] = [
+  join(srcRoot, 'features', 'holidays', 'services', 'holidays.ts'),
+  join(srcRoot, 'features', 'holidays', 'services', 'write.ts'),
+];
+
+/** Story 21.17: *Što se mijenja*'s body of a holiday write, shared by the *Blagdani* card and the team dialog. */
+export const HOLIDAY_CHECK_BODY = join(srcRoot, 'features', 'holidays', 'components', 'holiday-check-body.tsx');
+
 export const SHIFT_TYPE_LIST_HOOK = join(srcRoot, ...SHIFT_TYPE_LIST_PARTS.hook);
 
 export const SHIFT_TYPE_EDIT_HOOK = join(srcRoot, ...SHIFT_TYPE_EDIT_PARTS.hook);
@@ -998,7 +1012,11 @@ export const SCREENS = [
   // dialog's name field, Odustani and Spremi.
   // NINE FIELDS AND SIXTEEN BUTTONS since story 13.4: the carry-over card's
   // `Uredi`, and its dialog's cap, expiry day and month, and first year.
-  { name: 'the organization settings surface', file: SETTINGS, expectedFields: 10, expectedButtons: 21 },
+  // TWELVE FIELDS AND THIRTY-ONE BUTTONS since story 21.17: a holiday's date
+  // and name; *Blagdani*'s add, two year steps, import, a row's rename and
+  // removal, the dialog's cancel and save, and the preview's back and save.
+  // THIRTY-TWO with the card's own read retry.
+  { name: 'the organization settings surface', file: SETTINGS, expectedFields: 12, expectedButtons: 32 },
   // THREE on the member list, and the count is what keeps a fourth from
   // arriving unreviewed: the search field, the permission-level filter, and ONE
   // `<Button>` — the sort control, written once inside a map over
@@ -1126,7 +1144,9 @@ export const SCREENS = [
   // list whose own close replaced the link back.
   // SEVEN AND SIX SINCE THE DEFERRED-WORK SWEEP: each read failure's retry.
   { name: 'the team list', file: TEAM_LIST, expectedFields: 1, expectedButtons: 6 },
-  { name: 'the team edit form', file: TEAM_EDIT, expectedFields: 1, expectedButtons: 5 },
+  // SEVEN BUTTONS since story 21.17: the flag preview's *Natrag* and *Spremi*
+  // (the switch is the shared Switch, not a Button).
+  { name: 'the team edit form', file: TEAM_EDIT, expectedFields: 1, expectedButtons: 7 },
   // STORY 1.8. ONE on the roster: the link back to Danas, a `<Button asChild>`.
   // No field, no form and no write — the count is what notices one arriving.
   // ZERO on Danas: its one new control is the `<Link>` to the roster, which

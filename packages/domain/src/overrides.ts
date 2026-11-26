@@ -26,7 +26,7 @@
  */
 
 import { checkDate } from './calendar.js';
-import type { HolidayOff } from './holidays.js';
+import { holidayOffOf, type HolidayOff, type HolidayRule } from './holidays.js';
 import { projectedShiftTypeOn, type RotationAssignment, type RotationStep } from './projection.js';
 
 /** One live stored override (`shift_type_overrides`): `teamId` works `shiftTypeId` on `date`. */
@@ -130,16 +130,20 @@ export function applyOverride(
  * when no rotation version is in effect on `date`; an override on such a date
  * is not applied (it is pending, story 3.5c).
  *
- * It applies NO holiday (story 21.15): it reads no holiday rule, so it is the
- * scheduled type with no holiday or no team off. The month derivations of
- * `schedule.ts` apply R13.3; the browser's callers read the rule from 21.16.
+ * THE HOLIDAY RULE (story 21.16, R13.3) is the optional sixth argument.
+ * Absent, it applies no holiday, and the type and the value are exactly 21.15's
+ * (the scheduled type with no holiday or no team off). Given, the answer is
+ * {@link applyOverride}'s: a team the holiday empties answers
+ * `shiftTypeId: null` with its projected type kept, so a caller treats a
+ * `null` type as no working shift. A rule that decides nothing (no holiday or
+ * no team off) answers as if it were absent (R13.5).
  *
  * `overrides` may name any team and date; only `teamId` on `date` is read, but
  * every override is checked.
  *
  * @throws RangeError when a version belongs to another team than `teamId`,
- *   on every precondition of {@link projectedShiftTypeOn}, and on every one of
- *   {@link overridesByTeamAndDate}.
+ *   on every precondition of {@link projectedShiftTypeOn}, on every one of
+ *   {@link overridesByTeamAndDate}, and on every one of `holidayOffOf`.
  */
 export function scheduledShiftTypeOn(
   versions: readonly RotationAssignment[],
@@ -147,15 +151,30 @@ export function scheduledShiftTypeOn(
   overrides: readonly ShiftTypeOverride[],
   teamId: string,
   date: string,
-): ScheduledShiftType | null {
+): ScheduledShiftType | null;
+export function scheduledShiftTypeOn(
+  versions: readonly RotationAssignment[],
+  steps: readonly RotationStep[],
+  overrides: readonly ShiftTypeOverride[],
+  teamId: string,
+  date: string,
+  holidays: HolidayRule | undefined,
+): LayeredShiftType | null;
+export function scheduledShiftTypeOn(
+  versions: readonly RotationAssignment[],
+  steps: readonly RotationStep[],
+  overrides: readonly ShiftTypeOverride[],
+  teamId: string,
+  date: string,
+  holidays?: HolidayRule,
+): LayeredShiftType | null {
   const stranger = versions.find((version) => version.teamId !== teamId);
   if (stranger !== undefined) {
     throw new RangeError(`a rotation assignment of team ${stranger.teamId} was given for team ${teamId}`);
   }
   const indexed = overridesByTeamAndDate(overrides);
-  const scheduled = applyOverride(indexed, teamId, date, projectedShiftTypeOn(versions, steps, date));
-  // Narrowing only: no holiday rule is given, so `applyOverride` never returns the emptied form here.
-  return scheduled === null || scheduled.shiftTypeId === null ? null : scheduled;
+  const holidayOff = holidays === undefined ? null : holidayOffOf(holidays);
+  return applyOverride(indexed, teamId, date, projectedShiftTypeOn(versions, steps, date), holidayOff);
 }
 
 /**

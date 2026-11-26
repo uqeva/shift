@@ -1,6 +1,6 @@
 import { collisionKeyOf, erasedCollisionsOf, hasTeam, scheduledShiftTypeOn } from '@shift/domain';
 
-import type { CalendarSnapshot } from '@/features/calendar/services/snapshot';
+import { holidayRuleOfCalendar, type CalendarSnapshot } from '@/features/calendar/services/snapshot';
 import { dayMonthOf, overrideStandingOfCalendar, weekdayOf, workingShiftTypeIdsOf } from '@/features/calendar/utils/month';
 import { collisionInputOf, resolutionsOf } from '@/features/conflicts/services/conflicts-queue';
 import { organizationLeaveRecordsOf } from '@/features/leave/services/leave-list';
@@ -183,6 +183,8 @@ export function erasuresOf(
   const types = new Map(before.types.map((type) => [type.id, type]));
   const inForce = overrideStandingOfCalendar(after).inForce;
   const working = new Set(workingShiftTypeIdsOf(after));
+  // STORY 21.16 (R13.3): the "after" snapshot's holiday rule; a team it empties does not work.
+  const holidays = holidayRuleOfCalendar(after);
 
   // Story 21.1: an erasure with no team is listed from story 21.7, with the collision key it stores.
   return erased
@@ -202,6 +204,7 @@ export function erasuresOf(
         inForce,
         collision.teamId,
         collision.date,
+        holidays,
       );
 
       return {
@@ -214,7 +217,7 @@ export function erasuresOf(
         weekday: weekdayOf(collision.date),
         dayMonth: dayMonthOf(collision.date),
         shiftTypeName: type.name,
-        teamWorks: now !== null && working.has(now.shiftTypeId),
+        teamWorks: now !== null && now.shiftTypeId !== null && working.has(now.shiftTypeId),
       };
     })
     .sort(byDateAndTeam);

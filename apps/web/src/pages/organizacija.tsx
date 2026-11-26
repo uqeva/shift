@@ -8,6 +8,7 @@ import { t } from '@/lib/i18n';
 import { requireAdmin } from '@/features/navigation/services/admin-guard';
 import { OrganizationSettingsCard } from '@/features/organization/components/organization-settings-card';
 import { useOrganizationAbsenceTypes } from '@/features/organization/hooks/use-organization-absence-types';
+import { useOrganizationHolidays } from '@/features/organization/hooks/use-organization-holidays';
 import { useOrganizationHourBands } from '@/features/organization/hooks/use-organization-hour-bands';
 import { useOrganizationJobRoles } from '@/features/organization/hooks/use-organization-job-roles';
 import { useOrganizationSettings } from '@/features/organization/hooks/use-organization-settings';
@@ -21,7 +22,8 @@ import { appLayoutRoute } from '@/pages/_app';
  * `useOrganizationSettings`; the *Satni pojasi* card's read of the bands is
  * `useOrganizationHourBands`; the *Vrste odsutnosti* card's read and its two
  * writes are `useOrganizationAbsenceTypes` (story 13.1b); the *Poslovi*
- * card's read and its writes are `useOrganizationJobRoles` (story 21.12); what the page
+ * card's read and its writes are `useOrganizationJobRoles` (story 21.12); the *Blagdani*
+ * card's writes and their checks are `useOrganizationHolidays` (story 21.17); what the page
  * deliberately does not offer is `OrganizationSettingsCard`'s.
  *
  * ADMIN ONLY (UX-DR32). The WRITES are enforced by the DATABASE:
@@ -43,6 +45,7 @@ export function OrganizacijaScreen() {
   const hourBands = useOrganizationHourBands();
   const absenceTypes = useOrganizationAbsenceTypes();
   const jobRoles = useOrganizationJobRoles();
+  const holidays = useOrganizationHolidays();
 
   return (
     <main className="mx-auto flex w-full min-w-0 max-w-5xl flex-1 flex-col gap-6 p-6">
@@ -80,6 +83,7 @@ export function OrganizacijaScreen() {
         hourBands={hourBands}
         absenceTypes={absenceTypes}
         jobRoles={jobRoles}
+        holidays={holidays}
       />
     </main>
   );

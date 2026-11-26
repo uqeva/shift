@@ -93,12 +93,17 @@ export const DEVICE_SNAPSHOT_KEY = 'shift-query-cache';
  * from it would ignore a personal rotation or a manual-only spell the
  * database holds.
  *
+ * 7 SINCE STORY 21.16: the calendar entry gained `holidays`, and its teams and
+ * the `teams` entry's rows gained `offOnHolidays`. A shape-6 snapshot has
+ * neither, and every roster derived from it would ignore a holiday a team is
+ * off on.
+ *
  * TWO BUNDLES AT ONCE. While an old and a new bundle both run (a waiting
  * service worker under `registerType: 'prompt'`, or an old tab left open),
  * each deletes the other's blob on restore. That costs offline reading until
  * the next save, never correctness: neither hydrates the other's shape.
  */
-export const DEVICE_SNAPSHOT_SHAPE = 6;
+export const DEVICE_SNAPSHOT_SHAPE = 7;
 
 /**
  * The `buster` a snapshot of `userId`'s cache is saved and restored under:

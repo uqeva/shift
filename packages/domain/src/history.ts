@@ -86,6 +86,8 @@ export const HISTORY_RECORDS = [
   'job-role',
   // Story 21.10: a member's schedule source from a date (`member_schedule_versions`, 0079).
   'schedule-version',
+  // Story 21.16: an organization's holiday (`organization_holidays`, 0080).
+  'holiday',
   // A table this build does not know yet (an audited table added after it):
   // drawn as a generic record, its fields as raw operands, never a failed read.
   'other',
@@ -219,6 +221,8 @@ export const HISTORY_FIELDS = [
   'active',
   'position',
   'archived',
+  // Story 21.16 (0080): whether a team is off on holidays.
+  'offOnHolidays',
   'isWorking',
   'shiftType',
   'rotationPattern',
@@ -315,6 +319,7 @@ const RECORD_OF_TABLE: Readonly<Record<string, HistoryRecord>> = {
   personal_assignments: 'personal-assignment',
   job_roles: 'job-role',
   member_schedule_versions: 'schedule-version',
+  organization_holidays: 'holiday',
 };
 
 /** The record an audited table holds, or `null` for a table this build does not know. */
@@ -449,6 +454,7 @@ const FIELD_OF_COLUMN: Readonly<Record<string, readonly [HistoryField, FieldType
   // Text on a team membership (0015), a number on a rotation step (0016).
   position: ['position', 'auto'],
   archived: ['archived', 'boolean'],
+  off_on_holidays: ['offOnHolidays', 'boolean'],
   is_working: ['isWorking', 'boolean'],
   shift_type_id: ['shiftType', 'shift-type'],
   pattern_id: ['rotationPattern', 'rotation-pattern'],

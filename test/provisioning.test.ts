@@ -702,7 +702,7 @@ describe('every organization table carries row level security, and only its revi
               'push_subscriptions', 'swap_requests', 'swap_request_decisions',
               'absence_types', 'leave_allowances', 'audit_events', 'team_loans',
               'calendar_feed_tokens', 'reminder_settings', 'personal_assignments',
-              'job_roles', 'member_schedule_versions'
+              'job_roles', 'member_schedule_versions', 'organization_holidays'
             )
           order by relname`,
       );
@@ -739,6 +739,8 @@ describe('every organization table carries row level security, and only its revi
         'members',
         'notification_outbox',
         'notification_settings',
+        // STORY 21.16 (0080): an organization's holidays.
+        'organization_holidays',
         'organizations',
         // STORY 21.2 (0077): the Personal Assignments, an active admin's read alone.
         'personal_assignments',
@@ -917,17 +919,18 @@ describe('every organization table carries row level security, and only its revi
       const { rows: columns } = await client.query<{ column: string; verb: string; held: boolean }>(
         `select column_name as column, verb,
                 has_column_privilege('authenticated', 'public.teams', column_name, verb) as held
-           from unnest(array['organization_id', 'id', 'name', 'archived', 'created_by', 'created_at'])
+           from unnest(array['organization_id', 'id', 'name', 'archived', 'off_on_holidays', 'created_by', 'created_at'])
                   as column_name,
                 unnest(array['INSERT', 'UPDATE']) as verb`,
       );
+      // STORY 21.16 (0080): a team's off-on-holidays flag is updated, never named on insert (it defaults false).
       expect(
         columns
           .filter((row) => row.held)
           .map((row) => `${row.verb}:${row.column}`)
           .sort(),
         'the writable team columns changed',
-      ).toEqual(['INSERT:name', 'INSERT:organization_id', 'UPDATE:archived', 'UPDATE:name']);
+      ).toEqual(['INSERT:name', 'INSERT:organization_id', 'UPDATE:archived', 'UPDATE:name', 'UPDATE:off_on_holidays']);
     } finally {
       await client.end();
     }
@@ -2038,6 +2041,67 @@ describe('every organization table carries row level security, and only its revi
     }
   });
 
+  it.skipIf(noDatabase)('holds no privilege on organization_holidays but read, a three-column insert, a rename and delete, never truncate, and attaches the lock and the re-check (story 21.16)', async () => {
+    // `authenticated` reads (an active member, by the policy), inserts the
+    // tenant, the date and the name, renames (`name` alone) and deletes; no
+    // session names an id, `created_by` or `created_at`, changes a date,
+    // truncates, or holds anything as `anon`.
+    const client = await connect();
+    try {
+      const held = await heldPrivileges(client, 'organization_holidays', [
+        'organization_id',
+        'id',
+        'date',
+        'name',
+        'created_by',
+        'created_at',
+      ]);
+      expect(held.tables).toEqual(['authenticated:DELETE', 'authenticated:SELECT']);
+      expect(held.columns, 'the writable holiday columns changed, or anon holds one').toEqual([
+        'authenticated:INSERT:date',
+        'authenticated:INSERT:name',
+        'authenticated:INSERT:organization_id',
+        'authenticated:UPDATE:name',
+      ]);
+
+      const { rows: truncate } = await client.query<{ role: string }>(
+        `select role from unnest(array['anon', 'authenticated', 'service_role']) as role
+          where has_table_privilege(role, 'public.organization_holidays', 'TRUNCATE')`,
+      );
+      expect(truncate, 'a role may truncate the audited holidays').toEqual([]);
+
+      const { rows: keys } = await client.query<{ definition: string }>(
+        `select pg_get_constraintdef(oid) as definition
+           from pg_constraint
+          where contype in ('p', 'f', 'u') and conrelid = 'public.organization_holidays'::regclass`,
+      );
+      expect(keys.map((row) => row.definition).sort()).toEqual([
+        'FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE',
+        'PRIMARY KEY (id)',
+        'UNIQUE (organization_id, date)',
+      ]);
+
+      const { rows: triggers } = await client.query<{ definition: string }>(
+        `select pg_get_triggerdef(oid) as definition from pg_trigger
+          where tgrelid = 'public.organization_holidays'::regclass and not tgisinternal
+            and tgfoid <> 'private.record_audit_event()'::regprocedure
+          order by 1`,
+      );
+      expect(triggers.map((row) => row.definition)).toEqual([
+        'CREATE TRIGGER organization_holidays_refuse_write_by_stale_admin BEFORE INSERT OR DELETE OR UPDATE ON public.organization_holidays FOR EACH ROW EXECUTE FUNCTION refuse_write_by_stale_admin()',
+        'CREATE TRIGGER organization_holidays_serialize_organization_writes BEFORE INSERT OR DELETE OR UPDATE ON public.organization_holidays FOR EACH STATEMENT EXECUTE FUNCTION serialize_organization_writes()',
+      ]);
+
+      const { rows: flag } = await client.query<{ data_type: string; is_nullable: string; column_default: string | null }>(
+        `select data_type, is_nullable, column_default from information_schema.columns
+          where table_schema = 'public' and table_name = 'teams' and column_name = 'off_on_holidays'`,
+      );
+      expect(flag).toEqual([{ data_type: 'boolean', is_nullable: 'NO', column_default: 'false' }]);
+    } finally {
+      await client.end();
+    }
+  });
+
   it.skipIf(noDatabase)('keys absence types per organization, seeds annual leave in every one, and defaults every leave record to it (story 13.1)', async () => {
     const client = await connect();
     try {
@@ -2540,7 +2604,8 @@ describe('every organization table carries row level security, and only its revi
   // tables and the two `tg_argv` each one's triggers pass the recorder — 21
   // in 0061, 22 since story 18.2's `team_loans` (0062), 23 since story 21.2's
   // `personal_assignments` (0077), 24 since story 21.12's `job_roles` (0078),
-  // 25 since story 21.10's `member_schedule_versions` (0079).
+  // 25 since story 21.10's `member_schedule_versions` (0079), 26 since story
+  // 21.16's `organization_holidays` (0080).
   const AUDITED: Readonly<Record<string, readonly [string, string]>> = {
     organizations: ['id', 'id'],
     members: ['organization_id', 'id'],
@@ -2570,9 +2635,11 @@ describe('every organization table carries row level security, and only its revi
     job_roles: ['organization_id', 'id'],
     // STORY 21.10 (0079), attached in the migration that creates it.
     member_schedule_versions: ['organization_id', 'id'],
+    // STORY 21.16 (0080), attached in the migration that creates it.
+    organization_holidays: ['organization_id', 'id'],
   };
 
-  it.skipIf(noDatabase)('keeps the change history append-only, read by authenticated alone, and records each of the 25 audited tables through exactly its two triggers (story 14.1; personal_assignments since 21.2, job_roles since 21.12, member_schedule_versions since 21.10)', async () => {
+  it.skipIf(noDatabase)('keeps the change history append-only, read by authenticated alone, and records each of the 26 audited tables through exactly its two triggers (story 14.1; personal_assignments since 21.2, job_roles since 21.12, member_schedule_versions since 21.10, organization_holidays since 21.16)', async () => {
     const client = await connect();
     try {
       // APPEND-ONLY BY PRIVILEGE: `authenticated` SELECT, and nothing else for

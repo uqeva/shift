@@ -1211,7 +1211,7 @@ describe('the person filter (story 3.3b)', () => {
         // story 7.5's team for the month requires of every person's team.
         teams: [
           ...broken.teams,
-          { id: 'archived-team', organizationId: broken.teams[0]!.organizationId, name: 'Stara smjena', archived: true },
+          { id: 'archived-team', organizationId: broken.teams[0]!.organizationId, name: 'Stara smjena', archived: true, offOnHolidays: false },
         ],
         members: broken.members.map((one) =>
           one.id === COLLEAGUE

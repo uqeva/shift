@@ -1,6 +1,11 @@
 import { rosterOn, scheduledShiftTypeOn } from '@shift/domain';
 
-import type { CalendarRosterOverride, CalendarSnapshot } from '@/features/calendar/services/snapshot';
+import {
+  holidayRuleOfCalendar,
+  type CalendarHolidayRule,
+  type CalendarRosterOverride,
+  type CalendarSnapshot,
+} from '@/features/calendar/services/snapshot';
 import {
   overrideStandingOfCalendar,
   rosterStandingOfCalendar,
@@ -88,6 +93,8 @@ export interface ReplacementContext {
   readonly typeInForce: ReturnType<typeof overrideStandingOfCalendar>['inForce'];
   readonly rosterInForce: ReturnType<typeof rosterStandingOfCalendar>['inForce'];
   readonly overrides: ReadonlyMap<string, CalendarRosterOverride>;
+  /** STORY 21.16: the snapshot's holiday rule, built once for the context. */
+  readonly holidays: CalendarHolidayRule;
 }
 
 /**
@@ -103,6 +110,7 @@ export function replacementContextOf(snapshot: CalendarSnapshot): ReplacementCon
     typeInForce: overrideStandingOfCalendar(snapshot).inForce,
     rosterInForce: rosterStandingOfCalendar(snapshot).inForce,
     overrides: new Map(snapshot.rosterOverrides.map((override) => [override.id, override])),
+    holidays: holidayRuleOfCalendar(snapshot),
   };
 }
 
@@ -130,9 +138,13 @@ export function replacementStandingIn(context: ReplacementContext, link: Replace
     context.typeInForce,
     teamId,
     date,
+    context.holidays,
   );
 
-  if (scheduled === null || !context.working.has(scheduled.shiftTypeId)) return { kind: REPLACEMENT_NOT_APPLIED, override };
+  // STORY 21.16: a team a holiday empties (`shiftTypeId: null`) works no shift, so no replacement applies on it.
+  if (scheduled === null || scheduled.shiftTypeId === null || !context.working.has(scheduled.shiftTypeId)) {
+    return { kind: REPLACEMENT_NOT_APPLIED, override };
+  }
 
   const applied = rosterOn(snapshot.members, context.rosterInForce, teamId, date).applied;
 
@@ -174,6 +186,8 @@ function decidedOnAnotherShiftIn(context: ReplacementContext, resolution: Confli
     context.typeInForce,
     resolution.teamId,
     resolution.date,
+    // STORY 21.16: a holiday the team is off on leaves no type, which is another shift than the stored one.
+    context.holidays,
   );
 
   return scheduled?.shiftTypeId !== resolution.shiftTypeId;

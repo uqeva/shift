@@ -68,6 +68,8 @@ async function widenWithTeams(page: Page, count: number): Promise<void> {
           id: randomUUID(),
           name: `Širina ${String(index + 1).padStart(2, '0')}`,
           archived: false,
+          // Story 21.16 (0080): every team row carries its holiday flag, and the read refuses one without it.
+          off_on_holidays: false,
         });
       }
     }

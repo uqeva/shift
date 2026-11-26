@@ -47,6 +47,10 @@ export const SETTINGS_SCREEN_PARTS = {
   // its read and its writes.
   jobRoles: ['features', 'organization', 'components', 'organization-job-roles-card.tsx'],
   jobRolesHook: ['features', 'organization', 'hooks', 'use-organization-job-roles.ts'],
+  // STORY 21.17: the *Blagdani* card, with its dialogs, and the hook holding
+  // its checks and its writes.
+  holidays: ['features', 'organization', 'components', 'organization-holidays-card.tsx'],
+  holidaysHook: ['features', 'organization', 'hooks', 'use-organization-holidays.ts'],
   accentLabel: ['features', 'organization', 'utils', 'accent-label.ts'],
 } as const;
 

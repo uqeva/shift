@@ -9,11 +9,13 @@ import { OrganizationEmailNotificationsCard } from '@/features/organization/comp
 import { OrganizationMinimumMembersCard } from '@/features/organization/components/organization-minimum-members-card';
 import { OrganizationFireRanksCard } from '@/features/organization/components/organization-fire-ranks-card';
 import { OrganizationHourBandsCard } from '@/features/organization/components/organization-hour-bands-card';
+import { OrganizationHolidaysCard } from '@/features/organization/components/organization-holidays-card';
 import { OrganizationJobRolesCard } from '@/features/organization/components/organization-job-roles-card';
 import { OrganizationProfileCard } from '@/features/organization/components/organization-profile-card';
 import { OrganizationTimeCard } from '@/features/organization/components/organization-time-card';
 import type { OrganizationAbsenceTypes } from '@/features/organization/hooks/use-organization-absence-types';
 import type { OrganizationHourBands } from '@/features/organization/hooks/use-organization-hour-bands';
+import type { OrganizationHolidays } from '@/features/organization/hooks/use-organization-holidays';
 import type { OrganizationJobRoles } from '@/features/organization/hooks/use-organization-job-roles';
 import type { OrganizationSettings } from '@/features/organization/hooks/use-organization-settings';
 import { ORGANIZATION_READ_RETRY_ID } from '@/features/organization/utils/element-ids';
@@ -31,7 +33,9 @@ import { keepFocusOnAlert } from '@/utils/retry-focus';
  * and an eighth, *Vrste odsutnosti* (story 13.1b), the absence types with one
  * dialog to add a type or edit one; and a ninth, *Poslovi* (story 21.12), the
  * job roles with one dialog to add or rename a role and each row's archive or
- * restore. No field is mounted on the page.
+ * restore; and a tenth, *Blagdani* (story 21.17), a year's holidays with the
+ * add, rename, removal and the official list's import, each change but a
+ * rename shown in *Što se mijenja* first. No field is mounted on the page.
  *
  * WHAT IS DELIBERATELY NOT HERE:
  *
@@ -58,11 +62,13 @@ export function OrganizationSettingsCard({
   hourBands,
   absenceTypes,
   jobRoles,
+  holidays,
 }: {
   readonly settings: OrganizationSettings;
   readonly hourBands: OrganizationHourBands;
   readonly absenceTypes: OrganizationAbsenceTypes;
   readonly jobRoles: OrganizationJobRoles;
+  readonly holidays: OrganizationHolidays;
 }): ReactNode {
   const { snapshot, answered, organization, readFailure, readRetry, readAttempts, retryRead } = settings;
 
@@ -102,6 +108,7 @@ export function OrganizationSettingsCard({
         <OrganizationHourBandsCard hourBands={hourBands} />
         <OrganizationAbsenceTypesCard absenceTypes={absenceTypes} />
         <OrganizationJobRolesCard jobRoles={jobRoles} />
+        <OrganizationHolidaysCard holidays={holidays} />
       </>
     );
   }

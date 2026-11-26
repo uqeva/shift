@@ -46,6 +46,7 @@ import {
   CONFLICT_RESOLUTION_HELD_DEPENDENTS,
   CONFLICT_RESOLUTION_WRITE_DEPENDENTS,
   ABSENCE_TYPE_WRITE_DEPENDENTS,
+  HOLIDAY_WRITE_DEPENDENTS,
   JOB_ROLE_WRITE_DEPENDENTS,
   MEMBER_JOB_ROLE_SAVE_DEPENDENTS,
   HOUR_BAND_WRITE_DEPENDENTS,
@@ -64,6 +65,7 @@ import {
   SWAP_REQUEST_WRITE_DEPENDENTS,
   TEAM_CHANGE_DEPENDENTS,
   TEAM_CREATE_DEPENDENTS,
+  TEAM_HOLIDAY_FLAG_DEPENDENTS,
   refreshAfterWrite,
   retryRead,
   type InvalidatingClient,
@@ -506,6 +508,40 @@ describe('the reads a team or membership write makes stale', () => {
       // Its own list, the members list that embeds each member's role, and
       // the calendar snapshot whose day detail names it.
       stale: [MEMBERS_LIST_KEY, CALENDAR_KEY, JOB_ROLES_LIST_KEY],
+    },
+    {
+      write: 'a holiday added, imported or removed (story 21.17)',
+      own: CALENDAR_KEY,
+      dependents: HOLIDAY_WRITE_DEPENDENTS,
+      // The snapshot that carries every holiday, and the leave and
+      // resolutions the conflicts queue derives beside it.
+      stale: [
+        CALENDAR_KEY,
+        ORGANIZATION_LEAVE_RECORDS_KEY,
+        LEAVE_OVERVIEW_RECORDS_KEY,
+        MY_CONFLICT_RESOLUTIONS_KEY,
+        ORGANIZATION_CONFLICT_RESOLUTIONS_KEY,
+      ],
+    },
+    {
+      write: "a team's Ne radi na blagdane changed (story 21.17)",
+      own: TEAMS_LIST_KEY,
+      dependents: TEAM_HOLIDAY_FLAG_DEPENDENTS,
+      // The teams list and the rotation read carry the flag; the snapshot's
+      // holiday rule reads it; the queue's leave and resolutions beside it.
+      stale: [
+        TEAMS_LIST_KEY,
+        MEMBERS_LIST_KEY,
+        OWN_TEAM_KEY,
+        ROSTER_A,
+        ROSTER_B,
+        ROTATION_KEY,
+        CALENDAR_KEY,
+        ORGANIZATION_LEAVE_RECORDS_KEY,
+        LEAVE_OVERVIEW_RECORDS_KEY,
+        MY_CONFLICT_RESOLUTIONS_KEY,
+        ORGANIZATION_CONFLICT_RESOLUTIONS_KEY,
+      ],
     },
     {
       write: 'a member saved with a changed job role (story 21.12)',

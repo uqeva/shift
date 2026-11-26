@@ -528,6 +528,14 @@ const SOURCES = [
   //   - `logo-url.ts`, the one signed-URL read behind every lockup, holding the
   //     query key, the cache bound and the stable code both surfaces use.
   ...organizationScreenParts(),
+  // Story 21.17: the holidays' rules — the official names of the import's
+  // codes and the refusals and confirmations of *Blagdani* and of the team
+  // dialog's *Ne radi na blagdane*, each a return-type union — the check the
+  // two surfaces stand on, and *Što se mijenja*'s body they share.
+  join(webRoot, 'src', 'features', 'holidays', 'services', 'holidays.ts'),
+  join(webRoot, 'src', 'features', 'holidays', 'services', 'holiday-check.ts'),
+  join(webRoot, 'src', 'features', 'holidays', 'services', 'write.ts'),
+  join(webRoot, 'src', 'features', 'holidays', 'components', 'holiday-check-body.tsx'),
   // The navigation chrome, part B. `chrome.tsx` is the only thing in the
   // application that renders a `nav.*` label more than once — every destination
   // appears in the tab bar and in the sidebar — and the eight words are held to
@@ -1026,8 +1034,9 @@ describe('the build being read reflects the current localization source', () => 
     // component; thirteen since the list-refresh fix: the write dependents;
     // seventeen since story 7.17: the roster lines, and the member directory's
     // rules, hook and component; eighteen since story 8.2b: the directory's
-    // and the roster's offline surface keys.
-    expect(parts, 'the teams feature grew or lost a module').toHaveLength(18);
+    // and the roster's offline surface keys; nineteen since story 21.17: the
+    // team dialog's *Ne radi na blagdane* element ids.
+    expect(parts, 'the teams feature grew or lost a module').toHaveLength(19);
     for (const page of TEAM_PAGES) expect(SOURCES, `${page} is not in SOURCES`).toContain(page);
     expect([...parts].sort(), 'the feature holds a module no set and no rule list names').toEqual(
       [...TEAMS_SOURCES_REQUIRED].sort(),

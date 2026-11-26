@@ -27,7 +27,8 @@ import { FIXTURES, connect, localApiEndpoint, noDatabase, organizationId } from 
  * COMMITTED SCENE: PostgREST reads only what is committed, so the scene is
  * written as the OWNER before any request (each row naming the fixture
  * admin as `created_by`), and `afterAll` deletes it with the outbox rows its
- * notification triggers wrote, by subject. Its exceptions are 150–166 days
+ * notification triggers wrote, by subject (story 21.16: and its holidays,
+ * and the loan team's off-on-holidays flag reset). Its exceptions are 150–166 days
  * ahead, inside the window and clear of the seed, with rows wholly before,
  * across and after the window's edges. The seed gives nobody a team, so the
  * member's one team is the loan: the override and the leave fall inside it,
@@ -88,9 +89,22 @@ interface SceneIds {
   /** Story 21.10: the schedule versions (0079), and the pattern only they name. */
   readonly versions: string[];
   readonly patterns: string[];
+  /** Story 21.16: the holidays (0080), and the teams the scene marked off on holidays with each one's earlier flag. */
+  readonly holidays: string[];
+  readonly offTeams: { readonly id: string; readonly was: boolean }[];
 }
 
-const scene: SceneIds = { loans: [], rosterOverrides: [], overrides: [], leave: [], assignments: [], versions: [], patterns: [] };
+const scene: SceneIds = {
+  loans: [],
+  rosterOverrides: [],
+  overrides: [],
+  leave: [],
+  assignments: [],
+  versions: [],
+  patterns: [],
+  holidays: [],
+  offTeams: [],
+};
 
 interface Viewer {
   readonly memberId: string;
@@ -119,8 +133,19 @@ interface SceneRows {
   readonly personalPattern: string;
 }
 
+/** Story 21.16: the scene's holidays — before, in and after the window — and the loan team, marked off on holidays. */
+interface SceneHolidays {
+  /** In the window, by date: the override's date (the override wins, R13.3) and a free date inside the loan. */
+  readonly inWindow: readonly string[];
+  /** Wholly before and after the window: never carried. */
+  readonly outside: readonly string[];
+  /** The free date inside the loan, where the loan team works nothing (R13.2). */
+  readonly emptied: string;
+}
+
 interface FixtureScene {
   readonly rows: SceneRows;
+  readonly holidays: SceneHolidays;
   readonly fixture: string;
   readonly organization: string;
   readonly window: { readonly from: string; readonly to: string };
@@ -299,6 +324,44 @@ async function buildScene(client: Client, fixture: (typeof FIXTURES)[number]): P
     await versionOf(manualFrom, 'MANUAL', null, null),
   );
 
+  // Story 21.16: holidays before, in and after the window, and the loan team off on holidays, so both
+  // sides carry the dates in the window by date and the off team, and R12 is seen dropping its shift.
+  // THE EMPTIED DATE is read from the server's R12 of the member BEFORE any holiday exists: the first
+  // date of the loan where the member works a shift of the loan team, clear of every other scene date,
+  // so the holiday has a shift to remove on every run date (the seed rotations have off days).
+  const windowFrom = await at(-31);
+  const windowTo = await at(182);
+  const busy = new Set([rosterDate, overrideDate, await at(157), leaveFrom, leaveTo, halfDate]);
+  const before = await one<{ inputs: ScheduleInputs | null }>(
+    client,
+    'select private.member_schedule_inputs($1::uuid, $2::date, $3::date) as inputs',
+    [member.id, windowFrom, windowTo],
+  );
+  if (before.inputs === null) throw new Error(`${fixture.slug}: the member has no assembly`);
+  const lentShift = atWorkShiftsOf(before.inputs, loanFrom, loanTo).find(
+    (shift) => shift.teamId === lentTo && shift.personalAssignmentId === undefined && !busy.has(shift.date),
+  );
+  if (lentShift === undefined) throw new Error(`${fixture.slug}: the member works no free date of the loan`);
+  const holidayOf = async (date: string) => {
+    const id = await inserted(
+      `insert into organization_holidays (organization_id, date, name, created_by)
+       values ($1, $2::date, 'Paritet blagdan', $3) returning id`,
+      [organization, date, admin.authUserId],
+    );
+    scene.holidays.push(id);
+    return date;
+  };
+  const emptied = await holidayOf(lentShift.date);
+  const onOverride = await holidayOf(overrideDate);
+  const holidaysOutside = [await holidayOf(await at(-40)), await holidayOf(await at(200))];
+  const flag = await one<{ was: boolean }>(
+    client,
+    'select off_on_holidays as was from teams where id = $1',
+    [lentTo],
+  );
+  scene.offTeams.push({ id: lentTo, was: flag.was });
+  await client.query('update teams set off_on_holidays = true where id = $1', [lentTo]);
+
   const viewers = (
     await client.query<Viewer>(
       `select m.id as "memberId", u.email
@@ -327,10 +390,11 @@ async function buildScene(client: Client, fixture: (typeof FIXTURES)[number]): P
       bystander: bystander.id,
       personalPattern,
     },
+    holidays: { inWindow: [onOverride, emptied].sort(), outside: holidaysOutside, emptied },
     dates: { override: overrideDate, fullDay: [leaveFrom, leaveTo], halfDay: halfDate, workingType: working.id, personalFrom, manualFrom },
     fixture: fixture.fixture,
     organization,
-    window: { from: await at(-31), to: await at(182) },
+    window: { from: windowFrom, to: windowTo },
     viewers,
   };
 }
@@ -369,6 +433,11 @@ afterAll(async () => {
     );
     await client.query('delete from rotation_steps where pattern_id = any($1::uuid[])', [scene.patterns]);
     await client.query('delete from rotation_patterns where id = any($1::uuid[])', [scene.patterns]);
+    // Story 21.16: the holidays (they notify nobody, E-3), and each flagged team's earlier flag restored.
+    await client.query('delete from organization_holidays where id = any($1::uuid[])', [scene.holidays]);
+    for (const team of scene.offTeams) {
+      await client.query('update teams set off_on_holidays = $2 where id = $1', [team.id, team.was]);
+    }
     await client.query('commit');
   } finally {
     await client.query('rollback').catch(() => undefined);
@@ -511,6 +580,8 @@ describe('read parity: the server assembly equals the browser\'s read (AD-19)', 
     expect(scene.leave).toHaveLength(10);
     expect(scene.assignments).toHaveLength(6);
     expect(scene.versions).toHaveLength(4);
+    expect(scene.holidays).toHaveLength(8);
+    expect(scene.offTeams).toHaveLength(2);
   });
 
   for (const fixture of FIXTURES) {
@@ -571,6 +642,11 @@ describe('read parity: the server assembly equals the browser\'s read (AD-19)', 
         ).toEqual(['PERSONAL', 'MANUAL']);
         expect(inputs.steps.filter((step) => step.patternId === rows.personalPattern), `${one.fixture}: the personal pattern's steps`).toHaveLength(2);
         expect(inputs.assignments.some((assignment) => assignment.patternId === rows.personalPattern), `${one.fixture}: a team uses the pattern`).toBe(false);
+        // Story 21.16: the holidays dated in the window, by date, never their names; the off team by id.
+        expect(inputs.holidays, `${one.fixture}: the holidays in the window`).toEqual(one.holidays.inWindow);
+        for (const date of one.holidays.outside) expect(inputs.holidays, `${one.fixture}: a holiday outside the window`).not.toContain(date);
+        expect(inputs.teamsOffOnHolidays, `${one.fixture}: the teams off on holidays`).toEqual([rows.lentTo]);
+        expect(JSON.stringify(inputs)).not.toMatch(/Paritet blagdan/);
 
         // R12 over it, so the parity above is not of empty projections: on the lent team, the
         // confirmed override replaces the date's type, the full days hold nothing, the half day
@@ -586,6 +662,24 @@ describe('read parity: the server assembly equals the browser\'s read (AD-19)', 
         for (const shift of shifts.filter((candidate) => candidate.date === dates.halfDay)) {
           expect(shift.workedHalf, `${one.fixture}: the half day`).toBe('SECOND');
         }
+        // Story 21.16: the loan team works nothing on the free holiday, and every other shift is as with no
+        // holiday; on the override's date the override wins (R13.3), so that shift stays.
+        const plain = atWorkShiftsOf({ ...inputs, holidays: [], teamsOffOnHolidays: [] }, one.window.from, one.window.to);
+        // Not vacuous: with no rule, the member works the loan team's shift on the emptied holiday.
+        expect(
+          plain.filter((shift) => shift.date === one.holidays.emptied && shift.teamId === rows.lentTo).length,
+          `${one.fixture}: no shift for the holiday to remove`,
+        ).toBeGreaterThan(0);
+        expect(
+          shifts,
+          `${one.fixture}: the holiday's shifts`,
+        ).toEqual(
+          plain.filter(
+            (shift) => !(shift.date === one.holidays.emptied && shift.teamId === rows.lentTo && shift.personalAssignmentId === undefined),
+          ),
+        );
+        expect(shifts.filter((shift) => shift.date === one.holidays.emptied && shift.teamId === rows.lentTo), one.fixture).toEqual([]);
+        expect(shifts.filter((shift) => shift.date === dates.override).length, `${one.fixture}: the override on a holiday`).toBe(1);
         // Story 21.2: the member's working assignment is a Personal Shift, marked with its id.
         expect(
           shifts.filter((shift) => shift.personalAssignmentId === rows.assignments[0]).map((shift) => shift.shiftTypeId),

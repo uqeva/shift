@@ -304,6 +304,7 @@ const RECORD_KEYS: Readonly<Record<HistoryRecord, ReturnType<typeof historyRecor
   'personal-assignment': 'history.record.personalAssignment',
   'job-role': 'history.record.jobRole',
   'schedule-version': 'history.record.scheduleVersion',
+  holiday: 'history.record.holiday',
   other: 'history.record.other',
 };
 
@@ -337,6 +338,7 @@ export function historyRecordMessageKey(
   | 'history.record.personalAssignment'
   | 'history.record.jobRole'
   | 'history.record.scheduleVersion'
+  | 'history.record.holiday'
   | 'history.record.other' {
   return RECORD_KEYS[record];
 }
@@ -416,6 +418,7 @@ const FIELD_KEYS: Readonly<Record<HistoryField, ReturnType<typeof historyFieldMe
   active: 'history.field.active',
   position: 'history.field.position',
   archived: 'history.field.archived',
+  offOnHolidays: 'history.field.offOnHolidays',
   isWorking: 'history.field.isWorking',
   shiftType: 'history.field.shiftType',
   rotationPattern: 'history.field.rotationPattern',
@@ -484,6 +487,7 @@ export function historyFieldMessageKey(
   | 'history.field.active'
   | 'history.field.position'
   | 'history.field.archived'
+  | 'history.field.offOnHolidays'
   | 'history.field.isWorking'
   | 'history.field.shiftType'
   | 'history.field.rotationPattern'

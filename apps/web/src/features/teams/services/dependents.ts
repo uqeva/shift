@@ -122,6 +122,33 @@ export const MEMBER_JOB_ROLE_SAVE_DEPENDENTS: readonly QueryKey[] = [...MEMBER_S
  */
 export const JOB_ROLE_WRITE_DEPENDENTS: readonly QueryKey[] = [MEMBERS_LIST_KEY, CALENDAR_KEY];
 
+/**
+ * A holiday added, imported or removed (story 21.17), its own key the
+ * calendar snapshot that carries every holiday: the organization's live leave
+ * and its resolutions, which the conflicts queue derives beside the snapshot,
+ * so a holiday that erased a conflict takes it off the queue on the next
+ * read, as a roster change's does (both resolution reads). A rename changes
+ * no date: it re-reads the calendar snapshot alone (`NO_DEPENDENTS`).
+ */
+export const HOLIDAY_WRITE_DEPENDENTS: readonly QueryKey[] = [
+  ORGANIZATION_LEAVE_RECORDS_KEY,
+  LEAVE_OVERVIEW_RECORDS_KEY,
+  ORGANIZATION_CONFLICT_RESOLUTIONS_KEY,
+  MY_CONFLICT_RESOLUTIONS_KEY,
+];
+
+/**
+ * A team's *Ne radi na blagdane* changed (story 21.17), its own key the teams
+ * list that carries the flag: every read a team change makes stale (the
+ * rotation read embeds every team's columns, the calendar snapshot's holiday
+ * rule reads it), and the leave and both resolution reads a holiday write
+ * re-reads.
+ */
+export const TEAM_HOLIDAY_FLAG_DEPENDENTS: readonly QueryKey[] = [
+  ...TEAM_CHANGE_DEPENDENTS,
+  ...HOLIDAY_WRITE_DEPENDENTS,
+];
+
 /** An hour band added, changed or removed (story 4.1b): the snapshot *Sati* derives band hours from. */
 export const HOUR_BAND_WRITE_DEPENDENTS: readonly QueryKey[] = [CALENDAR_KEY];
 

@@ -1,7 +1,7 @@
 import { queryOptions } from '@tanstack/react-query';
 import { collisionKeyOf, scheduledShiftTypeOn, type LeaveHalf } from '@shift/domain';
 
-import type { CalendarSnapshot, CalendarSurfaceState } from '@/features/calendar/services/snapshot';
+import { holidayRuleOfCalendar, type CalendarSnapshot, type CalendarSurfaceState } from '@/features/calendar/services/snapshot';
 import { unknownSnapshotIdsOf } from '@/features/calendar/services/snapshot-skew';
 import { overrideStandingOfCalendar, typeRangeOn, workingShiftTypeIdsOf } from '@/features/calendar/utils/month';
 import {
@@ -368,6 +368,7 @@ export function resolvedConflictsViewOf(
   const types = new Map(snapshot.types.map((type) => [type.id, type]));
   const overrides = new Map(snapshot.rosterOverrides.map((override) => [override.id, override]));
 
+  const holidays = holidayRuleOfCalendar(snapshot);
   const entries = resolutions.map((resolution) => {
     const key = collisionKeyOf(resolution);
     const row = raw.get(key);
@@ -390,10 +391,15 @@ export function resolvedConflictsViewOf(
       typeInForce,
       resolution.teamId,
       resolution.date,
+      // STORY 21.16 (R13.3): a team off on a holiday answers no type, which is no working shift.
+      holidays,
     );
     const stored = resolution.shiftTypeId === null ? undefined : types.get(resolution.shiftTypeId);
     const type =
-      stored ?? (scheduled === null || !working.has(scheduled.shiftTypeId) ? undefined : types.get(scheduled.shiftTypeId));
+      stored ??
+      (scheduled === null || scheduled.shiftTypeId === null || !working.has(scheduled.shiftTypeId)
+        ? undefined
+        : types.get(scheduled.shiftTypeId));
     const link =
       resolution.kind === REPLACE_MEMBER && resolution.rosterOverrideId !== null
         ? overrides.get(resolution.rosterOverrideId)

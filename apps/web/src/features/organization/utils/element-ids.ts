@@ -143,3 +143,35 @@ export const ORGANIZATION_JOB_ROLE_ERROR_ID = 'organization-job-role-error';
 export const ORGANIZATION_JOB_ROLE_SAVE_ID = 'organization-job-role-save';
 /** The card's own refusal of an archive or a restore, which the row's button points at. */
 export const ORGANIZATION_JOB_ROLES_ERROR_ID = 'organization-job-roles-error';
+
+/**
+ * *Blagdani* (story 21.17): the card's heading, its year, its add and import
+ * buttons and its own refusal; the one add-or-rename dialog's title, date and
+ * name fields, past-date warning, refusal and save; *Što se mijenja*'s title
+ * and save; and the erasure confirmation's id prefix. Its own ids, as the
+ * job role dialog's are.
+ */
+export const ORGANIZATION_HOLIDAYS_HEADING_ID = 'organization-holidays-heading';
+export const ORGANIZATION_HOLIDAYS_YEAR_ID = 'organization-holidays-year';
+export const ORGANIZATION_HOLIDAYS_ADD_ID = 'organization-holidays-add';
+export const ORGANIZATION_HOLIDAYS_IMPORT_ID = 'organization-holidays-import';
+export const ORGANIZATION_HOLIDAYS_ERROR_ID = 'organization-holidays-error';
+export const ORGANIZATION_HOLIDAY_DIALOG_HEADING_ID = 'organization-holiday-dialog-heading';
+export const ORGANIZATION_HOLIDAY_DATE_FIELD_ID = 'organization-holiday-date';
+export const ORGANIZATION_HOLIDAY_NAME_FIELD_ID = 'organization-holiday-name';
+export const ORGANIZATION_HOLIDAY_PAST_ID = 'organization-holiday-past';
+export const ORGANIZATION_HOLIDAY_ERROR_ID = 'organization-holiday-error';
+export const ORGANIZATION_HOLIDAY_SAVE_ID = 'organization-holiday-save';
+export const ORGANIZATION_HOLIDAY_PREVIEW_HEADING_ID = 'organization-holiday-preview-heading';
+export const ORGANIZATION_HOLIDAY_CONFIRM_ID = 'organization-holiday-confirm';
+export const ORGANIZATION_HOLIDAY_ERASURES_ID = 'organization-holiday-erasures';
+/** The card's own confirmation line, and its read's retry. */
+export const ORGANIZATION_HOLIDAYS_STATUS_ID = 'organization-holidays-status';
+export const ORGANIZATION_HOLIDAYS_RETRY_ID = 'organization-holidays-retry';
+/** What the date is described by after a refusal: the past-date line AND the refusal. */
+export const ORGANIZATION_HOLIDAY_DATE_REFUSED_DESCRIPTION = `${ORGANIZATION_HOLIDAY_PAST_ID} ${ORGANIZATION_HOLIDAY_ERROR_ID}`;
+
+/** A holiday row's *Ukloni*: where focus goes back after its refused check. */
+export function organizationHolidayRemoveId(holidayId: string): string {
+  return `organization-holiday-remove-${holidayId}`;
+}

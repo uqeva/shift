@@ -392,7 +392,11 @@ describe('the member list reads once, under one key', () => {
       name: 'the team edit form',
       file: TEAM_EDIT,
       hookFile: TEAM_EDIT_HOOK,
-      refreshes: ['queryClient, TEAMS_LIST_KEY, landed ? TEAM_CHANGE_DEPENDENTS : NO_DEPENDENTS'],
+      // STORY 21.17: the flag's landed write re-reads its own dependents.
+      refreshes: [
+        'queryClient, TEAMS_LIST_KEY, landed ? TEAM_CHANGE_DEPENDENTS : NO_DEPENDENTS',
+        'queryClient, TEAMS_LIST_KEY, TEAM_HOLIDAY_FLAG_DEPENDENTS',
+      ],
     },
   ])('reads the teams exactly once, under the one team key, on $name', ({ file, hookFile, refreshes }) => {
     // STORY 1.7a, AD-13. The rows, both counts and the edited team all come

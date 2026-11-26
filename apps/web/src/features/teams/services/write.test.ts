@@ -44,7 +44,7 @@ import {
 /** Story 1.7a's write half, executed rather than read (AD-15). */
 
 const ORGANIZATION = '00000000-0000-4000-8000-000000000001';
-const ACTIVE: TeamRow = { id: 't1', organizationId: ORGANIZATION, name: 'Prvi', archived: false };
+const ACTIVE: TeamRow = { id: 't1', organizationId: ORGANIZATION, name: 'Prvi', archived: false, offOnHolidays: false };
 const ARCHIVED: TeamRow = { ...ACTIVE, id: 't2', archived: true };
 
 /** A read's surface state: rows (or none), and whether the read is failing. */

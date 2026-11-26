@@ -49,6 +49,7 @@ import {
   type CalendarReadFailure,
   type CalendarRosterOverride,
   type CalendarSnapshot,
+  holidayRuleOfCalendar,
   minimumOfCalendar,
 } from '@/features/calendar/services/snapshot';
 import { lentFromShownOf, loanNoticeShownOf, type LentFrom, type LoanNotice } from '@/features/calendar/utils/loan-marks';
@@ -1256,7 +1257,7 @@ export type SnapshotScheduleInput = Omit<MemberScheduleInput, 'memberId' | 'memb
 
 /**
  * The snapshot-wide part of every member's schedule input: every rotation,
- * and the shift-type and roster overrides IN FORCE — the standings walk every
+ * the holiday rule (story 21.16, `holidayRuleOfCalendar`), and the shift-type and roster overrides IN FORCE — the standings walk every
  * override, so a table of members works them out once (Epic 4 retro, C8).
  */
 export function snapshotScheduleInputOf(snapshot: CalendarSnapshot): SnapshotScheduleInput {
@@ -1267,6 +1268,8 @@ export function snapshotScheduleInputOf(snapshot: CalendarSnapshot): SnapshotSch
     members: snapshot.members,
     rosterOverrides: rosterStandingOfCalendar(snapshot).inForce,
     workingShiftTypeIds: workingShiftTypeIdsOf(snapshot),
+    // STORY 21.16 (R13): the one recipe; `{}` with no holiday or no team off, so the input is as before.
+    ...holidayRuleOfCalendar(snapshot),
   };
 }
 
@@ -1499,6 +1502,8 @@ export function calendarMonthOf(
       members: snapshot.members,
       rosterOverrides: rosterStandingOfCalendar(snapshot).inForce,
       workingShiftTypeIds: workingShiftTypeIdsOf(snapshot),
+      // STORY 21.16 (R13.3): a team off on a holiday works no shift that date.
+      ...holidayRuleOfCalendar(snapshot),
     },
     month,
   );

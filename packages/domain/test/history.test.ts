@@ -104,9 +104,11 @@ describe('the kind of an event', () => {
     ['job_roles', 'job-role'],
     // Story 21.10: a member's schedule source from a date (0079).
     ['member_schedule_versions', 'schedule-version'],
+    // Story 21.16: an organization's holiday (0080).
+    ['organization_holidays', 'holiday'],
   ];
 
-  it('names one record per audited table, all 26, and nothing else', () => {
+  it('names one record per audited table, all 27, and nothing else', () => {
     expect(TABLES.map(([table]) => historyRecordOf(table))).toEqual(TABLES.map(([, record]) => record));
     expect(new Set([...TABLES.map(([, record]) => record), 'other'])).toEqual(new Set(HISTORY_RECORDS));
     expect(historyRecordOf('audit_events')).toBeNull();
@@ -1147,7 +1149,7 @@ describe('every real change names a field (retro A4)', () => {
     );
   });
 
-  /** Every column of the 26 audited tables as 0002–0079 leave them (0067's recorder drops `token_hash` and `last_fetched_at`), with a value of its type. */
+  /** Every column of the 27 audited tables as 0002–0080 leave them (0067's recorder drops `token_hash` and `last_fetched_at`), with a value of its type. */
   const AT = '2026-11-10T08:00:00+00:00';
   const BOOKKEEPING = { organization_id: ORG, created_by: ANA_AUTH, created_at: AT };
   const LIVE = { removed_by: null, removed_at: null };
@@ -1201,7 +1203,8 @@ describe('every real change names a field (retro A4)', () => {
       effective_from: '2026-11-01',
       position: 'leader',
     },
-    teams: { ...BOOKKEEPING, id: TEAM_A, name: 'A', archived: false },
+    // Story 21.16 (0080): a team's off-on-holidays flag is a field like `archived`.
+    teams: { ...BOOKKEEPING, id: TEAM_A, name: 'A', archived: false, off_on_holidays: false },
     hour_bands: { organization_id: ORG, id: 'b', name: 'Noć', start_time: '22:00:00', created_at: AT },
     shift_types: { ...BOOKKEEPING, id: 's', name: 'Dan', is_working: true, archived: false },
     shift_type_versions: {
@@ -1344,6 +1347,8 @@ describe('every real change names a field (retro A4)', () => {
       pattern_id: 'pattern-1',
       offset_step_id: 'step-1',
     },
+    // Story 21.16 (0080): an organization's holiday, renamed in place.
+    organization_holidays: { ...BOOKKEEPING, id: 'oh', date: '2026-11-18', name: 'Dan sjećanja' },
   };
 
   /** A different value of the same type. */
@@ -1360,7 +1365,7 @@ describe('every real change names a field (retro A4)', () => {
 
   const LIFECYCLE_AT = new Set(['removed_at', 'confirmed_at', 'closed_at', 'answered_at']);
 
-  it('covers the 26 audited tables', () => {
+  it('covers the 27 audited tables', () => {
     expect(Object.keys(AUDITED).map((table) => historyRecordOf(table))).not.toContain(null);
     expect(new Set(Object.keys(AUDITED).map((table) => historyRecordOf(table)))).toEqual(
       new Set(HISTORY_RECORDS.filter((record) => record !== 'other')),

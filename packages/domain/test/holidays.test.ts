@@ -98,16 +98,29 @@ function guardedFiguresOf(organization: Organization) {
 
 type ParityOrganization = (typeof PARITY_FIXTURES)[number]['organization'];
 
+/** Story 21.16's fixture rows that only a holiday makes meaningful: the override on A's holiday and m2's assignment on B's. */
+const HOLIDAY_ROWS = new Set(['pilot-holiday-override', 'uj5-holiday-assignment']);
+
+
 /**
  * R12 for every member of both parity fixtures, over the whole parity window, with `lists` in each assembly.
  * Story 21.10 gave the fixtures schedule versions after this file's baseline (b130440) was pinned, so they are
- * emptied here (`[]` derives exactly as none, R15.6): the digest stays the claim about holidays alone.
+ * emptied here (`[]` derives exactly as none, R15.6): the digest stays the claim about holidays alone. Story
+ * 21.16 gave them a holiday rule of their own, which is stripped, so `lists` is the only rule.
  */
 function atWorkOf(listsOf: (organization: ParityOrganization) => HolidayLists | undefined) {
-  return PARITY_FIXTURES.map(({ fixture, organization: given }) => {
+  return PARITY_FIXTURES.map(({ fixture, organization: fixtureOrganization }) => {
+    // Story 21.16 gave the fixtures their own holiday rule; stripped, so `lists` alone decides.
+    const { holidays: _holidays, teamsOffOnHolidays: _off, ...given } = fixtureOrganization;
     const organization = {
       ...given,
-      members: given.members.map((member) => ({ ...member, scheduleVersions: [] })),
+      // And its two companions, the override on A's holiday and m2's assignment on B's.
+      overrides: given.overrides.filter((one) => !HOLIDAY_ROWS.has(one.id)),
+      members: given.members.map((member) => ({
+        ...member,
+        scheduleVersions: [],
+        personalAssignments: member.personalAssignments.filter((one) => !HOLIDAY_ROWS.has(one.id)),
+      })),
     } as unknown as ParityOrganization;
     const lists = listsOf(organization);
     return {
@@ -195,6 +208,56 @@ describe('R13.5 — the guard is not vacuous', () => {
     const holidays = ['2026-04-05', '2026-11-18', '2027-05-30'];
     const digest = digestOf(atWorkOf((organization) => ({ holidays, teamsOffOnHolidays: organization.teams.map((team) => team.id) })));
     expect(digest).not.toBe(BEFORE_HOLIDAYS['at-work']);
+  });
+});
+
+describe('story 21.16 — the parity fixtures carry a holiday rule of their own', () => {
+  it("R12: the off team's shifts on its holidays are gone, and every other shift is as before", () => {
+    for (const { fixture, organization } of PARITY_FIXTURES) {
+      const { holidays: _holidays, teamsOffOnHolidays: _off, ...stripped } = organization;
+      const holidays = new Set(organization.holidays);
+      const off = new Set(organization.teamsOffOnHolidays);
+      const removed: string[] = [];
+      for (const member of organization.members) {
+        const before = atWorkShiftsOf(inputsOf(stripped, member.id), PARITY_WINDOW.from, PARITY_WINDOW.to);
+        const after = atWorkShiftsOf(inputsOf(organization, member.id), PARITY_WINDOW.from, PARITY_WINDOW.to);
+        // An override on the date wins (R13.3) and an assignment is never emptied (R14.4).
+        const overridden = (shift: (typeof before)[number]) =>
+          organization.overrides.some((one) => one.teamId === shift.teamId && one.date === shift.date);
+        const emptied = (shift: (typeof before)[number]) =>
+          holidays.has(shift.date) &&
+          shift.teamId !== null &&
+          off.has(shift.teamId) &&
+          shift.personalAssignmentId === undefined &&
+          !overridden(shift);
+        expect(after, `${fixture} ${member.id}`).toEqual(before.filter((shift) => !emptied(shift)));
+        removed.push(...before.filter(emptied).map((shift) => `${member.id} ${shift.date} ${String(shift.teamId)}`));
+      }
+      // Not vacuous: each fixture's holiday empties at least one shift.
+      expect(removed.length, fixture).toBeGreaterThan(0);
+    }
+  });
+
+  it('pins which shifts go: the pilot\'s m1 on A\'s Noć of 2027-08-05; UJ-5\'s B on 2027-06-22 and m2\'s rotation on 2027-08-15', () => {
+    const [pilot, uj5] = PARITY_FIXTURES;
+    const datesOf = (organization: ParityOrganization, memberId: string, from: string, to: string) =>
+      atWorkShiftsOf(inputsOf(organization, memberId), from, to).map((shift) => `${shift.date} ${String(shift.teamId)}`);
+    expect(datesOf(pilot!.organization, 'pilot-m1', '2027-08-05', '2027-08-05')).toEqual([]);
+    // B is not off on holidays: m5 works its Dan on the second holiday.
+    expect(datesOf(pilot!.organization, 'pilot-m5', '2027-08-15', '2027-08-15')).toEqual(['2027-08-15 pilot-smjena-b']);
+    expect(datesOf(uj5!.organization, 'uj5-m2', '2027-08-15', '2027-08-15')).toEqual([]);
+    expect(datesOf(uj5!.organization, 'uj5-m2', '2027-08-16', '2027-08-16')).toEqual(['2027-08-16 uj5-smjena-b']);
+    // The override wins on A's holiday: m1 works its Noć. m2's assignment on B's holiday stays.
+    expect(
+      atWorkShiftsOf(inputsOf(pilot!.organization, 'pilot-m1'), '2027-08-15', '2027-08-15').map((shift) => [shift.teamId, shift.shiftTypeId]),
+    ).toEqual([['pilot-smjena-a', 'pilot-noc']]);
+    expect(
+      atWorkShiftsOf(inputsOf(uj5!.organization, 'uj5-m2'), '2027-06-22', '2027-06-22').map((shift) => [
+        shift.teamId,
+        shift.shiftTypeId,
+        shift.personalAssignmentId,
+      ]),
+    ).toEqual([['uj5-smjena-b', 'uj5-jutarnja', 'uj5-holiday-assignment']]);
   });
 });
 
@@ -476,13 +539,48 @@ describe('R13.2, R13.3, R15.4 — the matrix', () => {
     expect(rosterOverridesMadeInertOf(before, after, '2026-11-01', '2026-11-30')).toEqual(putOn);
   });
 
-  it('`scheduledShiftTypeOn` applies no holiday: it is the type with no holiday rule', () => {
+  it('`scheduledShiftTypeOn` with no holiday rule is the type with no holiday, exactly as before', () => {
     const versions = R138.assignments.filter((one) => one.teamId === 'D');
-    expect(scheduledShiftTypeOn(versions, R138.steps, [], 'D', HOLIDAY)).toEqual({
-      shiftTypeId: 't1',
+    const plain = { shiftTypeId: 't1', projectedShiftTypeId: 't1', overridden: false };
+    expect(scheduledShiftTypeOn(versions, R138.steps, [], 'D', HOLIDAY)).toStrictEqual(plain);
+    // The sixth argument left out, given as `undefined`, or a rule that decides nothing: the same value (R13.5).
+    expect(scheduledShiftTypeOn(versions, R138.steps, [], 'D', HOLIDAY, undefined)).toStrictEqual(plain);
+    for (const rule of [{}, { holidays: [HOLIDAY] }, { teamsOffOnHolidays: ['D'] }, { holidays: [HOLIDAY], teamsOffOnHolidays: ['K'] }]) {
+      expect(scheduledShiftTypeOn(versions, R138.steps, [], 'D', HOLIDAY, rule), JSON.stringify(rule)).toStrictEqual(plain);
+    }
+  });
+
+  it('`scheduledShiftTypeOn` given the rule (story 21.16): an emptied team answers a null type, its projected type kept', () => {
+    const d = R138.assignments.filter((one) => one.teamId === 'D');
+    const k = R138.assignments.filter((one) => one.teamId === 'K');
+    expect(scheduledShiftTypeOn(d, R138.steps, [], 'D', HOLIDAY, OFF_D)).toStrictEqual({
+      shiftTypeId: null,
       projectedShiftTypeId: 't1',
       overridden: false,
+      holiday: true,
+      offForHoliday: true,
     });
+    // The day after the holiday, and a team that works the holiday: as with no rule.
+    expect(scheduledShiftTypeOn(d, R138.steps, [], 'D', '2026-11-19', OFF_D)).toStrictEqual(
+      scheduledShiftTypeOn(d, R138.steps, [], 'D', '2026-11-19'),
+    );
+    expect(scheduledShiftTypeOn(k, R138.steps, [], 'K', HOLIDAY, OFF_D)).toStrictEqual({
+      shiftTypeId: 'dan',
+      projectedShiftTypeId: 'dan',
+      overridden: false,
+    });
+    // An override still wins on the holiday (R13.3), marked `holiday` alone.
+    const override: readonly ShiftTypeOverride[] = [{ teamId: 'D', date: HOLIDAY, shiftTypeId: 't1' }];
+    expect(scheduledShiftTypeOn(d, R138.steps, override, 'D', HOLIDAY, OFF_D)).toStrictEqual({
+      shiftTypeId: 't1',
+      projectedShiftTypeId: 't1',
+      overridden: true,
+      holiday: true,
+    });
+    // No rotation in effect: null, whatever the rule says.
+    expect(scheduledShiftTypeOn([], R138.steps, [], 'D', HOLIDAY, OFF_D)).toBeNull();
+    // The rule's own preconditions are checked.
+    expect(() => scheduledShiftTypeOn(d, R138.steps, [], 'D', HOLIDAY, { holidays: [HOLIDAY, HOLIDAY] })).toThrow(/given twice/);
   });
 
   it('refuses a holiday that is not a calendar date, and a date or a team given twice', () => {

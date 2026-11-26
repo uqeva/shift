@@ -447,7 +447,7 @@ describe('Unpicked / dates / reason: the preflight sends nothing', () => {
 });
 
 describe('the choices the card offers', () => {
-  const team = (id: string, archived = false): TeamRow => ({ id, organizationId: 'organization-1', name: id, archived });
+  const team = (id: string, archived = false): TeamRow => ({ id, organizationId: 'organization-1', name: id, archived, offOnHolidays: false });
   const member: MemberListRow = {
     id: ANA,
     organizationId: 'organization-1',
@@ -712,7 +712,7 @@ describe('Amend / change team / end early / remove: the edit\'s one "after"', ()
     expect(memberLoansOf(null, ANA)).toEqual([]);
     expect(memberLoansOf(two, 'gone')).toEqual([]);
 
-    const teams = [A, B, C, D].map((id): TeamRow => ({ id, organizationId: 'organization-1', name: id, archived: false }));
+    const teams = [A, B, C, D].map((id): TeamRow => ({ id, organizationId: 'organization-1', name: id, archived: false, offOnHolidays: false }));
     const ana: MemberListRow = {
       id: ANA,
       organizationId: 'organization-1',
@@ -737,7 +737,7 @@ describe('Amend / change team / end early / remove: the edit\'s one "after"', ()
     expect(loanAmendChoicesOf(ana, teams, TODAY, LIVE)?.map((choice) => choice.id)).not.toContain(A);
     expect(loanAmendChoicesOf(ana, null, TODAY, LIVE)).toBeNull();
     // No team left to offer: empty, not null, so the dialog still opens for a removal (review).
-    expect(loanAmendChoicesOf(ana, [{ id: A, organizationId: 'organization-1', name: A, archived: false }], TODAY, LIVE)).toEqual([]);
+    expect(loanAmendChoicesOf(ana, [{ id: A, organizationId: 'organization-1', name: A, archived: false, offOnHolidays: false }], TODAY, LIVE)).toEqual([]);
   });
 
   it('preflights an amend: an empty reason keeps the stored one (null), a typed one is checked', () => {

@@ -63,9 +63,12 @@ import { SEEDED_EFFECTIVE_FROM } from './fixtures.js';
  * Assignments (and story 21.10 schedule versions): every member's lists removed, so the digest below is still the
  * claim R14.7 makes (no assignment anywhere derives as before).
  */
-function withoutAssignments(organization: (typeof PARITY_FIXTURES)[number]['organization']) {
+function withoutAssignments(given: (typeof PARITY_FIXTURES)[number]['organization']) {
+  // Story 21.16: and no holiday rule, which the fixtures gained after all three, nor its override.
+  const { holidays: _holidays, teamsOffOnHolidays: _off, ...organization } = given;
   return {
     ...organization,
+    overrides: organization.overrides.filter((one) => one.id !== 'pilot-holiday-override'),
     // Story 21.10: and no schedule version, which the fixtures gained after both.
     members: organization.members.map(({ personalAssignments: _dropped, scheduleVersions: _versions, ...member }) => member),
   };
