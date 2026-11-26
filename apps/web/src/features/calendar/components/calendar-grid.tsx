@@ -7,6 +7,7 @@ import {
   DateGridRowHead,
   DateHead,
 } from '@/components/date-grid';
+import { Star } from '@/components/ui/icon';
 import { TableBody, TableCell, TableRow } from '@/components/ui/table';
 import { CalendarLetterBox } from '@/features/calendar/components/calendar-cell';
 import { CalendarTeamDays } from '@/features/calendar/components/calendar-day-list';
@@ -102,8 +103,16 @@ function renderCell(
  * the person, the type with its times (or *slobodno*, or *nema smjene*), each
  * mark, *dodijeljeno ručno* for an assigned day and an inactive date.
  */
-function personLabelOf(row: CalendarPersonRow, cell: CalendarPersonCell, date: { readonly weekday: string; readonly dayMonth: string }): string {
-  const name = cell.cell?.name ?? (cell.off ? t('kalendar.paper.cell.off') : t('kalendar.paper.cell.none'));
+export function personLabelOf(
+  row: CalendarPersonRow,
+  cell: CalendarPersonCell,
+  date: { readonly weekday: string; readonly dayMonth: string; readonly holiday?: string },
+): string {
+  // STORY 21.18: an emptied team shift leaves the slot to `blagdan`.
+  const name =
+    cell.cell?.offForHoliday === true
+      ? null
+      : (cell.cell?.name ?? (cell.off ? t('kalendar.paper.cell.off') : t('kalendar.paper.cell.none')));
   const parts = [
     cellLabelOf(
       {
@@ -115,6 +124,10 @@ function personLabelOf(row: CalendarPersonRow, cell: CalendarPersonCell, date: {
         modifiers: cell.cell?.modifiers ?? [],
         // STORY 21.6 (UX-DR73): an assigned day is named `dodijeljeno ručno`, as everywhere.
         assigned: cell.assigned,
+        // STORY 21.18: an emptied team shift reads `blagdan` in the type's slot.
+        ...(cell.cell?.offForHoliday === true ? { offForHoliday: true } : {}),
+        // STORY 21.18: `blagdan {name}` after the date, as a team's cell.
+        ...(date.holiday === undefined ? {} : { holiday: date.holiday }),
       },
       translateCellLabel,
     ),
@@ -208,9 +221,11 @@ export function CalendarGrid({
     return <p className="px-4 pb-4 text-sm text-muted-foreground">{t('kalendar.paper.empty')}</p>;
   }
 
+  const holidays = shown.holidays ?? [];
   const dates = gridDatesOf(
     shown.rows.map((row) => row.date),
     shown.rows.find((row) => row.isToday)?.date ?? NO_TEXT,
+    new Map(holidays.map((holiday) => [holiday.date, holiday.name])),
   );
   const tabStop = gridTabStopOf(screen.gridFocus, shown.month, dates, rows);
   const people = shown.peopleGroups.flatMap((group) => group.rows);
@@ -232,6 +247,15 @@ export function CalendarGrid({
           <li key={entry.letter}>{t('kalendar.paper.letter', { letter: entry.letter, name: entry.name })}</li>
         ))}
         {anyOff ? <li>{t('kalendar.paper.off', { mark: t('kalendar.paper.offMark') })}</li> : null}
+        {/* STORY 21.18 (UX-DR78): each holiday of the month by name — the date heads are too narrow — and the star an emptied box draws. */}
+        {holidays.map((holiday) => (
+          <li key={holiday.date} data-holiday className="flex items-center gap-1">
+            <Star className="size-3 shrink-0" />
+            {/* The word, then a space, so a screen reader hears `blagdan 18.11. {naziv}` as words. */}
+            <span className="sr-only">{`${t('kalendar.holiday.word')} `}</span>
+            {t('kalendar.holiday.keyLine', { dayMonth: holiday.dayMonth, name: holiday.name })}
+          </li>
+        ))}
       </ul>
       <CalendarLegend cells={[...teamCells, ...personCells]} />
       <DateGridFrame

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { HolidayMark } from '@/features/calendar/components/holiday-mark';
 import { CellMark, cellLabelOf, sourceText } from '@/features/planning/components/manual-grid';
 import { MANUAL_HEADING_ID, manualCellIdOf, type ManualScreen } from '@/features/planning/hooks/use-manual-schedule';
 import type { ManualMonth } from '@/features/planning/services/manual-grid';
@@ -69,10 +70,18 @@ export function ManualMemberDays({ screen, shown }: { readonly screen: ManualScr
                 <span aria-hidden className={cn('w-16 shrink-0 text-sm tabular-nums', date?.today === true && 'font-bold')}>
                   {date?.dayMonth}
                   <span className="ml-1 text-xs text-muted-foreground">{date?.weekday}</span>
+                  {/* STORY 21.18 (UX-DR78): the date's holiday; the button's label names it. */}
+                  {date?.holiday === undefined ? null : <HolidayMark name={date.holiday} />}
                 </span>
                 <CellMark cell={cell} />
                 <span aria-hidden className={cn('min-w-0 flex-1 truncate text-sm', cell.shiftTypeId === null && !cell.off && 'text-muted-foreground')}>
-                  {cell.off ? t('rucniRaspored.cell.off') : cell.shiftTypeId === null ? t('rucniRaspored.cell.empty') : typeName(cell.shiftTypeId)}
+                  {cell.off
+                    ? t('rucniRaspored.cell.off')
+                    : cell.holiday === true
+                      ? t('rucniRaspored.cell.holiday')
+                      : cell.shiftTypeId === null
+                        ? t('rucniRaspored.cell.empty')
+                        : typeName(cell.shiftTypeId)}
                 </span>
               </button>
             </li>

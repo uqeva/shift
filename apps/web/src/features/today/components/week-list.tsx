@@ -3,6 +3,7 @@ import { useId, type ReactNode } from 'react';
 
 import { Card } from '@/components/ui/card';
 import { CalendarCellBox } from '@/features/calendar/components/calendar-cell';
+import { HolidayMark } from '@/features/calendar/components/holiday-mark';
 import { ModifierGlyphs } from '@/features/calendar/components/modifier-glyphs';
 import { MODIFIER_LEAVE, glyphOf } from '@/features/calendar/utils/modifiers';
 import { dayEmptyMessageKey } from '@/features/calendar/utils/empty-day';
@@ -42,6 +43,8 @@ function renderDay({ day, onLeave }: TodayWeekDay): ReactNode {
       <span className="w-20 shrink-0 text-sm">
         <span className="block tabular-nums">{day.dayMonth}</span>
         <span className="block text-xs text-muted-foreground">{day.weekday}</span>
+        {/* STORY 21.18 (UX-DR78): the date's holiday, the star and its name. */}
+        {day.holiday === undefined ? null : <HolidayMark name={day.holiday} />}
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         {day.shifts.length === 0 ? (

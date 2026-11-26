@@ -5,6 +5,7 @@ import { MonthNav } from '@/components/month-nav';
 import { StickyHead } from '@/components/sticky-head';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Star } from '@/components/ui/icon';
 import { Notice } from '@/components/ui/notice';
 import { PageTitle } from '@/components/ui/page-header';
 import { calendarMessageKey } from '@/features/calendar/services/snapshot';
@@ -56,6 +57,14 @@ function ManualLegend({ screen, isPhone }: { readonly screen: ManualScreen; read
         <li>{t('rucniRaspored.legend.more')}</li>
         <li>{t('rucniRaspored.legend.inactive')}</li>
         <li>{t('rucniRaspored.legend.changed')}</li>
+        {/* STORY 21.18 (UX-DR78): each holiday of the month by name, beside the star its head and emptied cells draw. */}
+        {(shown.holidays ?? []).map((holiday) => (
+          <li key={holiday.date} data-holiday className="flex items-center gap-1">
+            <Star className="size-3 shrink-0" />
+            <span className="sr-only">{`${t('kalendar.holiday.word')} `}</span>
+            {t('kalendar.holiday.keyLine', { dayMonth: holiday.dayMonth, name: holiday.name })}
+          </li>
+        ))}
       </ul>
     </div>
   );

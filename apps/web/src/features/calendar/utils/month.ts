@@ -49,6 +49,7 @@ import {
   type CalendarReadFailure,
   type CalendarRosterOverride,
   type CalendarSnapshot,
+  holidayNamesOfCalendar,
   holidayRuleOfCalendar,
   minimumOfCalendar,
 } from '@/features/calendar/services/snapshot';
@@ -594,6 +595,12 @@ export interface CalendarCell {
    * order. ABSENT when the team has none that date.
    */
   readonly groups?: readonly CalendarCellGroup[];
+  /**
+   * STORY 21.18 (UX-DR78): a holiday emptied the cell (the domain's
+   * `offForHoliday`): `name` stays `null`, and the cell reads *blagdan* with
+   * the star where `—` was. ABSENT otherwise.
+   */
+  readonly offForHoliday?: true;
 }
 
 /** A grid cell: always a team's. */
@@ -791,6 +798,8 @@ export interface CalendarRow {
   /** Today in the organization's zone. */
   readonly isToday: boolean;
   readonly cells: readonly CalendarTeamCell[];
+  /** STORY 21.18: the date's holiday name (`calendar.holidays`). ABSENT on every other date. */
+  readonly holiday?: string;
 }
 
 /** An active team as a grid column: its row, and its letter in the compressed grid. */
@@ -910,6 +919,8 @@ export interface CalendarDay {
    * an empty day then says so, never "no team" (B449, UX-DR20).
    */
   readonly inactive: boolean;
+  /** STORY 21.18: the date's holiday name (`calendar.holidays`). ABSENT on every other date. */
+  readonly holiday?: string;
 }
 
 /**
@@ -989,6 +1000,40 @@ export interface CalendarMonth extends MonthHeader {
    * grouped by job role, narrowed by the team and the role chosen.
    */
   readonly peopleGroups: readonly CalendarPeopleGroup[];
+  /**
+   * STORY 21.18 (UX-DR78): the month's holidays, by date, as the grid's key
+   * lists them (`★ 18.11. {name}`). ABSENT with none in the month.
+   */
+  readonly holidays?: readonly MonthHoliday[];
+}
+
+/** STORY 21.18: one holiday of a month, as a key line names it. */
+export interface MonthHoliday {
+  readonly date: string;
+  /** `18.11.` */
+  readonly dayMonth: string;
+  readonly name: string;
+}
+
+/**
+ * STORY 21.18: the holidays among `dates`, by date, with their key lines'
+ * `dayMonth`; `[]` with none. Shared by *Kalendar*, *Danas*' week and *Ručni raspored*.
+ */
+export function monthHolidaysOf(names: ReadonlyMap<string, string>, dates: readonly string[]): readonly MonthHoliday[] {
+  if (names.size === 0) return [];
+
+  return dates.flatMap((date) => {
+    const name = names.get(date);
+
+    return name === undefined ? [] : [{ date, dayMonth: dayMonthOf(date), name }];
+  });
+}
+
+/** STORY 21.18: `{ holiday }` for a named date, else nothing, so a holiday-free output keeps its keys. */
+export function holidayFieldOf(names: ReadonlyMap<string, string>, date: string): { readonly holiday?: string } {
+  const name = names.get(date);
+
+  return name === undefined ? {} : { holiday: name };
 }
 
 /**
@@ -1092,10 +1137,11 @@ function cellLookupOf(snapshot: CalendarSnapshot, shown: Iterable<string | null>
   };
 }
 
-/** What story 21.6 adds to a cell: the assigned mark, or the staffing groups' type ids. */
+/** What story 21.6 adds to a cell: the assigned mark, or the staffing groups' type ids; story 21.18 the holiday's emptying. */
 interface CellSource {
   readonly assigned?: boolean;
   readonly groups?: readonly string[];
+  readonly offForHoliday?: boolean;
 }
 
 /**
@@ -1157,6 +1203,8 @@ function cellOf<Team extends string | null>(
       modifiers: NO_MODIFIERS,
       ...extras,
       ...(extras.groups === undefined ? {} : { modifiers }),
+      // STORY 21.18: the holiday emptied it; still no type, so a null type stays "no shift" everywhere.
+      ...(source.offForHoliday === true ? { offForHoliday: true as const } : {}),
     };
   }
 
@@ -1325,6 +1373,7 @@ export function calendarDayListOf(
     snapshot,
     schedule.flatMap((day) => day.shifts.map((shift) => shift.shiftTypeId)),
   );
+  const names = holidayNamesOfCalendar(snapshot);
 
   return schedule.map((day) => ({
     date: day.date,
@@ -1332,6 +1381,7 @@ export function calendarDayListOf(
     weekday: weekdayOf(day.date),
     isToday: day.date === today,
     inactive: !day.active,
+    ...holidayFieldOf(names, day.date),
     // Story 21.6: a Personal Shift is drawn as assigned, and one counted
     // with no team is a row of its own (`bez tima`).
     shifts: day.shifts.map((shift) => ({
@@ -1342,7 +1392,7 @@ export function calendarDayListOf(
         shift.shiftTypeId,
         day.date,
         memberCellMarksOf(marked, memberId, shift.teamId, day.date, shift.overridden || shift.rosterChanged),
-        { assigned: shift.personalAssignmentId !== undefined },
+        { assigned: shift.personalAssignmentId !== undefined, offForHoliday: shift.offForHoliday === true },
       ),
       viaOverride: shift.viaOverride,
     })),
@@ -1609,11 +1659,15 @@ export function calendarMonthOf(
   const teamRowsShown = columns.map((team, column) => ({ team, column }));
   // A person's cell with no team of its own opens the first turnus team's day, else the first team's.
   const opensFirst = (teamRowsShown.find(({ team }) => turnus(team.id)) ?? teamRowsShown[0])?.team.id ?? null;
+  // STORY 21.18: the names apart from the rule, so a worked holiday is named too.
+  const names = holidayNamesOfCalendar(snapshot);
+  const holidays = monthHolidaysOf(names, dates);
   const rows: CalendarRow[] = schedule.map((row) => ({
     date: row.date,
     dayMonth: dayMonthOf(row.date),
     weekday: weekdayOf(row.date),
     isToday: row.date === today,
+    ...holidayFieldOf(names, row.date),
     cells: row.cells
       .filter((cell) => shown(cell.teamId))
       .map((cell) =>
@@ -1623,21 +1677,27 @@ export function calendarMonthOf(
           cell.shiftTypeId,
           row.date,
           gridCellMarksOf(marked, cell.teamId, row.date, cell.overridden || cell.rosterChanged),
-          { groups: groups.get(teamDateKeyOf(cell.teamId, row.date)) ?? [] },
+          { groups: groups.get(teamDateKeyOf(cell.teamId, row.date)) ?? [], offForHoliday: cell.offForHoliday === true },
         ),
       ),
   }));
   const personCellOf = (memberId: string, memberships: readonly MembershipVersion[], day: MemberScheduleDay): CalendarPersonCell => {
     const shift = day.active ? typed(day) : undefined;
+    // STORY 21.18: with no typed shift, their team shift a holiday emptied reads *blagdan*, as a team cell does.
+    const emptied = day.active && shift === undefined ? day.shifts.find((one) => one.offForHoliday === true) : undefined;
     const own = membershipOn(memberships, day.date)?.teamId ?? null;
-    const opens = [shift?.teamId ?? null, own].find((teamId) => teamId !== null && activeTeams.has(teamId)) ?? opensFirst;
+    const opens = [shift?.teamId ?? emptied?.teamId ?? null, own].find((teamId) => teamId !== null && activeTeams.has(teamId)) ?? opensFirst;
     const assignment = day.active ? day.personalAssignment : undefined;
 
     return {
       date: day.date,
       cell:
         shift === undefined || shift.shiftTypeId === null
-          ? null
+          ? emptied === undefined
+            ? null
+            : cellOf(lookup, emptied.teamId, null, day.date, memberCellMarksOf(marked, memberId, emptied.teamId, day.date, false), {
+                offForHoliday: true,
+              })
           : cellOf(
               lookup,
               shift.teamId,
@@ -1710,6 +1770,7 @@ export function calendarMonthOf(
       cells: rows.map((row) => row.cells[column]).filter((cell) => cell !== undefined),
     })),
     peopleGroups,
+    ...(holidays.length === 0 ? {} : { holidays }),
   };
 }
 

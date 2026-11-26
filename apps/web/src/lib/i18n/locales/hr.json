@@ -824,6 +824,14 @@
       },
       "unavailable": "Raspored nije dostupan",
       "groupMark": "+{letter}"
+    },
+    "holiday": {
+      "word": "blagdan",
+      "label": "blagdan {name}",
+      "keyLine": "{dayMonth} {name}",
+      "dayOff": "{team} ne radi na blagdan.",
+      "dayOffGroups": "{team} ne radi na blagdan. Ručno dodijeljeni rade:",
+      "projected": "Prema rotaciji: {type}."
     }
   },
   "godisnji": {
@@ -3050,7 +3058,8 @@
       "more": "uz još jednu smjenu",
       "changed": "izmijenjeno, nije spremljeno",
       "separator": ", ",
-      "inactive": "osoba tada nije aktivna"
+      "inactive": "osoba tada nije aktivna",
+      "holiday": "blagdan"
     },
     "edit": "{count, plural, =0 {Uredi odabrano} one {Uredi odabrano (#)} few {Uredi odabrano (#)} other {Uredi odabrano (#)}}",
     "selectionHint": "Klik na dan otvara izbor. Povlačenje ili Shift označava više dana, Ctrl ili Cmd dodaje pojedini dan.",

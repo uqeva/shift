@@ -356,6 +356,46 @@ describe('Helper confirm/amend', () => {
     ).toEqual({ kind: CHECK_REFUSED, code: OVERRIDE_CHANGE_SAME_AS_PROJECTED });
   });
 
+  it('story 21.18: on a holiday that empties the team, an amend to the projected type is allowed; elsewhere still refused', async () => {
+    const snapshot = await calendarOf([calendarOverrideRow('in-force-free', A, '2026-09-10', SLOBODNO)]);
+    // The holiday layered on (R13.3): A is off on holidays, and 10.09 is one.
+    const holiday: CalendarSnapshot = {
+      ...snapshot,
+      holidays: [{ id: 'h-1', date: '2026-09-10', name: 'Blagdan' }],
+      teams: snapshot.teams.map((team) => (team.id === A ? { ...team, offOnHolidays: true } : team)),
+    };
+    const applied = overrideChangeSnapshotOf(holiday, amend('in-force-free', DAN));
+
+    expect(applied.ok).toBe(true);
+    expect(applied.ok ? applied.after.overrides.map((override) => [override.id, override.shiftTypeId]) : null).toEqual([
+      [UNWRITTEN_OVERRIDE_ID, DAN],
+    ]);
+    // A holiday the team works (B off, not A) changes nothing: the projection is still the same type.
+    const worked: CalendarSnapshot = {
+      ...snapshot,
+      holidays: [{ id: 'h-1', date: '2026-09-10', name: 'Blagdan' }],
+      teams: snapshot.teams.map((team) => (team.id === B ? { ...team, offOnHolidays: true } : team)),
+    };
+    expect(overrideChangeSnapshotOf(worked, amend('in-force-free', DAN))).toEqual({ ok: false, code: OVERRIDE_CHANGE_SAME_AS_PROJECTED });
+  });
+
+  it('story 21.18: on an emptied holiday an amend to another working type or to a non-working one is allowed too', async () => {
+    const snapshot = await calendarOf([calendarOverrideRow('in-force-free', A, '2026-09-10', SLOBODNO)]);
+    const holiday: CalendarSnapshot = {
+      ...snapshot,
+      holidays: [{ id: 'h-1', date: '2026-09-10', name: 'Blagdan' }],
+      teams: snapshot.teams.map((team) => (team.id === A ? { ...team, offOnHolidays: true } : team)),
+    };
+    const amendedOf = (shiftTypeId: string) => {
+      const applied = overrideChangeSnapshotOf(holiday, amend('in-force-free', shiftTypeId));
+
+      return applied.ok ? applied.after.overrides.map((override) => override.shiftTypeId) : applied.code;
+    };
+
+    expect(amendedOf(NOC)).toEqual([NOC]);
+    expect(amendedOf(SLOBODNO)).toEqual([SLOBODNO]);
+  });
+
   it('amend to a working type erases nothing', async () => {
     const snapshot = await calendarOf([
       calendarOverrideRow('pending-free', A, '2026-09-10', SLOBODNO, { createdAt: BEFORE_VERSIONS }),

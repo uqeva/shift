@@ -2,7 +2,7 @@ import { memberHoursOfMonth, monthOf, type CollisionResolution } from '@shift/do
 
 import { ROSTER_CHANGE_REMOVAL, ROSTER_CHANGE_SAVE, rosterChangeSnapshotOf } from '@/features/calendar/services/roster-erasures';
 import type { CalendarSnapshot } from '@/features/calendar/services/snapshot';
-import { OVERRIDE_NO_TYPE, ROSTER_NOBODY, dayDetailOf, type DayDetail } from '@/features/calendar/utils/day-detail';
+import { OVERRIDE_NO_TYPE, ROSTER_NOBODY, dayDetailOf, sameTypeOf, type DayDetail } from '@/features/calendar/utils/day-detail';
 import {
   OVERRIDE_CHANGE_REMOVE,
   OVERRIDE_CHANGE_SET,
@@ -221,7 +221,8 @@ function guarded(derive: () => ChangePreview | null): ChangePreview | null {
 
 /**
  * What setting `shiftTypeId` on the day `detail` would do; `null` for no type
- * chosen, the projected type (the form's own `sameAsProjected` refusal), an
+ * chosen, the type the team already works (the form's own `sameAsProjected`
+ * refusal, `sameTypeOf`: the projected type, none on a holiday-emptied day), an
  * override the write would refuse anyway, or a preview that cannot be derived.
  */
 export function overridePreviewOf(
@@ -233,7 +234,8 @@ export function overridePreviewOf(
   leaveRecords: LeaveRecordsByMember = NO_LEAVE_RECORDS,
 ): ChangePreview | null {
   if (snapshot === null || detail === null) return null;
-  if (shiftTypeId === OVERRIDE_NO_TYPE || shiftTypeId === detail.projectedShiftTypeId) return null;
+  // STORY 21.18: the day detail's own same-type rule, so the projected type offered on a holiday-emptied day is previewed.
+  if (shiftTypeId === OVERRIDE_NO_TYPE || shiftTypeId === sameTypeOf(detail)) return null;
 
   return guarded(() => {
     const applied = overrideChangeSnapshotOf(snapshot, {
@@ -324,7 +326,8 @@ export function overrideShortStaffedOf(
   leave: StaffingLeaveSource | null,
 ): ShortStaffedReport | null {
   if (snapshot === null || detail === null) return null;
-  if (shiftTypeId === OVERRIDE_NO_TYPE || shiftTypeId === detail.projectedShiftTypeId) return null;
+  // STORY 21.18: the day detail's own same-type rule, so the projected type offered on a holiday-emptied day is previewed.
+  if (shiftTypeId === OVERRIDE_NO_TYPE || shiftTypeId === sameTypeOf(detail)) return null;
 
   return dayReportOf(snapshot, detail.isoDate, leave, () =>
     overrideChangeSnapshotOf(snapshot, { kind: OVERRIDE_CHANGE_SET, teamId: detail.teamId, date: detail.isoDate, shiftTypeId }),

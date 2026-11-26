@@ -12,8 +12,15 @@ import {
   type PersonalAssignment,
 } from '@shift/domain';
 
-import type { CalendarMember, CalendarSnapshot } from '@/features/calendar/services/snapshot';
-import { memberScheduleInputOf, snapshotScheduleInputOf, teamHasRotationBy, typeLettersOf } from '@/features/calendar/utils/month';
+import { holidayNamesOfCalendar, type CalendarMember, type CalendarSnapshot } from '@/features/calendar/services/snapshot';
+import {
+  memberScheduleInputOf,
+  monthHolidaysOf,
+  snapshotScheduleInputOf,
+  teamHasRotationBy,
+  typeLettersOf,
+  type MonthHoliday,
+} from '@/features/calendar/utils/month';
 import { ALL_ROLES, NO_ROLE, chooseRole, type RoleFilter, type RoleFilterOption } from '@/features/members/services/list';
 import { compareText } from '@/lib/i18n/format';
 import { gridDatesOf, isWeekend, weekdayOf, type GridDate } from '@/utils/grid-dates';
@@ -312,6 +319,12 @@ export interface ManualCell extends ManualCellRef {
   readonly changed: boolean;
   /** More than one working shift that date (a double booking an override made). */
   readonly more: boolean;
+  /**
+   * STORY 21.18 (UX-DR78): no assignment, and a holiday emptied the member's
+   * team shift (the domain's `offForHoliday`): the star, named *blagdan*.
+   * ABSENT otherwise; an assignment on the holiday draws as before.
+   */
+  readonly holiday?: true;
 }
 
 export interface ManualRow {
@@ -348,6 +361,8 @@ export interface ManualMonth {
   readonly rows: readonly ManualRow[];
   /** The letters the month's cells use, in the types' order. */
   readonly legend: readonly ManualLegendEntry[];
+  /** STORY 21.18 (UX-DR78): the month's holidays, by date, as the legend names them. ABSENT with none. */
+  readonly holidays?: readonly MonthHoliday[];
 }
 
 export { isWeekend, weekdayOf };
@@ -413,7 +428,20 @@ function cellOf(
   const shift = day.shifts.find((candidate) => candidate.shiftTypeId !== null);
 
   if (shift === undefined || shift.shiftTypeId === null) {
-    return { ...ref, source: CELL_EMPTY, off: false, shiftTypeId: null, letter: null, working: false, countedTeamId: null, active: day.active, changed, more: false };
+    return {
+      ...ref,
+      source: CELL_EMPTY,
+      off: false,
+      shiftTypeId: null,
+      letter: null,
+      working: false,
+      countedTeamId: null,
+      active: day.active,
+      changed,
+      more: false,
+      // STORY 21.18: the holiday emptied their team's shift.
+      ...(day.shifts.some((candidate) => candidate.offForHoliday === true) ? { holiday: true as const } : {}),
+    };
   }
 
   return {
@@ -500,14 +528,19 @@ export function manualMonthOf(calendar: CalendarSnapshot, month: string, today: 
 
   if (teamless !== undefined) groups.push({ teamId: null, name: null, rows: [...teamless].sort(byName) });
 
+  // STORY 21.18: the names apart from the rule, so a worked holiday is named too.
+  const names = holidayNamesOfCalendar(after);
+  const holidays = monthHolidaysOf(names, dates);
+
   return {
     month,
-    dates: gridDatesOf(dates, today),
+    dates: gridDatesOf(dates, today, names),
     groups,
     rows: groups.flatMap((group) => group.rows),
     legend: after.types
       .filter((type) => used.has(type.id))
       .map((type) => ({ letter: letters.get(type.id) ?? type.name, name: type.name })),
+    ...(holidays.length === 0 ? {} : { holidays }),
   };
 }
 

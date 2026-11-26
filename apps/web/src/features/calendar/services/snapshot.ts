@@ -924,6 +924,26 @@ function holidayRuleBuiltOf(calendar: Pick<CalendarSnapshot, 'holidays' | 'teams
   return Object.freeze({ holidays, teamsOffOnHolidays });
 }
 
+const HOLIDAY_NAMES = new WeakMap<object, ReadonlyMap<string, string>>();
+
+/**
+ * THE NAMES (story 21.18, AD-27): every holiday's name by its date, apart from
+ * {@link holidayRuleOfCalendar}, which is `{}` with no team off (R13.5) — a
+ * holiday a 24-hour crew works still names its date. Memoized per snapshot.
+ * Names are display only and never enter a derivation. Empty with none.
+ */
+export function holidayNamesOfCalendar(calendar: Pick<CalendarSnapshot, 'holidays'>): ReadonlyMap<string, string> {
+  const known = HOLIDAY_NAMES.get(calendar);
+
+  if (known !== undefined) return known;
+
+  const names: ReadonlyMap<string, string> = new Map(calendar.holidays.map((holiday) => [holiday.date, holiday.name] as const));
+
+  HOLIDAY_NAMES.set(calendar, names);
+
+  return names;
+}
+
 /**
  * The live loans `calendar_team_loans()` answered, by member, each member's in
  * `from` order, or `null`: a malformed answer, an error, data that is not an

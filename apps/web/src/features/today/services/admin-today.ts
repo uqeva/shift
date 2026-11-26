@@ -24,10 +24,13 @@ import {
   calendarSearchTo,
   calendarTodayOf,
   dayMonthOf,
+  holidayFieldOf,
+  monthHolidaysOf,
   weekdayOf,
   type CalendarMarks,
   type CalendarMonth,
   type CalendarSearch,
+  type MonthHoliday,
 } from '@/features/calendar/utils/month';
 import {
   CONFLICTS_LOADING,
@@ -337,6 +340,8 @@ export interface WeekDay {
   /** `01.10.` */
   readonly dayMonth: string;
   readonly isToday: boolean;
+  /** STORY 21.18 (UX-DR78): the date's holiday name, its head's star. ABSENT on every other date. */
+  readonly holiday?: string;
 }
 
 /** One team on one date of the week. */
@@ -359,6 +364,8 @@ export interface WeekCell {
   readonly className: string;
   /** The calendar's own marks, for the ring and hatch. */
   readonly modifiers: CalendarMonth['rows'][number]['cells'][number]['modifiers'];
+  /** STORY 21.18: a holiday emptied the team's cell: the star, named *blagdan*. ABSENT otherwise. */
+  readonly offForHoliday?: true;
 }
 
 /** One active team across the week. */
@@ -383,6 +390,8 @@ export interface Week {
   readonly anyConflict: boolean;
   /** Whether any cell is short-staffed (story 11.3), so the legend names it. */
   readonly anyShortStaffed: boolean;
+  /** STORY 21.18 (UX-DR78): the week's holidays, by date, as the legend names them. ABSENT with none. */
+  readonly holidays?: readonly MonthHoliday[];
 }
 
 /** One short-staffed shift of the week, as *Premalo ljudi* lists it (story 11.4). */
@@ -969,9 +978,19 @@ export function weekOf(dates: readonly string[], months: ReadonlyMap<string, Cal
         shortStaffed,
         className: cell.className,
         modifiers: cell.modifiers,
+        ...(cell.offForHoliday === true ? { offForHoliday: true as const } : {}),
       };
     }),
   }));
+  // STORY 21.18: each date's holiday, read off its month's row (the names apart from the rule).
+  const named = new Map(
+    dates.flatMap((date) => {
+      const name = rowOn(monthFor(months, date), date).holiday;
+
+      return name === undefined ? [] : [[date, name] as const];
+    }),
+  );
+  const holidays = monthHolidaysOf(named, dates);
 
   return {
     days: dates.map((date) => ({
@@ -980,11 +999,13 @@ export function weekOf(dates: readonly string[], months: ReadonlyMap<string, Cal
       weekdayShort: weekdayShortOf(date),
       dayMonth: dayMonthOf(date),
       isToday: date === today,
+      ...holidayFieldOf(named, date),
     })),
     rows,
     legend,
     anyConflict,
     anyShortStaffed,
+    ...(holidays.length === 0 ? {} : { holidays }),
   };
 }
 

@@ -525,7 +525,8 @@ export const KEY_SOURCES = [
     // STORY 19.4: coverage with no team, its fact and its consequence.
     // 107 SINCE STORY 21.6: a Personal Shift's `ručno` and `dodijeljeno ručno` on a row and on a coverage group, `bez tima` on a row and in a duty note.
     // 109 SINCE ITS REVIEW: a duty leg's `ručno` and `dodijeljeno ručno`.
-    strings: 109,
+    // 114 SINCE STORY 21.18: the holiday's calls — the shared mark's `blagdan {name}` and an emptied shift's `blagdan` (`holiday-mark.tsx`), and the admin week's head and cell label `blagdan {name}`, an emptied cell's `blagdan`, and its legend's word and key line.
+    strings: 114,
   },
   {
     // STORY 6.1a: today's three cases, the next shift's two headings, and
@@ -959,7 +960,9 @@ export const KEY_SOURCES = [
     // 206 SINCE ITS REVIEW: the off and no-rotation sentences moved to `dayNotWorkingMessageKey` (the day detail's rules).
     // 231 SINCE STORY 21.25 (*Kalendar kao papir*): the paper grid's calls — its corner, the teams' heading, a person's no role, no team and unreadable days (its line and its cells' names), a filter or a month that leaves nothing (twice), the key of letters, its entry, *Slobodno* with its mark, a letter box's off mark and a staffing group's `+N`, a person's cell's three words — less the date column head; and the shared filter bar's *Posao* field, picker, *Svi poslovi* (twice), *Bez posla* and the summary with a role.
     // 233 SINCE STORY 21.10: a day detail member's `osobna rotacija`, after the line's separator.
-    strings: 233,
+    // 240 SINCE STORY 21.18: the holiday's calls — the shared mark's `blagdan {name}` and an emptied cell's `blagdan` (`holiday-mark.tsx`), the date head's `blagdan {name}` (`date-grid.tsx`), the key's word and line, and the day detail's `{team} ne radi na blagdan.` and `Prema rotaciji: {type}.`.
+    // 239 SINCE ITS REVIEW: the emptied day's sentence moved to `holidayOffMessageKey` (the day detail's rules).
+    strings: 239,
   },
   {
     // STORY 12.2. On the swap proposal: its heading (twice, once while the
@@ -1043,7 +1046,8 @@ export const KEY_SOURCES = [
     file: CALENDAR_MODIFIER_KEYS,
     keys: memberListKeys,
     // 8 SINCE STORY 21.6: `dodijeljeno ručno` and `bez tima` in a label.
-    strings: 8,
+    // 9 SINCE STORY 21.18: `blagdan`, after the date with the holiday's name and in an emptied cell's type slot.
+    strings: 9,
   },
   {
     // STORY 21.6: the day detail's sentence for an off or no-rotation day,
@@ -1051,7 +1055,8 @@ export const KEY_SOURCES = [
     name: 'the day detail rules',
     file: CALENDAR_DAY_DETAIL_KEYS,
     keys: messageKeyUnions,
-    strings: 4,
+    // 6 SINCE STORY 21.18'S REVIEW: a holiday-emptied day's sentence, with and without a staffing group (`holidayOffMessageKey`).
+    strings: 6,
   },
   {
     // STORY 4.1b. TWELVE on Sati: its own `nav.sati` heading; the shared month
@@ -1279,7 +1284,8 @@ export const KEY_SOURCES = [
     // 120 SINCE STORY 21.6: *Dodaj smjenu*'s alert for a member with no row.
     // 128 SINCE STORY 21.25: the *Posao* filter's chip, ✕, picker, heading, *Svi poslovi*, *Bez posla*, count and result count (`manual-filters.tsx`).
     // 129 SINCE STORY 21.10: a row's source *osobna rotacija*.
-    strings: 129,
+    // 136 SINCE STORY 21.18: the holiday's calls — an emptied cell's value `blagdan` (the label and the phone's line), the label's `blagdan {name}` after the date, the shared date head's and mark's `blagdan {name}`, and the legend's word and key line.
+    strings: 136,
   },
   {
     // STORY 21.4: the preview's shift and inert-override lines, and the save's refusals.

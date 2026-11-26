@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
-import { PencilSimple } from '@/components/ui/icon';
+import { PencilSimple, Star } from '@/components/ui/icon';
+import { HolidayOffWord } from '@/features/calendar/components/holiday-mark';
 import { ModifierGlyphs } from '@/features/calendar/components/modifier-glyphs';
 import { modifierNamesTextOf, modifierTreatmentOf } from '@/features/calendar/utils/modifiers';
 import {
@@ -20,6 +21,10 @@ import { cn } from '@/lib/utils';
 /** A cell's name or letter; in the grid, every part `aria-hidden` and the letter first. */
 function renderCellName(cell: CalendarCell, inGrid: boolean): ReactNode {
   if (cell.name === null) {
+    // STORY 21.18 (UX-DR78): a cell the holiday emptied reads *blagdan*, the star beside it — before any staffing group.
+    if (cell.offForHoliday === true) {
+      return inGrid ? <Star aria-hidden className="size-3 shrink-0" /> : <HolidayOffWord />;
+    }
     // STORY 21.6: a team with no rotation but a staffing group shows the group alone.
     if (cell.groups !== undefined) return null;
 
@@ -191,14 +196,19 @@ export function CalendarLetterBox({
           ? t('kalendar.paper.offMark')
           : null
         : cell.name === null
-          ? groups.length === 0
-            ? NO_ROTATION_SHOWN
-            : null
+          ? // STORY 21.18 (UX-DR78): the star in a box the holiday emptied, before any group; the gridcell's label says *blagdan*.
+            cell.offForHoliday === true
+            ? <Star data-holiday-off className="size-4" />
+            : groups.length === 0
+              ? NO_ROTATION_SHOWN
+              : null
           : cell.letter}
       {/* STORY 21.6 (R14.6): each staffing group's letter after the team's, smaller, the pencil marking them assigned. */}
       {groups.map((group) => (
         <span key={group.shiftTypeId} className="ml-0.5 text-[0.625rem] font-normal">
-          {cell?.name === null ? group.letter : t('kalendar.paper.groupMark', { letter: group.letter ?? group.name })}
+          {cell?.name === null && cell.offForHoliday !== true
+            ? group.letter
+            : t('kalendar.paper.groupMark', { letter: group.letter ?? group.name })}
         </span>
       ))}
       {treatment.glyphs.length === 0 ? null : (

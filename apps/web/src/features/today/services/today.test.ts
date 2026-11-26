@@ -633,6 +633,41 @@ describe('the next seven days', () => {
   });
 });
 
+describe('story 21.18: a holiday on Danas (UX-DR78)', () => {
+  /** The pilot with `dates` named as holidays, and team A off on them when `off`. */
+  function withHolidays(dates: readonly string[], off: boolean): CalendarSnapshot {
+    return {
+      ...pilot,
+      holidays: dates.map((date, index) => ({ id: `h-${String(index)}`, date, name: `Blagdan ${date}` })),
+      teams: pilot.teams.map((team) => (team.id === TEAM_A && off ? { ...team, offOnHolidays: true } : team)),
+    };
+  }
+
+  it('no holiday: the view and its week carry no new key', () => {
+    const view = readyOf(todayViewOf(pilot, [], noonOf('2026-10-01')));
+
+    expect(view).not.toHaveProperty('holiday');
+    expect(view.week.some(({ day }) => Object.hasOwn(day, 'holiday'))).toBe(false);
+    expect(view.todayCase.kind === CASE_WORKING && view.todayCase.shifts.some((shift) => Object.hasOwn(shift, 'offForHoliday'))).toBe(false);
+  });
+
+  it('today a holiday the team works: the card names it and today is worked as before', () => {
+    const view = readyOf(todayViewOf(withHolidays(['2026-10-01'], false), [], noonOf('2026-10-01')));
+
+    expect(view.holiday).toBe('Blagdan 2026-10-01');
+    expect(view.todayCase).toEqual(readyOf(todayViewOf(pilot, [], noonOf('2026-10-01'))).todayCase);
+  });
+
+  it("today a holiday the team is off on: free, its shift emptied (`offForHoliday`, no name), and the week's holiday named", () => {
+    const view = readyOf(todayViewOf(withHolidays(['2026-10-01', '2026-10-02'], true), [], noonOf('2026-10-01')));
+
+    expect(view.holiday).toBe('Blagdan 2026-10-01');
+    expect(view.todayCase).toMatchObject({ kind: CASE_FREE, shift: { teamId: TEAM_A, name: null, range: null, offForHoliday: true } });
+    expect(view.week[0]?.day).toMatchObject({ date: '2026-10-02', holiday: 'Blagdan 2026-10-02' });
+    expect(view.week[1]?.day).not.toHaveProperty('holiday');
+  });
+});
+
 describe('the reads', () => {
   const ROWS: TodayRowsAnswer = { data: [], isError: false, isPending: false, fetchStatus: 'idle' };
   const PENDING: TodayRowsAnswer = { data: undefined, isError: false, isPending: true, fetchStatus: 'fetching' };

@@ -8,7 +8,9 @@ import {
   type Ref,
 } from 'react';
 
+import { Star } from '@/components/ui/icon';
 import { TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { t } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import type { GridDate } from '@/utils/grid-dates';
 
@@ -142,7 +144,9 @@ export function DateGridCorner({ children }: { readonly children: ReactNode }): 
 /**
  * A date's column head: the day over its short weekday, a weekend tinted and
  * today edged — and, in the grid, not its copy, today's named
- * `aria-current="date"`.
+ * `aria-current="date"`. STORY 21.18 (UX-DR78): a holiday's head draws the
+ * star beside the day, its name for a screen reader (the key line under the
+ * letters names it visibly: the head is too narrow).
  */
 export function DateHead({ date, copy }: { readonly date: GridDate; readonly copy: boolean }): ReactNode {
   return (
@@ -155,8 +159,14 @@ export function DateHead({ date, copy }: { readonly date: GridDate; readonly cop
         date.today && 'border-x-2 border-foreground text-foreground',
       )}
     >
-      <span className="block text-xs font-semibold tabular-nums text-foreground">{date.day}</span>
+      <span className="flex items-center justify-center gap-px text-xs font-semibold tabular-nums text-foreground">
+        {date.day}
+        {date.holiday === undefined ? null : <Star data-holiday className="size-2.5 shrink-0" />}
+      </span>
       <span className="block text-[0.6875rem] font-normal">{date.weekday}</span>
+      {date.holiday === undefined || copy ? null : (
+        <span className="sr-only">{t('kalendar.holiday.label', { name: date.holiday })}</span>
+      )}
     </TableHead>
   );
 }

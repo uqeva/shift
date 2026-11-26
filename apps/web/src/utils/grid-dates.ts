@@ -20,6 +20,8 @@ export interface GridDate {
   readonly weekday: string;
   readonly weekend: boolean;
   readonly today: boolean;
+  /** STORY 21.18 (UX-DR78): the date's holiday name, its head drawing the star. ABSENT on every other date. */
+  readonly holiday?: string;
 }
 
 /** The weekday of a civil date (no zone): 0 is Sunday, 6 Saturday. */
@@ -39,17 +41,31 @@ export function isWeekend(date: string): boolean {
   return weekday === 0 || weekday === 6;
 }
 
-/** The date columns of `dates` (`YYYY-MM-DD`, in order), `today` marked. */
-export function gridDatesOf(dates: readonly string[], today: string): readonly GridDate[] {
-  return dates.map((date) => ({
-    date,
-    day: `${String(Number(date.slice(8, 10)))}.`,
-    dayMonth: formatIsoDayMonth(date) ?? date,
-    weekday: formatIsoWeekdayShortName(date) ?? '',
-    weekend: isWeekend(date),
-    today: date === today,
-  }));
+/**
+ * The date columns of `dates` (`YYYY-MM-DD`, in order), `today` marked, and
+ * each holiday among `holidays` (story 21.18: its names by date) named.
+ */
+export function gridDatesOf(
+  dates: readonly string[],
+  today: string,
+  holidays: ReadonlyMap<string, string> = NO_HOLIDAYS,
+): readonly GridDate[] {
+  return dates.map((date) => {
+    const holiday = holidays.get(date);
+
+    return {
+      date,
+      day: `${String(Number(date.slice(8, 10)))}.`,
+      dayMonth: formatIsoDayMonth(date) ?? date,
+      weekday: formatIsoWeekdayShortName(date) ?? '',
+      weekend: isWeekend(date),
+      today: date === today,
+      ...(holiday === undefined ? {} : { holiday }),
+    };
+  });
 }
+
+const NO_HOLIDAYS: ReadonlyMap<string, string> = new Map();
 
 /**
  * The scroll margins every data cell of a paper grid carries: the first

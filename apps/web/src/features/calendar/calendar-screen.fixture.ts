@@ -45,6 +45,8 @@ export const CALENDAR_SCREEN_PARTS = {
   legend: ['features', 'calendar', 'components', 'calendar-legend.tsx'],
   // Story 5.3c: the marks' glyphs, text and icon, drawn by the cell and the legend.
   modifierGlyphs: ['features', 'calendar', 'components', 'modifier-glyphs.tsx'],
+  // Story 21.18 (UX-DR78): the holiday's star and name, and an emptied cell's *blagdan*.
+  holidayMark: ['features', 'calendar', 'components', 'holiday-mark.tsx'],
   dayList: ['features', 'calendar', 'components', 'calendar-day-list.tsx'],
   dayDetailDialog: ['features', 'calendar', 'components', 'day-detail-dialog.tsx'],
   overrideForm: ['features', 'calendar', 'components', 'override-form.tsx'],

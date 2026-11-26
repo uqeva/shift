@@ -13,11 +13,17 @@ import {
   type LeaveRange,
 } from '@shift/domain';
 
-import { absenceTypesOfCalendar, type CalendarSnapshot, type CalendarSurfaceState } from '@/features/calendar/services/snapshot';
+import {
+  absenceTypesOfCalendar,
+  holidayNamesOfCalendar,
+  type CalendarSnapshot,
+  type CalendarSurfaceState,
+} from '@/features/calendar/services/snapshot';
 import {
   calendarDayListOf,
   calendarTodayOf,
   dayMonthOf,
+  holidayFieldOf,
   memberScheduleInputOf,
   weekdayOf,
   workingShiftTypeIdsOf,
@@ -146,6 +152,8 @@ export interface TodayShift {
   readonly range: string | null;
   /** A shift dated yesterday still running now (`od jučer`); today's own are `false`. */
   readonly fromYesterday: boolean;
+  /** STORY 21.18: a holiday emptied the team's shift (`name` `null`): *blagdan* and the star. ABSENT otherwise. */
+  readonly offForHoliday?: true;
 }
 
 /**
@@ -250,6 +258,8 @@ export interface TodayView {
    * loan is the view it was.
    */
   readonly loan?: LoanNotice;
+  /** STORY 21.18 (UX-DR78): today's holiday name, the card's star and name. ABSENT on every other date. */
+  readonly holiday?: string;
 }
 
 /** The `loan` field of a view: present only with a notice. */
@@ -428,6 +438,7 @@ export function todayViewOf(snapshot: CalendarSnapshot, rows: readonly unknown[]
         week: weekOf(days, today, records),
         ownTeam: ownTeamOf(snapshot, today),
         ...loanFieldOf(loanNoticeShownOf(snapshot, viewer.loans, today)),
+        ...holidayFieldOf(holidayNamesOfCalendar(snapshot), today),
       },
     };
   } catch (cause) {
@@ -566,6 +577,8 @@ function dayLookupOf(snapshot: CalendarSnapshot, today: string, records: readonl
           isToday: date === today,
           shifts: [],
           inactive: !activeOn(viewer.statuses, date),
+          // STORY 21.18: a holiday names its date with no shift too.
+          ...holidayFieldOf(holidayNamesOfCalendar(snapshot), date),
         }
       );
     },
@@ -598,7 +611,11 @@ function todayShiftOf(
   shift: CalendarDay['shifts'][number],
   fromYesterday = false,
 ): TodayShift {
-  const assigned = shift.cell.assigned === true ? { assigned: true as const } : {};
+  const assigned = {
+    ...(shift.cell.assigned === true ? { assigned: true as const } : {}),
+    // STORY 21.18: the holiday emptied the team's shift.
+    ...(shift.cell.offForHoliday === true ? { offForHoliday: true as const } : {}),
+  };
 
   // STORY 21.6: a Personal Shift counted with no team names no team.
   if (shift.teamId === null) {
@@ -733,7 +750,8 @@ function todayCaseOf(
     return { kind: CASE_WORKING, shifts: shifts.map((shift) => todayShiftOf(snapshot, shift)) };
   }
 
-  const free = day.shifts[0];
+  // STORY 21.18: a shift the holiday emptied is what today is, ahead of a non-working one.
+  const free = day.shifts.find((shift) => shift.cell.offForHoliday === true) ?? day.shifts[0];
 
   return { kind: CASE_FREE, shift: free === undefined ? null : todayShiftOf(snapshot, free), inactive: day.inactive };
 }

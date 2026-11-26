@@ -1,24 +1,37 @@
 import { collisionsOf, scheduleOfMonth } from '@shift/domain';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import type { CalendarSnapshot } from '@/features/calendar/services/snapshot';
+import {
+  holidayNamesOfCalendar,
+  holidayRuleOfCalendar,
+  type CalendarSnapshot,
+} from '@/features/calendar/services/snapshot';
+import { translateCellLabel } from '@/features/calendar/utils/cell-label';
 import {
   DAY_NO_ROTATION,
   DAY_OFF,
   DAY_WORKING,
   OVERRIDE_REFUSED_SAME,
   dayDetailOf,
+  holidayOffMessageKey,
   overrideEntryOf,
+  sameTypeOf,
   overrideTypeOptionsOf,
   type DayDetail,
 } from '@/features/calendar/utils/day-detail';
+import { dayListLabelsOf, gridCellLabelsOf } from '@/features/calendar/utils/modifiers';
 import {
   calendarDayListOf,
   calendarMonthOf,
+  monthHolidaysOf,
   snapshotScheduleInputOf,
   staffingInputOf,
   type CalendarDay,
+  type CalendarRow,
 } from '@/features/calendar/utils/month';
+import { personLabelOf } from '@/features/calendar/components/calendar-grid';
+import { overridePreviewOf } from '@/features/calendar/utils/change-preview';
+import { sameTypeIdOf } from '@/features/conflicts/services/override-erasures';
 import { ITEM_COLLISION, collisionInputOf, liveResolutionsOf } from '@/features/conflicts/services/conflicts-queue';
 import { erasuresOf } from '@/features/conflicts/services/erasures';
 import {
@@ -38,7 +51,10 @@ import {
   TODAY,
   DAY_TEAM,
   VIEWER_MEMBER,
+  ARCHIVED_TEAM,
+  assignmentRow,
   calendarOverrideRow,
+  memberMembershipRow,
   calendarPersonalAssignmentRow,
   calendarRosterOverrideRow,
   holidayRow,
@@ -48,6 +64,7 @@ import {
 } from '@/features/planning/planning.fixture';
 import { coverageAgainstMinimumOf } from '@/features/staffing/services/short-staffed';
 import { initLocalization } from '@/lib/i18n';
+import { gridDatesOf } from '@/utils/grid-dates';
 
 /**
  * STORY 21.16 — HOLIDAYS ARE ORGANIZATION DATA, read by every derivation the
@@ -99,6 +116,24 @@ function gridCellOf(of: CalendarSnapshot, teamId: string, date: string) {
   return cell;
 }
 
+/**
+ * STORY 21.18: the holiday NAME set aside on its known paths alone — a row's,
+ * a day's and the day detail's `holiday` — so the R13.5 comparisons keep
+ * their strength everywhere else. A name is display only (Design Note 1): a
+ * date is named whether or not a team is off.
+ */
+function rowsUnnamed(rows: readonly CalendarRow[]): readonly CalendarRow[] {
+  return rows.map(({ holiday: _name, ...row }) => row);
+}
+
+function daysUnnamed(days: readonly CalendarDay[] | null): readonly CalendarDay[] | null {
+  return days === null ? null : days.map(({ holiday: _name, ...day }) => day);
+}
+
+function detailUnnamed({ holiday: _name, ...detail }: DayDetail): DayDetail {
+  return detail;
+}
+
 function dayOf(days: readonly CalendarDay[] | null, date: string): CalendarDay {
   const day = days?.find((one) => one.date === date);
 
@@ -124,12 +159,20 @@ describe('no holiday: every derivation is as before (R13.5)', () => {
     for (const neutral of [holidayOnly, offOnly]) {
       expect(snapshotScheduleInputOf(neutral)).toStrictEqual(snapshotScheduleInputOf(plain));
       // Every cell as before; the columns differ only in the team's own flag, which is data, not a derivation.
-      expect(calendarMonthOf(neutral, { mjesec: MONTH }, TODAY).rows).toEqual(calendarMonthOf(plain, { mjesec: MONTH }, TODAY).rows);
-      expect(detailOf(neutral, A, HOLIDAY)).toEqual(detailOf(plain, A, HOLIDAY));
-      expect(calendarDayListOf(neutral, historyOf(neutral, ANA), MONTH, TODAY)).toEqual(
+      // STORY 21.18: the holiday still NAMES its date (display only), so the names are set aside here.
+      expect(rowsUnnamed(calendarMonthOf(neutral, { mjesec: MONTH }, TODAY).rows)).toEqual(calendarMonthOf(plain, { mjesec: MONTH }, TODAY).rows);
+      expect(detailUnnamed(detailOf(neutral, A, HOLIDAY))).toEqual(detailOf(plain, A, HOLIDAY));
+      expect(daysUnnamed(calendarDayListOf(neutral, historyOf(neutral, ANA), MONTH, TODAY))).toEqual(
         calendarDayListOf(plain, historyOf(plain, ANA), MONTH, TODAY),
       );
     }
+    // The team off with no holiday names nothing; the holiday with no team off is named, and empties nothing.
+    expect(calendarMonthOf(offOnly, { mjesec: MONTH }, TODAY)).toEqual(
+      expect.not.objectContaining({ holidays: expect.anything() }),
+    );
+    expect(calendarMonthOf(holidayOnly, { mjesec: MONTH }, TODAY).rows.find((row) => row.date === HOLIDAY)?.holiday).toBe(
+      holidayOnly.holidays[0]?.name,
+    );
   });
 });
 
@@ -217,10 +260,12 @@ describe('the working team on the holiday works its projection, with no mark (R1
   it("B's cell, day detail and the viewer's day list are what they were", () => {
     expect(gridCellOf(offA, B, HOLIDAY)).toEqual(gridCellOf(plain, B, HOLIDAY));
     expect(gridCellOf(offA, B, HOLIDAY).shiftTypeId).toBe(NOC);
-    expect(detailOf(offA, B, HOLIDAY)).toEqual(detailOf(plain, B, HOLIDAY));
-    expect(dayOf(calendarDayListOf(offA, historyOf(offA, VIEWER_MEMBER), MONTH, TODAY), HOLIDAY)).toEqual(
-      dayOf(calendarDayListOf(plain, historyOf(plain, VIEWER_MEMBER), MONTH, TODAY), HOLIDAY),
-    );
+    // STORY 21.18: the worked holiday is still named (Design Note 1); everything else is as it was.
+    expect(detailOf(offA, B, HOLIDAY)).toEqual({ ...detailOf(plain, B, HOLIDAY), holiday: 'Blagdan' });
+    expect(dayOf(calendarDayListOf(offA, historyOf(offA, VIEWER_MEMBER), MONTH, TODAY), HOLIDAY)).toEqual({
+      ...dayOf(calendarDayListOf(plain, historyOf(plain, VIEWER_MEMBER), MONTH, TODAY), HOLIDAY),
+      holiday: 'Blagdan',
+    });
     // The domain's cell of a team that works the holiday carries neither mark.
     const row = scheduleOfMonth({ teamIds: [B], ...snapshotScheduleInputOf(offA) }, MONTH).find((one) => one.date === HOLIDAY);
     expect(Object.hasOwn(row!.cells[0]!, 'holiday')).toBe(false);
@@ -340,5 +385,192 @@ describe('review pass 1: what a holiday never removes, and the override that win
     }
     const [replacement] = liveResolutionsOf(after, [resolutionRow('replace_member', DAN, 'ro-1')]);
     expect(heldByReplacement(after, replacement!)).toBe(false);
+  });
+});
+
+/**
+ * STORY 21.18 — HOLIDAYS SHOW: the names apart from the rule
+ * (`holidayNamesOfCalendar`), each surface's model fields, and the labels.
+ * Each case is a row of 21.18's I/O matrix over the same calendar.
+ */
+describe('story 21.18: the holiday shows on the month, the day lists, the day detail and the labels', () => {
+  const NAMED = { holidays: [holidayRow('h-1', HOLIDAY, 'Dan sjećanja')] } as const;
+  const rowOf = (of: CalendarSnapshot, date: string) => calendarMonthOf(of, { mjesec: MONTH }, TODAY).rows.find((row) => row.date === date);
+
+  it('no holiday: no new key anywhere — the month, its rows and cells, the day list, the day detail and the date columns', () => {
+    const month = calendarMonthOf(plain, { mjesec: MONTH }, TODAY);
+
+    expect(holidayNamesOfCalendar(plain).size).toBe(0);
+    expect(month).not.toHaveProperty('holidays');
+    expect(month.rows.some((row) => Object.hasOwn(row, 'holiday'))).toBe(false);
+    expect(month.rows.some((row) => row.cells.some((cell) => Object.hasOwn(cell, 'offForHoliday')))).toBe(false);
+    expect((calendarDayListOf(plain, historyOf(plain, ANA), MONTH, TODAY) ?? []).some((day) => Object.hasOwn(day, 'holiday'))).toBe(false);
+    expect(detailOf(plain, A, HOLIDAY)).not.toHaveProperty('holiday');
+    expect(detailOf(plain, A, HOLIDAY)).not.toHaveProperty('holidayOff');
+    expect(gridDatesOf([HOLIDAY], TODAY).every((date) => !Object.hasOwn(date, 'holiday'))).toBe(true);
+    expect(monthHolidaysOf(holidayNamesOfCalendar(plain), [HOLIDAY])).toEqual([]);
+  });
+
+  it('a holiday and nobody off: the row, the day and the date head carry the name; no cell is emptied; the key lists it', async () => {
+    const named = await planningSnapshotOf({ minimumMembers: 1, ...NAMED });
+    const month = calendarMonthOf(named, { mjesec: MONTH }, TODAY);
+
+    // The rule is `{}` with no team off (R13.5), and the names still hold the date (Design Note 1).
+    expect(holidayRuleOfCalendar(named)).toEqual({});
+    expect([...holidayNamesOfCalendar(named)]).toEqual([[HOLIDAY, 'Dan sjećanja']]);
+    expect(month.holidays).toEqual([{ date: HOLIDAY, dayMonth: '08.10.', name: 'Dan sjećanja' }]);
+    expect(rowOf(named, HOLIDAY)?.holiday).toBe('Dan sjećanja');
+    expect(rowOf(named, '2026-10-09')).not.toHaveProperty('holiday');
+    expect(rowOf(named, HOLIDAY)?.cells.some((cell) => Object.hasOwn(cell, 'offForHoliday'))).toBe(false);
+    expect(gridCellOf(named, A, HOLIDAY).shiftTypeId).toBe(DAN);
+    expect(dayOf(calendarDayListOf(named, historyOf(named, ANA), MONTH, TODAY), HOLIDAY).holiday).toBe('Dan sjećanja');
+    expect(detailOf(named, A, HOLIDAY)).toMatchObject({ kind: DAY_WORKING, holiday: 'Dan sjećanja' });
+    expect(detailOf(named, A, HOLIDAY)).not.toHaveProperty('holidayOff');
+    expect(gridDatesOf([HOLIDAY, '2026-10-09'], TODAY, holidayNamesOfCalendar(named)).map((date) => date.holiday)).toEqual([
+      'Dan sjećanja',
+      undefined,
+    ]);
+    // Every cell label of the date reads `blagdan {name}` after it; a working cell keeps its type.
+    const labels = gridCellLabelsOf(month, translateCellLabel);
+    const index = month.rows.findIndex((row) => row.date === HOLIDAY);
+    const column = month.columns.findIndex((team) => team.id === A);
+    expect(labels[index]?.[column]).toMatch(/^četvrtak 08\.10\., blagdan Dan sjećanja, Smjena A, Dan, /);
+  });
+
+  it('the off team emptied: its cell is `offForHoliday`, labelled `blagdan`, and the day detail says it does not work, with the projected type', async () => {
+    const off = await planningSnapshotOf({ minimumMembers: 1, ...NAMED, offTeams: [A] });
+    const month = calendarMonthOf(off, { mjesec: MONTH }, TODAY);
+    const cell = gridCellOf(off, A, HOLIDAY);
+
+    expect(cell).toMatchObject({ shiftTypeId: null, name: null, offForHoliday: true });
+    expect(gridCellOf(off, B, HOLIDAY)).not.toHaveProperty('offForHoliday');
+    expect(gridCellOf(off, A, '2026-10-09')).not.toHaveProperty('offForHoliday');
+    const index = month.rows.findIndex((row) => row.date === HOLIDAY);
+    const column = month.columns.findIndex((team) => team.id === A);
+    expect(gridCellLabelsOf(month, translateCellLabel)[index]?.[column]).toBe('četvrtak 08.10., blagdan Dan sjećanja, Smjena A, blagdan');
+    // The paper grid's team row reads the same cell.
+    expect(month.teamRows.find((row) => row.team.id === A)?.cells[index]).toEqual(cell);
+    // The day detail: the date named, the emptied sentence's projected type (R13.3).
+    expect(detailOf(off, A, HOLIDAY)).toMatchObject({
+      kind: DAY_OFF,
+      shiftTypeId: null,
+      projectedShiftTypeId: DAN,
+      holiday: 'Dan sjećanja',
+      holidayOff: { projectedTypeName: 'Dan' },
+    });
+    // ANA's day list: her team's emptied day reads `blagdan`, the date named.
+    const days = calendarDayListOf(off, historyOf(off, ANA), MONTH, TODAY) ?? [];
+    const day = dayOf(days, HOLIDAY);
+    expect(day.holiday).toBe('Dan sjećanja');
+    expect(day.shifts.map((shift) => shift.cell.offForHoliday)).toEqual([true]);
+    const dayIndex = days.findIndex((one) => one.date === HOLIDAY);
+    expect(dayListLabelsOf(days, off.teams, translateCellLabel)[dayIndex]).toEqual([
+      'četvrtak 08.10., blagdan Dan sjećanja, Smjena A, blagdan',
+    ]);
+  });
+
+  it('an override wins: its type, no `offForHoliday`, the date still named', async () => {
+    const overridden = await planningSnapshotOf({
+      minimumMembers: 1,
+      ...NAMED,
+      offTeams: [A],
+      overrides: [calendarOverrideRow('ov-1', A, HOLIDAY, NOC)],
+    });
+
+    expect(gridCellOf(overridden, A, HOLIDAY)).toMatchObject({ shiftTypeId: NOC, name: 'Noć' });
+    expect(gridCellOf(overridden, A, HOLIDAY)).not.toHaveProperty('offForHoliday');
+    expect(rowOf(overridden, HOLIDAY)?.holiday).toBe('Dan sjećanja');
+    expect(detailOf(overridden, A, HOLIDAY)).toMatchObject({ kind: DAY_WORKING, holiday: 'Dan sjećanja' });
+    expect(detailOf(overridden, A, HOLIDAY)).not.toHaveProperty('holidayOff');
+  });
+
+  it('a personal rotation emptied: no shift, and the day still names the holiday', async () => {
+    const versions = [scheduleVersionRow(DORA, HOLIDAY, 'PERSONAL', 'pilot-rotation', 'pilot-step-0')];
+    const off = await planningSnapshotOf({ minimumMembers: 1, scheduleVersions: versions, ...NAMED, offTeams: [DAY_TEAM] });
+    const day = dayOf(calendarDayListOf(off, historyOf(off, DORA), MONTH, TODAY), HOLIDAY);
+
+    expect(day.shifts).toEqual([]);
+    expect(day.holiday).toBe('Dan sjećanja');
+  });
+});
+
+describe('story 21.18 review pass 1: groups, previews, person rows, a non-working projection', () => {
+  const NAMED = { holidays: [holidayRow('h-1', HOLIDAY, 'Dan sjećanja')] } as const;
+  const labelOf = (of: CalendarSnapshot, teamId: string, date: string): string | undefined => {
+    const month = calendarMonthOf(of, { mjesec: MONTH }, TODAY);
+    const index = month.rows.findIndex((row) => row.date === date);
+    const column = month.columns.findIndex((team) => team.id === teamId);
+
+    return gridCellLabelsOf(month, translateCellLabel)[index]?.[column];
+  };
+
+  it('an emptied cell with a staffing group reads `blagdan` before the group, and the detail says so with the grouped sentence', async () => {
+    const assigned = await planningSnapshotOf({
+      minimumMembers: 1,
+      ...NAMED,
+      offTeams: [A],
+      assignments: [calendarPersonalAssignmentRow('00000000-0000-4000-8000-00000000f201', ANA, HOLIDAY, 'SHIFT', DAN, A)],
+    });
+    const cell = gridCellOf(assigned, A, HOLIDAY);
+
+    expect(cell).toMatchObject({ name: null, offForHoliday: true });
+    expect(cell.groups?.map((group) => group.shiftTypeId)).toEqual([DAN]);
+    expect(labelOf(assigned, A, HOLIDAY)).toMatch(/^četvrtak 08\.10\., blagdan Dan sjećanja, Smjena A, blagdan, Dan, .+, dodijeljeno ručno$/);
+    expect(holidayOffMessageKey(detailOf(assigned, A, HOLIDAY))).toBe('kalendar.holiday.dayOffGroups');
+    expect(holidayOffMessageKey(detailOf(offA, A, HOLIDAY))).toBe('kalendar.holiday.dayOff');
+    // With no holiday, nothing reads `blagdan`.
+    expect(labelOf(plain, A, HOLIDAY)).not.toContain('blagdan');
+  });
+
+  it('the projected type offered on an emptied day gets its preview; on a worked day it is the same type and none', () => {
+    expect(overridePreviewOf(offA, detailOf(offA, A, HOLIDAY), DAN, [])).not.toBeNull();
+    expect(overridePreviewOf(plain, detailOf(plain, A, HOLIDAY), DAN, [])).toBeNull();
+  });
+
+  it("the amend preflight's same type agrees with the day detail's, worked or emptied", () => {
+    for (const of of [plain, offA]) {
+      for (const date of [HOLIDAY, '2026-10-09', '2026-10-10']) {
+        expect(sameTypeIdOf(of, A, date), date).toBe(sameTypeOf(detailOf(of, A, date)));
+      }
+    }
+    expect(sameTypeIdOf(offA, A, HOLIDAY)).toBeNull();
+  });
+
+  it("a person row's team shift a holiday emptied reads `blagdan`, as a team cell does", async () => {
+    // DORA moves onto the archived team, which still projects the pilot rotation: no active turnus team, so a person row.
+    const setup = {
+      minimumMembers: 1,
+      memberships: [memberMembershipRow(DORA, ARCHIVED_TEAM, '2026-10-01')],
+      rotations: [assignmentRow(ARCHIVED_TEAM, 'pilot-rotation', 'pilot-step-0', '2020-01-01', '2020-01-01')],
+      ...NAMED,
+    } as const;
+    const working = await planningSnapshotOf(setup);
+    const off = await planningSnapshotOf({ ...setup, offTeams: [ARCHIVED_TEAM] });
+    const personOf = (of: CalendarSnapshot) => {
+      const month = calendarMonthOf(of, { mjesec: MONTH }, TODAY);
+      const row = month.peopleGroups.flatMap((group) => group.rows).find((one) => one.memberId === DORA);
+      const cell = row?.cells.find((one) => one.date === HOLIDAY);
+      const date = month.rows.find((one) => one.date === HOLIDAY);
+
+      if (row === undefined || cell === undefined || date === undefined) throw new Error('no person cell');
+
+      return { row, cell, date };
+    };
+
+    expect(personOf(working).cell.cell?.shiftTypeId).not.toBeNull();
+    const { row, cell, date } = personOf(off);
+    expect(cell.cell).toMatchObject({ shiftTypeId: null, name: null, offForHoliday: true });
+    expect(personLabelOf(row, cell, date)).toBe('četvrtak 08.10., blagdan Dan sjećanja, Dora Dorić, blagdan');
+    expect(personLabelOf(personOf(working).row, personOf(working).cell, personOf(working).date)).not.toMatch(/, blagdan$/);
+  });
+
+  it('a holiday on a date the off team projects a non-working type: emptied all the same, and the detail names that type', async () => {
+    // Smjena A projects Slobodno on 10.10.
+    const SLOBODNO_DAY = '2026-10-10';
+    const off = await planningSnapshotOf({ minimumMembers: 1, holidays: [holidayRow('h-1', SLOBODNO_DAY, 'Blagdan')], offTeams: [A] });
+
+    expect(gridCellOf(plain, A, SLOBODNO_DAY).name).toBe('Slobodno');
+    expect(gridCellOf(off, A, SLOBODNO_DAY)).toMatchObject({ shiftTypeId: null, name: null, offForHoliday: true });
+    expect(detailOf(off, A, SLOBODNO_DAY)).toMatchObject({ kind: DAY_OFF, holidayOff: { projectedTypeName: 'Slobodno' } });
   });
 });

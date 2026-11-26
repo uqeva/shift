@@ -759,9 +759,9 @@ development_status:
   21-13-floaters-are-suggested-for-an-uncovered-shift-by-role: ready-for-dev  # after 21.7, 21.12
   21-14-a-floater-covers-a-whole-leave-in-one-action: ready-for-dev  # after 21.13
   21-15-the-holiday-rule-in-the-domain: done  # PR #378, squash cdf4fd1, CI green; domain only, no migration
-  21-16-holidays-are-organization-data: review  # built, CI pending; feat/21-16-21-17-holidays (0080), no PR yet
-  21-17-an-admin-enters-holidays-and-imports-the-official-list: review  # built, CI pending; feat/21-16-21-17-holidays, no migration, no PR yet
-  21-18-holidays-show-on-the-calendar-the-schedule-and-the-grid: ready-for-dev  # after 21.16, 21.4
+  21-16-holidays-are-organization-data: done  # PR #380, squash 69ef8fc, CI green (run 45758802426); 0080
+  21-17-an-admin-enters-holidays-and-imports-the-official-list: done  # PR #380, squash 69ef8fc, CI green (run 45758802426); no migration
+  21-18-holidays-show-on-the-calendar-the-schedule-and-the-grid: review  # built, CI pending; feat/21-18-21-19-holidays-shown, no migration, no PR yet
   21-19-worked-holiday-hours-are-their-own-figure: ready-for-dev  # after 21.16; cuttable to a follow-up (proposal 3)
   21-20-each-team-has-its-own-minimum: ready-for-dev  # independent
   21-21-smjenko-the-public-page: review  # built, CI pending; feat/21-21-landing (no PR yet); independent; publishing waits: apex DNS and the info@<domain> mail route (founder; address decided 2026-11-25, a build input)
