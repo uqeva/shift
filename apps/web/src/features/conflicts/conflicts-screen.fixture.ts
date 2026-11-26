@@ -30,6 +30,9 @@ export const CONFLICT_RESOLUTION_PARTS = {
   option: ['features', 'conflicts', 'components', 'resolution-option.tsx'],
   picker: ['features', 'conflicts', 'components', 'replacement-picker.tsx'],
   skeleton: ['features', 'conflicts', 'components', 'resolution-skeleton.tsx'],
+  // STORY 21.14: *Pokrij cijelo odsustvo* — its dialog's state, check and write, and the dialog.
+  coverHook: ['features', 'conflicts', 'hooks', 'use-leave-cover.ts'],
+  coverDialog: ['features', 'conflicts', 'components', 'leave-cover-dialog.tsx'],
 } as const;
 
 /**
@@ -85,6 +88,10 @@ export const CONFLICTS_SCREEN_EXEMPT: readonly { readonly file: string; readonly
   {
     file: 'services/resolution-screen.ts',
     why: 'every rule of the resolution screen (story 5.4b) — its place in the queue, facts, strip and status line; a key source of its own, executed by resolution-screen.test.ts',
+  },
+  {
+    file: 'services/leave-cover.ts',
+    why: 'every rule of *Pokrij cijelo odsustvo* (story 21.14) — the record\'s dates, the floaters offered, the draft, the items, the check and its lines; a key source of its own, executed by leave-cover.test.ts',
   },
   {
     file: 'services/erasures.ts',

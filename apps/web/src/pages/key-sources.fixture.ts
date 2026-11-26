@@ -87,6 +87,7 @@ import {
   RESOLUTION,
   RESOLUTION_SCREEN_KEYS,
   RESOLUTION_WRITE_KEYS,
+  LEAVE_COVER_KEYS,
   LEAVE_REQUEST_REVIEW,
   LEAVE_REQUEST_REVIEW_KEYS,
   SWAP_PROPOSAL,
@@ -1433,7 +1434,15 @@ export const KEY_SOURCES = [
     keys: translationKeys,
     // 43 SINCE STORY 21.7: the accept card's sentence for a shift with no team, and `bez tima` in the facts and the coworkers line.
     // 45 SINCE STORY 21.13: *Predložene zamjene*'s heading, and the held line's *Ukloni je u Ručnom rasporedu*.
-    strings: 45,
+    // 71 SINCE STORY 21.14: *Pokrij cijelo odsustvo* — its opener and hint, a superseded decision's
+    // cover line, and its dialog (title, lede, *Zatvori*, the floaters' heading and line, a date's
+    // line, the none and none-covered lines, the unavailable and unchecked alerts, *Odustani*,
+    // *Provjeri*, *Što se mijenja*'s title, lede, changed line and erasures, *Natrag*, *Spremi*);
+    // counted per call, so *Zatvori*, the none line and *Spremi* (the erasure confirmation's too)
+    // twice, and *bez tima* and *Ukloni je u Ručnom rasporedu* once more.
+    // 74 SINCE ITS REVIEW: the loading line, the withdrawn offer, the picked floater's live summary, a landed
+    // cover's line and the none line with no role; the none line with a role is now a rules key.
+    strings: 74,
   },
   {
     // STORY 5.4b: the facts line with and without times, who else works or
@@ -1460,7 +1469,8 @@ export const KEY_SOURCES = [
     // 28 SINCE STORY 21.7: the coworkers line and its empty sentence for a shift with no team.
     // 31 SINCE STORY 21.13: a suggested floater's line with their shifts (`suggestionLineMessageKey`) and the
     // none line with a role and with none (`noSuggestionMessageKey`).
-    strings: 31,
+    // 32 SINCE STORY 21.14: the queue's status line for a whole leave covered.
+    strings: 32,
   },
   {
     // STORY 9.4. On one leave request's decision screen, through `t('…')`:
@@ -1688,6 +1698,19 @@ export const KEY_SOURCES = [
     keys: messageKeyUnions,
     // 6 SINCE STORY 21.13: the held line of a key a cover's assignment holds (*Ručni raspored*).
     strings: 6,
+  },
+  {
+    // STORY 21.14: *Pokrij cijelo odsustvo*'s rules — a date's seven lines
+    // (`leaveCoverReasonMessageKey`: covered, and the six reasons a date is
+    // left open) and a refused check's five (`leaveCoverRefusalMessageKey`:
+    // gone, none, stale, archived, too many).
+    // 16 SINCE ITS REVIEW: the none line with a role and with none
+    // (`leaveCoverNoneMessageKey`), and the write's taken and held lines
+    // (`leaveCoverFailureMessageKey`).
+    name: 'the leave cover rules',
+    file: LEAVE_COVER_KEYS,
+    keys: messageKeyUnions,
+    strings: 16,
   },
   {
     // STORY 5.2c: the two lines in place of the figures (unavailable,
@@ -2039,7 +2062,8 @@ export const KEY_SOURCES = [
     // (its heading, *Uskače kao zamjena* and its hint, the roles' legend and hint, no roles, loading, unavailable),
     // and *Timovi i raspored*'s button with its name.
     // 284 SINCE ITS REVIEW: the people rows' button and its name for a floater (*Zamjena · da*).
-    strings: 284,
+    // 285 SINCE STORY 21.14: the leave guard's line for a cover's assignment that stays.
+    strings: 285,
   },
   {
     // THIRTEEN on the member write path's rules: eleven `ljudi.form.error.*`

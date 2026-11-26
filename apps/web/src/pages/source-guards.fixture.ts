@@ -461,6 +461,9 @@ export const RESOLUTION_SCREEN_KEYS = join(CONFLICTS_FEATURE, 'services', 'resol
 /** Story 7.9: the replacement candidates' three group headings, off `candidateGroupMessageKey`. */
 export const REPLACEMENT_CANDIDATE_KEYS = join(srcRoot, 'features', 'calendar', 'utils', 'replacement-candidates.ts');
 
+/** Story 21.14: *Pokrij cijelo odsustvo*'s rules — a date's line and a refused check's, off `\w*MessageKey` unions. */
+export const LEAVE_COVER_KEYS = join(CONFLICTS_FEATURE, 'services', 'leave-cover.ts');
+
 /** Story 5.4b's write: its three refusals, off `resolutionFailureMessageKey`. */
 export const RESOLUTION_WRITE_KEYS = join(CONFLICTS_FEATURE, 'services', 'resolution-write.ts');
 
@@ -1385,7 +1388,9 @@ export const SCREENS = [
   // bulk action exist, which is what the count keeps true.
   // STILL SIX SINCE STORY 5.4c: the second card and the candidate picker's
   // rows are radio items of their own groups, never a `<Button>`.
-  { name: 'the conflict resolution screen', file: RESOLUTION, expectedFields: 0, expectedButtons: 6 },
+  // ELEVEN SINCE STORY 21.14: *Pokrij cijelo odsustvo*'s opener, and its dialog's *Odustani*,
+  // *Provjeri*, *Natrag* and *Spremi*.
+  { name: 'the conflict resolution screen', file: RESOLUTION, expectedFields: 0, expectedButtons: 11 },
   // STORY 9.4. On one leave request's decision screen: *Natrag na Za odluku*
   // (written once, drawn in every state), the unavailable alert's retry, and
   // *Odbij* and *Odobri*. No confirmation, no reason field (Epic 9 has none)

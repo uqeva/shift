@@ -995,6 +995,7 @@
     "savedRequestRejected": "Zahtjev odbijen: {member}, {from}–{to}.",
     "savedSwapApproved": "Zamjena odobrena: {proposer} → {addressee}, {date}.",
     "savedSwapRejected": "Zamjena nije odobrena: {proposer} → {addressee}, {date}.",
+    "savedCover": "Odsutnost pokrivena: {replacement} preuzima {count, plural, one {# smjenu} few {# smjene} other {# smjena}} umjesto osobe {member}.",
     "request": {
       "heading": "Zahtjev za odsutnost",
       "missing": "Zahtjev ne postoji.",
@@ -1134,6 +1135,50 @@
         "failed": "Odluku nije bilo moguće spremiti. Pokušaj ponovno.",
         "taken": "{name} je već na ovoj smjeni. Odaberi nekoga drugoga."
       }
+    },
+    "cover": {
+      "open": "Pokrij cijelo odsustvo",
+      "openHint": "Jedna zamjena preuzima otvorene smjene ove odsutnosti za koje je slobodna.",
+      "title": "Pokrij cijelo odsustvo",
+      "lede": "{member}: {count, plural, one {# smjena čeka odluku} few {# smjene čekaju odluku} other {# smjena čeka odluku}} u ovoj odsutnosti.",
+      "close": "Zatvori",
+      "floaters": "Zamjene",
+      "floaterLine": "{name} · pokriva {covered} od {total}",
+      "noFloaters": "Nema zamjene za posao {posao}.",
+      "noneCovered": "{name}: nema slobodnih datuma u ovoj odsutnosti.",
+      "date": "{weekday} {date} · {type} · {team}",
+      "reason": {
+        "covered": "pokriva",
+        "inactive": "taj dan nije u aktivnom statusu",
+        "onLeave": "taj dan je na odsutnosti",
+        "working": "taj dan radi",
+        "restGap": "premalo odmora između smjena",
+        "notCandidate": "ne može preuzeti tu smjenu",
+        "held": "čeka uklanjanje stare zamjene"
+      },
+      "cancel": "Odustani",
+      "check": "Provjeri",
+      "previewTitle": "Što se mijenja",
+      "previewLede": "{name} preuzima {count, plural, one {# smjenu} few {# smjene} other {# smjena}}. Ostali datumi ostaju otvoreni.",
+      "changed": "U međuvremenu se nešto promijenilo. Pregledaj promjene prije spremanja.",
+      "erasures": "{count, plural, one {Spremanje briše # odluku.} few {Spremanje briše # odluke.} other {Spremanje briše # odluka.}}",
+      "back": "Natrag",
+      "save": "Spremi",
+      "unavailable": "Zamjene trenutačno nije moguće izračunati. Pokušaj ponovno.",
+      "unchecked": "Provjeru nije bilo moguće napraviti, pa ništa nije spremljeno. Pokušaj ponovno.",
+      "superseded": "{name} i dalje ima smjenu {date} iz odluke donesene za drugu smjenu. {action} ako više ne treba.",
+      "error": {
+        "gone": "Ova stavka više ne čeka odluku: odluka je već zabilježena ili odsutnost više ne pokriva taj datum.",
+        "none": "Ova zamjena više ne pokriva nijedan datum. Odaberi drugu.",
+        "stale": "Raspored se u međuvremenu promijenio. Provjeri ponovno.",
+        "archived": "Smjena ili tim je u međuvremenu arhiviran. Provjeri ponovno.",
+        "tooMany": "Previše datuma za jedno spremanje.",
+        "taken": "{name} već ima smjenu na jedan od tih datuma. Provjeri ponovno.",
+        "held": "Jedan od tih datuma čeka uklanjanje stare zamjene. Provjeri ponovno."
+      },
+      "noFloatersAny": "Nema zamjene koja može preuzeti ovu odsutnost.",
+      "loading": "Učitavanje zamjena…",
+      "withdrawn": "Za ovu odsutnost više nema zamjene koja je može preuzeti."
     }
   },
   "sati": {
@@ -1512,6 +1557,7 @@
       "handoffGone": "Odsutnost iz stavke za odluku više ne postoji ili više ne pokriva taj datum, pa se ništa nije otvorilo.",
       "handoffPrefilled": "Od i do su izračunati iz stavke za odluku. Provjeri ih prije spremanja.",
       "replacementStays": "{name} ostaje na smjeni {team} · {date} kao zamjena. Ukloni zamjenu u kalendaru ako više ne treba.",
+      "coverStays": "{name} i dalje ima smjenu {date} kao zamjena. Ukloni je u Ručnom rasporedu ako više ne treba.",
       "replacementsUnknown": "Ne mogu provjeriti zamjene za ove datume.",
       "conflictLine": "{weekday} {date} {type}",
       "conflictsCreated": "{count, plural, one {Spremanjem nastaje # stavka koja čeka odluku.} few {Spremanjem nastaju # stavke koje čekaju odluku.} other {Spremanjem nastaje # stavki koje čekaju odluku.}}",

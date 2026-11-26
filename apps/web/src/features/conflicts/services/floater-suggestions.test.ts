@@ -252,6 +252,8 @@ describe('a key held by a cover\'s assignment (the 21.7 deferral)', () => {
 
     expect(view.held).toBe(true);
     expect(view.heldBy).toEqual({ kind: HELD_BY_ASSIGNMENT, manual: { mjesec: '2026-10', osoba: DORA, dan: '2026-10-10' } });
+    // STORY 21.14: the holder is the held line's, never named again as a superseded cover.
+    expect(view.supersededCovers).toEqual([]);
     expect(t('zaOdluku.resolution.heldAssignmentAction')).toBe('Ukloni je u Ručnom rasporedu');
     expect(resolutionFailureLineOf(RESOLUTION_HELD, null, true)).toEqual({ key: 'zaOdluku.resolution.heldAssignment' });
     expect(resolutionFailureLineOf(RESOLUTION_HELD, null)).toEqual({ key: 'zaOdluku.resolution.held' });

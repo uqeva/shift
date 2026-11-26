@@ -1,4 +1,12 @@
-import { skipToken, useQueryClient, type FetchQueryOptions, type QueryFunction, type QueryKey, type SkipToken } from '@tanstack/react-query';
+import {
+  skipToken,
+  useQueryClient,
+  type FetchQueryOptions,
+  type QueryClient,
+  type QueryFunction,
+  type QueryKey,
+  type SkipToken,
+} from '@tanstack/react-query';
 
 import { calendarSnapshotQueryOptions } from '@/features/calendar/hooks/use-calendar-snapshot';
 import type { ErasureReads } from '@/features/conflicts/services/erasure-check';
@@ -71,6 +79,22 @@ export function ownEntryOf<Data, Key extends QueryKey>(options: ScreenRead<Data,
     ...(retry === undefined ? {} : { retry }),
     ...(retryDelay === undefined ? {} : { retryDelay }),
   };
+}
+
+/**
+ * One more screen read fetched afresh under the check's own entry, as the
+ * three core ones are (story 21.14: the member list's floater fields), then
+ * written into the screen's own entry.
+ */
+export async function fetchFreshShared<Data, Key extends QueryKey>(
+  queryClient: QueryClient,
+  options: ScreenRead<Data, Key>,
+): Promise<Data> {
+  const data = await queryClient.fetchQuery({ ...ownEntryOf(options), staleTime: 0, networkMode: 'always' });
+
+  queryClient.setQueryData<Data>(options.queryKey as QueryKey, data);
+
+  return data;
 }
 
 /** The three core reads, fetched afresh, and how their answers reach the screens. */

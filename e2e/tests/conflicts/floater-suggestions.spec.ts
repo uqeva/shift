@@ -20,7 +20,7 @@ import {
   type SeededRotation,
 } from '../../utils/database-helper.ts';
 import { addDays } from '../../utils/dates.ts';
-import { hr } from '../../utils/i18n.ts';
+import { fill, hr } from '../../utils/i18n.ts';
 import { ADMIN_STATE } from '../../utils/run-fixture.ts';
 import { expect, test } from '../../utils/custom-fixtures.ts';
 
@@ -32,7 +32,8 @@ import { expect, test } from '../../utils/custom-fixtures.ts';
  * Under the run's rotation hold, a team of the test's own gets the seeded
  * rotation from today (`[Dan, Noć, Slobodno, Slobodno]`), with a crew member
  * on it, who is on leave over a Dan; a student on no team is a floater with no
- * role (so any absent member with no role is theirs to cover). Everything
+ * role (so any absent member with no role is theirs to cover). Story 21.14
+ * (R16.4): *Pokrij cijelo odsustvo* covers a whole leave in one call. Everything
  * written — the seed, the members with their assignments, leave, floater
  * roles and decisions, and the team — is removed in the `afterEach`.
  */
@@ -85,8 +86,12 @@ interface Setup {
   readonly date: string;
 }
 
-/** The hold, a team with the seeded rotation, its crew member on leave over a Dan, and a floater on no team. */
-async function setUp(slug: string): Promise<Setup> {
+/**
+ * The hold, a team with the seeded rotation, its crew member on leave over a
+ * Dan (and `days` more of the cycle: one more is the Noć after it), and a
+ * floater on no team.
+ */
+async function setUp(slug: string, days = 0): Promise<Setup> {
   hold = holdRotation(slug);
   await hold.ready;
   const own: { readonly slug: string; members: string[]; teams: string[] } = { slug, members: [], teams: [] };
@@ -102,7 +107,7 @@ async function setUp(slug: string): Promise<Setup> {
   own.members.push(floater.id);
   await seedFloaterInSql(slug, floater.id);
   const date = addDays(rotation.today, 4);
-  await seedLeaveRecord(slug, crew.id, date, date);
+  await seedLeaveRecord(slug, crew.id, date, addDays(date, days));
 
   return { rotation, teamId: team.id, crew, floater, date };
 }
@@ -218,4 +223,56 @@ test('the member page marks a member a floater with one role, and stores the fla
   await expect(peoplePage.floaterCard).toContainText(role.name);
   await expect(peoplePage.floaterCard).toContainText(hr.ljudi.floater.saved);
   await expect.poll(async () => floaterOfInSql(fixture.slug, member.id)).toEqual({ isFloater: true, roleIds: [role.id] });
+});
+
+test('Pokrij cijelo odsustvo covers every open shift of the leave in one save, by the floater’s own assignments', async ({
+  page,
+  fixture,
+  conflictsPage,
+  resolutionPage,
+}) => {
+  test.slow();
+  // The leave runs over the Dan and the Noć after it: two open shifts of one record.
+  const { teamId, crew, floater, date } = await setUp(fixture.slug, 1);
+  const next = addDays(date, 1);
+
+  // ONE CALL: every covered date goes in a single `resolve_with_personal_assignment` POST.
+  let coverCalls = 0;
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && request.url().includes('/rpc/resolve_with_personal_assignment')) coverCalls += 1;
+  });
+
+  await page.goto(`/za-odluku/${crew.id}/${date}/${teamId}`);
+  await resolutionPage.coverOpenButton.click();
+  await expect(resolutionPage.coverDialog).toBeVisible();
+  // The floaters are listed (the model is in) before nothing is said to be picked.
+  const offered = resolutionPage.coverFloater(floater.name);
+  await expect(offered).toBeVisible();
+  await expect(resolutionPage.coverDialog.getByRole('radio', { checked: true })).toHaveCount(0);
+
+  // The floater covers both dates, said in their line and per date.
+  await expect(offered).toHaveAccessibleName(fill(hr.zaOdluku.cover.floaterLine, { name: floater.name, covered: '2', total: '2' }));
+  await offered.click();
+  await expect(resolutionPage.coverDialog.getByText(hr.zaOdluku.cover.reason.covered, { exact: true })).toHaveCount(2);
+
+  // PROVJERI: the grid's *Što se mijenja*; SPREMI writes both in one call.
+  await resolutionPage.coverCheckButton.click();
+  await expect(resolutionPage.coverDialog.getByRole('heading', { name: hr.zaOdluku.cover.previewTitle })).toBeVisible();
+  await resolutionPage.coverSaveButton.click();
+  await expect(page).toHaveURL('/za-odluku');
+  await expect(conflictsPage.savedStatus).toContainText(floater.name);
+  // The queue's line counts the shifts taken: `… preuzima 2 smjene umjesto osobe …`.
+  await expect(conflictsPage.savedStatus).toContainText(`${floater.name} preuzima 2 smjene`);
+  expect(coverCalls).toBe(1);
+  await expect(conflictsPage.rowsOf(crew.name)).toHaveCount(0);
+  await expect
+    .poll(async () => (await personalAssignmentsOfInSql(fixture.slug, floater.id)).map((row) => [row.date, row.kind, row.teamId]))
+    .toEqual([
+      [date, 'SHIFT', teamId],
+      [next, 'SHIFT', teamId],
+    ]);
+  expect(await conflictResolutionsOfInSql(fixture.slug, crew.id)).toEqual([
+    { date, teamId, kind: 'replace_member', assignmentMember: floater.id },
+    { date: next, teamId, kind: 'replace_member', assignmentMember: floater.id },
+  ]);
 });

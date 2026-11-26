@@ -27,6 +27,16 @@
  * order given, which the caller makes the names' order. The absent member is
  * never suggested.
  *
+ * A WHOLE LEAVE (R16.4, story 21.14; {@link leaveCoverOf}): one floater's
+ * standing on each uncovered shift of a leave record, in date order, each
+ * read as if the floater already held every shift covered before it — so a
+ * covered Noć leaves no rest for a Dan the next morning, and a second
+ * uncovered shift on a date already covered finds them working. A date the
+ * caller cannot write (`writable: false`: the floater may not take that
+ * shift, or its key is held) is never covered and adds nothing. A date the
+ * floater is not free on is listed with its reason and left open, never
+ * forced.
+ *
  * Ids, codes and counts only (AD-8): never a name or a formatted string. The
  * caller gives each floater's at-work shifts from `atWorkShiftsOf` (R12.3),
  * at least every one of d's month and of d−1 and d+1.
@@ -220,4 +230,69 @@ export function floaterSuggestionsOf(input: FloaterSuggestionInput): readonly Fl
 
   // A stable sort: ties keep the order given.
   return suggested.sort((left, right) => left.shiftsInMonth - right.shiftsInMonth);
+}
+
+/** One uncovered shift of a whole leave (R16.4): the shift, and whether the caller may write a cover on it. */
+export interface LeaveCoverShift extends UncoveredShift {
+  /**
+   * False when the cover cannot be written whatever the floater's standing:
+   * they are not among the shift's cover candidates, or its key is held. Such
+   * a shift is never covered and adds nothing to the floater's day.
+   */
+  readonly writable: boolean;
+}
+
+/** One shift's place in a whole leave's cover: the floater's standing, and whether it is covered. */
+export interface LeaveCoverEntry {
+  readonly standing: FloaterStanding;
+  /** Free and writable: the cover is written for it. */
+  readonly covered: boolean;
+}
+
+/** One floater over a whole leave: an entry per shift, in the order given, and how many are covered. */
+export interface LeaveCover {
+  readonly entries: readonly LeaveCoverEntry[];
+  readonly covered: number;
+}
+
+/**
+ * R16.4: `floater`'s cover of a leave record's uncovered `shifts`, given in
+ * date order: each shift's {@link floaterStandingOn} with every shift covered
+ * before it added to the floater's own, and covered when free and writable.
+ * Eligibility is not read here: the caller offers only eligible floaters.
+ *
+ * @throws RangeError when the shifts are not in date order, and on any
+ *   precondition of {@link floaterStandingOn}.
+ */
+export function leaveCoverOf(floater: Floater, shifts: readonly LeaveCoverShift[]): LeaveCover {
+  const held: FloaterShift[] = [...floater.shifts];
+  const entries: LeaveCoverEntry[] = [];
+  let previous: string | null = null;
+  let covered = 0;
+
+  for (const shift of shifts) {
+    checkDate('an uncovered date', shift.date);
+    if (previous !== null && shift.date < previous) {
+      throw new RangeError(`the uncovered shifts are not in date order: ${shift.date} after ${previous}`);
+    }
+    previous = shift.date;
+
+    const standing = floaterStandingOn({ ...floater, shifts: held }, shift);
+    const isCovered = standing === FLOATER_FREE && shift.writable;
+
+    entries.push({ standing, covered: isCovered });
+
+    if (!isCovered) continue;
+
+    covered += 1;
+    // THE COVER IS NOW THEIR SHIFT: a later date reads it (R5's rest gap, a second shift that date).
+    // A shift with no times still makes the date a working one: a zero-length mark, never an interval read.
+    held.push(
+      shift.interval === null
+        ? { date: shift.date, startMinute: 0, endMinute: 1 }
+        : { date: shift.date, startMinute: shift.interval.startMinute, endMinute: shift.interval.endMinute },
+    );
+  }
+
+  return { entries, covered };
 }

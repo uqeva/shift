@@ -823,6 +823,10 @@ const SOURCES = [
   join(webRoot, 'src', 'features', 'conflicts', 'components', 'resolution-skeleton.tsx'),
   join(webRoot, 'src', 'features', 'conflicts', 'services', 'resolution-screen.ts'),
   join(webRoot, 'src', 'features', 'conflicts', 'services', 'resolution-write.ts'),
+  // Story 21.14: *Pokrij cijelo odsustvo* — its hook, its dialog and its rules module.
+  join(webRoot, 'src', 'features', 'conflicts', 'hooks', 'use-leave-cover.ts'),
+  join(webRoot, 'src', 'features', 'conflicts', 'components', 'leave-cover-dialog.tsx'),
+  join(webRoot, 'src', 'features', 'conflicts', 'services', 'leave-cover.ts'),
   // Story 9.4: one leave request's decision screen — its page, hook and body,
   // its rules module, and the admin leave dialog's conflict lines it shares.
   join(webRoot, 'src', 'pages', 'za-odluku.zahtjev.$requestId.tsx'),

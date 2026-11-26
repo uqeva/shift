@@ -23,10 +23,12 @@ import {
   groupsLessSuggested,
   type SuggestedCandidate,
 } from '@/features/conflicts/services/floater-suggestions';
+import { leaveCoverOffered } from '@/features/conflicts/services/leave-cover';
 import {
   heldByReplacement,
   personalShiftCountedWith,
   replacementContextOf,
+  supersededCoverOf,
 } from '@/features/conflicts/services/replacement-effect';
 import { ACCEPT_UNCOVERED, REPLACE_MEMBER } from '@/features/conflicts/services/resolutions';
 import { durationMessageKey } from '@/features/hour-bands/services/list';
@@ -139,6 +141,14 @@ import {
  * A KEY HELD BY AN ASSIGNMENT (story 21.13, the 21.7 deferral): a cover's
  * assignment that no longer applies says to remove it in *Ručni raspored*,
  * linking the cover's month, person and date ({@link ResolutionView.heldBy}).
+ *
+ * A WHOLE LEAVE (story 21.14; R16.4): with a floater in the organization, the
+ * screen offers *Pokrij cijelo odsustvo* ({@link ResolutionView.leaveCover}),
+ * a dialog over the record's unresolved conflicts (`leave-cover.ts`). And a
+ * SUPERSEDED DECISION'S COVER (the 21.7 deferral): a cover by assignment
+ * decided on another shift type (0038) decides nothing, yet its cover still
+ * holds that shift; the screen names each one, linking *Ručni raspored*
+ * ({@link ResolutionView.supersededCovers}).
  *
  * NEVER A PARTIAL SCREEN. A read that failed or is paused offline, a row that
  * cannot be trusted, and any `RangeError` of a derivation make the screen
@@ -281,7 +291,15 @@ export type SwapSavedKind = typeof SWAP_APPROVED_SAVED | typeof SWAP_REJECTED_SA
  * 5.4c, since story 9.4 a leave request's approval and rejection, and since
  * story 12.4 a swap's.
  */
-export type ResolutionSavedKind = typeof ACCEPT_UNCOVERED | typeof REPLACE_MEMBER | LeaveRequestSavedKind | SwapSavedKind;
+export type ResolutionSavedKind =
+  | typeof ACCEPT_UNCOVERED
+  | typeof REPLACE_MEMBER
+  | LeaveRequestSavedKind
+  | SwapSavedKind
+  | typeof LEAVE_COVER_SAVED;
+
+/** STORY 21.14: a whole leave covered by one floater (R16.4). */
+export const LEAVE_COVER_SAVED = 'leave_cover';
 
 /** What every landed decision names on the queue: the shift, the date and the member, as shown. */
 interface ResolutionSavedFacts {
@@ -300,7 +318,19 @@ export type ResolutionSaved =
   | (ResolutionSavedFacts & { readonly kind: typeof ACCEPT_UNCOVERED })
   | (ResolutionSavedFacts & { readonly kind: typeof REPLACE_MEMBER; readonly replacementName: string })
   | LeaveRequestSaved
-  | SwapSaved;
+  | SwapSaved
+  | LeaveCoverSaved;
+
+/**
+ * A whole leave covered in one action (story 21.14), in the same slot: the
+ * absent member, the floater, and how many dates the one call covered.
+ */
+export interface LeaveCoverSaved {
+  readonly kind: typeof LEAVE_COVER_SAVED;
+  readonly memberName: string;
+  readonly replacementName: string;
+  readonly days: number;
+}
 
 /**
  * A leave request decided on its own screen (story 9.4), in the same slot:
@@ -623,6 +653,16 @@ export type ResolutionHeldBy =
   | { readonly kind: typeof HELD_BY_OVERRIDE }
   | { readonly kind: typeof HELD_BY_ASSIGNMENT; readonly manual: HeldManualSearch };
 
+/** STORY 21.14: a superseded decision's cover who still holds its shift: who, the date, and where to remove it. */
+export interface ResolutionSupersededCover {
+  /** The cover's assignment: the line's stable identity. */
+  readonly key: string;
+  readonly name: string;
+  /** `02.10.`, as `dayMonthOf` writes it. */
+  readonly date: string;
+  readonly manual: HeldManualSearch;
+}
+
 /** The screen, ready to render. */
 export interface ResolutionView {
   readonly key: string;
@@ -736,6 +776,18 @@ export interface ResolutionView {
    * date. `null` while nothing holds it.
    */
   readonly heldBy: ResolutionHeldBy | null;
+  /**
+   * STORY 21.14 (R16.4): whether *Pokrij cijelo odsustvo* is offered — some
+   * floater is eligible for the absent member's role and is not them (the
+   * record always has this unresolved conflict). False: the screen is as
+   * 21.13 left it.
+   */
+  readonly leaveCover: boolean;
+  /**
+   * STORY 21.14 (the 21.7 deferral): each cover a decision on this key made on
+   * another shift type (0038) left with its shift, by name; empty for none.
+   */
+  readonly supersededCovers: readonly ResolutionSupersededCover[];
   /** The insert's columns: the organization and the key. */
   readonly organizationId: string;
   /** The shift type the conflict is on, as derived: stored with the decision (0038). */
@@ -1152,6 +1204,24 @@ function resolutionScreenFrom(
   );
   const held = holder !== undefined;
   const heldBy = holder === undefined ? null : heldByOf(snapshot, holder.personalAssignmentId, collision.date);
+  // STORY 21.14: a decision on another type (0038) whose cover still holds that shift.
+  const supersededCovers = liveResolutionsOf(snapshot, resolutionRows)
+    // The key's holder is the held line's, never named twice.
+    .filter((resolution) => collisionKeyOf(resolution) === key && (holder === undefined || holder.personalAssignmentId !== resolution.personalAssignmentId))
+    .flatMap((resolution): ResolutionSupersededCover[] => {
+      const cover = supersededCoverOf(snapshot, resolution);
+
+      return cover === null || resolution.personalAssignmentId === null
+        ? []
+        : [
+            {
+              key: resolution.personalAssignmentId,
+              name: cover.name,
+              date: dayMonthOf(resolution.date),
+              manual: { mjesec: resolution.date.slice(0, 7), osoba: cover.id, dan: resolution.date },
+            },
+          ];
+    });
 
   return {
     kind: RESOLUTION_READY,
@@ -1208,6 +1278,9 @@ function resolutionScreenFrom(
       held,
       heldCalendar: heldCalendarSearchOf(collision),
       heldBy,
+      // STORY 21.14: only with a floater eligible for this member's role, never the member themselves.
+      leaveCover: leaveCoverOffered(sources.members.members ?? [], member.id, member.jobRole?.id ?? null),
+      supersededCovers,
       organizationId: snapshot.organizationId,
       shiftTypeId: collision.shiftTypeId,
       replaceForm: byAssignment ? REPLACE_BY_ASSIGNMENT : REPLACE_BY_OVERRIDE,
@@ -1513,13 +1586,20 @@ export function resolutionSavedOf(state: unknown): ResolutionSaved | null {
 
   if (typeof saved !== 'object' || saved === null) return null;
 
-  const { kind, shiftTypeName, teamName, dateShown, memberName, replacementName, from, to, proposerName, addresseeName, date } =
+  const { kind, shiftTypeName, teamName, dateShown, memberName, replacementName, from, to, proposerName, addresseeName, date, days } =
     saved as Record<string, unknown>;
   const filled = (value: unknown): value is string => typeof value === 'string' && value !== '';
 
   // STORY 9.4: a leave request's decision names the member and the range alone.
   if (kind === LEAVE_REQUEST_APPROVED_SAVED || kind === LEAVE_REQUEST_REJECTED_SAVED) {
     return filled(memberName) && filled(from) && filled(to) ? { kind, memberName, from, to } : null;
+  }
+
+  // STORY 21.14: a whole leave's cover names the absent member, the floater and the dates covered.
+  if (kind === LEAVE_COVER_SAVED) {
+    return filled(memberName) && filled(replacementName) && typeof days === 'number' && Number.isInteger(days) && days > 0
+      ? { kind, memberName, replacementName, days }
+      : null;
   }
 
   // STORY 12.4: a swap's decision names both members and the given shift's date.
@@ -1555,8 +1635,10 @@ export function resolutionSavedMessageKey(
   | 'zaOdluku.savedRequestApproved'
   | 'zaOdluku.savedRequestRejected'
   | 'zaOdluku.savedSwapApproved'
-  | 'zaOdluku.savedSwapRejected' {
+  | 'zaOdluku.savedSwapRejected'
+  | 'zaOdluku.savedCover' {
   if (kind === ACCEPT_UNCOVERED) return 'zaOdluku.saved';
+  if (kind === LEAVE_COVER_SAVED) return 'zaOdluku.savedCover';
   if (kind === REPLACE_MEMBER) return 'zaOdluku.savedReplace';
   if (kind === LEAVE_REQUEST_APPROVED_SAVED) return 'zaOdluku.savedRequestApproved';
   if (kind === LEAVE_REQUEST_REJECTED_SAVED) return 'zaOdluku.savedRequestRejected';
@@ -1597,6 +1679,12 @@ export type ResolutionSavedLine =
       readonly swap: true;
       readonly key: 'zaOdluku.savedSwapApproved' | 'zaOdluku.savedSwapRejected';
       readonly values: { readonly proposer: string; readonly addressee: string; readonly date: string };
+    }
+  | {
+      readonly request: false;
+      readonly swap: false;
+      readonly key: 'zaOdluku.savedCover';
+      readonly values: { readonly member: string; readonly replacement: string; readonly count: number };
     };
 
 /**
@@ -1642,6 +1730,13 @@ export function resolutionSavedLineOf(saved: ResolutionSaved, noTeam: string): R
         key: 'zaOdluku.saved',
         // STORY 21.7: `noTeam` (*bez tima*) for a collision with none.
         values: { type: saved.shiftTypeName, team: saved.teamName ?? noTeam, date: saved.dateShown, member: saved.memberName },
+      };
+    case LEAVE_COVER_SAVED:
+      return {
+        request: false,
+        swap: false,
+        key: 'zaOdluku.savedCover',
+        values: { member: saved.memberName, replacement: saved.replacementName, count: saved.days },
       };
     case REPLACE_MEMBER:
       return {

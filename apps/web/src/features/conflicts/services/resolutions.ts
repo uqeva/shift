@@ -458,3 +458,53 @@ export function replacementLinksOf(rows: readonly unknown[], memberId: string): 
 
   return links;
 }
+
+/**
+ * One live `replace_member` resolution of the second form (story 21.7, 0081):
+ * the conflict's key and stored type, and the cover's Personal Assignment.
+ */
+export interface CoverLink extends CollisionResolution {
+  readonly shiftTypeId: string | null;
+  readonly personalAssignmentId: string;
+}
+
+/**
+ * THE COVER LINKS (story 21.14, the 21.7 deferral): every `replace_member`
+ * row of `memberId` that names a cover's Personal Assignment, in the order
+ * given; every other kind, every override link and every other member is
+ * skipped. Trust is judged as {@link replacementLinksOf} judges it, for this
+ * member only: null when a row is not a record or its member cannot be read,
+ * or a replacement row of this member names an assignment that is not a
+ * non-empty text, or a cover row of this member carries a date that is no calendar date, or a
+ * team or type that is neither a non-empty text nor `null`.
+ */
+export function coverLinksOf(rows: readonly unknown[], memberId: string): readonly CoverLink[] | null {
+  const links: CoverLink[] = [];
+
+  for (const row of rows) {
+    if (!isRecord(row)) return null;
+
+    const rowMember = row[MEMBER_COLUMN];
+
+    if (typeof rowMember !== 'string' || rowMember === '') return null;
+    if (rowMember !== memberId || row[KIND_COLUMN] !== REPLACE_MEMBER) continue;
+
+    const personalAssignmentId = row[PERSONAL_ASSIGNMENT_COLUMN] ?? null;
+
+    // An override link (no assignment) is not this reader's; a link that is not a non-empty text cannot be trusted.
+    if (personalAssignmentId === null) continue;
+    if (typeof personalAssignmentId !== 'string' || personalAssignmentId === '') return null;
+
+    const date = row[DATE_COLUMN];
+    const teamId = row[TEAM_COLUMN] ?? null;
+    const shiftTypeId = row[SHIFT_TYPE_COLUMN] ?? null;
+
+    if (typeof date !== 'string' || !isIsoDate(date)) return null;
+    if (teamId !== null && (typeof teamId !== 'string' || teamId === '')) return null;
+    if (shiftTypeId !== null && (typeof shiftTypeId !== 'string' || shiftTypeId === '')) return null;
+
+    links.push({ memberId, date, teamId, shiftTypeId, personalAssignmentId });
+  }
+
+  return links;
+}

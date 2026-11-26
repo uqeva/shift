@@ -142,12 +142,16 @@ export {
   floaterEligibleFor,
   floaterStandingOn,
   floaterSuggestionsOf,
+  leaveCoverOf,
   type Floater,
   type FloaterLeave,
   type FloaterShift,
   type FloaterStanding,
   type FloaterSuggestion,
   type FloaterSuggestionInput,
+  type LeaveCover,
+  type LeaveCoverEntry,
+  type LeaveCoverShift,
   type UncoveredShift,
 } from './floaters.js';
 

@@ -203,6 +203,33 @@ export class ConflictResolutionPage extends BasePage {
     return this.page.getByText(resolution.suggestionsNoneAny, { exact: true });
   }
 
+  /** STORY 21.14: *Pokrij cijelo odsustvo*, which opens the whole leave's cover. */
+  get coverOpenButton(): Locator {
+    return this.page.getByRole('button', { name: hr.zaOdluku.cover.open, exact: true });
+  }
+
+  /** STORY 21.14: the cover's dialog, named by its title (the floaters) or *Što se mijenja* (the check). */
+  get coverDialog(): Locator {
+    return this.page.getByRole('dialog');
+  }
+
+  /** STORY 21.14: one floater offered, by the name their line starts with (`Ana · pokriva 2 od 2`). */
+  coverFloater(name: string): Locator {
+    return this.coverDialog
+      .getByRole('radiogroup', { name: hr.zaOdluku.cover.floaters, exact: true })
+      .getByRole('radio', { name: new RegExp(`^${escapeRegExp(name)} · `) });
+  }
+
+  /** STORY 21.14: *Provjeri*. */
+  get coverCheckButton(): Locator {
+    return this.coverDialog.getByRole('button', { name: hr.zaOdluku.cover.check, exact: true });
+  }
+
+  /** STORY 21.14: the check's *Spremi*. */
+  get coverSaveButton(): Locator {
+    return this.coverDialog.getByRole('button', { name: hr.zaOdluku.cover.save, exact: true });
+  }
+
   /** The line a conflict no longer open states. */
   get missingLine(): Locator {
     return this.page.getByText(resolution.missing, { exact: true });

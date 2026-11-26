@@ -1,14 +1,20 @@
-import type { LeaveRange } from '@shift/domain';
+import { PERSONAL_ASSIGNMENT_SHIFT, type LeaveRange } from '@shift/domain';
 
 import type { CalendarSnapshot } from '@/features/calendar/services/snapshot';
 import { dayMonthOf } from '@/features/calendar/utils/month';
 import {
   REPLACEMENT_APPLIED,
   REPLACEMENT_MISMATCH,
+  assignmentStandingIn,
   replacementContextOf,
   replacementStandingIn,
 } from '@/features/conflicts/services/replacement-effect';
-import { replacementLinksOf, type ReplacementLink } from '@/features/conflicts/services/resolutions';
+import {
+  coverLinksOf,
+  replacementLinksOf,
+  type CoverLink,
+  type ReplacementLink,
+} from '@/features/conflicts/services/resolutions';
 import { FETCH_PAUSED } from '@/features/leave/services/leave-section-base';
 import { compareText } from '@/lib/i18n/format';
 
@@ -29,6 +35,12 @@ import { compareText } from '@/lib/i18n/format';
  * confirmation name each such replacement, one line each; the notice after a
  * landed write repeats the lines captured before it. A NOTE, NEVER A GATE:
  * nothing here disables, blocks or asks.
+ *
+ * STORY 21.14 (the 21.7 deferral): a REPLACEMENT BY ASSIGNMENT (0081) is
+ * ended the same way, while the cover's `SHIFT` assignment stays. Each one on
+ * an uncovered date whose assignment still applies (`assignmentStandingIn`)
+ * gets its own line, `{name} i dalje ima smjenu {date}`, removed in *Ručni
+ * raspored*.
  */
 
 /**
@@ -46,7 +58,10 @@ export function leaveUncoversDate(record: LeaveRange, next: LeaveRange | null, d
 export const REPLACEMENTS_UNAVAILABLE = 'REPLACEMENTS_UNAVAILABLE';
 
 /** One replacement that would stay rostered: who, on which team's shift, on which date. */
-export interface ReplacementWarning {
+export type ReplacementWarning = OverrideWarning | CoverWarning;
+
+/** A replacement by roster override (story 5.4e). */
+export interface OverrideWarning {
   /** The override that put them on: a line's stable identity. */
   readonly overrideId: string;
   /** The replacement's name, as the calendar's members read answers it. */
@@ -56,13 +71,31 @@ export interface ReplacementWarning {
   readonly date: string;
 }
 
+/** STORY 21.14: a cover's Personal Assignment that would stay: who, and on which date. */
+export interface CoverWarning {
+  /** The cover's assignment: a line's stable identity. */
+  readonly assignmentId: string;
+  /** The cover's name, as the calendar's members read answers it. */
+  readonly name: string;
+  /** `02.10.`, as `dayMonthOf` writes it. */
+  readonly date: string;
+}
+
+/** Whether a warning is a cover's assignment (story 21.14) rather than an override. */
+export function isCoverWarning(warning: ReplacementWarning): warning is CoverWarning {
+  return 'assignmentId' in warning;
+}
+
 /**
  * The replacements changing `record` to `next` (null: its removal) would
  * leave behind (story 5.4e): each of `links` of `memberId` dated on a date the
  * change uncovers, whose override — joined by its id, never by team and date —
  * is still live in the snapshot and actually APPLIED on its date: a working
  * shift that date, the override in force, and `rosterOn` applying it. A
- * removed or inert override gives no line. Ordered by date, then team name.
+ * removed or inert override gives no line. STORY 21.14: and each of
+ * `covers` dated on such a date whose assignment the snapshot holds and still
+ * applies; one it does not hold, or holds unapplied, gives no line. Ordered by
+ * date, then team name (a cover's line after the date's override lines).
  *
  * Null — the replacements cannot be known — when a link and the override it
  * names disagree on the team or the date, a replacement's member or team is
@@ -74,13 +107,15 @@ export function replacementWarningsOf(
   memberId: string,
   record: LeaveRange,
   next: LeaveRange | null,
+  covers: readonly CoverLink[] = [],
 ): readonly ReplacementWarning[] | null {
   const uncovered = links.filter((link) => link.memberId === memberId && leaveUncoversDate(record, next, link.date));
+  const uncoveredCovers = covers.filter((link) => link.memberId === memberId && leaveUncoversDate(record, next, link.date));
 
-  if (uncovered.length === 0) return [];
+  if (uncovered.length === 0 && uncoveredCovers.length === 0) return [];
 
   try {
-    const warnings: (ReplacementWarning & { readonly isoDate: string })[] = [];
+    const warnings: { readonly warning: ReplacementWarning; readonly isoDate: string; readonly team: string | null }[] = [];
     // THE SHARED TEST (story 5.5d), its standings worked out once for every link.
     const context = replacementContextOf(snapshot);
 
@@ -108,12 +143,48 @@ export function replacementWarningsOf(
         return null;
       }
 
-      warnings.push({ overrideId: override.id, name: replacement.name, team: team.name, date: dayMonthOf(date), isoDate: date });
+      warnings.push({
+        warning: { overrideId: override.id, name: replacement.name, team: team.name, date: dayMonthOf(date) },
+        isoDate: date,
+        team: team.name,
+      });
+    }
+
+    // STORY 21.14: a cover whose assignment still gives them the shift stays with it.
+    for (const link of uncoveredCovers) {
+      if (assignmentStandingIn(context, link) !== REPLACEMENT_APPLIED) continue;
+
+      const cover = snapshot.members.find((member) =>
+        member.personalAssignments.some(
+          (assignment) => assignment.id === link.personalAssignmentId && assignment.kind === PERSONAL_ASSIGNMENT_SHIFT,
+        ),
+      );
+
+      if (cover === undefined) {
+        console.error(REPLACEMENTS_UNAVAILABLE, 'snapshot');
+
+        return null;
+      }
+
+      warnings.push({
+        warning: { assignmentId: link.personalAssignmentId, name: cover.name, date: dayMonthOf(link.date) },
+        isoDate: link.date,
+        // After the date's override lines, which name a team.
+        team: null,
+      });
     }
 
     return warnings
-      .sort((left, right) => (left.isoDate === right.isoDate ? compareText(left.team, right.team) : left.isoDate < right.isoDate ? -1 : 1))
-      .map(({ overrideId, name, team, date }) => ({ overrideId, name, team, date }));
+      .sort((left, right) =>
+        left.isoDate !== right.isoDate
+          ? left.isoDate < right.isoDate
+            ? -1
+            : 1
+          : left.team === null || right.team === null
+            ? Number(left.team === null) - Number(right.team === null)
+            : compareText(left.team, right.team),
+      )
+      .map(({ warning }) => warning);
   } catch (cause) {
     console.error(REPLACEMENTS_UNAVAILABLE, cause);
 
@@ -167,7 +238,9 @@ export function replacementGuardOf(
   }
 
   const links = resolutions.data === undefined ? null : replacementLinksOf(resolutions.data, memberId);
-  const lines = links === null ? null : replacementWarningsOf(links, snapshot, memberId, record, next);
+  // STORY 21.14: a cover's assignment link, judged for this member as the override links are.
+  const covers = resolutions.data === undefined ? null : coverLinksOf(resolutions.data, memberId);
+  const lines = links === null || covers === null ? null : replacementWarningsOf(links, snapshot, memberId, record, next, covers);
 
   return lines === null ? { kind: REPLACEMENTS_UNKNOWN } : { kind: REPLACEMENTS_KNOWN, lines };
 }

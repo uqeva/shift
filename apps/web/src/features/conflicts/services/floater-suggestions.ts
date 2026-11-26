@@ -64,7 +64,7 @@ export interface FloaterSuggestionsView {
  *
  * @throws RangeError when `date` is not a calendar date, or is the calendar's first or last day.
  */
-function windowOf(date: string): { readonly from: string; readonly to: string } {
+export function floaterWindowOf(date: string): { readonly from: string; readonly to: string } {
   const dates = datesOfMonth(monthOf(date));
   const before = previousIsoDate(date);
   const after = nextIsoDate(date);
@@ -83,7 +83,7 @@ function windowOf(date: string): { readonly from: string; readonly to: string } 
  *
  * @throws RangeError for a type the snapshot lacks, or on `shiftTypeVersionOn`'s preconditions.
  */
-function uncoveredOf(snapshot: CalendarSnapshot, collision: Collision): UncoveredShift {
+export function uncoveredShiftOf(snapshot: CalendarSnapshot, collision: Collision): UncoveredShift {
   const type = snapshot.types.find((one) => one.id === collision.shiftTypeId);
 
   if (type === undefined) throw new RangeError(`shift type ${collision.shiftTypeId} is not in the snapshot`);
@@ -120,7 +120,36 @@ export function floaterSuggestionsOfConflict(
 
   if (absent === undefined) throw new RangeError(`member ${collision.memberId} is not in the snapshot`);
 
-  const window = windowOf(collision.date);
+  const floaters = floatersOf(snapshot, records, byId, floaterWindowOf(collision.date));
+  const offered = new Map(assignmentCandidates.flatMap((group) => group.candidates).map((candidate) => [candidate.id, candidate]));
+  const suggested = floaterSuggestionsOf({
+    absentMemberId: collision.memberId,
+    absentRoleId: absent.jobRole?.id ?? null,
+    uncovered: uncoveredShiftOf(snapshot, collision),
+    floaters,
+  }).flatMap((suggestion) => {
+    const candidate = offered.get(suggestion.memberId);
+
+    return candidate === undefined ? [] : [{ ...candidate, shiftsInMonth: suggestion.shiftsInMonth }];
+  });
+
+  return { suggested, roleName: absent.jobRole?.name ?? null };
+}
+
+/**
+ * The organization's floaters as R16 reads them (`byId`, the member list's
+ * floaters), in the snapshot's order (the names'), each with their at-work
+ * shifts over `window` and their live leave. Story 21.14's whole-leave cover
+ * reads them over the leave's window.
+ *
+ * @throws RangeError on any precondition of the domain's derivation.
+ */
+export function floatersOf(
+  snapshot: CalendarSnapshot,
+  records: readonly OrganizationLeaveRecord[],
+  byId: ReadonlyMap<string, FloaterMember>,
+  window: { readonly from: string; readonly to: string },
+): readonly Floater[] {
   // ONE ASSEMBLY, reused per floater with their own id and leave (AD-19's adapter, built once).
   const assembly = scheduleInputsOfCalendar(snapshot, [], window);
   const floaters: Floater[] = [];
@@ -143,19 +172,7 @@ export function floaterSuggestionsOfConflict(
     });
   }
 
-  const offered = new Map(assignmentCandidates.flatMap((group) => group.candidates).map((candidate) => [candidate.id, candidate]));
-  const suggested = floaterSuggestionsOf({
-    absentMemberId: collision.memberId,
-    absentRoleId: absent.jobRole?.id ?? null,
-    uncovered: uncoveredOf(snapshot, collision),
-    floaters,
-  }).flatMap((suggestion) => {
-    const candidate = offered.get(suggestion.memberId);
-
-    return candidate === undefined ? [] : [{ ...candidate, shiftsInMonth: suggestion.shiftsInMonth }];
-  });
-
-  return { suggested, roleName: absent.jobRole?.name ?? null };
+  return floaters;
 }
 
 /** The groups without the suggested candidates: a suggested floater is listed once, first. */

@@ -17,6 +17,7 @@ import {
   LEAVE_REMOVE_PROMPT_ID,
   LEAVE_REMOVE_REPLACEMENTS_ID,
   REPLACEMENTS_UNKNOWN,
+  isCoverWarning,
   leaveConfirmFailureOf,
   leaveCostHalfMessageKey,
   leaveListFailureOf,
@@ -83,7 +84,7 @@ export function LeaveReplacementLines({
   );
 }
 
-/** The guard's lines as text, each with a stable key: its override, or the one unknown line. */
+/** The guard's lines as text, each with a stable key: its override or cover assignment, or the one unknown line. */
 function replacementLinesOf(guard: ReplacementGuard | null): readonly { readonly key: string; readonly text: string }[] {
   if (guard === null) return [];
 
@@ -91,10 +92,15 @@ function replacementLinesOf(guard: ReplacementGuard | null): readonly { readonly
     return [{ key: REPLACEMENTS_UNKNOWN, text: t('ljudi.leaveRecord.replacementsUnknown') }];
   }
 
-  return guard.lines.map((line) => ({
-    key: line.overrideId,
-    text: t('ljudi.leaveRecord.replacementStays', { name: line.name, team: line.team, date: line.date }),
-  }));
+  return guard.lines.map((line) =>
+    // STORY 21.14: a cover's assignment stays, removed in *Ručni raspored*.
+    isCoverWarning(line)
+      ? { key: line.assignmentId, text: t('ljudi.leaveRecord.coverStays', { name: line.name, date: line.date }) }
+      : {
+          key: line.overrideId,
+          text: t('ljudi.leaveRecord.replacementStays', { name: line.name, team: line.team, date: line.date }),
+        },
+  );
 }
 
 /**

@@ -394,13 +394,16 @@ export const FEATURE_PUBLIC = {
   // *Ručni raspored* does — the same derivation over the same "after" shape,
   // and the same body — rather than a second copy of either.
   planning: [
-    'components/manual-preview-dialog', // members
-    'services/manual-preview', // members
+    'components/manual-preview-dialog', // conflicts, members
+    'services/manual-preview', // conflicts, members
     // Story 21.8: a swap of a Personal Shift builds its "after" as the grid's
     // draft does (`draftAppliedOf`), never a second assignment "after".
-    'services/manual-grid', // swaps
+    'services/manual-grid', // conflicts, swaps
     // Story 21.13: *Ručni raspored*'s search, for *Za odluku*'s held line on a cover's assignment.
     'services/manual-search', // conflicts
+    // Story 21.14: a whole leave's cover is checked as the grid's save is (AD-5),
+    // the same check over the same draft, never a second one.
+    'services/manual-save', // conflicts
   ],
   rotation: [
     'services/list', // calendar, members, onboarding, shift-types, teams

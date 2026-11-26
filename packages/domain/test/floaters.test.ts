@@ -9,8 +9,10 @@ import {
   floaterEligibleFor,
   floaterStandingOn,
   floaterSuggestionsOf,
+  leaveCoverOf,
   type Floater,
   type FloaterShift,
+  type LeaveCoverShift,
   type UncoveredShift,
 } from '../src/index.js';
 
@@ -199,5 +201,86 @@ describe('R16.2: the suggestions', () => {
     expect(() => floaterSuggestionsOf({ absentMemberId: 'x', absentRoleId: null, uncovered: DAN, floaters: [floater('')] })).toThrow(
       RangeError,
     );
+  });
+});
+
+describe('R16.4: a whole leave covered by one floater (story 21.14)', () => {
+  /** A Dan 07:00–19:00 on `date`, writable unless said otherwise. */
+  function dan(date: string, writable = true): LeaveCoverShift {
+    return { date, interval: { startMinute: 420, endMinute: 1140 }, writable };
+  }
+
+  /** A Noć 19:00–07:00 on `date`. */
+  function noc(date: string): LeaveCoverShift {
+    return { date, interval: { startMinute: 1140, endMinute: 1860 }, writable: true };
+  }
+
+  const WEEK = ['2026-12-07', '2026-12-08', '2026-12-09', '2026-12-10', '2026-12-11', '2026-12-12', '2026-12-13'];
+
+  it('Whole week: free on five dates, working on one and on leave on another (matrix row 1)', () => {
+    const cover = leaveCoverOf(
+      floater('a', { shifts: [shift('2026-12-09')], leave: [{ from: '2026-12-12', to: '2026-12-12' }] }),
+      WEEK.map((date) => dan(date)),
+    );
+
+    expect(cover.covered).toBe(5);
+    expect(cover.entries.map((entry) => [entry.standing, entry.covered])).toEqual([
+      [FLOATER_FREE, true],
+      [FLOATER_FREE, true],
+      [FLOATER_WORKING, false],
+      [FLOATER_FREE, true],
+      [FLOATER_FREE, true],
+      [FLOATER_ON_LEAVE, false],
+      [FLOATER_FREE, true],
+    ]);
+  });
+
+  it('Rest gap: a covered Noć leaves no rest for the next morning Dan (matrix row 2)', () => {
+    const cover = leaveCoverOf(floater('a'), [noc('2026-12-07'), dan('2026-12-08')]);
+
+    expect(cover.entries.map((entry) => entry.standing)).toEqual([FLOATER_FREE, FLOATER_REST_GAP]);
+    expect(cover.covered).toBe(1);
+  });
+
+  it('Rest gap: the floater\'s own Noć ending as the shift starts', () => {
+    const cover = leaveCoverOf(floater('a', { shifts: [shift('2026-12-06', 1140, 1860)] }), [dan('2026-12-07')]);
+
+    expect(cover.entries[0]).toEqual({ standing: FLOATER_REST_GAP, covered: false });
+  });
+
+  it('a shift that cannot be written is free yet not covered, and adds nothing to the day (matrix row 3)', () => {
+    const cover = leaveCoverOf(floater('a'), [{ ...noc('2026-12-07'), writable: false }, dan('2026-12-08')]);
+
+    expect(cover.entries).toEqual([
+      { standing: FLOATER_FREE, covered: false },
+      { standing: FLOATER_FREE, covered: true },
+    ]);
+  });
+
+  it('a second uncovered shift on a date already covered finds the floater working', () => {
+    const cover = leaveCoverOf(floater('a'), [dan('2026-12-07'), { date: '2026-12-07', interval: null, writable: true }]);
+
+    expect(cover.entries.map((entry) => entry.standing)).toEqual([FLOATER_FREE, FLOATER_WORKING]);
+  });
+
+  it('a covered shift with no times still makes its date a working one', () => {
+    const cover = leaveCoverOf(floater('a'), [{ date: '2026-12-07', interval: null, writable: true }, dan('2026-12-07')]);
+
+    expect(cover.entries.map((entry) => entry.covered)).toEqual([true, false]);
+  });
+
+  it('None free: nothing covered (matrix row 4)', () => {
+    const cover = leaveCoverOf(floater('a', { statuses: [{ active: false, effectiveFrom: '2026-12-01' }] }), [dan('2026-12-07')]);
+
+    expect(cover).toEqual({ entries: [{ standing: FLOATER_INACTIVE, covered: false }], covered: 0 });
+  });
+
+  it('nothing to cover: no entries', () => {
+    expect(leaveCoverOf(floater('a'), [])).toEqual({ entries: [], covered: 0 });
+  });
+
+  it('refuses shifts out of date order, and a bad date', () => {
+    expect(() => leaveCoverOf(floater('a'), [dan('2026-12-08'), dan('2026-12-07')])).toThrow(RangeError);
+    expect(() => leaveCoverOf(floater('a'), [dan('2026-13-01')])).toThrow(RangeError);
   });
 });

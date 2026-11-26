@@ -630,8 +630,9 @@ describe('the member list reads once, under one key', () => {
     expect(occurrences(check, "networkMode: 'always'"), 'a fetch could pause offline').toBe(1);
     expect(check, 'the builder no longer stands on the shared core reads').toContain('useErasureReads()');
     expect(occurrences(reads, 'useQuery('), 'the check observes its reads between presses').toBe(0);
-    expect(occurrences(reads, 'staleTime: 0')).toBe(3);
-    expect(occurrences(reads, "networkMode: 'always'"), 'a fetch could pause offline').toBe(3);
+    // FOUR SINCE STORY 21.14: `fetchFreshShared`, one more screen read fetched the same way (the cover's member list).
+    expect(occurrences(reads, 'staleTime: 0')).toBe(4);
+    expect(occurrences(reads, "networkMode: 'always'"), 'a fetch could pause offline').toBe(4);
     expect(screen, 'useMutation arrived; this repository uses a pending ref').not.toContain('useMutation');
     expect(screen, 'no in-flight ref guards a second save').toMatch(/saving\.current = true/);
     expect(screen, 'the in-flight ref is never released').toMatch(/finally \{\s*saving\.current = false;/);

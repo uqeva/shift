@@ -168,6 +168,14 @@ const SANCTIONED_PLURAL_KEYS = [
   // STORY 21.13: a suggested floater's line with their shifts this month —
   // `Ana · 1 smjena`, `Ana · 3 smjene`, `Ana · 5 smjena`.
   'zaOdluku.resolution.suggestionsLine',
+  // STORY 21.14: *Pokrij cijelo odsustvo* — the record's open shifts
+  // (`1 smjena čeka odluku`, `3 smjene čekaju odluku`), the shifts the
+  // floater takes (`1 smjenu`, `3 smjene`, `5 smjena`), the erasures' count,
+  // and the queue's line once a whole leave is covered.
+  'zaOdluku.cover.lede',
+  'zaOdluku.cover.previewLede',
+  'zaOdluku.cover.erasures',
+  'zaOdluku.savedCover',
   // STORY 21.13: the *Zamjena* card's roles by count — `za posao` for one,
   // `za poslove` for more — and the same with roles the read lacks.
   'ljudi.floater.roles',
@@ -1871,6 +1879,8 @@ const SANCTIONED_SCREEN_KEYS = [
   // amend or a removal would leave rostered, and the line in its place when
   // the resolutions cannot be read.
   'ljudi.leaveRecord.replacementStays',
+  // STORY 21.14 (the 21.7 deferral): a cover's assignment an amend or removal leaves behind.
+  'ljudi.leaveRecord.coverStays',
   'ljudi.leaveRecord.replacementsUnknown',
   // STORY 5.2c: *Godišnji*, the viewer's own leave — the three tiles' labels
   // (the figures themselves render through `count.days`), the line a failed
@@ -2156,6 +2166,46 @@ const SANCTIONED_SCREEN_KEYS = [
   // STORY 21.13 (the 21.7 deferral): a key a cover's assignment holds, removed in *Ručni raspored*.
   'zaOdluku.resolution.heldAssignment',
   'zaOdluku.resolution.heldAssignmentAction',
+  // STORY 21.14 (R16.4, UX-DR77): *Pokrij cijelo odsustvo* — its opener, its
+  // dialog, a date's lines, *Što se mijenja*, the refusals, and a superseded
+  // decision's cover line. The three plural lines are listed above.
+  'zaOdluku.cover.open',
+  'zaOdluku.cover.openHint',
+  'zaOdluku.cover.title',
+  'zaOdluku.cover.close',
+  'zaOdluku.cover.floaters',
+  'zaOdluku.cover.floaterLine',
+  'zaOdluku.cover.noFloaters',
+  'zaOdluku.cover.noneCovered',
+  'zaOdluku.cover.date',
+  'zaOdluku.cover.reason.covered',
+  'zaOdluku.cover.reason.inactive',
+  'zaOdluku.cover.reason.onLeave',
+  'zaOdluku.cover.reason.working',
+  'zaOdluku.cover.reason.restGap',
+  'zaOdluku.cover.reason.notCandidate',
+  'zaOdluku.cover.reason.held',
+  'zaOdluku.cover.cancel',
+  'zaOdluku.cover.check',
+  'zaOdluku.cover.previewTitle',
+  'zaOdluku.cover.changed',
+  'zaOdluku.cover.back',
+  'zaOdluku.cover.save',
+  'zaOdluku.cover.unavailable',
+  'zaOdluku.cover.unchecked',
+  'zaOdluku.cover.superseded',
+  'zaOdluku.cover.error.gone',
+  'zaOdluku.cover.error.none',
+  'zaOdluku.cover.error.stale',
+  'zaOdluku.cover.error.archived',
+  'zaOdluku.cover.error.tooMany',
+  // REVIEW PASS 1: the loading line, the none line with no role, the withdrawn
+  // offer, and the write's taken and held lines of the cover's own.
+  'zaOdluku.cover.loading',
+  'zaOdluku.cover.noFloatersAny',
+  'zaOdluku.cover.withdrawn',
+  'zaOdluku.cover.error.taken',
+  'zaOdluku.cover.error.held',
   // STORY 6.1a: *Danas* for the viewer — the heading's date subline; today's
   // three cases and the leave's range; the next shift's plain title, its
   // heading with the days (`count.days`, a plural listed above), the return
@@ -4027,6 +4077,16 @@ const MANUAL_SCHEDULE_NAMESPACE = 'rucniRaspored.';
 const LEAVE_REPLACEMENT_KEY = 'ljudi.leaveRecord.replacementStays';
 
 /**
+ * STORY 21.14: *Pokrij cijelo odsustvo* (`zaOdluku.cover.*`), the queue's line
+ * once a whole leave is covered, and the leave guard's line for a cover's
+ * assignment that stays: each names the worked shifts a floater takes or
+ * keeps, so `smjen` is that shift there, as on the resolution screen, and
+ * `tip… smjen…` is refused.
+ */
+const LEAVE_COVER_NAMESPACE = 'zaOdluku.cover.';
+const LEAVE_COVER_KEYS: readonly string[] = ['zaOdluku.savedCover', 'ljudi.leaveRecord.coverStays'];
+
+/**
  * The deactivation's consequence in numbers (story 7.13c), ONE KEY: "… a u
  * listopadu je to 7 smjena." — the spec's own words, where `smjen` counts the
  * member's duties left in the month (story 6.2's touching shifts count once),
@@ -4335,6 +4395,8 @@ function teamTermOutOfTurn(key: string, message: string): boolean {
     key.startsWith(HOURS_NAMESPACE) ||
     key.startsWith(DANAS_NAMESPACE) ||
     key.startsWith(RESOLUTION_NAMESPACE) ||
+    key.startsWith(LEAVE_COVER_NAMESPACE) ||
+    LEAVE_COVER_KEYS.includes(key) ||
     key.startsWith(MANUAL_SCHEDULE_NAMESPACE) ||
     key === LEAVE_REPLACEMENT_KEY ||
     key === DEACTIVATION_CONSEQUENCE_KEY ||
