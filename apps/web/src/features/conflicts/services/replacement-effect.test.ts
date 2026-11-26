@@ -97,6 +97,7 @@ const replaced = (
   kind: REPLACE_MEMBER,
   rosterOverrideId,
   shiftTypeId,
+  personalAssignmentId: null,
 });
 const accepted = (date: string, shiftTypeId: string | null = null): ConflictResolution => ({
   memberId: VIEWER_MEMBER,
@@ -105,6 +106,7 @@ const accepted = (date: string, shiftTypeId: string | null = null): ConflictReso
   kind: ACCEPT_UNCOVERED,
   rosterOverrideId: null,
   shiftTypeId,
+  personalAssignmentId: null,
 });
 
 describe('whether a replacement applies (story 5.5d)', () => {

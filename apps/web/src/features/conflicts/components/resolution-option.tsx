@@ -112,7 +112,7 @@ export function AcceptUncoveredOption({
         {t('zaOdluku.resolution.acceptTitle')}
       </span>
       <span id={RESOLUTION_ACCEPT_BODY_ID} className="min-w-0 break-words text-sm text-muted-foreground">
-        {t('zaOdluku.resolution.acceptBody', { team: view.teamName })}
+        {view.teamName === null ? t('zaOdluku.resolution.acceptBodyNoTeam') : t('zaOdluku.resolution.acceptBody', { team: view.teamName })}
       </span>
     </RadioCard>
   );

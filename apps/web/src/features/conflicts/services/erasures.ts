@@ -1,10 +1,11 @@
-import { collisionKeyOf, erasedCollisionsOf, hasTeam, scheduledShiftTypeOn } from '@shift/domain';
+import { collisionKeyOf, erasedCollisionsOf, scheduledShiftTypeOn } from '@shift/domain';
 
 import { holidayRuleOfCalendar, type CalendarSnapshot } from '@/features/calendar/services/snapshot';
 import { dayMonthOf, overrideStandingOfCalendar, weekdayOf, workingShiftTypeIdsOf } from '@/features/calendar/utils/month';
 import { collisionInputOf, resolutionsOf } from '@/features/conflicts/services/conflicts-queue';
 import { organizationLeaveRecordsOf } from '@/features/leave/services/leave-list';
 import { instantMicrosOf } from '@/features/rotation/services/list';
+import { t } from '@/lib/i18n';
 import { compareText } from '@/lib/i18n/format';
 
 /**
@@ -42,8 +43,10 @@ export interface ErasureRow {
   readonly memberId: string;
   /** `YYYY-MM-DD`. */
   readonly date: string;
-  readonly teamId: string;
+  /** `null` for a Personal Shift counted with no team (story 21.7). */
+  readonly teamId: string | null;
   readonly memberName: string;
+  /** The team's name, or *bez tima* for none (story 21.7). */
   readonly teamName: string;
   /** `petak`. */
   readonly weekday: string;
@@ -186,26 +189,30 @@ export function erasuresOf(
   // STORY 21.16 (R13.3): the "after" snapshot's holiday rule; a team it empties does not work.
   const holidays = holidayRuleOfCalendar(after);
 
-  // Story 21.1: an erasure with no team is listed from story 21.7, with the collision key it stores.
+  // STORY 21.7: an erasure with no team is listed too, with the collision key it stores, so AD-5's guard is complete.
   return erased
-    .filter(hasTeam)
     .map((collision): ErasureRow => {
       const memberName = members.get(collision.memberId);
-      const teamName = teams.get(collision.teamId);
+      // A teamless shift is the member's own: the row names their *osobni raspored* (review: never "bez tima taj dan bez …").
+      const teamName = collision.teamId === null ? t('sati.explain.source.personal') : teams.get(collision.teamId);
       const type = types.get(collision.shiftTypeId);
 
       if (memberName === undefined) throw new RangeError(`member ${collision.memberId} is not in the snapshot`);
       if (teamName === undefined) throw new RangeError(`team ${collision.teamId} is not in the snapshot`);
       if (type === undefined) throw new RangeError(`shift type ${collision.shiftTypeId} is not in the snapshot`);
 
-      const now = scheduledShiftTypeOn(
-        after.assignments.filter((assignment) => assignment.teamId === collision.teamId),
-        after.steps,
-        inForce,
-        collision.teamId,
-        collision.date,
-        holidays,
-      );
+      // A teamless shift has no team to stay at work: the member's own shift is what goes ("taj dan bez …").
+      const now =
+        collision.teamId === null
+          ? null
+          : scheduledShiftTypeOn(
+              after.assignments.filter((assignment) => assignment.teamId === collision.teamId),
+              after.steps,
+              inForce,
+              collision.teamId,
+              collision.date,
+              holidays,
+            );
 
       return {
         key: collisionKeyOf(collision),
@@ -217,7 +224,7 @@ export function erasuresOf(
         weekday: weekdayOf(collision.date),
         dayMonth: dayMonthOf(collision.date),
         shiftTypeName: type.name,
-        teamWorks: now !== null && now.shiftTypeId !== null && working.has(now.shiftTypeId),
+        teamWorks: collision.teamId === null || (now !== null && now.shiftTypeId !== null && working.has(now.shiftTypeId)),
       };
     })
     .sort(byDateAndTeam);

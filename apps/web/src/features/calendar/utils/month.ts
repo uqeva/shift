@@ -670,13 +670,12 @@ function marksLookupOf(
 ): MarksLookup {
   return {
     shortStaffedTeamDates: new Set(shortStaffed.map((shift) => teamDateKeyOf(shift.teamId, shift.date))),
-    // Story 21.1: a collision with no team marks no team cell; story 21.7 reads it.
+    // Story 21.1: a collision with no team marks no team cell (there is none to mark).
     teamDates: new Set(marks.collisions.filter(hasTeam).map((collision) => teamDateKeyOf(collision.teamId, collision.date))),
-    uncoveredTeamDates: new Set(marks.uncovered.map((key) => teamDateKeyOf(key.teamId, key.date))),
+    uncoveredTeamDates: new Set(marks.uncovered.filter(hasTeam).map((key) => teamDateKeyOf(key.teamId, key.date))),
+    // STORY 21.7: the member's own cell marks it, with a team or none (its key's team is `''`).
     memberTeamDates: new Set(
-      marks.collisions
-        .filter(hasTeam)
-        .map((collision) => memberTeamDateKeyOf(collision.memberId, collision.teamId, collision.date)),
+      marks.collisions.map((collision) => memberTeamDateKeyOf(collision.memberId, collision.teamId, collision.date)),
     ),
     leave: marks.leave,
   };
@@ -777,7 +776,8 @@ function uncoveredOnRosterOf(
 
   const inForce = rosterStandingOfCalendar(snapshot).inForce;
 
-  return uncovered.filter((key) => {
+  // STORY 21.7: a key with no team names no team cell, so it marks none.
+  return uncovered.filter(hasTeam).filter((key) => {
     const type = typeOn.get(teamDateKeyOf(key.teamId, key.date)) ?? null;
 
     return (

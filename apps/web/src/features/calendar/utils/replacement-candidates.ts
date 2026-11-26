@@ -5,6 +5,7 @@ import {
   memberScheduleOfMonth,
   monthOf,
   personalAssignmentOn,
+  PERSONAL_ASSIGNMENT_SHIFT,
   rosterOn,
   scheduleSourceOn,
   SCHEDULE_SOURCE_PERSONAL,
@@ -161,6 +162,78 @@ export function replacementCandidatesOf(
     }
   }
 
+  return groupedCandidatesOf(snapshot, leave, excluded, date, shiftTypeId);
+}
+
+/**
+ * STORY 21.7 (AD-4 as amended, the second form of Replace Member): who may
+ * cover a PERSONAL SHIFT of `shiftTypeId` on `date`, counted with `teamId`
+ * (none for `null`), by a Personal Assignment of their own — what
+ * `resolve_with_personal_assignment` writes. In the three groups, as
+ * {@link replacementCandidatesOf}. 21.13's floater suggestions narrow this
+ * list (by role and freedom); they never widen it.
+ *
+ * Left out, besides the absent member (`absentId`) and every inactive one:
+ *
+ *   - a member already working a shift counted with that team that date
+ *     (their day holds it: the cover would add nothing);
+ *   - a member whose live assignment that date is a `SHIFT`: the write
+ *     refuses one it would replace (`CONFLICT_REPLACEMENT_TAKEN`); a day off
+ *     (`OFF`) is replaced, so its member stays;
+ *   - for a collision with NO team, a member with an effective team that date
+ *     (R11.1): their assignment would count with it, never with none, so the
+ *     resolution would not match its collision. A teamless shift is covered
+ *     by a member with no team (a floater, a student).
+ *
+ * @throws RangeError on any precondition of `activeOn`, `effectiveTeamOn`,
+ *   `personalAssignmentOn` or `memberScheduleOfMonth`.
+ */
+export function assignmentCandidatesOf(
+  snapshot: CalendarSnapshot,
+  leave: readonly CandidateLeave[],
+  absentId: string,
+  teamId: string | null,
+  date: string,
+  shiftTypeId: string,
+): readonly CandidateGroup[] {
+  const excluded = new Set<string>([absentId]);
+  const working = new Set(workingShiftTypeIdsOf(snapshot));
+  const month = monthOf(date);
+
+  for (const member of snapshot.members) {
+    if (personalAssignmentOn(member.personalAssignments, date)?.kind === PERSONAL_ASSIGNMENT_SHIFT) {
+      excluded.add(member.id);
+      continue;
+    }
+    if (teamId === null && effectiveTeamOn(member, date) !== null) {
+      excluded.add(member.id);
+      continue;
+    }
+
+    const input = memberScheduleInputOf(snapshot, { memberId: member.id, memberships: member.memberships, statuses: member.statuses });
+    const day = memberScheduleOfMonth(input, month).find((one) => one.date === date);
+
+    if (day?.shifts.some((shift) => shift.teamId === teamId && shift.shiftTypeId !== null && working.has(shift.shiftTypeId))) {
+      excluded.add(member.id);
+    }
+  }
+
+  return groupedCandidatesOf(snapshot, leave, excluded, date, shiftTypeId);
+}
+
+/**
+ * The active members outside `excluded`, in the three groups and their fixed
+ * order: the one grouping both replacement forms share.
+ *
+ * @throws RangeError on any precondition of `activeOn`, `effectiveTeamOn` or `memberScheduleOfMonth`.
+ */
+function groupedCandidatesOf(
+  snapshot: CalendarSnapshot,
+  leave: readonly CandidateLeave[],
+  excluded: ReadonlySet<string>,
+  date: string,
+  shiftTypeId: string | null,
+): readonly CandidateGroup[] {
   // Every record groups a candidate as on leave, a half day's too: they are
   // away for half the shift, a conservative grouping never a gate (R6.6, story 13.5).
   const onLeave = new Set(

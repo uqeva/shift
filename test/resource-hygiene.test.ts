@@ -2002,10 +2002,14 @@ const SANCTIONED_SCREEN_KEYS = [
   'zaOdluku.resolution.shift',
   'zaOdluku.resolution.coworkers',
   'zaOdluku.resolution.noCoworkers',
+  // Story 21.7: a shift with no team.
+  'zaOdluku.resolution.coworkersNoTeam',
+  'zaOdluku.resolution.noCoworkersNoTeam',
   'zaOdluku.resolution.choice',
   'zaOdluku.resolution.choiceHint',
   'zaOdluku.resolution.acceptTitle',
   'zaOdluku.resolution.acceptBody',
+  'zaOdluku.resolution.acceptBodyNoTeam',
   'zaOdluku.resolution.coverageLabel',
   'zaOdluku.resolution.uncovered',
   // LEAVE IN DAYS (2026-10-10): the strip's middle term is named for whom it
@@ -3626,6 +3630,7 @@ const SANCTIONED_SCREEN_KEYS = [
   'rucniRaspored.cell.inactive',
   // Story 21.18: a cell a holiday emptied, in words.
   'rucniRaspored.cell.holiday',
+  'rucniRaspored.cell.leave',
   'rucniRaspored.selectionHint',
   'rucniRaspored.legend.heading',
   'rucniRaspored.legend.entry',
@@ -3635,6 +3640,8 @@ const SANCTIONED_SCREEN_KEYS = [
   'rucniRaspored.legend.counted',
   'rucniRaspored.legend.more',
   'rucniRaspored.legend.inactive',
+  // Story 21.7: the grid draws leave.
+  'rucniRaspored.legend.leave',
   'rucniRaspored.legend.changed',
   'rucniRaspored.picker.titleOne',
   'rucniRaspored.picker.lede',
@@ -3675,7 +3682,7 @@ const SANCTIONED_SCREEN_KEYS = [
   'rucniRaspored.preview.shiftNoTeam',
   'rucniRaspored.preview.double',
   'rucniRaspored.preview.restGap',
-  'rucniRaspored.preview.unlistedLeave',
+  'rucniRaspored.preview.newConflict',
   'rucniRaspored.preview.inertHeading',
   'rucniRaspored.preview.inertSwap',
   'rucniRaspored.preview.inertOut',

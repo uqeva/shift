@@ -56,6 +56,7 @@ function ManualLegend({ screen, isPhone }: { readonly screen: ManualScreen; read
         <li>{t('rucniRaspored.legend.counted', { mark: t('rucniRaspored.countedMark') })}</li>
         <li>{t('rucniRaspored.legend.more')}</li>
         <li>{t('rucniRaspored.legend.inactive')}</li>
+        <li>{t('rucniRaspored.legend.leave')}</li>
         <li>{t('rucniRaspored.legend.changed')}</li>
         {/* STORY 21.18 (UX-DR78): each holiday of the month by name, beside the star its head and emptied cells draw. */}
         {(shown.holidays ?? []).map((holiday) => (

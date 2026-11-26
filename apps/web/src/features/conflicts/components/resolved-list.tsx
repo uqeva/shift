@@ -63,7 +63,7 @@ function ResolvedItem({ row }: { readonly row: ResolvedConflictRow }): ReactNode
   return (
     <li className="grid min-w-0 gap-1 rounded-md border bg-card p-3">
       <EntryHead dateShown={row.dateShown} decision={decisionOf(row)} kind={t('zaOdluku.kind.collision')} />
-      <span className="min-w-0 break-words font-medium">{t('zaOdluku.who', { member: row.memberName, team: row.teamName })}</span>
+      <span className="min-w-0 break-words font-medium">{t('zaOdluku.who', { member: row.memberName, team: row.teamName ?? t('kalendar.cell.noTeam') })}</span>
       <span className="min-w-0 break-words text-sm text-muted-foreground">
         {row.shiftTypeName === null
           ? t('zaOdluku.resolved.shiftGone')

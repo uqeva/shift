@@ -146,14 +146,16 @@ export interface NeedsYouCollisionRow {
   /** With `date` and `teamId`, what opens the row's resolution screen. */
   readonly memberId: string;
   readonly date: string;
-  readonly teamId: string;
+  /** `null` for a collision with no team (story 21.7). */
+  readonly teamId: string | null;
   /** `srijeda` */
   readonly weekday: string;
   /** `30.09.` */
   readonly dayMonth: string;
   readonly shiftTypeName: string;
   readonly times: string | null;
-  readonly teamName: string;
+  /** `null` with no team (story 21.7): the line says *bez tima*. */
+  readonly teamName: string | null;
   readonly memberName: string;
   /** `prošlo`, `danas`, or none for a later date. */
   readonly badge: NeedsYouBadge | null;

@@ -10,6 +10,7 @@ import {
   atWorkShiftsOf,
   checkPersonalAssignments,
   collisionsOf,
+  erasedCollisionsOf,
   datesOfMonth,
   explainMemberHours,
   hasTeam,
@@ -29,6 +30,7 @@ import {
   shiftRoster,
   shortStaffedShiftsOf,
   staffingOn,
+  unresolvedCollisionsOf,
   type CollisionLeaveRecord,
   type PersonalAssignment,
   type ScheduleInputs,
@@ -617,6 +619,25 @@ describe('R14.2–R14.6 — the matrix', () => {
       ['k2', null],
       ['k3', 'K'],
     ]);
+  });
+
+  it('story 21.7: a decision keyed with no team resolves the teamless collision alone, and its loss is an erasure', () => {
+    const members = withAssignments('k2', [shift('k2-none', '2026-03-09', 't1', null)]).map((member) =>
+      member.id === 'k2' ? { ...member, memberships: [] } : member,
+    );
+    const leaveRecords = [
+      { id: 'leave-k2', memberId: 'k2', from: '2026-03-09', to: '2026-03-09' },
+      { id: 'leave-k3', memberId: 'k3', from: '2026-03-09', to: '2026-03-09' },
+    ];
+    const before = { ...r148Shared(members), leaveRecords };
+    const collisions = collisionsOf(before);
+    expect(unresolvedCollisionsOf(collisions, [{ memberId: 'k2', date: '2026-03-09', teamId: null }]).map((one) => one.memberId)).toEqual(['k3']);
+    // A decision on a team's key of the same member and date drops nothing.
+    expect(unresolvedCollisionsOf(collisions, [{ memberId: 'k2', date: '2026-03-09', teamId: 'K' }])).toEqual(collisions);
+    // Clearing the student's shift takes the unresolved teamless collision away: AD-5 lists it.
+    const after = { ...r148Shared(withAssignments('k2', []).map((member) => (member.id === 'k2' ? { ...member, memberships: [] } : member))), leaveRecords };
+    expect(erasedCollisionsOf(before, after, [], '2026-03-01').map((one) => [one.memberId, one.teamId])).toEqual([['k2', null]]);
+    expect(erasedCollisionsOf(before, after, [{ memberId: 'k2', date: '2026-03-09', teamId: null }], '2026-03-01')).toEqual([]);
   });
 
   it('`hasTeam` keeps exactly what counts with a team', () => {

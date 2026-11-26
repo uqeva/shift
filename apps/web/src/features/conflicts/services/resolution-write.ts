@@ -88,7 +88,8 @@ export interface ResolutionInsertRow {
   readonly organization_id: string;
   readonly member_id: string;
   readonly date: string;
-  readonly team_id: string;
+  /** `null` for a collision with no team (story 21.7, 0081). */
+  readonly team_id: string | null;
   readonly kind: typeof ACCEPT_UNCOVERED;
   readonly shift_type_id: string;
 }
@@ -106,7 +107,8 @@ export interface ResolutionTarget {
   readonly organizationId: string;
   readonly memberId: string;
   readonly date: string;
-  readonly teamId: string;
+  /** `null` for a collision with no team (story 21.7). */
+  readonly teamId: string | null;
   readonly shiftTypeId: string;
 }
 
@@ -131,8 +133,9 @@ export interface ResolutionReplaceRpc {
   rpc(fn: typeof REPLACE_CONFLICT_MEMBER_FUNCTION, args: ReplaceConflictMemberArgs): PromiseLike<ResolutionWriteAnswer>;
 }
 
-/** What a replacement adds to the target: who is put on, and why. */
+/** What a replacement adds to the target: who is put on, and why. Always a team's shift (0032's override). */
 export interface ReplacementTarget extends ResolutionTarget {
+  readonly teamId: string;
   readonly replacementId: string;
   /** Generated through `t()` by the caller: "Zamjena za {member} (odsutnost)" (story 13.2b: a noun, never the type, since a member may read it). */
   readonly reason: string;
@@ -215,6 +218,76 @@ export async function replaceMember(
         p_replacement_id: target.replacementId,
         p_reason: replacementReasonOf(target.reason),
         p_shift_type_id: target.shiftTypeId,
+      }),
+    (error) => resolutionReplaceFailureOf(error, held),
+  );
+}
+
+/** The function a replacement by assignment is written through (story 21.7, 0081). */
+export const RESOLVE_WITH_PERSONAL_ASSIGNMENT_FUNCTION = 'resolve_with_personal_assignment';
+
+/** 0081's bound on one call: a leave record's longest range (`MAX_LEAVE_RANGE_DAYS`). */
+export const PERSONAL_COVER_MAX_ITEMS = 366;
+
+/**
+ * ONE COVER (story 21.7; AD-4 as amended): the collision's key and type, and
+ * who covers it with a `SHIFT` assignment of that type counted with that team
+ * (none for `null`). 21.14's whole-leave cover passes one per covered date to
+ * the same call; 21.13's floater suggestion passes one.
+ */
+export interface PersonalCoverItem {
+  readonly memberId: string;
+  readonly date: string;
+  readonly teamId: string | null;
+  readonly shiftTypeId: string;
+  readonly replacementId: string;
+  /** The assignment's note (admins only, E-2); none by default. */
+  readonly note?: string | null;
+}
+
+/** The one call a replacement by assignment makes, named structurally so it can be stubbed. */
+export interface ResolutionCoverRpc {
+  rpc(
+    fn: typeof RESOLVE_WITH_PERSONAL_ASSIGNMENT_FUNCTION,
+    args: { readonly p_items: readonly Record<string, string | null>[] },
+  ): PromiseLike<ResolutionWriteAnswer>;
+}
+
+/**
+ * Resolve each item's conflict by a Personal Assignment of its replacement
+ * (story 21.7), through 0081's `resolve_with_personal_assignment`: every
+ * assignment and every resolution in ONE transaction, and one notice per
+ * replacement. No items, more than {@link PERSONAL_COVER_MAX_ITEMS}, or a date
+ * that is not a calendar `YYYY-MM-DD`, is {@link RESOLUTION_FAILED} without a
+ * request. The refusals map as a replacement's: the replacement already
+ * holding another shift that date is {@link RESOLUTION_TAKEN}; `held` as for
+ * {@link acceptUncovered}.
+ */
+export async function resolveWithPersonalAssignment(
+  client: ResolutionCoverRpc,
+  items: readonly PersonalCoverItem[],
+  held = false,
+): Promise<ResolutionWriteOutcome> {
+  if (items.length === 0 || items.length > PERSONAL_COVER_MAX_ITEMS) {
+    console.error(RESOLUTION_FAILED, 'cover items', items.length);
+
+    return { ok: false, code: RESOLUTION_FAILED };
+  }
+
+  const bad = items.find((item) => !isIsoDate(item.date));
+
+  return settledWrite(
+    bad === undefined ? items[0]!.date : bad.date,
+    () =>
+      client.rpc(RESOLVE_WITH_PERSONAL_ASSIGNMENT_FUNCTION, {
+        p_items: items.map((item) => ({
+          memberId: item.memberId,
+          date: item.date,
+          teamId: item.teamId,
+          shiftTypeId: item.shiftTypeId,
+          replacementId: item.replacementId,
+          note: item.note ?? null,
+        })),
       }),
     (error) => resolutionReplaceFailureOf(error, held),
   );

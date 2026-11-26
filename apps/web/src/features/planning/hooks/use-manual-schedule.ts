@@ -1,5 +1,5 @@
 import { monthOf } from '@shift/domain';
-import { onlineManager, useQueryClient } from '@tanstack/react-query';
+import { onlineManager, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 
 import { useCalendarSnapshot } from '@/features/calendar/hooks/use-calendar-snapshot';
@@ -9,11 +9,18 @@ import { useErasureConfirmation, type ShownErasures } from '@/features/conflicts
 import { useErasureReads } from '@/features/conflicts/hooks/use-erasure-reads';
 import { CHECK_REFUSED, CHECK_UNAVAILABLE } from '@/features/conflicts/services/erasure-check';
 import {
+  LEAVE_RECORDS_TABLE,
+  organizationLeaveRecordsQueryOptions,
+  type OrganizationLeaveRecordsTable,
+} from '@/features/leave/services/leave-list';
+import {
   MANUAL_STALE,
   NO_DRAFT,
   draftAgainst,
   draftKeyOf,
   draftWith,
+  NO_MANUAL_LEAVE,
+  manualLeaveOf,
   manualMonthOf,
   manualRoleFilterOf,
   movedOf,
@@ -141,6 +148,15 @@ export function useManualSchedule(search: ManualSearch, navigate: ManualNavigate
   const { snapshot } = surface;
   const { today } = useOrganizationToday(snapshot === null ? null : snapshot.timeZone);
   const readErasures = useErasureReads();
+  // STORY 21.7: the organization's leave, drawn in the cells (the page is an admin's). Pending or failed draws none.
+  const leaveRead = useQuery({
+    ...organizationLeaveRecordsQueryOptions(
+      () => supabaseClient().from(LEAVE_RECORDS_TABLE) as unknown as OrganizationLeaveRecordsTable,
+    ),
+    enabled: snapshot !== null,
+  });
+  const leaveRows = leaveRead.data;
+  const leave = useMemo(() => (snapshot === null ? NO_MANUAL_LEAVE : manualLeaveOf(snapshot, leaveRows)), [snapshot, leaveRows]);
   const saving = useRef(false);
   const saveButton = useRef<HTMLButtonElement>(null);
   const retryButton = useRef<HTMLButtonElement>(null);
@@ -176,13 +192,13 @@ export function useManualSchedule(search: ManualSearch, navigate: ManualNavigate
     if (snapshot === null || today === null || month === null) return { whole: null, failed: false };
 
     try {
-      return { whole: manualMonthOf(snapshot, month, today, draft), failed: false };
+      return { whole: manualMonthOf(snapshot, month, today, draft, leave), failed: false };
     } catch (cause) {
       console.error(MANUAL_UNAVAILABLE, cause);
 
       return { whole: null, failed: true };
     }
-  }, [snapshot, today, month, draft]);
+  }, [snapshot, today, month, draft, leave]);
   const { whole, failed } = derived;
   // STORY 21.25: *Posao* narrows the rows (`?posao=`, *Ljudi*'s semantics); the draft keeps every row's cells.
   const posao = search.posao;

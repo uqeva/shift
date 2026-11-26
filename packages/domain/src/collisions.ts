@@ -243,10 +243,11 @@ export interface CollisionResolution {
   readonly memberId: string;
   readonly date: string;
   /**
-   * Always a team today: a resolution of a collision with no team (story
-   * 21.1) is stored from story 21.7, which widens this key (AD-4 as amended).
+   * `null` for the decision on a collision with no team (a Personal Shift
+   * counted with none, story 21.1), stored since story 21.7 (`0081`; AD-4 as
+   * amended 2026-11-25): `collisionKeyOf` keys it like any other.
    */
-  readonly teamId: string;
+  readonly teamId: string | null;
 }
 
 /**

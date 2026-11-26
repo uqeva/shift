@@ -252,6 +252,13 @@ export async function removeFormerMemberInSql(slug: string, memberId: string): P
         where o.slug = $1 and n.organization_id = o.id and n.recipient_member_id = $2 and n.code = 'SCHEDULE_ASSIGNED'`,
       [slug, memberId],
     );
+    // Story 21.7: a replacement by assignment keys to the assignment it names (0081), with no cascade.
+    await client.query(
+      `delete from conflict_resolutions c
+        using personal_assignments p, organizations o
+        where o.slug = $1 and p.organization_id = o.id and p.member_id = $2 and c.personal_assignment_id = p.id`,
+      [slug, memberId],
+    );
     await client.query(
       `delete from personal_assignments p
         using organizations o
@@ -477,7 +484,14 @@ export async function removeLeaveMemberInSql(slug: string, memberId: string): Pr
       scope,
     );
     await client.query('delete from team_loans where organization_id = $1 and member_id = $2', scope);
-    // Story 21.2: the member's Personal Assignments (0077), whose member key does not cascade.
+    // Story 21.2: the member's Personal Assignments (0077), whose member key does not cascade;
+    // story 21.7: first any replacement by assignment naming one (0081).
+    await client.query(
+      `delete from conflict_resolutions
+        where organization_id = $1
+          and personal_assignment_id in (select id from personal_assignments where organization_id = $1 and member_id = $2)`,
+      scope,
+    );
     await client.query('delete from personal_assignments where organization_id = $1 and member_id = $2', scope);
     // Story 21.10: the member's schedule versions (0079), whose member key does not cascade.
     await client.query('delete from member_schedule_versions where organization_id = $1 and member_id = $2', scope);
@@ -777,6 +791,13 @@ export async function removeOfflineMemberInSql(slug: string, username: string): 
           and o.id = m.organization_id and o.slug = $1 and m.username = $2`,
       [slug, username],
     );
+    // Story 21.7: a replacement by assignment keys to the assignment it names (0081), with no cascade.
+    await client.query(
+      `delete from conflict_resolutions c using personal_assignments p, members m, organizations o
+        where c.personal_assignment_id = p.id and p.organization_id = m.organization_id and p.member_id = m.id
+          and o.id = m.organization_id and o.slug = $1 and m.username = $2`,
+      [slug, username],
+    );
     await client.query(
       `delete from personal_assignments p using members m, organizations o
         where p.organization_id = m.organization_id and p.member_id = m.id
@@ -905,6 +926,63 @@ export async function personalAssignmentsOfInSql(slug: string, memberId: string)
          from personal_assignments p join organizations o on o.id = p.organization_id
         where o.slug = $1 and p.member_id = $2 and p.removed_at is null
         order by p.date`,
+      [slug, memberId],
+    );
+
+    return rows;
+  } finally {
+    await client.end();
+  }
+}
+
+/**
+ * One live `SHIFT` Personal Assignment of `memberId` on `date`, counted with
+ * `teamId` (none by default), in SQL as the run's admin (story 21.7's scene):
+ * the superuser bypasses the table's missing write grants. Removed with the
+ * member ({@link removeLeaveMemberInSql}) or the types it names
+ * ({@link removeSeededRotation}).
+ */
+export async function seedPersonalAssignmentInSql(
+  slug: string,
+  memberId: string,
+  date: string,
+  shiftTypeId: string,
+  teamId: string | null = null,
+): Promise<string> {
+  const client = await connect();
+  try {
+    const { rows } = await client.query<{ id: string }>(
+      `insert into personal_assignments (organization_id, member_id, date, kind, shift_type_id, team_id, created_by)
+       select o.id, $2, $3::date, 'SHIFT', $4, $5,
+              (select a.auth_user_id from members a where a.organization_id = o.id and a.role = 'admin' order by a.created_at, a.id limit 1)
+         from organizations o
+        where o.slug = $1
+       returning id::text as id`,
+      [slug, memberId, date, shiftTypeId, teamId],
+    );
+    const id = rows[0]?.id;
+    if (id === undefined) throw new Error(`E2E: the assignment of ${memberId} on ${date} was not inserted`);
+
+    return id;
+  } finally {
+    await client.end();
+  }
+}
+
+/** The live decisions on `memberId`'s conflicts as stored (story 21.7): key team, kind and the assignment a replacement names. */
+export async function conflictResolutionsOfInSql(
+  slug: string,
+  memberId: string,
+): Promise<{ readonly date: string; readonly teamId: string | null; readonly kind: string; readonly assignmentMember: string | null }[]> {
+  const client = await connect();
+  try {
+    const { rows } = await client.query<{ date: string; teamId: string | null; kind: string; assignmentMember: string | null }>(
+      `select c.date::text as date, c.team_id::text as "teamId", c.kind, p.member_id::text as "assignmentMember"
+         from conflict_resolutions c
+         join organizations o on o.id = c.organization_id
+         left join personal_assignments p on p.id = c.personal_assignment_id
+        where o.slug = $1 and c.member_id = $2 and c.removed_at is null
+        order by c.date`,
       [slug, memberId],
     );
 
@@ -1996,7 +2074,14 @@ export async function removeTeamInSql(slug: string, teamId: string): Promise<voi
                       where o.slug = $1 and l.team_id = $2`;
     await client.query(`delete from notification_outbox where subject_id in (${lending})`, scope);
     await client.query(`delete from team_loans where id in (${lending})`, scope);
-    // Story 21.2: an assignment counted with the team keys to it (0077), with no cascade.
+    // Story 21.2: an assignment counted with the team keys to it (0077), with no cascade; story 21.7:
+    // a decision keyed to the team, or naming such an assignment (0081), goes first.
+    await client.query(
+      `delete from conflict_resolutions c using organizations o
+        where o.slug = $1 and c.organization_id = o.id
+          and (c.team_id = $2 or c.personal_assignment_id in (select p.id from personal_assignments p where p.organization_id = o.id and p.team_id = $2))`,
+      scope,
+    );
     await client.query(
       `delete from personal_assignments p using organizations o
         where o.slug = $1 and p.organization_id = o.id and p.team_id = $2`,
@@ -2473,7 +2558,13 @@ export async function removeSeededRotation(seeded: SeededRotation): Promise<void
       'delete from shift_type_overrides where organization_id = $1 and shift_type_id = any($2::uuid[])',
       types,
     );
-    // Story 21.2: so does a Personal Assignment (0077).
+    // Story 21.2: so does a Personal Assignment (0077); story 21.7: first any decision naming one (0081).
+    await client.query(
+      `delete from conflict_resolutions
+        where organization_id = $1
+          and personal_assignment_id in (select id from personal_assignments where organization_id = $1 and shift_type_id = any($2::uuid[]))`,
+      types,
+    );
     await client.query(
       'delete from personal_assignments where organization_id = $1 and shift_type_id = any($2::uuid[])',
       types,

@@ -1,4 +1,4 @@
-import { collisionKeyOf, collisionsOf, hasTeam, unresolvedCollisionsOf, type Collision, type LeaveRange } from '@shift/domain';
+import { collisionKeyOf, collisionsOf, unresolvedCollisionsOf, type Collision, type LeaveRange } from '@shift/domain';
 
 import type { CalendarSnapshot } from '@/features/calendar/services/snapshot';
 import { collisionInputOf, resolutionsOf } from '@/features/conflicts/services/conflicts-queue';
@@ -136,10 +136,10 @@ export function leaveConflictsOf(
     const types = new Map(snapshot.types.map((type) => [type.id, type.name]));
     // Every record collides whatever its absence type (story 13.2), so only the range and the id matter here.
     const collisionsWith = (live: readonly Pick<LeaveRecord, 'id' | 'from' | 'to'>[], id: string): readonly Collision[] =>
-      // Story 21.1: with a team only, as *Za odluku*'s `unresolvedOf` (story 21.7 reads the rest).
-      collisionsOf(collisionInputOf(snapshot, live.map((record) => ({ ...record, memberId }))))
-        .filter(hasTeam)
-        .filter((collision) => collision.leaveRecordId === id);
+      // Story 21.7: every collision, one with no team included, as *Za odluku*'s `unresolvedOf`.
+      collisionsOf(collisionInputOf(snapshot, live.map((record) => ({ ...record, memberId })))).filter(
+        (collision) => collision.leaveRecordId === id,
+      );
     const lineOf = (collision: Collision): LeaveConflictLine => {
       const weekday = formatIsoWeekdayShortName(collision.date);
       const date = formatIsoDayMonth(collision.date);

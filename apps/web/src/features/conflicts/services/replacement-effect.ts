@@ -1,4 +1,4 @@
-import { rosterOn, scheduledShiftTypeOn } from '@shift/domain';
+import { personalShiftOn, rosterOn, scheduledShiftTypeOn, type PersonalShift } from '@shift/domain';
 
 import {
   holidayRuleOfCalendar,
@@ -55,6 +55,19 @@ import { REPLACE_MEMBER, type ConflictResolution } from '@/features/conflicts/se
  * the key supersedes it in the database (0038's trigger), so it never holds
  * the key ({@link heldByReplacement}). A row with no stored type (before 0038)
  * matches its key as before.
+ *
+ * STORY 21.7 (0081; AD-4 as amended 2026-11-25): A REPLACEMENT BY ASSIGNMENT.
+ * A `replace_member` of the second form names the replacement's Personal
+ * Assignment (`personalAssignmentId`) instead of an override. It counts while
+ * the snapshot holds that assignment and it gives its member a Personal Shift
+ * on the resolution's date, of its stored type, counted with its team (none
+ * for a teamless key) — {@link assignmentStandingIn}. An assignment the
+ * snapshot does not hold is unknown, and counts, as an override's is: 0081
+ * ends the resolution when the save removes its assignment. And A DECISION ON
+ * A PERSONAL SHIFT is compared with the member's own shift that date (its
+ * type, counted with the key's team), not the team's rotation, so a decision
+ * on a dispatcher's day shift is not dropped because their team's crew works
+ * nights ({@link decidedOnAnotherShiftIn}).
  *
  * Nothing here computes a roster in the database (AD-4); the leave screen's
  * replacement guard (5.4e) asks the same question through
@@ -170,14 +183,42 @@ export function appliedReplacementOverrideOf(
 }
 
 /**
+ * STORY 21.7: `memberId`'s Personal Shift on `date` when it counts with
+ * `teamId` (none for `null`), else `null`. A member the snapshot lacks has none.
+ *
+ * @throws RangeError on any precondition of `personalShiftOn`.
+ */
+export function personalShiftCountedWith(
+  context: Pick<ReplacementContext, 'snapshot' | 'working' | 'holidays'>,
+  memberId: string,
+  teamId: string | null,
+  date: string,
+): PersonalShift | null {
+  const member = context.snapshot.members.find((one) => one.id === memberId);
+
+  if (member === undefined) return null;
+
+  const shift = personalShiftOn(member, date, context.working, context.snapshot.steps, context.holidays);
+
+  return shift !== null && shift.teamId === teamId ? shift : null;
+}
+
+/**
  * Whether `resolution` was decided on a shift type other than the one its
  * team's schedule has on its date today, or on a date the team does not work
- * (0038). Never for a row with no stored type.
+ * (0038). Never for a row with no stored type. STORY 21.7: when the member's
+ * own Personal Shift that date counts with the key's team, or the key has no
+ * team, that shift's type is the one compared (none: another shift).
  *
  * @throws RangeError on any precondition of the domain's derivation.
  */
 function decidedOnAnotherShiftIn(context: ReplacementContext, resolution: ConflictResolution): boolean {
   if (resolution.shiftTypeId === null) return false;
+
+  const personal = personalShiftCountedWith(context, resolution.memberId, resolution.teamId, resolution.date);
+
+  if (personal !== null) return personal.shiftTypeId !== resolution.shiftTypeId;
+  if (resolution.teamId === null) return true;
 
   const { snapshot } = context;
   const scheduled = scheduledShiftTypeOn(
@@ -193,9 +234,42 @@ function decidedOnAnotherShiftIn(context: ReplacementContext, resolution: Confli
   return scheduled?.shiftTypeId !== resolution.shiftTypeId;
 }
 
+/**
+ * STORY 21.7: where a replacement by assignment stands in the context's
+ * snapshot — unknown when no member's live assignments hold its id; applied
+ * when it gives its member a Personal Shift on the resolution's date, of the
+ * stored type (when one is stored), counted with the resolution's team; not
+ * applied otherwise (the replacement inactive, moved onto a team, or the type
+ * made non-working).
+ *
+ * @throws RangeError on any precondition of `personalShiftOn`.
+ */
+export function assignmentStandingIn(
+  context: Pick<ReplacementContext, 'snapshot' | 'working' | 'holidays'>,
+  resolution: Pick<ConflictResolution, 'date' | 'teamId' | 'shiftTypeId'> & { readonly personalAssignmentId: string },
+): typeof REPLACEMENT_APPLIED | typeof REPLACEMENT_UNKNOWN | typeof REPLACEMENT_NOT_APPLIED {
+  const holder = context.snapshot.members.find((member) =>
+    member.personalAssignments.some((assignment) => assignment.id === resolution.personalAssignmentId),
+  );
+
+  if (holder === undefined) return REPLACEMENT_UNKNOWN;
+
+  const shift = personalShiftCountedWith(context, holder.id, resolution.teamId, resolution.date);
+
+  return shift !== null &&
+    shift.personalAssignmentId === resolution.personalAssignmentId &&
+    (resolution.shiftTypeId === null || shift.shiftTypeId === resolution.shiftTypeId)
+    ? REPLACEMENT_APPLIED
+    : REPLACEMENT_NOT_APPLIED;
+}
+
 /** Whether `resolution` still decides its conflict, in `context`: every kind but a replacement the snapshot holds unapplied. */
 function countsIn(context: ReplacementContext, resolution: ConflictResolution): boolean {
-  if (resolution.kind !== REPLACE_MEMBER || resolution.rosterOverrideId === null) return true;
+  if (resolution.kind === REPLACE_MEMBER && resolution.personalAssignmentId !== null) {
+    return assignmentStandingIn(context, { ...resolution, personalAssignmentId: resolution.personalAssignmentId }) !== REPLACEMENT_NOT_APPLIED;
+  }
+
+  if (resolution.kind !== REPLACE_MEMBER || resolution.rosterOverrideId === null || resolution.teamId === null) return true;
 
   const standing = replacementStandingIn(context, {
     teamId: resolution.teamId,
@@ -245,11 +319,20 @@ export function effectiveResolutionsOf<Resolution extends ConflictResolution>(
  * @throws RangeError on any precondition of the domain's derivation.
  */
 export function heldByReplacement(snapshot: CalendarSnapshot, resolution: ConflictResolution): boolean {
-  if (resolution.kind !== REPLACE_MEMBER || resolution.rosterOverrideId === null) return false;
+  if (resolution.kind !== REPLACE_MEMBER) return false;
+  // No link at all (a member's read from before 0033), or an override link on no team: nothing holds the key.
+  if (resolution.personalAssignmentId === null && (resolution.rosterOverrideId === null || resolution.teamId === null)) return false;
 
   const context = replacementContextOf(snapshot);
 
   if (decidedOnAnotherShiftIn(context, resolution)) return false;
+
+  // STORY 21.7: an assignment the snapshot holds unapplied holds the key the same way.
+  if (resolution.personalAssignmentId !== null) {
+    return assignmentStandingIn(context, { ...resolution, personalAssignmentId: resolution.personalAssignmentId }) === REPLACEMENT_NOT_APPLIED;
+  }
+
+  if (resolution.rosterOverrideId === null || resolution.teamId === null) return false;
 
   const standing = replacementStandingIn(context, {
     teamId: resolution.teamId,
@@ -262,6 +345,7 @@ export function heldByReplacement(snapshot: CalendarSnapshot, resolution: Confli
 
 const KIND_COLUMN = 'kind';
 const LINK_COLUMN = 'roster_override_id';
+const ASSIGNMENT_LINK_COLUMN = 'personal_assignment_id';
 
 /**
  * The override ids that `replace_member` rows link and the snapshot does not
@@ -270,16 +354,22 @@ const LINK_COLUMN = 'roster_override_id';
  * throws: what cannot be read names nothing.
  */
 export function unknownReplacementLinksOf(snapshot: CalendarSnapshot, rows: readonly unknown[]): readonly string[] {
-  const held = new Set(snapshot.rosterOverrides.map((override) => override.id));
+  // STORY 21.7: an assignment a replacement names is held when some member's live assignments carry it.
+  const held = new Set([
+    ...snapshot.rosterOverrides.map((override) => override.id),
+    ...snapshot.members.flatMap((member) => member.personalAssignments.map((assignment) => assignment.id)),
+  ]);
   const unknown = new Set<string>();
 
   for (const row of rows) {
     if (typeof row !== 'object' || row === null) continue;
 
     const record = row as Record<string, unknown>;
-    const link = record[LINK_COLUMN];
+    if (record[KIND_COLUMN] !== REPLACE_MEMBER) continue;
 
-    if (record[KIND_COLUMN] === REPLACE_MEMBER && typeof link === 'string' && link !== '' && !held.has(link)) unknown.add(link);
+    for (const link of [record[LINK_COLUMN], record[ASSIGNMENT_LINK_COLUMN]]) {
+      if (typeof link === 'string' && link !== '' && !held.has(link)) unknown.add(link);
+    }
   }
 
   return [...unknown].sort();

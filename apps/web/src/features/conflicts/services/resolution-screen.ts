@@ -1,9 +1,10 @@
-import { collisionKeyOf, daysBetween, deriveShiftTimes, isHalfDay, leaveBalanceOf, leaveRangeCostOf, leaveSpanOf, shiftTypeVersionOn, type LeaveHalf } from '@shift/domain';
+import { collisionKeyOf, daysBetween, effectiveTeamOn, deriveShiftTimes, isHalfDay, leaveBalanceOf, leaveRangeCostOf, leaveSpanOf, shiftTypeVersionOn, type Collision, type LeaveHalf } from '@shift/domain';
 
 import type { CalendarSnapshot, CalendarSurfaceState } from '@/features/calendar/services/snapshot';
-import { dayDetailOf } from '@/features/calendar/utils/day-detail';
-import { MODE_SVE, calendarTodayOf, dayMonthOf, type CalendarSearch } from '@/features/calendar/utils/month';
+import { dayDetailOf, type DayDetailMember } from '@/features/calendar/utils/day-detail';
+import { MODE_SVE, calendarTodayOf, dayMonthOf, typeRangeOn, weekdayOf, type CalendarSearch } from '@/features/calendar/utils/month';
 import {
+  assignmentCandidatesOf,
   replacementCandidatesOf,
   type CandidateGroup,
   type CandidateGroupKind,
@@ -16,9 +17,12 @@ import {
   queueReadFailed,
   unresolvedOf,
   type LeaveRowsAnswer,
-  type TeamCollision,
 } from '@/features/conflicts/services/conflicts-queue';
-import { heldByReplacement } from '@/features/conflicts/services/replacement-effect';
+import {
+  heldByReplacement,
+  personalShiftCountedWith,
+  replacementContextOf,
+} from '@/features/conflicts/services/replacement-effect';
 import { ACCEPT_UNCOVERED, REPLACE_MEMBER } from '@/features/conflicts/services/resolutions';
 import { durationMessageKey } from '@/features/hour-bands/services/list';
 import {
@@ -48,7 +52,7 @@ import {
   type LeaveRecordsInput,
 } from '@/features/leave/services/leave-section';
 import { positionsShown, rosterPositionMessageKey } from '@/features/members/utils/position';
-import { previousIsoDate } from '@/lib/i18n/format';
+import { formatIsoDate, previousIsoDate } from '@/lib/i18n/format';
 import { ranksShown, rosterRankMessageKey } from '@/features/members/utils/rank';
 import { durationValuesOf, type DurationValues } from '@/utils/time';
 import { ROSTER_CHANGE_SAVE, rosterChangeSnapshotOf } from '@/features/calendar/services/roster-erasures';
@@ -185,7 +189,33 @@ export const RESOLUTION_SAVE_HINT_ID = 'resolution-save-hint';
 export interface ResolutionParams {
   readonly memberId: string;
   readonly date: string;
-  readonly teamId: string;
+  /** `null` for a collision with no team (story 21.7; the route's `bez-tima`). */
+  readonly teamId: string | null;
+}
+
+/** Replace Member by a roster override that puts the replacement on the team's shift (story 5.4c, 0032). */
+export const REPLACE_BY_OVERRIDE = 'override';
+/**
+ * STORY 21.7 (AD-4 as amended): Replace Member by a Personal Assignment of the
+ * replacement (0081's `resolve_with_personal_assignment`), for a collision over
+ * a Personal Shift, with a team or none. 21.13's floater suggestion and 21.14's
+ * whole-leave cover write this form too.
+ */
+export const REPLACE_BY_ASSIGNMENT = 'assignment';
+
+export type ReplaceForm = typeof REPLACE_BY_OVERRIDE | typeof REPLACE_BY_ASSIGNMENT;
+
+/**
+ * The one dispatch of a replacement's write (story 21.7): by assignment for
+ * the second form, and always for a key with no team (an override needs a
+ * team); else by 0032's override, naming the team.
+ */
+export function replaceWriteOf(
+  view: Pick<ResolutionView, 'replaceForm' | 'teamId'>,
+): { readonly form: typeof REPLACE_BY_ASSIGNMENT } | { readonly form: typeof REPLACE_BY_OVERRIDE; readonly teamId: string } {
+  return view.replaceForm === REPLACE_BY_ASSIGNMENT || view.teamId === null
+    ? { form: REPLACE_BY_ASSIGNMENT }
+    : { form: REPLACE_BY_OVERRIDE, teamId: view.teamId };
 }
 
 /** An adjacent conflict, for ‹ and ›: where it goes, and the date its label names. */
@@ -226,7 +256,8 @@ export type ResolutionSavedKind = typeof ACCEPT_UNCOVERED | typeof REPLACE_MEMBE
 /** What every landed decision names on the queue: the shift, the date and the member, as shown. */
 interface ResolutionSavedFacts {
   readonly shiftTypeName: string;
-  readonly teamName: string;
+  /** `null` with no team (story 21.7): the line says *bez tima*. */
+  readonly teamName: string | null;
   readonly dateShown: string;
   readonly memberName: string;
 }
@@ -406,7 +437,7 @@ export const STAFFING_REPLACEMENT_ID = 'staffing-replacement';
 function replacedCoverageOf(
   snapshot: CalendarSnapshot,
   records: readonly OrganizationLeaveRecord[],
-  collision: TeamCollision,
+  collision: Collision & { readonly teamId: string },
   memberInId: string,
 ): CoverageAgainstMinimum | null {
   try {
@@ -441,7 +472,7 @@ function replacedCoverageOf(
 export function resolutionStaffingOf(
   snapshot: CalendarSnapshot,
   records: readonly OrganizationLeaveRecord[],
-  collision: TeamCollision,
+  collision: Collision & { readonly teamId: string },
   record: LeaveRecord,
   target: ResolutionAmendTarget,
   candidateIds: readonly string[] = [],
@@ -492,7 +523,8 @@ export interface ResolutionView {
   readonly shiftTypeName: string;
   /** `07:00–19:00`, or `null` for a working type with no times on the date. */
   readonly times: string | null;
-  readonly teamName: string;
+  /** `null` with no team (story 21.7): the facts say *bez tima*. */
+  readonly teamName: string | null;
   /** `četvrtak 10.09.2026`: the day detail's own wording. */
   readonly dateShown: string;
   readonly memberName: string;
@@ -564,6 +596,14 @@ export interface ResolutionView {
   readonly organizationId: string;
   /** The shift type the conflict is on, as derived: stored with the decision (0038). */
   readonly shiftTypeId: string;
+  /**
+   * STORY 21.7: how Replace Member is written for this conflict — by a roster
+   * override for a team's rotation shift, by an assignment for a Personal
+   * Shift (with a team or none). The candidates follow it.
+   */
+  readonly replaceForm: ReplaceForm;
+  /** The team the key and an assignment's cover count with: `null` for none (story 21.7). */
+  readonly teamId: string | null;
   /** What the queue's status line names once an acceptance lands; a replacement adds its name ({@link replacedSavedOf}). */
   readonly saved: Extract<ResolutionSaved, { readonly kind: typeof ACCEPT_UNCOVERED }>;
 }
@@ -636,7 +676,7 @@ export function refetchingAfterFailure(reads: readonly ResolutionReadState[]): b
 }
 
 /** An adjacent conflict's link. */
-function linkOf(collision: TeamCollision | undefined): ResolutionLink | null {
+function linkOf(collision: Collision | undefined): ResolutionLink | null {
   if (collision === undefined) return null;
 
   return {
@@ -662,7 +702,7 @@ function onLeave(records: readonly OrganizationLeaveRecord[], memberId: string, 
  *
  * @throws RangeError for a type the snapshot lacks.
  */
-function shiftMinutesOf(snapshot: CalendarSnapshot, collision: TeamCollision): number | null {
+function shiftMinutesOf(snapshot: CalendarSnapshot, collision: Collision): number | null {
   const type = snapshot.types.find((one) => one.id === collision.shiftTypeId);
 
   if (type === undefined) throw new RangeError(`shift type ${collision.shiftTypeId} is not in the snapshot`);
@@ -670,6 +710,89 @@ function shiftMinutesOf(snapshot: CalendarSnapshot, collision: TeamCollision): n
   const version = shiftTypeVersionOn(type.versions, collision.date);
 
   return version === null ? null : deriveShiftTimes(version.startMinute, version.endMinute).durationMinutes;
+}
+
+/**
+ * Everyone whose own Personal Shift on the collision's date is of its type and
+ * counts with its team (none for `null`), in the snapshot's order (story 21.7).
+ *
+ * @throws RangeError on any precondition of `personalShiftOn`.
+ */
+function personalRosterOf(
+  snapshot: CalendarSnapshot,
+  context: ReturnType<typeof replacementContextOf>,
+  collision: Collision,
+): readonly Pick<DayDetailMember, 'id' | 'name' | 'position'>[] {
+  return snapshot.members
+    .filter(
+      (member) => personalShiftCountedWith(context, member.id, collision.teamId, collision.date)?.shiftTypeId === collision.shiftTypeId,
+    )
+    .map((member) => ({ id: member.id, name: member.name, position: effectiveTeamOn(member, collision.date)?.position ?? null }));
+}
+
+/** The shift a conflict is on, as the screen states it (story 21.7). */
+interface CollisionShift {
+  readonly replaceForm: ReplaceForm;
+  /** Everyone on that shift that day, the absent member included. */
+  readonly roster: readonly Pick<DayDetailMember, 'id' | 'name' | 'position'>[];
+  readonly teamName: string | null;
+  readonly dateShown: string;
+  readonly typeName: string | null;
+  readonly range: string | null;
+}
+
+/**
+ * THE SHIFT A CONFLICT IS ON (story 21.7). A team's rotation shift is the
+ * team's day detail, as before: its roster, name, wording and times, replaced
+ * by an override. A PERSONAL SHIFT (the absent member's own shift that date,
+ * of the collision's type, counted with its team or none) is replaced by an
+ * assignment, and its roster is everyone whose own shift that date is of that
+ * type and counts with the same team: the day detail's roster when the
+ * member is on it, else its staffing group of the type, and for no team every
+ * such member, in the snapshot's order.
+ *
+ * @throws RangeError for a team the snapshot lacks, or on any precondition of the derivation.
+ */
+function shiftOfCollision(snapshot: CalendarSnapshot, collision: Collision): CollisionShift {
+  const context = replacementContextOf(snapshot);
+  const own = personalShiftCountedWith(context, collision.memberId, collision.teamId, collision.date);
+  const personal = own !== null && own.shiftTypeId === collision.shiftTypeId;
+  const type = snapshot.types.find((one) => one.id === collision.shiftTypeId);
+
+  if (type === undefined) throw new RangeError(`shift type ${collision.shiftTypeId} is not in the snapshot`);
+
+  if (collision.teamId !== null) {
+    const detail = dayDetailOf(snapshot, collision.teamId, collision.date);
+
+    if (detail === null) throw new RangeError(`team ${collision.teamId} is not in the snapshot`);
+
+    const onRoster = detail.roster.some((one) => one.id === collision.memberId);
+    const group = detail.groups?.find((one) => one.shiftTypeId === collision.shiftTypeId);
+    const own = personal && !onRoster;
+
+    return {
+      replaceForm: personal ? REPLACE_BY_ASSIGNMENT : REPLACE_BY_OVERRIDE,
+      // A Personal Shift off the team's roster: its staffing group, else everyone whose own shift is that one.
+      roster: !own ? detail.roster : (group?.roster ?? personalRosterOf(snapshot, context, collision)),
+      teamName: detail.teamName,
+      dateShown: detail.date,
+      typeName: own ? type.name : detail.typeName,
+      range: own ? typeRangeOn(type, collision.date) : detail.range,
+    };
+  }
+
+  const full = formatIsoDate(collision.date);
+
+  if (full === null) throw new RangeError(`the date ${collision.date} could not be formatted`);
+
+  return {
+    replaceForm: REPLACE_BY_ASSIGNMENT,
+    roster: personalRosterOf(snapshot, context, collision),
+    teamName: null,
+    dateShown: `${weekdayOf(collision.date)} ${full}`,
+    typeName: type.name,
+    range: typeRangeOn(type, collision.date),
+  };
 }
 
 /**
@@ -686,7 +809,7 @@ export function resolutionPlaceOf(
   params: ResolutionParams,
   today: string,
 ): {
-  readonly ordered: readonly TeamCollision[];
+  readonly ordered: readonly Collision[];
   readonly index: number;
 } {
   const ordered = queueOrderOf(unresolvedOf(snapshot, records, resolutionRows), today);
@@ -806,34 +929,37 @@ function resolutionScreenFrom(
 
   const member = snapshot.members.find((one) => one.id === collision.memberId);
   const type = snapshot.types.find((one) => one.id === collision.shiftTypeId);
-  const detail = dayDetailOf(snapshot, collision.teamId, collision.date);
 
   if (member === undefined) throw new RangeError(`member ${collision.memberId} is not in the snapshot`);
   if (type === undefined) throw new RangeError(`shift type ${collision.shiftTypeId} is not in the snapshot`);
-  if (detail === null) throw new RangeError(`team ${collision.teamId} is not in the snapshot`);
 
-  const absent = detail.roster.find((one) => one.id === collision.memberId);
+  const shift = shiftOfCollision(snapshot, collision);
+  const absent = shift.roster.find((one) => one.id === collision.memberId);
 
   // A collision is a shift the member is rostered on (R6.1): one the day's
   // roster does not hold is a derivation that disagrees with itself.
   if (absent === undefined) {
-    throw new RangeError(`member ${collision.memberId} is not on the roster of ${collision.teamId} on ${collision.date}`);
+    throw new RangeError(`member ${collision.memberId} is not on the roster of ${collision.teamId ?? 'no team'} on ${collision.date}`);
   }
 
   // ONE LIST for the coverage and the names: the roster less every member on
   // live leave, a member on a half day counting at work (R10.1, story 13.5).
   // The names leave out the absent member, who is the screen's subject.
-  const working = detail.roster.filter((one) => !onLeave(records, one.id, collision.date));
+  const working = shift.roster.filter((one) => !onLeave(records, one.id, collision.date));
   const coworkers = working.filter((one) => one.id !== collision.memberId).map((one) => {
     if (one.name === null) throw new RangeError(`member ${one.id} is rostered but has no name in the snapshot`);
 
     return one.name;
   });
   const minutes = shiftMinutesOf(snapshot, collision);
-  const candidates = replacementCandidatesOf(snapshot, records, collision.teamId, collision.date, collision.shiftTypeId);
+  const teamId = collision.teamId;
+  const byAssignment = shift.replaceForm === REPLACE_BY_ASSIGNMENT || teamId === null;
+  const candidates = byAssignment
+    ? assignmentCandidatesOf(snapshot, records, collision.memberId, teamId, collision.date, collision.shiftTypeId)
+    : replacementCandidatesOf(snapshot, records, teamId, collision.date, collision.shiftTypeId);
   const range = leaveRangeValuesOf(record.record);
-  const dateShown = detail.date;
-  const typeName = detail.typeName ?? type.name;
+  const dateShown = shift.dateShown;
+  const typeName = shift.typeName ?? type.name;
   const key = collisionKeyOf(collision);
   const amend = resolutionAmendOf(base.input, record.record, collision.date);
   // Unresolved, yet a live row holds this key: a replacement the snapshot holds pending or inert.
@@ -851,8 +977,8 @@ function resolutionScreenFrom(
       previous: linkOf(ordered[index - 1]),
       next: linkOf(ordered[index + 1]),
       shiftTypeName: typeName,
-      times: detail.range,
-      teamName: detail.teamName,
+      times: shift.range,
+      teamName: shift.teamName,
       dateShown,
       memberName: member.name,
       rankKey: rosterRankMessageKey(member.fireRank, ranksShown(snapshot)),
@@ -862,7 +988,7 @@ function resolutionScreenFrom(
       leaveHalf: record.record.half ?? null,
       leaveCostDays: record.costDays,
       coworkers,
-      total: detail.roster.length,
+      total: shift.roster.length,
       covered: working.length,
       shiftHours: minutes === null ? null : { key: durationMessageKey(minutes), values: durationValuesOf(minutes) },
       // A half day's date costs 0.5 (story 13.5).
@@ -876,19 +1002,24 @@ function resolutionScreenFrom(
       dayMonth: dayMonthOf(collision.date),
       leaveRecordId: record.record.id,
       amend,
-      staffing: resolutionStaffingOf(
-        snapshot,
-        records,
-        collision,
-        record.record,
-        amend.target,
-        candidates.flatMap((group) => group.candidates.map((candidate) => candidate.id)),
-      ),
+      // STORY 21.7: the minimum is a team rotation shift's figure; a Personal Shift's cards keep the shipped terms.
+      staffing: byAssignment
+        ? null
+        : resolutionStaffingOf(
+            snapshot,
+            records,
+            { ...collision, teamId },
+            record.record,
+            amend.target,
+            candidates.flatMap((group) => group.candidates.map((candidate) => candidate.id)),
+          ),
       held,
       heldCalendar: heldCalendarSearchOf(collision),
       organizationId: snapshot.organizationId,
       shiftTypeId: collision.shiftTypeId,
-      saved: { kind: ACCEPT_UNCOVERED, shiftTypeName: typeName, teamName: detail.teamName, dateShown, memberName: member.name },
+      replaceForm: byAssignment ? REPLACE_BY_ASSIGNMENT : REPLACE_BY_OVERRIDE,
+      teamId,
+      saved: { kind: ACCEPT_UNCOVERED, shiftTypeName: typeName, teamName: shift.teamName, dateShown, memberName: member.name },
     },
   };
 }
@@ -906,7 +1037,15 @@ export function shiftFactsMessageKey(times: string | null): 'zaOdluku.resolution
 /** Who else works: the names, or the sentence for nobody. */
 export function coworkersMessageKey(
   coworkers: readonly string[],
-): 'zaOdluku.resolution.coworkers' | 'zaOdluku.resolution.noCoworkers' {
+  noTeam = false,
+):
+  | 'zaOdluku.resolution.coworkers'
+  | 'zaOdluku.resolution.noCoworkers'
+  | 'zaOdluku.resolution.coworkersNoTeam'
+  | 'zaOdluku.resolution.noCoworkersNoTeam' {
+  // STORY 21.7: a shift with no team names no team.
+  if (noTeam) return coworkers.length === 0 ? 'zaOdluku.resolution.noCoworkersNoTeam' : 'zaOdluku.resolution.coworkersNoTeam';
+
   return coworkers.length === 0 ? 'zaOdluku.resolution.noCoworkers' : 'zaOdluku.resolution.coworkers';
 }
 
@@ -944,7 +1083,10 @@ export function saveHintMessageKey(
  * on the conflict's month, narrowed to its team. The day itself opens from
  * its cell: which day is open is not in the URL (story 3.4b).
  */
-export function heldCalendarSearchOf(conflict: { readonly date: string; readonly teamId: string }): CalendarSearch {
+export function heldCalendarSearchOf(conflict: { readonly date: string; readonly teamId: string | null }): CalendarSearch {
+  // STORY 21.7: a teamless conflict's month, every team shown.
+  if (conflict.teamId === null) return { prikaz: MODE_SVE, mjesec: conflict.date.slice(0, 7) };
+
   return { prikaz: MODE_SVE, mjesec: conflict.date.slice(0, 7), smjena: conflict.teamId };
 }
 
@@ -1160,7 +1302,8 @@ export function resolutionSavedOf(state: unknown): ResolutionSaved | null {
 
   if (
     typeof shiftTypeName !== 'string' ||
-    typeof teamName !== 'string' ||
+    // STORY 21.7: a teamless conflict's decision names no team (`null`, said *bez tima*).
+    (typeof teamName !== 'string' && teamName !== null) ||
     typeof dateShown !== 'string' ||
     typeof memberName !== 'string'
   ) {
@@ -1235,7 +1378,7 @@ export type ResolutionSavedLine =
  * and a replacement its name — a leave request's the member and the range,
  * and a swap's both members and the given shift's date.
  */
-export function resolutionSavedLineOf(saved: ResolutionSaved): ResolutionSavedLine {
+export function resolutionSavedLineOf(saved: ResolutionSaved, noTeam: string): ResolutionSavedLine {
   switch (saved.kind) {
     case LEAVE_REQUEST_APPROVED_SAVED:
       return {
@@ -1270,7 +1413,8 @@ export function resolutionSavedLineOf(saved: ResolutionSaved): ResolutionSavedLi
         request: false,
         swap: false,
         key: 'zaOdluku.saved',
-        values: { type: saved.shiftTypeName, team: saved.teamName, date: saved.dateShown, member: saved.memberName },
+        // STORY 21.7: `noTeam` (*bez tima*) for a collision with none.
+        values: { type: saved.shiftTypeName, team: saved.teamName ?? noTeam, date: saved.dateShown, member: saved.memberName },
       };
     case REPLACE_MEMBER:
       return {
@@ -1279,7 +1423,7 @@ export function resolutionSavedLineOf(saved: ResolutionSaved): ResolutionSavedLi
         key: 'zaOdluku.savedReplace',
         values: {
           type: saved.shiftTypeName,
-          team: saved.teamName,
+          team: saved.teamName ?? noTeam,
           date: saved.dateShown,
           member: saved.memberName,
           replacement: saved.replacementName,

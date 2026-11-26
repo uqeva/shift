@@ -78,7 +78,8 @@ export interface ResolvedConflictRow {
   readonly kind: ConflictResolutionKind;
   /** `12.09.2026`. */
   readonly dateShown: string;
-  readonly teamName: string;
+  /** `null` for a decision on a collision with no team (story 21.7). */
+  readonly teamName: string | null;
   readonly memberName: string;
   /**
    * The shift type the decision was made on (0038); for an older row, the
@@ -245,7 +246,8 @@ function rowsByKeyOf(rows: readonly unknown[]): ReadonlyMap<string, Record<strin
 
     const { member_id: memberId, date, team_id: teamId } = row;
 
-    if (typeof memberId === 'string' && typeof date === 'string' && typeof teamId === 'string') {
+    // STORY 21.7: a teamless key's `team_id` is null.
+    if (typeof memberId === 'string' && typeof date === 'string' && (typeof teamId === 'string' || teamId === null)) {
       byKey.set(collisionKeyOf({ memberId, date, teamId }), row);
     }
   }
@@ -373,7 +375,7 @@ export function resolvedConflictsViewOf(
     const key = collisionKeyOf(resolution);
     const row = raw.get(key);
     const memberName = members.get(resolution.memberId);
-    const teamName = teams.get(resolution.teamId);
+    const teamName = resolution.teamId === null ? null : teams.get(resolution.teamId);
     const dateShown = formatIsoDate(resolution.date);
     const created = row?.['created_at'];
     const createdAt = typeof created === 'string' ? new Date(created) : null;
@@ -385,15 +387,18 @@ export function resolvedConflictsViewOf(
     if (createdAt === null || Number.isNaN(createdAt.getTime())) throw new RangeError(`resolution ${key} has no valid instant`);
     if (typeof createdBy !== 'string') throw new RangeError(`resolution ${key} has no author`);
 
-    const scheduled = scheduledShiftTypeOn(
-      snapshot.assignments.filter((assignment) => assignment.teamId === resolution.teamId),
-      snapshot.steps,
-      typeInForce,
-      resolution.teamId,
-      resolution.date,
-      // STORY 21.16 (R13.3): a team off on a holiday answers no type, which is no working shift.
-      holidays,
-    );
+    const scheduled =
+      resolution.teamId === null
+        ? null
+        : scheduledShiftTypeOn(
+            snapshot.assignments.filter((assignment) => assignment.teamId === resolution.teamId),
+            snapshot.steps,
+            typeInForce,
+            resolution.teamId,
+            resolution.date,
+            // STORY 21.16 (R13.3): a team off on a holiday answers no type, which is no working shift.
+            holidays,
+          );
     const stored = resolution.shiftTypeId === null ? undefined : types.get(resolution.shiftTypeId);
     const type =
       stored ??
@@ -404,7 +409,13 @@ export function resolvedConflictsViewOf(
       resolution.kind === REPLACE_MEMBER && resolution.rosterOverrideId !== null
         ? overrides.get(resolution.rosterOverrideId)
         : undefined;
-    const replacementId = link?.memberInId ?? null;
+    // STORY 21.7: a replacement by assignment names the member who holds it.
+    const replacementId =
+      resolution.kind === REPLACE_MEMBER && resolution.personalAssignmentId !== null
+        ? (snapshot.members.find((member) =>
+            member.personalAssignments.some((assignment) => assignment.id === resolution.personalAssignmentId),
+          )?.id ?? null)
+        : (link?.memberInId ?? null);
 
     const shown: ResolvedConflictRow = {
       item: ITEM_COLLISION,

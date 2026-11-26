@@ -32,7 +32,7 @@ import {
   manualInertMessageKey,
   manualPreviewOf,
   manualShiftMessageKey,
-  teamlessConflictsOf,
+  newConflictsOf,
 } from '@/features/planning/services/manual-preview';
 import { initLocalization } from '@/lib/i18n';
 
@@ -178,20 +178,20 @@ describe('only what the save makes is said (review)', () => {
   });
 });
 
-describe('the 21.4 gate: a leave over a shift with no team (deferred-work, answered: warn)', () => {
+describe('the new conflicts a save makes over leave (21.4 gate; story 21.7: every team, listed in Za odluku)', () => {
   const LEAVE = [leaveRowOf('00000000-0000-4000-8000-00000000f005', IVA, '2026-10-09', '2026-10-12')];
 
-  it('warns, per date, of each new conflict with no team the save makes over existing leave', () => {
+  it('says, per date, each new conflict with no team the save makes over existing leave', () => {
     const cells = ['2026-10-10', '2026-10-11', '2026-10-15'].map((date) => ({ memberId: IVA, date }));
     const preview = previewOf(plain, drafted(plain, cells, DAN_VALUE), LEAVE);
 
-    expect(preview.members[0]?.teamless).toEqual([
+    expect(preview.members[0]?.newConflicts).toEqual([
       { key: '2026-10-10', date: '2026-10-10' },
       { key: '2026-10-11', date: '2026-10-11' },
     ]);
   });
 
-  it('never repeats one already there, and says none for a shift counted with a team', async () => {
+  it('never repeats one already there, and says one counted with a team too (story 21.7)', async () => {
     const snapshot = await planningSnapshotOf({
       assignments: [calendarPersonalAssignmentRow('00000000-0000-4000-8000-00000000f006', IVA, '2026-10-10', 'SHIFT', DAN)],
     });
@@ -199,18 +199,21 @@ describe('the 21.4 gate: a leave over a shift with no team (deferred-work, answe
     const window = { from: '2026-10-10', to: '2026-10-11' };
     const draft = drafted(snapshot, [{ memberId: IVA, date: '2026-10-11' }], { kind: 'SHIFT', shiftTypeId: DAN, teamId: A });
 
-    expect(teamlessConflictsOf(snapshot, draftAppliedOf(snapshot, draft), IVA, window, records)).toEqual([]);
+    expect(newConflictsOf(snapshot, draftAppliedOf(snapshot, draft), IVA, window, records)).toEqual([
+      { key: '2026-10-11', date: '2026-10-11' },
+    ]);
 
-    const again = drafted(snapshot, [{ memberId: IVA, date: '2026-10-11' }], DAN_VALUE);
+    // 10.10. was a conflict before the save, and is not said again.
+    const again = drafted(snapshot, [{ memberId: IVA, date: '2026-10-10' }, { memberId: IVA, date: '2026-10-11' }], DAN_VALUE);
 
-    expect(teamlessConflictsOf(snapshot, draftAppliedOf(snapshot, again), IVA, window, records)).toEqual([
+    expect(newConflictsOf(snapshot, draftAppliedOf(snapshot, again), IVA, window, records)).toEqual([
       { key: '2026-10-11', date: '2026-10-11' },
     ]);
   });
 
-  it('says no teamless line while the leave is not known', () => {
+  it('says no new-conflict line while the leave is not known', () => {
     const preview = previewOf(plain, drafted(plain, [{ memberId: IVA, date: '2026-10-10' }], DAN_VALUE), null);
 
-    expect(preview.members[0]?.teamless).toEqual([]);
+    expect(preview.members[0]?.newConflicts).toEqual([]);
   });
 });

@@ -24,6 +24,7 @@ import {
   type SwapProposalMark,
 } from '@/features/calendar/utils/day-detail';
 import { HolidayMark } from '@/features/calendar/components/holiday-mark';
+import { teamParamOf } from '@/features/conflicts/services/conflicts-queue';
 import { MODIFIER_CONFLICT, MODIFIER_OVERRIDDEN, modifierTreatmentOf } from '@/features/calendar/utils/modifiers';
 import {
   OverrideChangeDialog,
@@ -421,7 +422,7 @@ function renderConflicts(conflicts: readonly DayConflict[]): ReactNode {
             <Button asChild variant="outline" className="h-11 justify-self-start">
               <Link
                 to="/za-odluku/$memberId/$date/$teamId"
-                params={{ memberId: conflict.memberId, date: conflict.date, teamId: conflict.teamId }}
+                params={{ memberId: conflict.memberId, date: conflict.date, teamId: teamParamOf(conflict.teamId) }}
                 aria-describedby={conflictLineIdOf(conflict.memberId)}
               >
                 {t('kalendar.detail.conflict.resolve')}

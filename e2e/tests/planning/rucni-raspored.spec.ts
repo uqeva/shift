@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { ManualSchedulePage } from '../../pages/manual-schedule.page.ts';
 import {
   archiveShiftType,
+  conflictResolutionsOfInSql,
   holdRotation,
   personalAssignmentsOfInSql,
   removeLeaveMemberInSql,
@@ -11,6 +12,7 @@ import {
   seedExtraTeam,
   seedLeaveMember,
   seedLeaveRecord,
+  seedPersonalAssignmentInSql,
   seedTeamRotation,
   type RotationHold,
   type SeededLeaveMember,
@@ -245,6 +247,49 @@ test('an OFF over a queued conflict waits for the erasure confirmation, then the
   await conflictsPage.goto();
   await expect(conflictsPage.anyCountHeading).toBeVisible();
   await expect(conflictsPage.rowsOf(crew.name)).toHaveCount(0);
+});
+
+test('story 21.7: a student’s teamless shift over leave is drawn in the grid, listed in Za odluku with no team, and covered by another student’s assignment', async ({
+  page,
+  fixture,
+  conflictsPage,
+  resolutionPage,
+}) => {
+  test.slow();
+  const { rotation, student } = await setUp(fixture.slug);
+  const cover = await seedLeaveMember(fixture.slug, null, rotation.today, 0);
+  written?.members.push(cover.id);
+  const screen = new ManualSchedulePage(page);
+  const [dan] = rotation.steps;
+  const date = addDays(rotation.today, 2);
+  await seedPersonalAssignmentInSql(fixture.slug, student.id, date, rotation.shiftTypeIds[0]!);
+  await seedLeaveRecord(fixture.slug, student.id, date, date);
+
+  // THE GRID DRAWS THE ABSENCE (deferred from 21.4): the cell names it.
+  await screen.gotoMonth(date.slice(0, 7));
+  await expect(screen.cellOf(student.id, date)).toHaveAttribute('aria-label', new RegExp(`${dan}.*${words.cell.leave}`));
+
+  // ZA ODLUKU LISTS IT, with no team.
+  await conflictsPage.goto();
+  const rows = conflictsPage.rowsOf(student.name);
+  await expect(rows).toHaveCount(1);
+  await expect(rows).toContainText(fill(hr.zaOdluku.who, { member: student.name, team: hr.kalendar.cell.noTeam }));
+  await conflictsPage.rowLink(rows.nth(0)).click();
+  await expect(page).toHaveURL(new RegExp(`/za-odluku/${student.id}/${date}/bez-tima$`));
+
+  // REPLACE MEMBER BY ASSIGNMENT: the other student, on no team, is offered and saved.
+  await resolutionPage.replaceOption.click();
+  await resolutionPage.candidate(cover.name).click();
+  await resolutionPage.saveButton.click();
+  await expect(page).toHaveURL('/za-odluku');
+  await expect(conflictsPage.savedStatus).toContainText(cover.name);
+  await expect(conflictsPage.rowsOf(student.name)).toHaveCount(0);
+  await expect
+    .poll(async () => (await personalAssignmentsOfInSql(fixture.slug, cover.id)).map((row) => [row.date, row.kind, row.teamId]))
+    .toEqual([[date, 'SHIFT', null]]);
+  expect(await conflictResolutionsOfInSql(fixture.slug, student.id)).toEqual([
+    { date, teamId: null, kind: 'replace_member', assignmentMember: cover.id },
+  ]);
 });
 
 test('a save refused as stale (22023) keeps the draft and re-reads the calendar, and the next save lands', async ({

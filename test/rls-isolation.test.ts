@@ -19254,11 +19254,11 @@ describe('a conflict resolution is recorded by an active admin alone, one live p
     },
   );
 
-  it.skipIf(noDatabase)('my_conflict_resolutions returns exactly member_id, date, team_id, kind and, since 0033 and 0038, roster_override_id and shift_type_id', async () => {
+  it.skipIf(noDatabase)('my_conflict_resolutions returns exactly member_id, date, team_id, kind and, since 0033 and 0038, roster_override_id and shift_type_id, and since 0081 personal_assignment_id', async () => {
     const client = await connect();
     try {
       const { fields } = await client.query('select * from public.my_conflict_resolutions() limit 0');
-      expect(fields.map((field) => field.name)).toEqual(['member_id', 'date', 'team_id', 'kind', 'roster_override_id', 'shift_type_id']);
+      expect(fields.map((field) => field.name)).toEqual(['member_id', 'date', 'team_id', 'kind', 'roster_override_id', 'shift_type_id', 'personal_assignment_id']);
     } finally {
       await client.end();
     }
@@ -29403,6 +29403,328 @@ describe("a member's schedule source is versioned (story 21.10, 0079)", () => {
         expect(seen[0]?.total, `${slug}: an active member reads the versions`).toBe(1);
         expect(write.code, `${slug}: a member wrote a version`).toBe(POLICY_REFUSED);
         expect(anonRead.code, `${slug}: anon read the versions`).toBe(POLICY_REFUSED);
+      });
+    },
+  );
+});
+
+// --------------- story 21.7: a leave over a personal shift is a conflict, and a replacement is an assignment
+
+/**
+ * STORY 21.7 (`0081`; AD-4 as amended 2026-11-25). A conflict's key may name
+ * no team (`conflict_resolutions.team_id` null, one live decision per key
+ * under NULLS NOT DISTINCT). Replace Member's second form is
+ * `resolve_with_personal_assignment(p_items)`: the replacement's `SHIFT`
+ * assignment through 0077's save (its checks, its one notice) and the
+ * `replace_member` resolution naming it (`personal_assignment_id`), in one
+ * transaction; removing that assignment through the save ends the decision
+ * (0081's trigger). Every scene is built as the owner before the case's first
+ * `actAs`; every case runs in a rolled-back transaction. Written unrun: CI is
+ * their first run.
+ */
+describe('a leave over a personal shift is a conflict, and a replacement is an assignment (story 21.7, 0081)', () => {
+  /** `resolve_with_personal_assignment`, as whoever the connection currently is: the resolutions' ids. */
+  async function resolve(client: Client, items: unknown): Promise<string[]> {
+    const { rows } = await client.query<{ answer: string[] }>(
+      'select public.resolve_with_personal_assignment(p_items => $1::jsonb) as answer',
+      [JSON.stringify(items)],
+    );
+    const answer = rows[0]?.answer;
+    if (answer === undefined) throw new Error('the call answered nothing');
+    return answer;
+  }
+
+  /** Owner scene: an absent member on leave over `date` with a teamless working assignment, a cover with an address, and a working type. */
+  async function scene(client: Client, organization: string, by: string) {
+    await client.query('update organizations set email_notifications = true where id = $1', [organization]);
+    const absent = await addThrowawayMember(client, organization);
+    const cover = await addThrowawayMember(client, organization);
+    await client.query('update members set email = $2 where id = $1', [cover.id, `${cover.id}@example.org`]);
+    const working = await addThrowawayShiftType(client, organization, by);
+    const other = await addThrowawayShiftType(client, organization, by);
+    const date = await organizationDay(client, organization, 5);
+    const after = await organizationDay(client, organization, 6);
+    await client.query(
+      `insert into personal_assignments (organization_id, member_id, date, kind, shift_type_id, created_by)
+       values ($1, $2, $3::date, 'SHIFT', $4, $5)`,
+      [organization, absent.id, date, working, by],
+    );
+    await insertLeave(client, { organization, member: absent.id, during: `[${date},${after})`, by });
+    return { absent, cover, working, other, date };
+  }
+
+  it.skipIf(noDatabase).each(FIXTURES)(
+    'resolves a $fixture teamless conflict by the cover’s own assignment in one call: both rows attributed, linked, and one SCHEDULE_ASSIGNED to the cover',
+    async ({ slug, admin }) => {
+      await inRolledBackTransaction(async (client) => {
+        const caller = await memberByUsername(client, slug, admin);
+        const organization = caller.organizationId;
+        const { absent, cover, working, date } = await scene(client, organization, caller.authUserId);
+        const item = { memberId: absent.id, date, teamId: null, shiftTypeId: working, replacementId: cover.id };
+
+        await actAs(client, caller.authUserId, organization);
+        const ids = await resolve(client, [item]);
+        await actAsOwner(client);
+
+        expect(ids, slug).toHaveLength(1);
+        const { rows: assignments } = await client.query<{ id: string; kind: string; type: string; team: string | null; by: string }>(
+          `select id::text as id, kind, shift_type_id::text as type, team_id::text as team, created_by::text as by
+             from personal_assignments where member_id = $1 and removed_at is null`,
+          [cover.id],
+        );
+        expect(assignments.map((row) => [row.kind, row.type, row.team, row.by]), slug).toEqual([['SHIFT', working, null, caller.authUserId]]);
+        const { rows: resolutions } = await client.query<{ id: string; team: string | null; kind: string; type: string; link: string | null; override: string | null; by: string }>(
+          `select id::text as id, team_id::text as team, kind, shift_type_id::text as type, personal_assignment_id::text as link,
+                  roster_override_id::text as override, created_by::text as by
+             from conflict_resolutions where member_id = $1 and removed_at is null`,
+          [absent.id],
+        );
+        expect(resolutions, slug).toEqual([
+          { id: ids[0], team: null, kind: 'replace_member', type: working, link: assignments[0]!.id, override: null, by: caller.authUserId },
+        ]);
+        const { rows: notices } = await client.query<{ recipient: string; operands: Record<string, unknown> }>(
+          `select recipient_member_id::text as recipient, operands from notification_outbox
+            where code = 'SCHEDULE_ASSIGNED' and recipient_member_id = any($1::uuid[])`,
+          [[cover.id, absent.id]],
+        );
+        expect(notices, `${slug}: not one notice to the cover alone`).toEqual([{ recipient: cover.id, operands: { from: date, to: date, days: 1 } }]);
+
+        // The key is decided: a second call on it is refused before anything is written.
+        await actAs(client, caller.authUserId, organization);
+        const again = await refusedThenContinue(client, () => resolve(client, [item]));
+        await actAsOwner(client);
+        expect({ code: again.code, message: again.message }, slug).toEqual({ code: '23505', message: 'CONFLICT_RESOLUTION_EXISTS' });
+      });
+    },
+  );
+
+  it.skipIf(noDatabase).each(FIXTURES)(
+    'ends a $fixture replacement by assignment when the save removes that assignment, attributed to the removal (AD-4 as amended)',
+    async ({ slug, admin }) => {
+      await inRolledBackTransaction(async (client) => {
+        const caller = await memberByUsername(client, slug, admin);
+        const organization = caller.organizationId;
+        const { absent, cover, working, other, date } = await scene(client, organization, caller.authUserId);
+
+        await actAs(client, caller.authUserId, organization);
+        await resolve(client, [{ memberId: absent.id, date, teamId: null, shiftTypeId: working, replacementId: cover.id }]);
+        // An equal re-save changes nothing and keeps the decision.
+        await client.query('select public.save_personal_assignments(p_changes => $1::jsonb)', [
+          JSON.stringify([{ memberId: cover.id, date, set: { kind: 'SHIFT', shiftTypeId: working, teamId: null, note: null } }]),
+        ]);
+        await actAsOwner(client);
+        const { rows: kept } = await client.query<{ live: boolean }>(
+          'select removed_at is null as live from conflict_resolutions where member_id = $1',
+          [absent.id],
+        );
+        expect(kept.map((row) => row.live), `${slug}: an equal save ended the decision`).toEqual([true]);
+
+        // Another type replaces the assignment: the decision ends with it.
+        await actAs(client, caller.authUserId, organization);
+        await client.query('select public.save_personal_assignments(p_changes => $1::jsonb)', [
+          JSON.stringify([{ memberId: cover.id, date, set: { kind: 'SHIFT', shiftTypeId: other } }]),
+        ]);
+        await actAsOwner(client);
+        const { rows: ended } = await client.query<{ live: boolean; by: string | null }>(
+          'select removed_at is null as live, removed_by::text as by from conflict_resolutions where member_id = $1',
+          [absent.id],
+        );
+        expect(ended, slug).toEqual([{ live: false, by: caller.authUserId }]);
+      });
+    },
+  );
+
+  it.skipIf(noDatabase).each(FIXTURES)(
+    'refuses a $fixture replacement by assignment that is malformed, of the absent member, taken, off leave or not an active admin’s, and writes nothing',
+    async ({ slug, admin, member: memberName }) => {
+      await inRolledBackTransaction(async (client) => {
+        const caller = await memberByUsername(client, slug, admin);
+        const plain = await memberByUsername(client, slug, memberName);
+        const organization = caller.organizationId;
+        const { absent, cover, working, other, date } = await scene(client, organization, caller.authUserId);
+        const offLeave = await organizationDay(client, organization, 9);
+        // Another member who already holds another shift on `date`.
+        const taken = await addThrowawayMember(client, organization);
+        await client.query(
+          `insert into personal_assignments (organization_id, member_id, date, kind, shift_type_id, created_by)
+           values ($1, $2, $3::date, 'SHIFT', $4, $5)`,
+          [organization, taken.id, date, other, caller.authUserId],
+        );
+        const item = { memberId: absent.id, date, teamId: null, shiftTypeId: working, replacementId: cover.id };
+
+        await actAs(client, caller.authUserId, organization);
+        const empty = await refusedThenContinue(client, () => resolve(client, []));
+        const extraKey = await refusedThenContinue(client, () => resolve(client, [{ ...item, reason: 'x' }]));
+        const noTeamKey = await refusedThenContinue(client, () => {
+          const { teamId: _team, ...rest } = item;
+          return resolve(client, [rest]);
+        });
+        const twice = await refusedThenContinue(client, () => resolve(client, [item, item]));
+        const self = await refusedThenContinue(client, () => resolve(client, [{ ...item, replacementId: absent.id }]));
+        const busy = await refusedThenContinue(client, () => resolve(client, [{ ...item, replacementId: taken.id }]));
+        const notOnLeave = await refusedThenContinue(client, () => resolve(client, [{ ...item, date: offLeave }]));
+        await actAsOwner(client);
+        await actAs(client, plain.authUserId, organization);
+        const asMember = await refusedThenContinue(client, () => resolve(client, [item]));
+        await actAsOwner(client);
+
+        const INVALID = { code: '22023', message: 'CONFLICT_REPLACEMENT_INVALID' };
+        expect(
+          [empty, extraKey, noTeamKey, twice, self, busy, notOnLeave, asMember].map((refusal) => ({ code: refusal.code, message: refusal.message })),
+          slug,
+        ).toEqual([
+          INVALID,
+          INVALID,
+          INVALID,
+          INVALID,
+          { code: '23514', message: 'CONFLICT_REPLACEMENT_IS_ABSENT_MEMBER' },
+          { code: '23505', message: 'CONFLICT_REPLACEMENT_TAKEN' },
+          { code: 'P0002', message: 'CONFLICT_RESOLUTION_NOT_ON_LEAVE' },
+          { code: '42501', message: 'CONFLICT_REPLACEMENT_REFUSED' },
+        ]);
+        const { rows: written } = await client.query<{ total: number }>(
+          `select (select count(*) from conflict_resolutions where member_id = $1)::int
+                + (select count(*) from personal_assignments where member_id = $2)::int as total`,
+          [absent.id, cover.id],
+        );
+        expect(written[0]?.total, `${slug}: a refused call wrote`).toBe(0);
+      });
+    },
+  );
+
+  it.skipIf(noDatabase).each(FIXTURES)(
+    'covers $fixture absences in one call over a day off and an equal shift, one notice per cover, never one assignment twice, and a note alone keeps the decision',
+    async ({ slug, admin }) => {
+      await inRolledBackTransaction(async (client) => {
+        const caller = await memberByUsername(client, slug, admin);
+        const organization = caller.organizationId;
+        const first = await scene(client, organization, caller.authUserId);
+        const { working, date } = first;
+        // A second absent member on the same date, on leave over the same type.
+        const second = await addThrowawayMember(client, organization);
+        const after = await organizationDay(client, organization, 6);
+        await insertLeave(client, { organization, member: second.id, during: `[${date},${after})`, by: caller.authUserId });
+        // The first cover holds a day off that date; a second cover already works that very shift.
+        const offCover = first.cover;
+        const equalCover = await addThrowawayMember(client, organization);
+        await client.query('update members set email = $2 where id = $1', [equalCover.id, `${equalCover.id}@example.org`]);
+        await client.query(
+          `insert into personal_assignments (organization_id, member_id, date, kind, created_by) values ($1, $2, $3::date, 'OFF', $4)`,
+          [organization, offCover.id, date, caller.authUserId],
+        );
+        const { rows: equal } = await client.query<{ id: string }>(
+          `insert into personal_assignments (organization_id, member_id, date, kind, shift_type_id, created_by)
+           values ($1, $2, $3::date, 'SHIFT', $4, $5) returning id::text as id`,
+          [organization, equalCover.id, date, working, caller.authUserId],
+        );
+        const third = await addThrowawayMember(client, organization);
+        await insertLeave(client, { organization, member: third.id, during: `[${date},${after})`, by: caller.authUserId });
+
+        await actAs(client, caller.authUserId, organization);
+        const ids = await resolve(client, [
+          { memberId: first.absent.id, date, teamId: null, shiftTypeId: working, replacementId: offCover.id },
+          { memberId: second.id, date, teamId: null, shiftTypeId: working, replacementId: equalCover.id },
+        ]);
+        // The equal shift now covers the second absence: it never covers a third.
+        const twice = await refusedThenContinue(client, () =>
+          resolve(client, [{ memberId: third.id, date, teamId: null, shiftTypeId: working, replacementId: equalCover.id }]),
+        );
+        // A note alone on the first cover's assignment is no change of cover.
+        await client.query('select public.save_personal_assignments(p_changes => $1::jsonb)', [
+          JSON.stringify([{ memberId: offCover.id, date, set: { kind: 'SHIFT', shiftTypeId: working, teamId: null, note: 'Pokriva' } }]),
+        ]);
+        await actAsOwner(client);
+
+        expect(ids, slug).toHaveLength(2);
+        expect({ code: twice.code, message: twice.message }, slug).toEqual({ code: '23505', message: 'CONFLICT_REPLACEMENT_TAKEN' });
+        const { rows: covers } = await client.query<{ member: string; kind: string; live: boolean }>(
+          `select member_id::text as member, kind, removed_at is null as live from personal_assignments
+            where member_id = any($1::uuid[]) order by member_id, created_at`,
+          [[offCover.id, equalCover.id]],
+        );
+        // The day off was replaced; the equal shift was reused, never written again.
+        expect(covers.filter((row) => row.member === offCover.id && row.live).map((row) => row.kind), slug).toEqual(['SHIFT']);
+        expect(covers.filter((row) => row.member === equalCover.id), slug).toEqual([{ member: equalCover.id, kind: 'SHIFT', live: true }]);
+        const { rows: decisions } = await client.query<{ member: string; link: string }>(
+          `select c.member_id::text as member, p.member_id::text as link
+             from conflict_resolutions c join personal_assignments p on p.id = c.personal_assignment_id
+            where c.member_id = any($1::uuid[]) and c.removed_at is null and p.removed_at is null
+            order by c.member_id`,
+          [[first.absent.id, second.id, third.id]],
+        );
+        expect(
+          decisions.map((row) => [row.member, row.link]).sort(),
+          `${slug}: the note ended a decision, or the equal shift covers twice`,
+        ).toEqual([[first.absent.id, offCover.id], [second.id, equalCover.id]].sort());
+        expect(equal[0]?.id, slug).toBeDefined();
+        const { rows: notices } = await client.query<{ recipient: string }>(
+          `select recipient_member_id::text as recipient from notification_outbox
+            where code = 'SCHEDULE_ASSIGNED' and recipient_member_id = any($1::uuid[])`,
+          [[offCover.id, equalCover.id]],
+        );
+        // The day off's cover is told once (the reused shift wrote nothing); the note alone changed no day.
+        expect(notices.map((row) => row.recipient), slug).toEqual([offCover.id]);
+      });
+    },
+  );
+
+  it.skipIf(noDatabase).each(FIXTURES)(
+    'supersedes a $fixture teamless decision made on another type (0038 null-safe)',
+    async ({ slug, admin }) => {
+      await inRolledBackTransaction(async (client) => {
+        const caller = await memberByUsername(client, slug, admin);
+        const organization = caller.organizationId;
+        const { absent, working, other, date } = await scene(client, organization, caller.authUserId);
+        const accept = (type: string) =>
+          client.query(
+            `insert into conflict_resolutions (organization_id, member_id, date, team_id, kind, shift_type_id)
+             values ($1, $2, $3::date, null, 'accept_uncovered', $4)`,
+            [organization, absent.id, date, type],
+          );
+
+        await actAs(client, caller.authUserId, organization);
+        await accept(other);
+        await accept(working);
+        await actAsOwner(client);
+
+        const { rows } = await client.query<{ type: string; live: boolean; by: string | null }>(
+          `select shift_type_id::text as type, removed_at is null as live, removed_by::text as by
+             from conflict_resolutions where member_id = $1 order by removed_at is null, created_at`,
+          [absent.id],
+        );
+        expect(rows, slug).toEqual([
+          { type: other, live: false, by: caller.authUserId },
+          { type: working, live: true, by: null },
+        ]);
+      });
+    },
+  );
+
+  it.skipIf(noDatabase).each(FIXTURES)(
+    'keeps one live $fixture decision per teamless key: a second direct acceptance is refused by the live key (NULLS NOT DISTINCT)',
+    async ({ slug, admin }) => {
+      await inRolledBackTransaction(async (client) => {
+        const caller = await memberByUsername(client, slug, admin);
+        const organization = caller.organizationId;
+        const { absent, working, date } = await scene(client, organization, caller.authUserId);
+        const accept = () =>
+          client.query(
+            `insert into conflict_resolutions (organization_id, member_id, date, team_id, kind, shift_type_id)
+             values ($1, $2, $3::date, null, 'accept_uncovered', $4)`,
+            [organization, absent.id, date, working],
+          );
+
+        await actAs(client, caller.authUserId, organization);
+        await accept();
+        const second = await refusedThenContinue(client, accept);
+        await actAsOwner(client);
+
+        expect(second.code, slug).toBe('23505');
+        const { rows } = await client.query<{ team: string | null; live: boolean }>(
+          'select team_id::text as team, removed_at is null as live from conflict_resolutions where member_id = $1',
+          [absent.id],
+        );
+        expect(rows, slug).toEqual([{ team: null, live: true }]);
       });
     },
   );

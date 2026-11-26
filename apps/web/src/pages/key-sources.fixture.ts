@@ -526,7 +526,8 @@ export const KEY_SOURCES = [
     // 107 SINCE STORY 21.6: a Personal Shift's `ručno` and `dodijeljeno ručno` on a row and on a coverage group, `bez tima` on a row and in a duty note.
     // 109 SINCE ITS REVIEW: a duty leg's `ručno` and `dodijeljeno ručno`.
     // 114 SINCE STORY 21.18: the holiday's calls — the shared mark's `blagdan {name}` and an emptied shift's `blagdan` (`holiday-mark.tsx`), and the admin week's head and cell label `blagdan {name}`, an emptied cell's `blagdan`, and its legend's word and key line.
-    strings: 114,
+    // 115 SINCE STORY 21.7: a teamless conflict's `bez tima` in *Treba tebe*.
+    strings: 115,
   },
   {
     // STORY 6.1a: today's three cases, the next shift's two headings, and
@@ -1286,7 +1287,8 @@ export const KEY_SOURCES = [
     // 128 SINCE STORY 21.25: the *Posao* filter's chip, ✕, picker, heading, *Svi poslovi*, *Bez posla*, count and result count (`manual-filters.tsx`).
     // 129 SINCE STORY 21.10: a row's source *osobna rotacija*.
     // 136 SINCE STORY 21.18: the holiday's calls — an emptied cell's value `blagdan` (the label and the phone's line), the label's `blagdan {name}` after the date, the shared date head's and mark's `blagdan {name}`, and the legend's word and key line.
-    strings: 136,
+    // 138 SINCE STORY 21.7: a cell's `odsutnost` and its legend line.
+    strings: 138,
   },
   {
     // STORY 21.4: the preview's shift and inert-override lines, and the save's refusals.
@@ -1350,7 +1352,8 @@ export const KEY_SOURCES = [
     // on Odlučeno its three outcomes (*Odobrena*, *Nije odobrena*,
     // *Zatvorena deaktivacijom*) and *Zamjena je naknadno izmijenjena u
     // kalendaru.*
-    strings: 48,
+    // 51 SINCE STORY 21.7: `bez tima` for a teamless conflict on Čeka odluku, on Odlučeno and in the status line.
+    strings: 51,
   },
   {
     // STORY 5.4b. On one conflict's screen, through `t('…')`: the way back
@@ -1378,7 +1381,8 @@ export const KEY_SOURCES = [
     name: 'the conflict resolution screen',
     file: RESOLUTION,
     keys: translationKeys,
-    strings: 40,
+    // 43 SINCE STORY 21.7: the accept card's sentence for a shift with no team, and `bez tima` in the facts and the coworkers line.
+    strings: 43,
   },
   {
     // STORY 5.4b: the facts line with and without times, who else works or
@@ -1402,7 +1406,8 @@ export const KEY_SOURCES = [
     name: 'the conflict resolution rules',
     file: RESOLUTION_SCREEN_KEYS,
     keys: messageKeyUnions,
-    strings: 26,
+    // 28 SINCE STORY 21.7: the coworkers line and its empty sentence for a shift with no team.
+    strings: 28,
   },
   {
     // STORY 9.4. On one leave request's decision screen, through `t('…')`:

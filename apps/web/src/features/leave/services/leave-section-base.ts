@@ -280,8 +280,15 @@ export function memberLeaveBaseOf(sources: MemberLeaveSources, memberId: string,
 
   const scheduled = snapshot.members.find((candidate) => candidate.id === memberId);
 
-  // STORY 18.5: a member with no team but a loan is scheduled on the loan's dates.
-  if (scheduled === undefined || (scheduled.memberships.length === 0 && scheduled.loans.length === 0)) {
+  // STORY 18.5: a member with no team but a loan is scheduled on the loan's dates. STORY 21.7: and one with
+  // no team but Personal Assignments or a schedule version (a student, a dispatcher), whose leave costs and collides.
+  if (
+    scheduled === undefined ||
+    (scheduled.memberships.length === 0 &&
+      scheduled.loans.length === 0 &&
+      scheduled.personalAssignments.length === 0 &&
+      scheduled.scheduleVersions.length === 0)
+  ) {
     return { kind: LEAVE_UNSCHEDULED };
   }
 

@@ -20,6 +20,7 @@ import {
   VIEWER_MEMBER,
   calendarPersonalAssignmentRow,
   holidayRow,
+  leaveRowOf,
   planningSnapshotOf,
   statusRow,
 } from '@/features/planning/planning.fixture';
@@ -34,6 +35,7 @@ import {
   MANUAL_STALE,
   MANUAL_TOO_MANY,
   NO_DRAFT,
+  NO_MANUAL_LEAVE,
   SOURCE_MANUAL,
   SOURCE_TEAM,
   draftAgainst,
@@ -44,6 +46,7 @@ import {
   draftWindowOf,
   draftWith,
   isWeekend,
+  manualLeaveOf,
   manualMonthOf,
   manualRoleFilterOf,
   movedOf,
@@ -77,6 +80,25 @@ function cellOf(month: ManualMonth, memberId: string, date: string) {
 
   return cell;
 }
+
+describe('the grid draws leave (story 21.7, deferred from 21.4)', () => {
+  const LEAVE = [leaveRowOf('00000000-0000-4000-8000-00000000f0a1', IVA, '2026-10-09', '2026-10-11')];
+
+  it('marks each date a live record of the member covers, over a shift or none, and no other cell', () => {
+    const month = manualMonthOf(planned, MONTH, TODAY, NO_DRAFT, manualLeaveOf(planned, LEAVE));
+
+    expect(cellOf(month, IVA, '2026-10-09')).toMatchObject({ onLeave: true, source: CELL_EMPTY });
+    expect(cellOf(month, IVA, '2026-10-10')).toMatchObject({ onLeave: true, source: CELL_ASSIGNED });
+    expect(cellOf(month, IVA, '2026-10-11').onLeave).toBe(false);
+    expect(cellOf(month, ANA, '2026-10-10').onLeave).toBe(false);
+  });
+
+  it('draws none while the leave is not known, or when its rows cannot be trusted', () => {
+    expect(manualLeaveOf(planned, undefined)).toBe(NO_MANUAL_LEAVE);
+    expect(manualLeaveOf(planned, [{ id: 'x', member_id: 'nobody', during: '[2026-10-09,2026-10-10)' }])).toBe(NO_MANUAL_LEAVE);
+    expect(cellOf(manualMonthOf(planned, MONTH, TODAY, NO_DRAFT), IVA, '2026-10-10').onLeave).toBe(false);
+  });
+});
 
 describe('the month as the grid draws it (UX-DR72, UX-DR73)', () => {
   it('groups the active members by their team as at the first date, in the teams order, no team last, by name inside', () => {

@@ -1,3 +1,4 @@
+import { teamParamOf } from '@/features/conflicts/services/conflicts-queue';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
@@ -10,7 +11,9 @@ import { useReplacementLinkRefresh } from '@/features/conflicts/hooks/use-replac
 import {
   OPTION_AMEND_LEAVE,
   OPTION_REPLACE_MEMBER,
+  REPLACE_BY_ASSIGNMENT,
   RESOLUTION_LOADING,
+  replaceWriteOf,
   RESOLUTION_READY,
   RESOLUTION_UNAVAILABLE,
   SAVE_FOCUS_CANDIDATES,
@@ -39,6 +42,8 @@ import {
   RESOLUTION_WRITE_TABLE,
   acceptUncovered,
   replaceMember,
+  resolveWithPersonalAssignment,
+  type ResolutionCoverRpc,
   type ResolutionInsertTable,
   type ResolutionReplaceRpc,
   type ResolutionWriteFailure,
@@ -314,7 +319,7 @@ export function useConflictResolution(params: ResolutionParams) {
 
     void navigate({
       to: '/za-odluku/$memberId/$date/$teamId',
-      params: { memberId: link.memberId, date: link.date, teamId: link.teamId },
+      params: { memberId: link.memberId, date: link.date, teamId: teamParamOf(link.teamId) },
     });
   }
 
@@ -382,6 +387,7 @@ export function useConflictResolution(params: ResolutionParams) {
       shiftTypeId: view.shiftTypeId,
     };
     const replacing = choice === OPTION_REPLACE_MEMBER && replacement !== null ? replacement : null;
+    const write = replaceWriteOf(view);
 
     saving.current = true;
     setPending(true);
@@ -398,15 +404,31 @@ export function useConflictResolution(params: ResolutionParams) {
               target,
               view.held,
             )
-          : await replaceMember(
-              supabaseClient() as unknown as ResolutionReplaceRpc,
-              {
-                ...target,
-                replacementId: replacing.id,
-                reason: replacementReasonOf(view.memberName),
-              },
-              view.held,
-            );
+          : write.form === REPLACE_BY_ASSIGNMENT
+            ? // STORY 21.7: a Personal Shift is covered by the replacement's own assignment (0081).
+              await resolveWithPersonalAssignment(
+                supabaseClient() as unknown as ResolutionCoverRpc,
+                [
+                  {
+                    memberId: target.memberId,
+                    date: target.date,
+                    teamId: target.teamId,
+                    shiftTypeId: target.shiftTypeId,
+                    replacementId: replacing.id,
+                  },
+                ],
+                view.held,
+              )
+            : await replaceMember(
+                supabaseClient() as unknown as ResolutionReplaceRpc,
+                {
+                  ...target,
+                  teamId: write.teamId,
+                  replacementId: replacing.id,
+                  reason: replacementReasonOf(view.memberName),
+                },
+                view.held,
+              );
 
       // A screen left meanwhile is not written to.
       if (!mounted.current) return;

@@ -1,6 +1,5 @@
 import {
   collisionsOf,
-  hasTeam,
   monthOf,
   unresolvedCollisionsOf,
   type Collision,
@@ -201,12 +200,12 @@ export function hoursLeaveOf(
 
     // THE SAME FUNNEL as the admin's (story 5.5d): a replacement that no
     // longer applies hides nothing, so a member's own *Sati* agrees. Story
-    // 21.1: with a team only, as `unresolvedOf` (story 21.7 reads the rest).
+    // 21.7: a collision with no team counts too, as in `unresolvedOf`.
     return {
       collisions: unresolvedCollisionsOf(
         collisionsOf(collisionInputOf(snapshot, records)),
         effectiveResolutionsOf(snapshot, resolutions),
-      ).filter(hasTeam),
+      ),
       leaveRecords: byMemberOf(records),
     };
   }
@@ -373,7 +372,7 @@ export function conflictCountIn(counts: ConflictCounts, memberId: string): numbe
 export function leaveShiftsOf(
   leaveKeys: readonly CollisionResolution[],
   memberId: string,
-): readonly { readonly date: string; readonly teamId: string }[] {
+): readonly { readonly date: string; readonly teamId: string | null }[] {
   return leaveKeys.filter((key) => key.memberId === memberId).map(({ date, teamId }) => ({ date, teamId }));
 }
 
