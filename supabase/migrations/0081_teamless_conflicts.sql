@@ -212,17 +212,17 @@ begin
      set personal_assignment_id = new.id,
          removed_by = null,
          removed_at = null
-    from public.personal_assignments old
-   where old.organization_id = new.organization_id
-     and old.member_id = new.member_id
-     and old.date = new.date
-     and old.id <> new.id
-     and old.removed_at = now()
-     and old.kind = new.kind
-     and old.shift_type_id is not distinct from new.shift_type_id
-     and old.team_id is not distinct from new.team_id
+    from public.personal_assignments removed
+   where removed.organization_id = new.organization_id
+     and removed.member_id = new.member_id
+     and removed.date = new.date
+     and removed.id <> new.id
+     and removed.removed_at = now()
+     and removed.kind = new.kind
+     and removed.shift_type_id is not distinct from new.shift_type_id
+     and removed.team_id is not distinct from new.team_id
      and c.organization_id = new.organization_id
-     and c.personal_assignment_id = old.id
+     and c.personal_assignment_id = removed.id
      and c.removed_at = now()
      and not exists (
        select 1

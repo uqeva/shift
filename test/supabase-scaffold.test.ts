@@ -7840,3 +7840,68 @@ describe('holidays are organization data (0080, story 21.16)', () => {
     expect(sql()).toContain('revoke execute on function private.member_schedule_inputs(uuid, date, date) from public, anon, authenticated, service_role;');
   });
 });
+
+// ------------------- story 21.7 CI: a plpgsql name never shadows a record or a column
+
+describe('a plpgsql function names nothing a trigger record or a column already names (story 21.7)', () => {
+  // CI run 1 of 21.7: 0081's relink trigger aliased `personal_assignments` as
+  // `old`, which in a trigger function is also the OLD record, so every write
+  // to the table failed with 42702 ("column reference "old.organization_id" is
+  // ambiguous"). No local check could see it: plpgsql resolves names only when
+  // the body first runs, and no migration is applied locally.
+  const sources = migrationNames()
+    .sort()
+    .map((name) => ({ name, text: stripLineComments(readFileSync(join(supabaseRoot, 'migrations', name), 'utf8')) }));
+
+  /** Every plpgsql function body (between its dollar quotes) with the function's name. */
+  function plpgsqlBodies(text: string): { readonly fn: string; readonly body: string }[] {
+    const bodies: { fn: string; body: string }[] = [];
+    const header = /create (?:or replace )?function ([\w.]+)\s*\(([\s\S]*?)\)\s*returns[\s\S]*?language plpgsql[\s\S]*?as \$(\w*)\$/gi;
+    for (let match = header.exec(text); match !== null; match = header.exec(text)) {
+      const tag = `$${match[3] ?? ''}$`;
+      const start = header.lastIndex;
+      const end = text.indexOf(tag, start);
+      if (end > start) bodies.push({ fn: match[1] ?? '', body: text.slice(start, end) });
+    }
+    return bodies;
+  }
+
+  it('never aliases a relation `old` or `new` inside a plpgsql body', () => {
+    const alias = /\b(?:from|join|update|using)\s+(?:only\s+)?[a-z_][\w.]*\s+(?:as\s+)?(old|new)\b/gi;
+    const offences = sources.flatMap(({ name, text }) =>
+      plpgsqlBodies(text).flatMap(({ fn, body }) => [...body.matchAll(alias)].map((found) => `${name} ${fn}: ${found[0]}`)),
+    );
+
+    expect(plpgsqlBodies(readFileSync(join(supabaseRoot, 'migrations', '0081_teamless_conflicts.sql'), 'utf8')).length).toBeGreaterThan(2);
+    expect(offences).toEqual([]);
+  });
+
+  it('declares no plpgsql variable from 0081 on that a table column names', () => {
+    const columns = new Set<string>();
+    const table = /create table (?:if not exists )?[\w.]+\s*\(([\s\S]*?)\n\);/gi;
+    const column = /^\s+([a-z_][a-z0-9_]*)\s+(?:uuid|text|date|timestamptz|integer|smallint|bigint|boolean|jsonb|daterange|numeric|time)\b/gim;
+    for (const { text } of sources) {
+      for (const definition of text.matchAll(table)) {
+        for (const found of (definition[1] ?? '').matchAll(column)) columns.add(found[1] ?? '');
+      }
+    }
+    for (const { text } of sources) {
+      for (const found of text.matchAll(/\badd column (?:if not exists )?([a-z_][a-z0-9_]*)\s+[a-z]/gi)) columns.add(found[1] ?? '');
+    }
+    expect(columns.has('organization_id') && columns.has('personal_assignment_id')).toBe(true);
+
+    const offences = sources
+      .filter(({ name }) => (MIGRATION_NAME.exec(name)?.[1] ?? '0000') >= '0081')
+      .flatMap(({ name, text }) =>
+        plpgsqlBodies(text).flatMap(({ fn, body }) => {
+          const declared = /^\s*declare\b([\s\S]*?)^\s*begin\b/im.exec(body)?.[1] ?? '';
+          return [...declared.matchAll(/^\s*([a-z_][a-z0-9_]*)\s+[a-z]/gim)]
+            .map((found) => found[1] ?? '')
+            .filter((variable) => columns.has(variable))
+            .map((variable) => `${name} ${fn}: ${variable}`);
+        }),
+      );
+
+    expect(offences).toEqual([]);
+  });
+});
