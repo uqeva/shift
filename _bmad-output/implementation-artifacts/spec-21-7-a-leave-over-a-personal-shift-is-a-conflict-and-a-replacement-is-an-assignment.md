@@ -93,6 +93,10 @@ Status: review, built, CI pending (no PR yet; branch `feat/21-7-teamless-conflic
 
 - The database job was green. e2e shard 4 failed `rucni-raspored.spec.ts` (story 21.7): after a teamless cover was saved, *Za odluku* showed no status line. The save landed, but `resolutionSavedOf`, which reads the decision back from router state, refused a saved fact whose `teamName` is `null`, so the queue had nothing to announce. Fixed: it reads `null` as no team, which the line then says as *bez tima*, and still refuses any other type. Unit tests in `teamless-conflicts.test.ts` round-trip a teamless replacement and a teamless acceptance through the state and pin the line's text with the cover's name. The flaky `answer-swap.spec.ts:165` in the same shard is outside this story.
 
+### 2026-11-26 — rebased onto 21.18/21.19 (`f0af532`, #382)
+
+- Conflicts resolved by keeping both sides: *Ručni raspored*'s cell carries 21.18's `holiday` and 21.7's `onLeave`; the day detail imports both; `resource-hygiene` holds both cell keys; `key-sources.fixture.ts` counts *Danas* 115 and *Ručni raspored* 138 (21.18's and 21.7's strings); `deferred-work.md` keeps both stories' sections. No migration from 21.18/21.19, so `0081` stays the next number. After the rebase: build, typecheck and lint clean; web 203 files, 7349 tests; ICS green; domain green (two digest tests timed out at 5 s under load in the full run and passed alone); the 35 DB-free root files, 5613 tests.
+
 ## Review Triage Log
 
 ### 2026-11-26 — Review pass 1
