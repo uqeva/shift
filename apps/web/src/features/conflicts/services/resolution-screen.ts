@@ -1302,7 +1302,8 @@ export function resolutionSavedOf(state: unknown): ResolutionSaved | null {
 
   if (
     typeof shiftTypeName !== 'string' ||
-    typeof teamName !== 'string' ||
+    // STORY 21.7: a teamless conflict's decision names no team (`null`, said *bez tima*).
+    (typeof teamName !== 'string' && teamName !== null) ||
     typeof dateShown !== 'string' ||
     typeof memberName !== 'string'
   ) {

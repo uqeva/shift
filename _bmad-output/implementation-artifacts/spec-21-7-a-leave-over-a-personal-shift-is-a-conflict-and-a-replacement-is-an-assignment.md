@@ -89,6 +89,10 @@ Status: review, built, CI pending (no PR yet; branch `feat/21-7-teamless-conflic
 
 - The Vitest database job failed the whole 21.7 block and 21.2's `save_personal_assignments` cases with 42702 `column reference "old.organization_id" is ambiguous`: `private.relink_resolution_to_assignment()` aliased `personal_assignments` as `old`, which in a trigger function is also the OLD record, and the trigger fires on every insert, so every save failed; e2e shard 4 failed downstream (the grid's save). Fixed in `0081` (never applied anywhere): the alias is `removed`. New DB-free guard in `test/supabase-scaffold.test.ts`: no plpgsql body in any migration aliases a relation `old` or `new`, and no plpgsql variable declared from 0081 on is named after a table column (both pass on every migration; the alias rule fails on the pushed `0081`).
 
+### 2026-11-26 — CI run 2 on the pushed branch (`1cf0051`)
+
+- The database job was green. e2e shard 4 failed `rucni-raspored.spec.ts` (story 21.7): after a teamless cover was saved, *Za odluku* showed no status line. The save landed, but `resolutionSavedOf`, which reads the decision back from router state, refused a saved fact whose `teamName` is `null`, so the queue had nothing to announce. Fixed: it reads `null` as no team, which the line then says as *bez tima*, and still refuses any other type. Unit tests in `teamless-conflicts.test.ts` round-trip a teamless replacement and a teamless acceptance through the state and pin the line's text with the cover's name. The flaky `answer-swap.spec.ts:165` in the same shard is outside this story.
+
 ## Review Triage Log
 
 ### 2026-11-26 — Review pass 1

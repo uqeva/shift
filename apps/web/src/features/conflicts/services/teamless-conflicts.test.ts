@@ -19,7 +19,10 @@ import {
   REPLACE_BY_OVERRIDE,
   RESOLUTION_READY,
   replaceWriteOf,
+  resolutionSavedLineOf,
+  resolutionSavedOf,
   resolutionScreenOf,
+  withResolutionSaved,
   type ResolutionSources,
   type ResolutionView,
 } from '@/features/conflicts/services/resolution-screen';
@@ -35,7 +38,7 @@ import { organizationLeaveRecordsOf } from '@/features/leave/services/leave-list
 import { LEAVE_HANDOFF_ORIGIN_STATE, leaveHandoffOriginOf } from '@/features/leave/services/leave-section-handoff';
 import { ANA, DAN, DAY_TEAM, DORA, IVA, NOC, leaveRowOf, planningSnapshotOf } from '@/features/planning/planning.fixture';
 import { calendarPersonalAssignmentRow, memberMembershipRow } from '@/features/rotation/rotation.fixture';
-import { initLocalization } from '@/lib/i18n';
+import { initLocalization, t } from '@/lib/i18n';
 
 type Row = Record<string, unknown>;
 
@@ -212,6 +215,35 @@ describe('a replacement by assignment (AD-4’s second form)', () => {
     });
 
     expect(collisionRowsOf(snapshot, [replacement])).toHaveLength(1);
+  });
+});
+
+describe('the queue announces a teamless decision (story 21.7, CI run 2)', () => {
+  it('carries a replacement with no team through the router state, and the status line names the cover and bez tima', () => {
+    const saved = {
+      kind: 'replace_member' as const,
+      shiftTypeName: 'Dan',
+      teamName: null,
+      dateShown: 'subota 10.10.2026',
+      memberName: 'Iva Ivić',
+      replacementName: 'Dora Dorić',
+    };
+    const read = resolutionSavedOf(withResolutionSaved({}, saved));
+
+    expect(read).toEqual(saved);
+    if (read === null) throw new Error('the saved decision did not survive the hand-off');
+
+    const line = resolutionSavedLineOf(read, t('kalendar.cell.noTeam'));
+
+    if (line.request || line.swap) throw new Error('a request or swap line');
+    expect(t(line.key, line.values)).toBe('Odluka je spremljena: Dan · bez tima · subota 10.10.2026 · Iva Ivić, zamjena: Dora Dorić.');
+  });
+
+  it('carries an acceptance with no team, and still refuses a team that is neither a name nor none', () => {
+    const accepted = { kind: 'accept_uncovered' as const, shiftTypeName: 'Dan', teamName: null, dateShown: 'subota 10.10.2026', memberName: 'Iva Ivić' };
+
+    expect(resolutionSavedOf(withResolutionSaved({}, accepted))).toEqual(accepted);
+    expect(resolutionSavedOf(withResolutionSaved({}, { ...accepted, teamName: 7 as unknown as null }))).toBeNull();
   });
 });
 
