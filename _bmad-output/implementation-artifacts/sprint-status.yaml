@@ -770,6 +770,7 @@ development_status:
   21-23-compact-toolbar-and-filters: review  # built, CI pending; founder request 2026-11-25; presentation only, after 21.3
   21-25-the-calendar-reads-like-paper-kalendar-kao-papir: review  # built, CI pending; feat/21-25-calendar-like-paper (no PR yet); founder request 2026-11-25; after 21.6, 21.9; no migration
   21-26-set-the-schedule-up-in-one-place: review  # built, CI pending; feat/21-26-setup-in-one-place, no PR yet; founder request 2026-11-26; no migration; after 21.10, 21.12, 21.17, 21.20, 21.23
+  21-27-emails-look-like-smjenko: review  # built, CI pending; feat/21-27-email-templates, no PR yet; founder request 2026-11-26; no migration
   epic-21-retrospective: optional
 action_items:
   - id: "epic-4-retro-item-1-fix-c1-a-sati-name-for-a-member-no-longe"

@@ -3,17 +3,55 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<meta name="x-apple-disable-message-reformatting">
 <title>Nova lozinka za Smjenko</title>
+<style>:root{color-scheme:light dark}@media (prefers-color-scheme:dark){.sk-page{background:#0a1020!important}.sk-card{background:#111a2e!important}.sk-text{color:#e2e8f0!important}.sk-muted{color:#94a3b8!important}.sk-link{color:#7cc0ff!important}.sk-button{background:#3fa0fa!important}.sk-button a{color:#0b1628!important}}</style>
 </head>
-<body style="margin:0;padding:24px 16px;background:#e8edf5;color:#18202b;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.5">
-<div style="max-width:520px;margin:0 auto;padding:24px;background:#ffffff;border-radius:12px">
-<h1 style="margin:0 0 16px;font-size:22px;line-height:1.3">Postavi novu lozinku</h1>
-<p style="margin:0 0 24px">Za račun u Smjenku s ovom adresom zatražena je nova lozinka.</p>
-<p style="margin:0 0 24px"><a href="{{ .SiteURL }}/potvrda?token_hash={{ .TokenHash }}&amp;type=recovery" style="display:inline-block;padding:12px 20px;background:#1f3a5f;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:bold">Postavi novu lozinku</a></p>
-<p style="margin:0 0 8px;font-size:14px">Ako gumb ne radi, otvori ovu poveznicu u pregledniku:</p>
-<p style="margin:0 0 24px;font-size:14px;word-break:break-all"><a href="{{ .SiteURL }}/potvrda?token_hash={{ .TokenHash }}&amp;type=recovery" style="color:#1f3a5f">{{ .SiteURL }}/potvrda?token_hash={{ .TokenHash }}&amp;type=recovery</a></p>
-<p style="margin:0 0 8px;font-size:14px">Poveznica vrijedi jedan sat i može se upotrijebiti jednom.</p>
-<p style="margin:0;font-size:14px">Ako zahtjev nije tvoj, zanemari ovu poruku. Lozinka ostaje ista.</p>
-</div>
+<body class="sk-page" style="margin:0;padding:0;background:#e8edf5">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all">Za račun u Smjenku s ovom adresom zatražena je nova lozinka.&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;</div>
+<table role="presentation" class="sk-page" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#e8edf5" style="background:#e8edf5">
+<tr>
+<td align="center" style="padding:24px 12px">
+<!--[if mso]><table role="presentation" width="600" align="center" cellspacing="0" cellpadding="0" border="0"><tr><td><![endif]-->
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:600px">
+<tr>
+<td style="padding:0 8px 16px">
+<table role="presentation" cellspacing="0" cellpadding="0" border="0">
+<tr>
+<td style="padding:0 12px 0 0;vertical-align:middle"><img src="{{ .SiteURL }}/email-mark.png" width="40" height="40" alt="Smjenko" style="display:block;width:40px;height:40px;border:0;border-radius:9px"></td>
+<td class="sk-text" aria-hidden="true" style="vertical-align:middle;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a;font-size:22px;line-height:28px;font-weight:600">Smjenko</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td class="sk-card" bgcolor="#ffffff" style="background:#ffffff;border-radius:12px;border-top:4px solid #3fa0fa;padding:28px 24px">
+<h1 class="sk-text" style="margin:0 0 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a;font-size:22px;line-height:30px;font-weight:700">Postavi novu lozinku</h1>
+<p class="sk-text" style="margin:0 0 24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a;font-size:16px;line-height:24px">Za račun u Smjenku s ovom adresom zatražena je nova lozinka.</p>
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 24px">
+<tr>
+<td class="sk-button" align="center" bgcolor="#2a4fae" style="border-radius:8px;background:#2a4fae;mso-padding-alt:12px 24px">
+<a href="{{ .SiteURL }}/potvrda?token_hash={{ .TokenHash }}&amp;type=recovery" style="display:inline-block;padding:12px 24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:20px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px">Postavi novu lozinku</a>
+</td>
+</tr>
+</table>
+<p class="sk-muted" style="margin:0 0 8px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:20px;color:#556275">Ako gumb ne radi, otvori ovu poveznicu:</p>
+<p style="margin:0 0 24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:20px;word-break:break-all"><a class="sk-link" href="{{ .SiteURL }}/potvrda?token_hash={{ .TokenHash }}&amp;type=recovery" style="color:#2a4fae">{{ .SiteURL }}/potvrda?token_hash={{ .TokenHash }}&amp;type=recovery</a></p>
+<p class="sk-muted" style="margin:0 0 8px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:20px;color:#556275">Poveznica vrijedi jedan sat i može se upotrijebiti jednom.</p>
+<p class="sk-muted" style="margin:0 0 8px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:20px;color:#556275">Ako zahtjev nije tvoj, zanemari ovu poruku. Lozinka ostaje ista.</p>
+</td>
+</tr>
+<tr>
+<td style="padding:16px 8px 0">
+<p class="sk-muted" style="margin:0 0 4px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:13px;line-height:18px;color:#556275">Ovu poruku primaš jer je za ovu adresu e-pošte zatražena radnja u Smjenku.</p>
+</td>
+</tr>
+</table>
+<!--[if mso]></td></tr></table><![endif]-->
+</td>
+</tr>
+</table>
 </body>
 </html>

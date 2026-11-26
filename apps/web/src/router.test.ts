@@ -197,7 +197,8 @@ describe("every notification email's link is a return target the sign-in follows
   }));
   // Every message, the two-way and half-day variants included (13.7b): a
   // variant links where its code's own message does.
-  const keys = Object.keys(OBAVIJESTI).filter((key): key is MessageKey => key !== 'footer');
+  // Story 21.27: `email` is the HTML part's own words, no message, as `footer` is.
+  const keys = Object.keys(OBAVIJESTI).filter((key): key is MessageKey => key !== 'footer' && key !== 'email');
   const variantPaths = keys.map((key) => ({ code: key, path: linkPathOf(key, { requestId: REQUEST }) }));
 
   it('derives a path for every code', () => {

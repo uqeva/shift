@@ -5,6 +5,9 @@
     "jsx": "react-jsx",
     "types": ["vite/client", "node"],
     "noEmit": true,
+    // Story 21.27: `src/lib/auth-email.ts` imports `./email-layout.ts` by its
+    // file name, so `scripts/auth-email-templates.mjs` can run it in Node.
+    "allowImportingTsExtensions": true,
     "declaration": false,
     "declarationMap": false,
     "paths": {

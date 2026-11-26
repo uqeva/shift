@@ -132,6 +132,8 @@ expect /favicon.svg 200 image/svg+xml no-cache
 # (nginx names it image/x-icon or image/vnd.microsoft.icon), never the shell.
 expect /favicon.ico 200 image/ no-cache
 expect /pwa-192x192.png 200 image/png no-cache
+# Story 21.27: the mark every email loads from the app origin, an image, never the shell.
+expect /email-mark.png 200 image/png no-cache
 # A missing asset is a plain 404, never index.html, and never immutable.
 expect /assets/nope.js 404 text/plain no-cache
 expect /assets/ 404 text/plain no-cache

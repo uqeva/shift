@@ -18,199 +18,262 @@
  * `reminders.notice`, on its own branch: every other code renders exactly as
  * before.
  *
- * Imports nothing, so Vitest asserts it in the node environment (AD-15).
+ * Story 21.27 (UX-DR85): each message is a `body` and an `action`, the
+ * button's label; the plain text and the push join them as before
+ * (`<body> <action>: <link>`). The footer is a `reason` (why the email came,
+ * naming the organization) and a `settings` line linking to `/obavijesti`.
+ * {@link renderEmail} also draws the HTML part, in `email-layout.ts`.
+ *
+ * Imports only `email-layout.ts`, which imports nothing, so Vitest asserts it
+ * in the node environment (AD-15).
  */
+
+import { EMAIL_MARK_FILE, emailHtml } from './email-layout.ts';
 
 export const OBAVIJESTI = {
   leaveRequestApproved: {
     subject: 'Zahtjev za odsutnost {startDate}–{endDate} je odobren',
-    body: '{organizationName}: tvoj zahtjev za odsutnost {startDate}–{endDate} je odobren. Pogledaj ga u aplikaciji: {link}',
+    body: '{organizationName}: tvoj zahtjev za odsutnost {startDate}–{endDate} je odobren.',
+    action: 'Otvori Godišnji',
   },
   leaveRequestApprovedHalfFirst: {
     subject: 'Zahtjev za odsutnost {startDate}–{endDate} (prvi dio smjene) je odobren',
-    body: '{organizationName}: tvoj zahtjev za odsutnost {startDate}–{endDate} (prvi dio smjene) je odobren. Pogledaj ga u aplikaciji: {link}',
+    body: '{organizationName}: tvoj zahtjev za odsutnost {startDate}–{endDate} (prvi dio smjene) je odobren.',
+    action: 'Otvori Godišnji',
   },
   leaveRequestApprovedHalfSecond: {
     subject: 'Zahtjev za odsutnost {startDate}–{endDate} (drugi dio smjene) je odobren',
-    body: '{organizationName}: tvoj zahtjev za odsutnost {startDate}–{endDate} (drugi dio smjene) je odobren. Pogledaj ga u aplikaciji: {link}',
+    body: '{organizationName}: tvoj zahtjev za odsutnost {startDate}–{endDate} (drugi dio smjene) je odobren.',
+    action: 'Otvori Godišnji',
   },
   leaveRequestRejected: {
     subject: 'Zahtjev za odsutnost {startDate}–{endDate} je odbijen',
-    body: '{organizationName}: tvoj zahtjev za odsutnost {startDate}–{endDate} je odbijen. Pogledaj ga u aplikaciji: {link}',
+    body: '{organizationName}: tvoj zahtjev za odsutnost {startDate}–{endDate} je odbijen.',
+    action: 'Otvori Godišnji',
   },
   leaveRequestRejectedHalfFirst: {
     subject: 'Zahtjev za odsutnost {startDate}–{endDate} (prvi dio smjene) je odbijen',
-    body: '{organizationName}: tvoj zahtjev za odsutnost {startDate}–{endDate} (prvi dio smjene) je odbijen. Pogledaj ga u aplikaciji: {link}',
+    body: '{organizationName}: tvoj zahtjev za odsutnost {startDate}–{endDate} (prvi dio smjene) je odbijen.',
+    action: 'Otvori Godišnji',
   },
   leaveRequestRejectedHalfSecond: {
     subject: 'Zahtjev za odsutnost {startDate}–{endDate} (drugi dio smjene) je odbijen',
-    body: '{organizationName}: tvoj zahtjev za odsutnost {startDate}–{endDate} (drugi dio smjene) je odbijen. Pogledaj ga u aplikaciji: {link}',
+    body: '{organizationName}: tvoj zahtjev za odsutnost {startDate}–{endDate} (drugi dio smjene) je odbijen.',
+    action: 'Otvori Godišnji',
   },
   leaveRecorded: {
     subject: 'Upisana ti je odsutnost {startDate}–{endDate}',
-    body: '{organizationName}: upisana ti je odsutnost {startDate}–{endDate}. Pogledaj je u aplikaciji: {link}',
+    body: '{organizationName}: upisana ti je odsutnost {startDate}–{endDate}.',
+    action: 'Otvori Godišnji',
   },
   leaveRecordedHalfFirst: {
     subject: 'Upisana ti je odsutnost {startDate}–{endDate} (prvi dio smjene)',
-    body: '{organizationName}: upisana ti je odsutnost {startDate}–{endDate} (prvi dio smjene). Pogledaj je u aplikaciji: {link}',
+    body: '{organizationName}: upisana ti je odsutnost {startDate}–{endDate} (prvi dio smjene).',
+    action: 'Otvori Godišnji',
   },
   leaveRecordedHalfSecond: {
     subject: 'Upisana ti je odsutnost {startDate}–{endDate} (drugi dio smjene)',
-    body: '{organizationName}: upisana ti je odsutnost {startDate}–{endDate} (drugi dio smjene). Pogledaj je u aplikaciji: {link}',
+    body: '{organizationName}: upisana ti je odsutnost {startDate}–{endDate} (drugi dio smjene).',
+    action: 'Otvori Godišnji',
   },
   leaveRecordChanged: {
     subject: 'Izmijenjena ti je odsutnost, sada {startDate}–{endDate}',
-    body: '{organizationName}: tvoja odsutnost izmijenjena je na {startDate}–{endDate}. Pogledaj je u aplikaciji: {link}',
+    body: '{organizationName}: tvoja odsutnost izmijenjena je na {startDate}–{endDate}.',
+    action: 'Otvori Godišnji',
   },
   leaveRecordChangedHalfFirst: {
     subject: 'Izmijenjena ti je odsutnost, sada {startDate}–{endDate} (prvi dio smjene)',
-    body: '{organizationName}: tvoja odsutnost izmijenjena je na {startDate}–{endDate} (prvi dio smjene). Pogledaj je u aplikaciji: {link}',
+    body: '{organizationName}: tvoja odsutnost izmijenjena je na {startDate}–{endDate} (prvi dio smjene).',
+    action: 'Otvori Godišnji',
   },
   leaveRecordChangedHalfSecond: {
     subject: 'Izmijenjena ti je odsutnost, sada {startDate}–{endDate} (drugi dio smjene)',
-    body: '{organizationName}: tvoja odsutnost izmijenjena je na {startDate}–{endDate} (drugi dio smjene). Pogledaj je u aplikaciji: {link}',
+    body: '{organizationName}: tvoja odsutnost izmijenjena je na {startDate}–{endDate} (drugi dio smjene).',
+    action: 'Otvori Godišnji',
   },
   leaveRecordRemoved: {
     subject: 'Uklonjena ti je odsutnost {startDate}–{endDate}',
-    body: '{organizationName}: uklonjena ti je odsutnost {startDate}–{endDate}. Pogledaj u aplikaciji: {link}',
+    body: '{organizationName}: uklonjena ti je odsutnost {startDate}–{endDate}.',
+    action: 'Otvori Godišnji',
   },
   leaveRecordRemovedHalfFirst: {
     subject: 'Uklonjena ti je odsutnost {startDate}–{endDate} (prvi dio smjene)',
-    body: '{organizationName}: uklonjena ti je odsutnost {startDate}–{endDate} (prvi dio smjene). Pogledaj u aplikaciji: {link}',
+    body: '{organizationName}: uklonjena ti je odsutnost {startDate}–{endDate} (prvi dio smjene).',
+    action: 'Otvori Godišnji',
   },
   leaveRecordRemovedHalfSecond: {
     subject: 'Uklonjena ti je odsutnost {startDate}–{endDate} (drugi dio smjene)',
-    body: '{organizationName}: uklonjena ti je odsutnost {startDate}–{endDate} (drugi dio smjene). Pogledaj u aplikaciji: {link}',
+    body: '{organizationName}: uklonjena ti je odsutnost {startDate}–{endDate} (drugi dio smjene).',
+    action: 'Otvori Godišnji',
   },
   rosterPutOn: {
     subject: 'Promjena rasporeda {date}: na rasporedu si',
-    body: '{organizationName}: upisana je promjena rasporeda koja te stavlja na raspored {date}. Pogledaj kalendar: {link}',
+    body: '{organizationName}: upisana je promjena rasporeda koja te stavlja na raspored {date}.',
+    action: 'Otvori kalendar',
   },
   rosterPutOnChanged: {
     subject: 'Izmijenjena promjena rasporeda {date}',
-    body: '{organizationName}: izmijenjena je promjena rasporeda koja te stavlja na raspored {date}. Pogledaj kalendar: {link}',
+    body: '{organizationName}: izmijenjena je promjena rasporeda koja te stavlja na raspored {date}.',
+    action: 'Otvori kalendar',
   },
   rosterPutOnRemoved: {
     subject: 'Uklonjena promjena rasporeda {date}',
-    body: '{organizationName}: uklonjena je promjena rasporeda koja te stavila na raspored {date}. Pogledaj kalendar: {link}',
+    body: '{organizationName}: uklonjena je promjena rasporeda koja te stavila na raspored {date}.',
+    action: 'Otvori kalendar',
   },
   rosterTakenOff: {
     subject: 'Promjena rasporeda {date}: nisi na rasporedu',
-    body: '{organizationName}: upisana je promjena rasporeda koja te miče s rasporeda {date}. Pogledaj kalendar: {link}',
+    body: '{organizationName}: upisana je promjena rasporeda koja te miče s rasporeda {date}.',
+    action: 'Otvori kalendar',
   },
   rosterTakenOffChanged: {
     subject: 'Izmijenjena promjena rasporeda {date}',
-    body: '{organizationName}: izmijenjena je promjena rasporeda koja te miče s rasporeda {date}. Pogledaj kalendar: {link}',
+    body: '{organizationName}: izmijenjena je promjena rasporeda koja te miče s rasporeda {date}.',
+    action: 'Otvori kalendar',
   },
   rosterTakenOffRemoved: {
     subject: 'Uklonjena promjena rasporeda {date}',
-    body: '{organizationName}: uklonjena je promjena rasporeda koja te maknula s rasporeda {date}. Pogledaj kalendar: {link}',
+    body: '{organizationName}: uklonjena je promjena rasporeda koja te maknula s rasporeda {date}.',
+    action: 'Otvori kalendar',
   },
   teamShiftTypeSet: {
     subject: 'Promjena rasporeda {date}',
-    body: '{organizationName}: za {date} vrijedi {shiftTypeName} umjesto rasporeda po rotaciji. Pogledaj kalendar: {link}',
+    body: '{organizationName}: za {date} vrijedi {shiftTypeName} umjesto rasporeda po rotaciji.',
+    action: 'Otvori kalendar',
   },
   teamShiftTypeChanged: {
     subject: 'Izmijenjena promjena rasporeda {date}',
-    body: '{organizationName}: za {date} sada vrijedi {shiftTypeName} umjesto rasporeda po rotaciji. Pogledaj kalendar: {link}',
+    body: '{organizationName}: za {date} sada vrijedi {shiftTypeName} umjesto rasporeda po rotaciji.',
+    action: 'Otvori kalendar',
   },
   teamShiftTypeRemoved: {
     subject: 'Uklonjena promjena rasporeda {date}',
-    body: '{organizationName}: za {date} ponovno vrijedi raspored po rotaciji. Pogledaj kalendar: {link}',
+    body: '{organizationName}: za {date} ponovno vrijedi raspored po rotaciji.',
+    action: 'Otvori kalendar',
   },
   rotationChanges: {
     subject: 'Nova rotacija od {effectiveFrom}',
-    body: '{organizationName}: od {effectiveFrom} vrijedi nova rotacija. Pogledaj kalendar: {link}',
+    body: '{organizationName}: od {effectiveFrom} vrijedi nova rotacija.',
+    action: 'Otvori kalendar',
   },
   rotationChangeCancelled: {
     subject: 'Otkazana promjena rotacije od {effectiveFrom}',
-    body: '{organizationName}: promjena rotacije zakazana od {effectiveFrom} je otkazana. Pogledaj kalendar: {link}',
+    body: '{organizationName}: promjena rotacije zakazana od {effectiveFrom} je otkazana.',
+    action: 'Otvori kalendar',
   },
   leaveRequestCreated: {
     subject: 'Novi zahtjev za odsutnost: {memberName}',
-    body: '{organizationName}: {memberName} traži odsutnost {startDate}–{endDate}. Zahtjev čeka tvoju odluku: {link}',
+    body: '{organizationName}: {memberName} traži odsutnost {startDate}–{endDate}.',
+    action: 'Odluči o zahtjevu',
   },
   leaveRequestCreatedHalfFirst: {
     subject: 'Novi zahtjev za odsutnost: {memberName}',
-    body: '{organizationName}: {memberName} traži odsutnost {startDate}–{endDate} (prvi dio smjene). Zahtjev čeka tvoju odluku: {link}',
+    body: '{organizationName}: {memberName} traži odsutnost {startDate}–{endDate} (prvi dio smjene).',
+    action: 'Odluči o zahtjevu',
   },
   leaveRequestCreatedHalfSecond: {
     subject: 'Novi zahtjev za odsutnost: {memberName}',
-    body: '{organizationName}: {memberName} traži odsutnost {startDate}–{endDate} (drugi dio smjene). Zahtjev čeka tvoju odluku: {link}',
+    body: '{organizationName}: {memberName} traži odsutnost {startDate}–{endDate} (drugi dio smjene).',
+    action: 'Odluči o zahtjevu',
   },
   swapRequestProposed: {
     subject: 'Predložena ti je zamjena {date}',
-    body: '{organizationName}: predložena ti je zamjena smjene {date}. Odgovori u aplikaciji: {link}',
+    body: '{organizationName}: predložena ti je zamjena smjene {date}.',
+    action: 'Odgovori na prijedlog',
   },
   swapRequestProposedWithReturn: {
     subject: 'Predložena ti je zamjena {date} (zauzvrat {returnDate})',
-    body: '{organizationName}: predložena ti je zamjena smjene {date} (zauzvrat {returnDate}). Odgovori u aplikaciji: {link}',
+    body: '{organizationName}: predložena ti je zamjena smjene {date} (zauzvrat {returnDate}).',
+    action: 'Odgovori na prijedlog',
   },
   swapRequestAccepted: {
     subject: 'Zamjena {date} je prihvaćena',
-    body: '{organizationName}: tvoj prijedlog zamjene smjene {date} je prihvaćen i čeka odluku. Pogledaj u aplikaciji: {link}',
+    body: '{organizationName}: tvoj prijedlog zamjene smjene {date} je prihvaćen i čeka odluku.',
+    action: 'Pogledaj zamjenu',
   },
   swapRequestAcceptedWithReturn: {
     subject: 'Zamjena {date} (zauzvrat {returnDate}) je prihvaćena',
-    body: '{organizationName}: tvoj prijedlog zamjene smjene {date} (zauzvrat {returnDate}) je prihvaćen i čeka odluku. Pogledaj u aplikaciji: {link}',
+    body: '{organizationName}: tvoj prijedlog zamjene smjene {date} (zauzvrat {returnDate}) je prihvaćen i čeka odluku.',
+    action: 'Pogledaj zamjenu',
   },
   swapRequestDeclined: {
     subject: 'Zamjena {date} je odbijena',
-    body: '{organizationName}: tvoj prijedlog zamjene smjene {date} je odbijen. Pogledaj u aplikaciji: {link}',
+    body: '{organizationName}: tvoj prijedlog zamjene smjene {date} je odbijen.',
+    action: 'Pogledaj zamjenu',
   },
   swapRequestDeclinedWithReturn: {
     subject: 'Zamjena {date} (zauzvrat {returnDate}) je odbijena',
-    body: '{organizationName}: tvoj prijedlog zamjene smjene {date} (zauzvrat {returnDate}) je odbijen. Pogledaj u aplikaciji: {link}',
+    body: '{organizationName}: tvoj prijedlog zamjene smjene {date} (zauzvrat {returnDate}) je odbijen.',
+    action: 'Pogledaj zamjenu',
   },
   swapRequestWaiting: {
     subject: 'Nova zamjena za odluku: {proposerName} → {addresseeName}',
-    body: '{organizationName}: zamjena smjene {date}, {proposerName} → {addresseeName}. Čeka tvoju odluku: {link}',
+    body: '{organizationName}: zamjena smjene {date}, {proposerName} → {addresseeName}.',
+    action: 'Odluči o zamjeni',
   },
   swapRequestApproved: {
     subject: 'Zamjena {date} je odobrena',
-    body: '{organizationName}: zamjena smjene {date} je odobrena. Pogledaj u aplikaciji: {link}',
+    body: '{organizationName}: zamjena smjene {date} je odobrena.',
+    action: 'Pogledaj zamjenu',
   },
   swapRequestApprovedWithReturn: {
     subject: 'Zamjena {date} (zauzvrat {returnDate}) je odobrena',
-    body: '{organizationName}: zamjena smjene {date} (zauzvrat {returnDate}) je odobrena. Pogledaj u aplikaciji: {link}',
+    body: '{organizationName}: zamjena smjene {date} (zauzvrat {returnDate}) je odobrena.',
+    action: 'Pogledaj zamjenu',
   },
   swapRequestRejected: {
     subject: 'Zamjena {date} nije odobrena',
-    body: '{organizationName}: zamjena smjene {date} nije odobrena. Pogledaj u aplikaciji: {link}',
+    body: '{organizationName}: zamjena smjene {date} nije odobrena.',
+    action: 'Pogledaj zamjenu',
   },
   swapRequestRejectedWithReturn: {
     subject: 'Zamjena {date} (zauzvrat {returnDate}) nije odobrena',
-    body: '{organizationName}: zamjena smjene {date} (zauzvrat {returnDate}) nije odobrena. Pogledaj u aplikaciji: {link}',
+    body: '{organizationName}: zamjena smjene {date} (zauzvrat {returnDate}) nije odobrena.',
+    action: 'Pogledaj zamjenu',
   },
   loanMade: {
     subject: 'Od {startDate} do {endDate} radiš u timu {teamName}',
-    body: '{organizationName}: od {startDate} do {endDate} radiš u timu {teamName}. Pogledaj kalendar: {link}',
+    body: '{organizationName}: od {startDate} do {endDate} radiš u timu {teamName}.',
+    action: 'Otvori kalendar',
   },
   loanChanged: {
     subject: 'Posudba je izmijenjena: od {startDate} do {endDate} radiš u timu {teamName}',
-    body: '{organizationName}: tvoja posudba je izmijenjena. Od {startDate} do {endDate} radiš u timu {teamName}. Pogledaj kalendar: {link}',
+    body: '{organizationName}: tvoja posudba je izmijenjena. Od {startDate} do {endDate} radiš u timu {teamName}.',
+    action: 'Otvori kalendar',
   },
   loanRemoved: {
     subject: 'Posudba u timu {teamName} je uklonjena',
-    body: '{organizationName}: posudba u timu {teamName} od {startDate} do {endDate} je uklonjena. Pogledaj kalendar: {link}',
+    body: '{organizationName}: posudba u timu {teamName} od {startDate} do {endDate} je uklonjena.',
+    action: 'Otvori kalendar',
   },
   scheduleAssigned: {
     subject: 'Raspored ti je izmijenjen od {from} do {to}',
-    body: '{organizationName}: raspored ti je izmijenjen od {from} do {to} (izmijenjenih dana: {days}). Pogledaj kalendar: {link}',
+    body: '{organizationName}: raspored ti je izmijenjen od {from} do {to} (izmijenjenih dana: {days}).',
+    action: 'Otvori kalendar',
   },
   scheduleSourceTeam: {
     subject: 'Od {effectiveFrom} radiš po rotaciji tima',
-    body: '{organizationName}: od {effectiveFrom} raspored ti slijedi rotaciju tima u kojem si. Pogledaj kalendar: {link}',
+    body: '{organizationName}: od {effectiveFrom} raspored ti slijedi rotaciju tima u kojem si.',
+    action: 'Otvori kalendar',
   },
   scheduleSourcePersonal: {
     subject: 'Od {effectiveFrom} radiš po osobnoj rotaciji',
-    body: '{organizationName}: od {effectiveFrom} radiš po svojoj osobnoj rotaciji, neovisno o rotaciji tima. Pogledaj kalendar: {link}',
+    body: '{organizationName}: od {effectiveFrom} radiš po svojoj osobnoj rotaciji, neovisno o rotaciji tima.',
+    action: 'Otvori kalendar',
   },
   scheduleSourceManual: {
     subject: 'Od {effectiveFrom} raspored ti se slaže ručno',
-    body: '{organizationName}: od {effectiveFrom} radiš samo dane koje ti administrator dodijeli u rasporedu. Pogledaj kalendar: {link}',
+    body: '{organizationName}: od {effectiveFrom} radiš samo dane koje ti administrator dodijeli u rasporedu.',
+    action: 'Otvori kalendar',
   },
-  footer: 'Obavijesti e-poštom možeš isključiti u aplikaciji, pod Obavijesti: {link}',
+  footer: {
+    reason: 'Ovu poruku primaš jer su ti u organizaciji {organizationName} uključene obavijesti e-poštom.',
+    settings: 'Obavijesti e-poštom isključuješ u aplikaciji, pod Obavijesti',
+  },
+  email: {
+    brand: 'Smjenko',
+    fallback: 'Ako gumb ne radi, otvori ovu poveznicu:',
+  },
 } as const;
 
 /**
@@ -224,21 +287,28 @@ export const OBAVIJESTI = {
 export const PODSJETNICI = {
   hours: {
     subject: 'Za {leadHours} h radiš: {shiftTypeName} {start}–{end}, {teamName}',
-    body: '{organizationName}: za {leadHours} h, {date}, radiš: {shiftTypeName} {start}–{end}, {teamName}. Pogledaj dan u kalendaru: {link}',
+    body: '{organizationName}: za {leadHours} h, {date}, radiš: {shiftTypeName} {start}–{end}, {teamName}.',
+    action: 'Otvori dan u kalendaru',
   },
   eveningBefore: {
     subject: 'Sutra radiš: {shiftTypeName} {start}–{end}, {teamName}',
-    body: '{organizationName}: sutra, {date}, radiš: {shiftTypeName} {start}–{end}, {teamName}. Pogledaj dan u kalendaru: {link}',
+    body: '{organizationName}: sutra, {date}, radiš: {shiftTypeName} {start}–{end}, {teamName}.',
+    action: 'Otvori dan u kalendaru',
   },
   hoursNoTeam: {
     subject: 'Za {leadHours} h radiš: {shiftTypeName} {start}–{end}',
-    body: '{organizationName}: za {leadHours} h, {date}, radiš: {shiftTypeName} {start}–{end}. Pogledaj dan u kalendaru: {link}',
+    body: '{organizationName}: za {leadHours} h, {date}, radiš: {shiftTypeName} {start}–{end}.',
+    action: 'Otvori dan u kalendaru',
   },
   eveningBeforeNoTeam: {
     subject: 'Sutra radiš: {shiftTypeName} {start}–{end}',
-    body: '{organizationName}: sutra, {date}, radiš: {shiftTypeName} {start}–{end}. Pogledaj dan u kalendaru: {link}',
+    body: '{organizationName}: sutra, {date}, radiš: {shiftTypeName} {start}–{end}.',
+    action: 'Otvori dan u kalendaru',
   },
-  footer: 'Podsjetnike e-poštom možeš isključiti u aplikaciji, pod Obavijesti → Podsjetnici: {link}',
+  footer: {
+    reason: 'Ovaj podsjetnik primaš jer su ti u organizaciji {organizationName} uključeni podsjetnici e-poštom.',
+    settings: 'Podsjetnike e-poštom isključuješ u aplikaciji, pod Obavijesti → Podsjetnici',
+  },
 } as const;
 
 /** The code `remind` writes (0070), rendered from {@link PODSJETNICI}. */
@@ -296,10 +366,11 @@ export const REMINDER_NO_TEAM_VARIANT_OF: Readonly<Record<'hours' | 'eveningBefo
 };
 
 /**
- * A message an outbox code renders with. `footer` is not one: it is the line
- * every email ends with (story 10.3), linking to the settings.
+ * A message an outbox code renders with. `footer` is not one: it is the lines
+ * every email ends with (story 10.3), linking to the settings; nor is `email`,
+ * the HTML part's own words (story 21.27).
  */
-export type MessageKey = Exclude<keyof typeof OBAVIJESTI, 'footer'>;
+export type MessageKey = Exclude<keyof typeof OBAVIJESTI, 'footer' | 'email'>;
 
 /** The surface the footer links to: the member's own notification settings. */
 export const SETTINGS_PATH = '/obavijesti';
@@ -574,6 +645,16 @@ export function formatIsoDate(isoDate: string): string | null {
   return valid ? `${day}.${month}.${year}` : null;
 }
 
+/**
+ * Story 21.27: the language a message renders in, as `compose` resolves it:
+ * the locale's own when there is a resource for it, else the fallback. One
+ * resource table decides for the email's own words and the reminder alike:
+ * both hold Croatian alone, and a language added to one is added to both.
+ */
+function renderedLanguageOf(language: string): string {
+  return Object.hasOwn(MESSAGES_BY_LANGUAGE, language) ? language : FALLBACK_LANGUAGE;
+}
+
 /** The language subtag of a BCP 47 tag, lowercased: `hr-HR` → `hr`. */
 function languageOf(locale: string | null): string {
   return (locale ?? '').split('-')[0]?.trim().toLowerCase() ?? '';
@@ -611,10 +692,19 @@ type Composed =
   | {
       readonly ok: true;
       readonly subject: string;
+      /** The message, without its link. */
       readonly body: string;
+      /** The button's label; the text says it before the link. */
+      readonly action: string;
       readonly link: string;
       readonly linkPath: string;
-      readonly footer: string;
+      /** Why the email came, naming the organization. */
+      readonly reason: string;
+      /** Where email is turned off; the text says it before the settings link. */
+      readonly settings: string;
+      readonly settingsLink: string;
+      /** Story 21.27: the language the message was rendered in, which the HTML part's own words follow. */
+      readonly language: string;
     }
   | { readonly ok: false; readonly code: typeof MESSAGE_UNKNOWN | typeof OPERANDS_INVALID };
 
@@ -689,10 +779,22 @@ function compose(code: string, locale: string | null, operands: unknown, target:
   const message = messages[key];
   const subject = interpolate(message.subject, values);
   const body = interpolate(message.body, values);
-  const footer = interpolate(messages.footer, { link: linkOf(target.appUrl, slug, SETTINGS_PATH) });
-  if (subject === null || body === null || footer === null) return { ok: false, code: OPERANDS_INVALID };
+  const action = interpolate(message.action, values);
+  const reason = interpolate(messages.footer.reason, { organizationName });
+  if (subject === null || body === null || action === null || reason === null) return { ok: false, code: OPERANDS_INVALID };
 
-  return { ok: true, subject, body, link, linkPath: signInPathOf(slug, path), footer };
+  return {
+    ok: true,
+    subject,
+    body,
+    action,
+    link,
+    linkPath: signInPathOf(slug, path),
+    reason,
+    settings: messages.footer.settings,
+    settingsLink: linkOf(target.appUrl, slug, SETTINGS_PATH),
+    language: renderedLanguageOf(language),
+  };
 }
 
 /**
@@ -746,23 +848,80 @@ function composeReminder(
   const message = reminders[key];
   const subject = interpolate(message.subject, values);
   const body = interpolate(message.body, values);
-  const footer = interpolate(reminders.footer, { link: linkOf(appUrl, slug, SETTINGS_PATH) });
-  if (subject === null || body === null || footer === null) return { ok: false, code: OPERANDS_INVALID };
+  const action = interpolate(message.action, values);
+  const reason = interpolate(reminders.footer.reason, { organizationName });
+  if (subject === null || body === null || action === null || reason === null) return { ok: false, code: OPERANDS_INVALID };
 
-  return { ok: true, subject, body, link, linkPath: signInPathOf(slug, path), footer };
+  return {
+    ok: true,
+    subject,
+    body,
+    action,
+    link,
+    linkPath: signInPathOf(slug, path),
+    reason,
+    settings: reminders.footer.settings,
+    settingsLink: linkOf(appUrl, slug, SETTINGS_PATH),
+    language: renderedLanguageOf(language),
+  };
 }
 
 /**
  * One outbox row's email, in the organization's language, naming the
  * organization and linking through its sign-in route to the surface. Every
- * body ends with the footer line, linking the same way to `/obavijesti`,
- * where the member turns email off (story 10.3).
+ * body ends with the footer (story 10.3; its reason since 21.27), linking the
+ * same way to `/obavijesti`, where the member turns email off. This is the
+ * plain-text part; {@link renderEmail} adds the HTML.
  */
 export function render(code: string, locale: string | null, operands: unknown, target: RenderTarget): Rendered {
   const composed = compose(code, locale, operands, target);
   if (!composed.ok) return composed;
 
-  return { ok: true, subject: composed.subject, text: `${composed.body}\n\n${composed.footer}` };
+  return { ok: true, subject: composed.subject, text: textOf(composed) };
+}
+
+/** The message and its link, on one line: the plain text's first paragraph and the push's body. */
+function messageLineOf(composed: Extract<Composed, { ok: true }>): string {
+  return `${composed.body} ${composed.action}: ${composed.link}`;
+}
+
+/** The plain-text part: the message line, then the footer's two lines. */
+function textOf(composed: Extract<Composed, { ok: true }>): string {
+  return `${messageLineOf(composed)}\n\n${composed.reason}\n${composed.settings}: ${composed.settingsLink}`;
+}
+
+export type RenderedEmail =
+  | { readonly ok: true; readonly subject: string; readonly text: string; readonly html: string }
+  | { readonly ok: false; readonly code: typeof MESSAGE_UNKNOWN | typeof OPERANDS_INVALID };
+
+/**
+ * Story 21.27 (UX-DR85): one outbox row's email with both parts, the plain
+ * text {@link render} returns and the HTML drawn in `email-layout.ts`: the
+ * mark from `<appUrl>/email-mark.png`, the subject as the heading, the
+ * message, the action as the button to the same sign-in link, and the footer
+ * (the reason, then the settings line as a link). Every text is escaped by
+ * the layout; nothing here writes HTML.
+ */
+export function renderEmail(code: string, locale: string | null, operands: unknown, target: RenderTarget): RenderedEmail {
+  const composed = compose(code, locale, operands, target);
+  if (!composed.ok) return composed;
+
+  // The words around the message follow the language it was rendered in.
+  const messages = MESSAGES_BY_LANGUAGE[composed.language] ?? OBAVIJESTI;
+  const html = emailHtml({
+    lang: composed.language,
+    title: composed.subject,
+    preheader: composed.body,
+    brand: messages.email.brand,
+    markUrl: `${target.appUrl.replace(/\/+$/, '')}/${EMAIL_MARK_FILE}`,
+    heading: composed.subject,
+    paragraphs: [composed.body],
+    action: { label: composed.action, href: composed.link },
+    fallback: messages.email.fallback,
+    notes: [],
+    footer: { lines: [composed.reason], link: { label: composed.settings, href: composed.settingsLink } },
+  });
+  return { ok: true, subject: composed.subject, text: textOf(composed), html };
 }
 
 /**
@@ -774,5 +933,5 @@ export function renderPush(code: string, locale: string | null, operands: unknow
   const composed = compose(code, locale, operands, target);
   if (!composed.ok) return composed;
 
-  return { ok: true, title: composed.subject, body: composed.body, url: composed.linkPath };
+  return { ok: true, title: composed.subject, body: messageLineOf(composed), url: composed.linkPath };
 }

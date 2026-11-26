@@ -23,7 +23,7 @@ import {
   type Delivery,
   type Fetch,
 } from './handler.ts';
-import { render } from './messages.ts';
+import { renderEmail } from './messages.ts';
 
 /**
  * A provider answer, as a delivery. 2xx is sent; 401 and 403 stop the run's email;
@@ -46,7 +46,7 @@ export async function deliverEmail(row: ClaimedNotification, configuration: Conf
   // TRANSIENT, not permanent: a code this deployment cannot render yet is
   // most likely one a newer migration writes before the newer function is
   // deployed. The backoff gives the deploy time; five misses fail the row.
-  const rendered = render(row.code, row.locale, row.operands, {
+  const rendered = renderEmail(row.code, row.locale, row.operands, {
     appUrl: configuration.appUrl,
     slug: row.slug,
     organizationName: row.organization_name,
@@ -70,7 +70,9 @@ export async function deliverEmail(row: ClaimedNotification, configuration: Conf
         from: configuration.emailFrom,
         to: [address],
         subject: rendered.subject,
+        // Story 21.27: both parts, the same message, link and footer.
         text: rendered.text,
+        html: rendered.html,
       }),
       signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
     });

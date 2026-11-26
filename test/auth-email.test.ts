@@ -57,7 +57,8 @@ describe('the Auth email templates (story 19.1)', () => {
       const html = built[index]?.html ?? '';
       const text = copy.templates[key];
       expect(html).toContain('<html lang="hr">');
-      for (const message of [text.subject, text.heading, text.body, text.action, text.ignore, copy.expiry, copy.fallback]) {
+      // Story 21.27: the footer's reason and the brand (the mark's alt, the wordmark) too.
+      for (const message of [text.subject, text.heading, text.body, text.action, text.ignore, copy.expiry, copy.fallback, copy.reason, copy.brand]) {
         expect(html, `${key} lacks ${message}`).toContain(escapeHtml(message));
       }
     }
@@ -70,12 +71,13 @@ describe('the Auth email templates (story 19.1)', () => {
     const read = [
       'signup.email.expiry',
       'signup.email.fallback',
+      'signup.email.reason',
       ...AUTH_EMAIL_TEMPLATES.flatMap(({ key }) =>
         Object.keys(copy.templates[key]).map((field) => `signup.email.${key}.${field}`),
       ),
     ].sort();
     expect(leafKeys(resource).filter((key) => key.startsWith('signup.email.')).sort()).toEqual(read);
-    expect(read).toHaveLength(17);
+    expect(read).toHaveLength(18);
   });
 
   it('links every mail to /potvrda with a token_hash and its own type, and to nothing else (AD-12)', () => {
@@ -90,11 +92,19 @@ describe('the Auth email templates (story 19.1)', () => {
       for (const link of links) {
         expect(link, file).toBe(`{{ .SiteURL }}/potvrda?token_hash={{ .TokenHash }}&amp;type=${types[file] ?? ''}`);
       }
-      // No GET on /auth/v1/verify, no session token, no remote resource.
+      // No GET on /auth/v1/verify, no session token.
       expect(html, file).not.toContain('ConfirmationURL');
       expect(html, file).not.toMatch(/\/auth\/v1\/|access_token|refresh_token/);
-      expect(html, file).not.toMatch(/<img|<script|<link|src=|url\(/i);
       expect(html, file).toContain('token_hash');
+      // Story 21.27: one remote resource only, the mark on the app origin
+      // GoTrue's SiteURL names: no query, the same for every recipient, with
+      // an alt and fixed dimensions. No script, stylesheet link, font or
+      // `url(`, so nothing else is fetched and nothing tracks.
+      expect([...html.matchAll(/<img\b[^>]*>/gi)].map((match) => match[0])).toEqual([
+        '<img src="{{ .SiteURL }}/email-mark.png" width="40" height="40" alt="Smjenko" style="display:block;width:40px;height:40px;border:0;border-radius:9px">',
+      ]);
+      expect([...html.matchAll(/\bsrc=/gi)]).toHaveLength(1);
+      expect(html, file).not.toMatch(/<script|<link|<iframe|<object|url\(|@import|@font-face|data:/i);
     }
   });
 
