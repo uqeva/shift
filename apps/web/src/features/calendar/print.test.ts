@@ -72,6 +72,8 @@ function monthWith(filter: Partial<CalendarFilter>): CalendarMonth {
       ],
       person: null,
       teamCounts: { a: 1, b: 2 },
+      roles: [],
+      role: null,
       ...filter,
     },
   } as unknown as CalendarMonth;

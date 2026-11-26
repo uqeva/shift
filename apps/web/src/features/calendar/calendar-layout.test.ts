@@ -7,13 +7,16 @@ import { describe, expect, it } from 'vitest';
 import { CALENDAR_SCREEN_PARTS } from '@/features/calendar/calendar-screen.fixture';
 
 /**
- * Package 3c and story 21.3, the parts of the calendar's layout a source can
- * hold and a browser run cannot: one scroll, the page's (no height bound and
- * no vertical scroller on the grid, a horizontal-only scroller), the sticky
- * strip (outside the scroller, under the phone's head, hidden from assistive
- * technology and print), the pull-up that IS the header height, the scroll
- * margins that ARE the sticky sizes, the phone's form chosen by `usePhone()`,
- * and the one read. The rest is `e2e/tests/calendar/layout.spec.ts`.
+ * Package 3c and stories 21.3 and 21.25, the parts of the calendar's layout a
+ * source can hold and a browser run cannot: one scroll, the page's (no height
+ * bound and no vertical scroller on the grid, a horizontal-only scroller), the
+ * sticky date strip (outside the scroller, under the phone's head, hidden
+ * from assistive technology and print), the pull-up that IS the header
+ * height, the scroll margins that ARE the sticky sizes, the strip's copy
+ * drawn with no live attribute, the phone's form chosen by `usePhone()`, and
+ * the one read. Since story 21.25 the frame, the strip and the heads are the
+ * paper grid's shared pieces (`@/components/date-grid`), which *Ručni
+ * raspored* draws too. The rest is `e2e/tests/calendar/layout.spec.ts`.
  */
 
 const srcRoot = fileURLToPath(new URL('../..', import.meta.url));
@@ -22,16 +25,19 @@ const source = (parts: readonly string[]): string =>
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 const grid = source(CALENDAR_SCREEN_PARTS.grid);
+const frame = source(CALENDAR_SCREEN_PARTS.dateGrid);
+const gridDates = source(['utils', 'grid-dates.ts']);
+const manual = source(['features', 'planning', 'components', 'manual-grid.tsx']);
 const hook = source(CALENDAR_SCREEN_PARTS.screenHook);
 const binding = source(CALENDAR_SCREEN_PARTS.snapshotHook);
 
-/** Every `className="…"` string in the grid. */
-const classes = [...grid.matchAll(/className="([^"]*)"/g)].map(([, value]) => value ?? '');
+/** Every `className="…"` string in the frame. */
+const classes = [...frame.matchAll(/className="([^"]*)"/g)].map(([, value]) => value ?? '');
 
-/** The one element of the grid's source that carries `attribute` (a whole attribute name or `name="value"`), as its tag's text. */
+/** The one element of the frame's source that carries `attribute` (a whole attribute name or `name="value"`), as its tag's text. */
 const tagWith = (attribute: string): string => {
   const whole = new RegExp(`\\s${attribute.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=[\\s=>/])`);
-  const tags = [...grid.matchAll(/<[A-Za-z][^>]*>/g)].map(([tag]) => tag).filter((tag) => whole.test(tag));
+  const tags = [...frame.matchAll(/<[A-Za-z][^>]*>/g)].map(([tag]) => tag).filter((tag) => whole.test(tag));
 
   expect(tags, `exactly one element carries ${attribute}`).toHaveLength(1);
 
@@ -39,11 +45,24 @@ const tagWith = (attribute: string): string => {
 };
 const classesOf = (tag: string): string[] => (/className="([^"]*)"/.exec(tag)?.[1] ?? '').split(/\s+/);
 
-describe('one scroll, the page’s (story 21.3)', () => {
-  it('bounds no part of the grid in height and scrolls nothing in it vertically', () => {
-    expect(grid, 'a height bound is back on the grid').not.toMatch(/\bmax-h-|\bh-\[\d+s?d?l?vh\]|svh|dvh|\bvh\b/);
-    expect(grid, 'a vertical scroller is back on the grid').not.toMatch(/\boverflow-(auto|scroll|y-auto|y-scroll)\b/);
-    expect(grid, 'the grid is inside the table primitive’s overflow-auto wrapper').not.toMatch(/<Table\b/);
+describe('one scroll, the page’s (stories 21.3, 21.25)', () => {
+  it('bounds no part of either paper grid in height and scrolls nothing in it vertically', () => {
+    for (const [name, text] of [
+      ['the frame', frame],
+      ['the calendar grid', grid],
+      ['the manual grid', manual],
+    ] as const) {
+      expect(text, `a height bound is back on ${name}`).not.toMatch(/\bmax-h-|\bh-\[\d+s?d?l?vh\]|svh|dvh|\bvh\b/);
+      expect(text, `a vertical scroller is back on ${name}`).not.toMatch(/\boverflow-(auto|scroll|y-auto|y-scroll)\b/);
+      expect(text, `${name} is inside the table primitive’s overflow-auto wrapper`).not.toMatch(/<Table\b/);
+    }
+  });
+
+  it('draws both paper grids through the one frame, neither with a strip of its own', () => {
+    expect(grid).toMatch(/<DateGridFrame\b/);
+    expect(manual).toMatch(/<DateGridFrame\b/);
+    expect(grid).not.toMatch(/data-grid-strip|data-grid-scroller/);
+    expect(manual).not.toMatch(/data-grid-strip|data-grid-scroller/);
   });
 
   it('scrolls the grid sideways only, in one scroller lifted in print', () => {
@@ -80,41 +99,47 @@ describe('one scroll, the page’s (story 21.3)', () => {
     expect(copy).toMatch(/\binert\b/);
     expect(classesOf(copy)).toEqual(expect.arrayContaining(['h-full', 'overflow-hidden']));
     expect(copy, 'the copy does not follow the scroller sideways').toMatch(/ref=\{strip\}/);
+    // The copy is the grid's own renderers, drawn with `copy` set.
+    expect(frame).toMatch(/\{header\(true\)\}/);
+    expect(frame).toMatch(/\{body\(true\)\}/);
   });
 
-  it('gives the strip’s copy no role, id, handler or tab stop', () => {
-    const copy = /function renderStripTable[\s\S]*?\n}\n/.exec(grid)?.[0] ?? '';
+  it('draws the copy of a calendar cell with no role, position, name, handler or tab stop, and names today on the grid’s head alone', () => {
+    const cell = /function renderCell[\s\S]*?\n}\n/.exec(grid)?.[0] ?? '';
+    const copyBranch = /if \(copy\) \{[\s\S]*?\n {2}\}/.exec(cell)?.[0] ?? '';
 
-    expect(copy, 'no strip table').not.toBe('');
-    expect(copy).not.toMatch(/\brole=|\bid=|\bon[A-Z]\w*=|tabIndex|aria-current|data-row|data-column/);
+    expect(copyBranch, 'no copy branch').not.toBe('');
+    expect(copyBranch).not.toMatch(/\brole=|\bid=|\bon[A-Z]\w*=|tabIndex|aria-|data-row|data-column/);
+    expect(frame).toMatch(/aria-current=\{!copy && date\.today \? 'date' : undefined\}/);
   });
 });
 
 describe('the sticky sizes', () => {
-  const cell = classes.find((value) => /\bscroll-ml-/.test(value)) ?? '';
-  const margin = (axis: 'l' | 't'): string | undefined => new RegExp(`\\bscroll-m${axis}-(\\d+)\\b`).exec(cell)?.[1];
   const corner = classes.find((value) => /\bsticky\b/.test(value) && /\bleft-0\b/.test(value) && /\bz-30\b/.test(value)) ?? '';
-  // The header cells are the cells with the header's inset edge: the corner and the team header.
-  const header = classes.filter((value) => /\bbg-muted\b/.test(value) && /shadow-\[inset_0_-1px/.test(value));
+  const scrollClass = /DATE_CELL_SCROLL_CLASS = '([^']*)'/.exec(gridDates)?.[1] ?? '';
+  const margin = (axis: 'l' | 't'): string | undefined => new RegExp(`\\bscroll-m${axis}-(\\d+)\\b`).exec(scrollClass)?.[1];
+  // The header cells are the cells with the header's inset edge: the corner and the date head.
+  const header = [...frame.matchAll(/["']([^"']*shadow-\[inset_0_-1px[^"']*)["']/g)].map(([, value]) => value ?? '');
   const strip = classesOf(tagWith('data-grid-strip'));
-  const table = classesOf(tagWith('role="grid"'));
+  const pullUp = /'-mt-(\d+) w-full caption-bottom text-sm print:mt-0'/.exec(frame)?.[1];
 
-  it('ties the date column width to scroll-margin-left', () => {
+  it('ties the first column width to scroll-margin-left, which every cell of both grids carries', () => {
     const width = /\bw-(\d+)\b/.exec(corner)?.[1];
 
-    expect(width, 'the date column has no explicit width').toBeDefined();
+    expect(width, 'the first column has no explicit width').toBeDefined();
     expect(corner.split(/\s+/)).toContain(`min-w-${width ?? ''}`);
     expect(margin('l')).toBe(width);
+    expect(grid).toMatch(/\bDATE_CELL_SCROLL_CLASS,/);
+    expect(manual).toMatch(/\bDATE_CELL_SCROLL_CLASS,/);
   });
 
   it('ties the strip height, every header cell, the pull-up and scroll-margin-top together', () => {
     const height = strip.map((value) => /^h-(\d+)$/.exec(value)?.[1]).find((value) => value !== undefined);
 
     expect(height, 'the strip has no explicit height').toBeDefined();
-    expect(header, 'the corner and the team header').toHaveLength(2);
+    expect(header, 'the corner and the date head').toHaveLength(2);
     for (const value of header) expect(/\bh-(\d+)\b/.exec(value)?.[1], 'a header cell is not the strip’s height').toBe(height);
-    expect(table, 'the grid is not pulled up by the header height').toContain(`-mt-${height ?? ''}`);
-    expect(table, 'the pull-up is not lifted in print').toContain('print:mt-0');
+    expect(pullUp, 'the grid is not pulled up by the header height, or the pull-up is not lifted in print').toBe(height);
     expect(margin('t')).toBe(height);
   });
 
@@ -128,7 +153,8 @@ describe('the phone’s form (story 21.3)', () => {
 
   it('is chosen by usePhone(), so exactly one form is in the DOM', () => {
     expect(grid).toMatch(/const isPhone = usePhone\(\);/);
-    expect(grid).toMatch(/if \(isPhone\) \{\s*return <CalendarTeamDays\b/);
+    // Story 21.25: a filter that leaves no team says so in its place.
+    expect(grid).toMatch(/if \(isPhone\) \{\s*return shown\.columns\.length === 0 \?[\s\S]{0,200}?<CalendarTeamDays\b/);
   });
 
   it('is a day list of every shown team, named by the month heading, each team a button that opens its day', () => {

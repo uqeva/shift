@@ -250,28 +250,28 @@ describe('the cell attributes', () => {
   });
 });
 
-describe('the one tab stop', () => {
-  const rows = (today: number | null, length = 30) =>
-    Array.from({ length }, (_, index) => ({ isToday: index === today }));
+describe('the one tab stop (story 21.25: the dates are the columns)', () => {
+  const dates = (today: number | null, length = 30) =>
+    Array.from({ length }, (_, index) => ({ today: index === today }));
 
-  it("starts on today's first team when the month shows today, otherwise on the first cell", () => {
-    expect(initialGridFocusOf(rows(25))).toEqual(at(25, 0));
-    expect(initialGridFocusOf(rows(null))).toEqual(at(0, 0));
+  it("starts on the first row's cell on today when the month shows today, otherwise on the first cell", () => {
+    expect(initialGridFocusOf(dates(25))).toEqual(at(0, 25));
+    expect(initialGridFocusOf(dates(null))).toEqual(at(0, 0));
     expect(initialGridFocusOf([])).toEqual(at(0, 0));
   });
 
   it('survives a re-render of the same month and resets when the month changes', () => {
-    const remembered = { month: '2026-09', position: at(7, 2) };
+    const remembered = { month: '2026-09', position: at(2, 7) };
 
-    expect(gridTabStopOf(null, '2026-09', rows(25), 4)).toEqual(at(25, 0));
-    expect(gridTabStopOf(remembered, '2026-09', rows(25), 4)).toEqual(at(7, 2));
-    expect(gridTabStopOf(remembered, '2026-10', rows(null, 31), 4)).toEqual(at(0, 0));
-    expect(gridTabStopOf(remembered, '2026-08', rows(3, 31), 4)).toEqual(at(3, 0));
+    expect(gridTabStopOf(null, '2026-09', dates(25), 4)).toEqual(at(0, 25));
+    expect(gridTabStopOf(remembered, '2026-09', dates(25), 4)).toEqual(at(2, 7));
+    expect(gridTabStopOf(remembered, '2026-10', dates(null, 31), 4)).toEqual(at(0, 0));
+    expect(gridTabStopOf(remembered, '2026-08', dates(3, 31), 4)).toEqual(at(0, 3));
   });
 
-  it('stays inside the grid when the columns shrink', () => {
-    expect(gridTabStopOf({ month: '2026-09', position: at(7, 3) }, '2026-09', rows(25), 2)).toEqual(at(7, 1));
-    expect(gridTabStopOf({ month: '2026-09', position: at(7, 3) }, '2026-09', rows(25), 0)).toEqual(at(25, 0));
+  it('stays inside the grid when the rows shrink', () => {
+    expect(gridTabStopOf({ month: '2026-09', position: at(3, 7) }, '2026-09', dates(25), 2)).toEqual(at(1, 7));
+    expect(gridTabStopOf({ month: '2026-09', position: at(3, 7) }, '2026-09', dates(25), 0)).toEqual(at(0, 25));
   });
 
   it('compares positions', () => {

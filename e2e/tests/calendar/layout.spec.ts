@@ -12,12 +12,13 @@ import { expect, test } from '../../utils/custom-fixtures.ts';
  * Package 3c: the calendar's layout where no unit test can see it.
  *
  * - ONE SCROLL, THE PAGE'S (story 21.3). The grid has no vertical scroller:
- *   the page scrolls the month, and the team header is a separate sticky
- *   STRIP at the top of the viewport, so a 28–31-row month scrolled to its
- *   end still names its teams. A wide month scrolls sideways inside the
- *   grid's one horizontal scroller, the strip in step with it and the date
- *   column and the strip's corner at the left; the page never scrolls
- *   sideways. The corner, strip, date column and cells stack in order and are
+ *   the page scrolls the month, and the date header is a separate sticky
+ *   STRIP at the top of the viewport, so a month of many rows scrolled to
+ *   its end still names its dates. Since story 21.25 (*Kalendar kao papir*)
+ *   the dates are the COLUMNS and the teams, then the people, the rows, so a
+ *   28–31-column month scrolls sideways inside the grid's one horizontal
+ *   scroller, the strip in step with it and the name column and the strip's
+ *   corner at the left; the page never scrolls sideways. The corner, strip, date column and cells stack in order and are
  *   opaque, and a press on the strip opens nothing.
  * - On a phone *Sve smjene* is the day list of every shown team, never a
  *   grid, with no horizontal overflow at any team count.
@@ -44,9 +45,10 @@ function isCalendarRead(route: Route): boolean {
 }
 
 /**
- * Widens the grid: `count` extra active teams, with no rotation, appended to
- * the calendar's answer in the browser alone, so the grid scrolls sideways
- * without writing a team other tests would see. Each is built from the team
+ * Lengthens the grid (story 21.25: the teams are its rows): `count` extra
+ * active teams, with no rotation, appended to the calendar's answer in the
+ * browser alone, so the page scrolls the month without writing a team other
+ * tests would see; on a phone, the day list holds that many more. Each is built from the team
  * columns alone — nothing copied from a real row — and named `Širina 01`…,
  * which sorts after every `S…` name under the Croatian collation, so the real
  * teams keep the first columns and the order is fixed.
@@ -128,9 +130,9 @@ async function expectClear(page: Page, step: string): Promise<void> {
 /** Sub-pixel layout rounding, and nothing more. */
 const ROUNDING = 1;
 
-/** The strip's team header cell for `teamName`, in its inert copy. */
-function stripHeader(calendarPage: CalendarPage, teamName: string): Locator {
-  return calendarPage.stripCopy.locator('thead th').filter({ hasText: new RegExp(`^${escapeRegExp(teamName)}$`) });
+/** The strip's date head for day `day` of the month (story 21.25: the dates are the columns), in its inert copy. */
+function stripHeader(calendarPage: CalendarPage, day: number): Locator {
+  return calendarPage.stripCopy.locator('thead th').filter({ hasText: new RegExp(`^${escapeRegExp(`${String(day)}.`)}`) });
 }
 
 test.describe('one scroll, the page’s, on a short window (story 21.3)', () => {
@@ -141,10 +143,14 @@ test.describe('one scroll, the page’s, on a short window (story 21.3)', () => 
     calendarPage,
     fixture,
   }) => {
+    // Story 21.25: the teams are the rows, so twenty more make the month
+    // taller than the window, whatever the run organization holds.
+    await widenWithTeams(page, 20);
     await calendarPage.goto('?prikaz=sve');
-    await expect(calendarPage.columnHeader(fixture.team.name)).toBeAttached();
+    await expect(calendarPage.teamHeader(fixture.team.name)).toBeAttached();
     // The whole month drawn, so nothing above or inside the grid moves later.
-    await expect.poll(() => calendarPage.rowCount()).toBeGreaterThanOrEqual(28);
+    await expect.poll(() => calendarPage.teamCount()).toBeGreaterThanOrEqual(21);
+    expect(await calendarPage.dateCount()).toBeGreaterThanOrEqual(28);
     const scroller = scrollerOf(calendarPage.grid);
 
     // No vertical scroller: nothing to scroll inside it, and its overflow-y clips.
@@ -182,7 +188,7 @@ test.describe('one scroll, the page’s, on a short window (story 21.3)', () => 
       page.evaluate((rounding) => {
         const strip = document.querySelector('[data-grid-strip]');
         const table = document.querySelector('table[role="grid"]');
-        const last = table?.querySelector('tbody tr:last-child');
+        const last = [...(table?.querySelectorAll('tbody tr') ?? [])].at(-1);
         if (strip === null || table === null || last === null || last === undefined) {
           throw new Error('E2E: no strip or grid');
         }
@@ -199,7 +205,7 @@ test.describe('one scroll, the page’s, on a short window (story 21.3)', () => 
         };
       }, ROUNDING);
     await expect.poll(offsets).toEqual({ atTop: true, onTop: true, lastRowInView: true });
-    await expect(stripHeader(calendarPage, fixture.team.name)).toBeVisible();
+    await expect(stripHeader(calendarPage, 1)).toBeVisible();
 
     // A press on the strip opens nothing: it is a copy, and no cell is under it for a pointer.
     await calendarPage.strip.click({ position: { x: 300, y: 20 } });
@@ -232,7 +238,7 @@ test.describe('the team day list on a phone (story 21.3)', () => {
 async function wideGrid(page: Page, calendarPage: CalendarPage, fixture: Fixture): Promise<Locator> {
   await widenWithTeams(page, 12);
   await calendarPage.goto('?prikaz=sve');
-  await expect(calendarPage.columnHeader(fixture.team.name)).toBeAttached();
+  await expect(calendarPage.teamHeader(fixture.team.name)).toBeAttached();
   const scroller = scrollerOf(calendarPage.grid);
   const overflow = await scroller.evaluate((element) => element.scrollWidth - element.clientWidth);
   expect(overflow, 'the grid does not scroll sideways').toBeGreaterThan(0);
@@ -240,10 +246,16 @@ async function wideGrid(page: Page, calendarPage: CalendarPage, fixture: Fixture
   return scroller;
 }
 
-/** Scrolls the scroller so column 0 sits partly under the sticky date column. */
+/**
+ * Scrolls the scroller so the grid's tab stop sits partly under the sticky
+ * name column (story 21.25: the tab stop is today's column, anywhere in the month).
+ */
 async function coverFirstColumn(scroller: Locator): Promise<void> {
   await scroller.evaluate((element) => {
-    element.scrollLeft = 20;
+    const stop = element.querySelector<HTMLElement>('[role="gridcell"][tabindex="0"]');
+    const name = element.querySelector<HTMLElement>('thead th');
+    if (stop === null || name === null) throw new Error('E2E: no tab stop or name column');
+    element.scrollLeft = Math.max(0, stop.offsetLeft - name.offsetWidth + 20);
   });
 }
 
@@ -271,7 +283,7 @@ test.describe('a wide grid at 800 px (story 21.3)', () => {
         const copy = document.querySelector('[data-grid-strip-copy]');
         const table = document.querySelector('table[role="grid"]');
         const scrollerElement = table?.parentElement ?? null;
-        const row = table?.querySelector('tbody tr') ?? null;
+        const row = table?.querySelector('tbody tr[data-team-row]') ?? null;
         if (copy === null || table === null || scrollerElement === null || row === null) throw new Error('E2E: no strip or grid');
         const heads = [...copy.querySelectorAll('thead th')].map((th) => th.getBoundingClientRect());
         const cells = [...row.children].map((cell) => cell.getBoundingClientRect());
@@ -279,7 +291,7 @@ test.describe('a wide grid at 800 px (story 21.3)', () => {
 
         return {
           inStep: copy.scrollLeft === scrollerElement.scrollLeft,
-          // Every team column's left and width, strip over grid.
+          // Every date column's left and width, strip over grid.
           columns: heads.slice(1).every((head, index) => {
             const cell = cells[index + 1];
 
@@ -303,16 +315,17 @@ test.describe('a wide grid at 800 px (story 21.3)', () => {
     const before = await heading.innerText();
     await calendarPage.nextButton.click();
     await expect(heading).not.toHaveText(before);
-    await expect(calendarPage.columnHeader(fixture.team.name)).toBeAttached();
+    await expect(calendarPage.teamHeader(fixture.team.name)).toBeAttached();
     await expect.poll(aligned).toEqual({ inStep: true, columns: true, cornerLeft: true, dateLeft: true });
     await expectNoHorizontalScroll(page);
   });
 
   test('from the keys, a focused cell lands clear of the date column and the strip', async ({ page, calendarPage, fixture }) => {
     const scroller = await wideGrid(page, calendarPage, fixture);
-    const rows = await calendarPage.rowCount();
-    const columns = await calendarPage.columnCount();
-    expect(columns).toBeGreaterThan(12);
+    const rows = await calendarPage.gridRowCount();
+    const columns = await calendarPage.dateCount();
+    expect(rows).toBeGreaterThan(12);
+    expect(columns).toBeGreaterThanOrEqual(28);
 
     // The LEAST scroll: a step to a cell already in view, away from every
     // edge, moves neither the grid nor the page.
@@ -386,7 +399,10 @@ test.describe('a wide grid at 800 px (story 21.3)', () => {
       const strip = document.querySelector('[data-grid-strip]');
       if (cell === null || strip === null || table.tHead === null) throw new Error('E2E: no cell, strip or header');
       const style = getComputedStyle(cell);
-      const widths = [...table.querySelectorAll('tr > th:first-child')].map((th) => th.getBoundingClientRect().width);
+      // The name column: the corner and every row's head, never a group's heading across the grid.
+      const widths = [...table.querySelectorAll('thead tr > th:first-child, tbody tr[data-team-row] > th:first-child')].map(
+        (th) => th.getBoundingClientRect().width,
+      );
 
       return {
         marginLeft: parseFloat(style.scrollMarginLeft),
@@ -430,15 +446,15 @@ test.describe('a wide grid at 800 px (story 21.3)', () => {
       }
       const frame = wrapper.getBoundingClientRect();
       const corner = head.children[0];
-      // A team header wholly in view past the corner, and a date wholly in view below the strip.
+      // A date head wholly in view past the corner, and a team's row head wholly in view below the strip.
       const header = [...head.children].slice(1).find((th) => {
         const box = th.getBoundingClientRect();
 
         return box.left >= frame.left + 120 && box.right <= frame.right;
       });
       const stripBottom = strip.getBoundingClientRect().bottom;
-      const date = [...(table.tBodies[0]?.rows ?? [])]
-        .map((row) => row.cells[0])
+      const date = [...table.querySelectorAll('tbody tr[data-team-row]')]
+        .map((row) => row.querySelector('th') ?? undefined)
         .find((th) => {
           const box = th?.getBoundingClientRect();
 
@@ -490,7 +506,7 @@ test.describe('the printed month (story 16.1, story 21.3)', () => {
 
   test('is the one table, its own header row repeated, with no strip and no pull-up', async ({ page, calendarPage, fixture }) => {
     await calendarPage.goto('?prikaz=sve');
-    await expect(calendarPage.columnHeader(fixture.team.name)).toBeAttached();
+    await expect(calendarPage.teamHeader(fixture.team.name)).toBeAttached();
     await page.emulateMedia({ media: 'print' });
 
     const printed = await calendarPage.grid.evaluate((table: HTMLTableElement) => {

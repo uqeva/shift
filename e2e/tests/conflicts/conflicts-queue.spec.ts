@@ -357,7 +357,7 @@ test('an amend that takes a resolved date out of the range ends that resolution 
   // THE CALENDAR agrees: +4 marked, today not.
   const conflict = new RegExp(`, ${hr.kalendar.modifier.conflict}(,|$)`);
   await peoplePage.navigationLink(hr.nav.kalendar, { exact: true }).click();
-  await expect(calendarPage.columnHeader(team.name)).toBeVisible();
+  await expect(calendarPage.teamHeader(team.name)).toBeVisible();
   for (const [date, marked] of [
     [today, false],
     [isoDaysAfter(today, 1), true],

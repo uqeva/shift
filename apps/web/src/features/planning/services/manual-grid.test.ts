@@ -43,6 +43,7 @@ import {
   draftWith,
   isWeekend,
   manualMonthOf,
+  manualRoleFilterOf,
   movedOf,
   pickableTeamsOf,
   pickableTypesOf,
@@ -100,6 +101,30 @@ describe('the month as the grid draws it (UX-DR72, UX-DR73)', () => {
       [DORA, null],
       [IVA, 'Student'],
     ]);
+  });
+
+  it('narrows the rows by Posao on Ljudi’s semantics (story 21.25): a role, nobody’s, or every role for an unknown id', () => {
+    const month = manualMonthOf(plain, MONTH, TODAY, NO_DRAFT);
+    const all = manualRoleFilterOf(month, undefined);
+
+    expect(all.options).toEqual([
+      { value: 'all', roleName: '', count: 4 },
+      { value: 'pilot-role-student', roleName: 'Student', count: 1 },
+      { value: 'none', roleName: '', count: 3 },
+    ]);
+    expect(all.applied).toBe('all');
+    expect(all.shown).toBe(month);
+
+    const student = manualRoleFilterOf(month, 'pilot-role-student');
+
+    expect(student.applied).toBe('pilot-role-student');
+    expect(student.shown.groups.map((group) => [group.teamId, group.rows.map((row) => row.memberId)])).toEqual([[null, [IVA]]]);
+    expect(student.shown.rows.map((row) => row.memberId)).toEqual([IVA]);
+    expect(student.shown.dates).toBe(month.dates);
+
+    expect(manualRoleFilterOf(month, 'none').shown.rows.map((row) => row.memberId)).toEqual([ANA, VIEWER_MEMBER, DORA]);
+    expect(manualRoleFilterOf(month, 'gone')).toMatchObject({ applied: 'all', shown: month });
+    expect(month.rows.map((row) => row.jobRoleId)).toEqual([null, null, null, 'pilot-role-student']);
   });
 
   it('names each row its source: rotacija tima for a team with a rotation, ručno otherwise and with no team', () => {

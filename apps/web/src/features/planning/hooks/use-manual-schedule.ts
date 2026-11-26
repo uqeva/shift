@@ -15,6 +15,7 @@ import {
   draftKeyOf,
   draftWith,
   manualMonthOf,
+  manualRoleFilterOf,
   movedOf,
   pickableTeamsOf,
   pickableTypesOf,
@@ -48,6 +49,7 @@ import {
 } from '@/features/planning/services/manual-fill';
 import { COPY_OPEN_ID, FILL_OPEN_ID } from '@/features/planning/utils/element-ids';
 import { SINGLE_CELL_OPEN, singleCellOf } from '@/features/planning/services/single-cell';
+import { ALL_ROLES } from '@/features/members/services/list';
 import { MEMBERSHIP_WRITE_DEPENDENTS, refreshAfterWrite } from '@/features/teams/services/dependents';
 import { useOrganizationToday } from '@/hooks/organization-today';
 import { isIsoDate } from '@/lib/i18n/format';
@@ -58,12 +60,14 @@ import { focusLater } from '@/utils/focus-later';
 /**
  * `?mjesec=2026-12&osoba=<id>`: the month shown, and on a phone the member
  * edited. STORY 21.6: `&dan=2026-12-06` opens the picker on that member's
- * cell once (*Dodaj smjenu*), then leaves the URL.
+ * cell once (*Dodaj smjenu*), then leaves the URL. STORY 21.25: `&posao=`
+ * the job role shown.
  */
 export interface ManualSearch {
   readonly mjesec?: string;
   readonly osoba?: string;
   readonly dan?: string;
+  readonly posao?: string;
 }
 
 /** The search as the route validates it: a month of the wrong shape, a person that is not text, or a day that is no date, dropped. */
@@ -71,11 +75,13 @@ export function manualSearchOf(search: Record<string, unknown>): ManualSearch {
   const mjesec = search['mjesec'];
   const osoba = search['osoba'];
   const dan = search['dan'];
+  const posao = search['posao'];
 
   return {
     ...(isCalendarMonth(mjesec) ? { mjesec } : {}),
     ...(typeof osoba === 'string' && osoba !== '' ? { osoba } : {}),
     ...(typeof dan === 'string' && isIsoDate(dan) ? { dan } : {}),
+    ...(typeof posao === 'string' && posao !== '' ? { posao } : {}),
   };
 }
 
@@ -166,18 +172,32 @@ export function useManualSchedule(search: ManualSearch, navigate: ManualNavigate
   }, [snapshot]);
 
   // A MONTH THAT CANNOT BE DERIVED says so (review): never an endless "loading".
-  const derived = useMemo((): { readonly shown: ManualMonth | null; readonly failed: boolean } => {
-    if (snapshot === null || today === null || month === null) return { shown: null, failed: false };
+  const derived = useMemo((): { readonly whole: ManualMonth | null; readonly failed: boolean } => {
+    if (snapshot === null || today === null || month === null) return { whole: null, failed: false };
 
     try {
-      return { shown: manualMonthOf(snapshot, month, today, draft), failed: false };
+      return { whole: manualMonthOf(snapshot, month, today, draft), failed: false };
     } catch (cause) {
       console.error(MANUAL_UNAVAILABLE, cause);
 
-      return { shown: null, failed: true };
+      return { whole: null, failed: true };
     }
   }, [snapshot, today, month, draft]);
-  const { shown, failed } = derived;
+  const { whole, failed } = derived;
+  // STORY 21.25: *Posao* narrows the rows (`?posao=`, *Ljudi*'s semantics); the draft keeps every row's cells.
+  const posao = search.posao;
+  const roleFilter = useMemo(() => (whole === null ? null : manualRoleFilterOf(whole, posao)), [whole, posao]);
+  const shown = roleFilter === null ? null : roleFilter.shown;
+  // A role changed by any way — the chip, Back, a pasted URL — drops the
+  // selection, which was about the rows shown before.
+  const appliedRole = roleFilter?.applied ?? null;
+  const [selectedFor, setSelectedFor] = useState<string | null>(appliedRole);
+
+  if (selectedFor !== appliedRole) {
+    setSelectedFor(appliedRole);
+    setSelected([]);
+    setAnchor(null);
+  }
   const header = month === null || today === null ? null : monthHeaderOf(month, today);
   const selectedKeys = useMemo(() => new Set(selected.map(draftKeyOf)), [selected]);
   const types = useMemo(() => (snapshot === null ? [] : pickableTypesOf(snapshot)), [snapshot]);
@@ -204,7 +224,7 @@ export function useManualSchedule(search: ManualSearch, navigate: ManualNavigate
   useEffect(() => {
     const day = search.dan;
 
-    if (day === undefined || shown === null || settling) return;
+    if (day === undefined || shown === null || whole === null || settling) return;
 
     const key = `${search.osoba ?? ''}|${day}`;
 
@@ -212,7 +232,10 @@ export function useManualSchedule(search: ManualSearch, navigate: ManualNavigate
 
     opened.current = key;
 
-    const found = singleCellOf(shown, search.osoba, day);
+    // STORY 21.25: read against every row, so a *Posao* that hides the member
+    // never says they have none; the role is then dropped, so their row shows.
+    const found = singleCellOf(whole, search.osoba, day);
+    const hidden = found.kind === SINGLE_CELL_OPEN && !shown.rows.some((row) => row.memberId === found.cell.memberId);
 
     if (found.kind === SINGLE_CELL_OPEN) {
       setNoRow(false);
@@ -229,10 +252,11 @@ export function useManualSchedule(search: ManualSearch, navigate: ManualNavigate
       {
         ...(search.mjesec === undefined ? {} : { mjesec: search.mjesec }),
         ...(search.osoba === undefined ? {} : { osoba: search.osoba }),
+        ...(search.posao === undefined || hidden ? {} : { posao: search.posao }),
       },
       { replace: true },
     );
-  }, [search, shown, settling, navigate]);
+  }, [search, shown, whole, settling, navigate]);
 
   /** Another month: the selection was about the one shown. */
   function show(next: string | null): void {
@@ -240,7 +264,26 @@ export function useManualSchedule(search: ManualSearch, navigate: ManualNavigate
     setSelected([]);
     setAnchor(null);
     setPlanned(null);
-    navigate({ ...(search.osoba === undefined ? {} : { osoba: search.osoba }), ...(next === null ? {} : { mjesec: next }) });
+    navigate({
+      ...(search.osoba === undefined ? {} : { osoba: search.osoba }),
+      ...(next === null ? {} : { mjesec: next }),
+      ...(search.posao === undefined ? {} : { posao: search.posao }),
+    });
+  }
+
+  /**
+   * STORY 21.25: the *Posao* chosen (`null`: every role), written to the URL
+   * at once; the selection was about the rows shown. Returns the state it
+   * leaves, as the option-chip bar's focus waits for it.
+   */
+  function chooseRole(role: string | null): string {
+    setSelected([]);
+    setAnchor(null);
+    const { posao: _dropped, ...rest } = search;
+
+    navigate(role === null || role === ALL_ROLES ? rest : { ...rest, posao: role });
+
+    return role ?? ALL_ROLES;
   }
 
   /** The phone's member. */
@@ -638,6 +681,11 @@ export function useManualSchedule(search: ManualSearch, navigate: ManualNavigate
     today,
     month: header,
     shown,
+    /** STORY 21.25: the *Posao* filter's options and the role applied, or `null` before a month is shown. */
+    roleFilter,
+    /** The *Posao* filter's state, as the option-chip bar's focus waits for it. */
+    roleState: roleFilter?.applied ?? ALL_ROLES,
+    chooseRole,
     /** The month could not be derived from the read: an alert, never an endless "loading". */
     failed,
     draft,

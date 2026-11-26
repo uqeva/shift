@@ -185,34 +185,38 @@ for (const [role, storageState] of [
   test.describe(`as ${role}`, () => {
     test.use({ storageState });
 
-    test('the month shows the team column and the projected types, today marked', async ({ calendarPage, fixture }) => {
+    test('the month shows the team row and the projected types, today marked (story 21.25: like paper)', async ({
+      calendarPage,
+      fixture,
+    }) => {
       test.slow(); // the shared rotation lock (`holdRotation`) can take longer than the default timeout
       const rotation = await seeded(fixture.slug, fixture.team.id);
 
       await calendarPage.goto();
       await expect(calendarPage.heading(hr.nav.kalendar)).toBeVisible();
       await expect(calendarPage.monthHeading(monthHeading(rotation.today))).toBeVisible();
-      await expect(calendarPage.columnHeader(fixture.team.name)).toBeVisible();
+      await expect(calendarPage.teamHeader(fixture.team.name)).toBeVisible();
 
-      const today = calendarPage.todayRowAnywhere;
+      // Today is a COLUMN now: its head names the day and is the one marked current.
+      const today = calendarPage.todayColumnAnywhere;
       await expect(today).toHaveCount(1);
-      await expect(calendarPage.rowHeaderIn(today)).toContainText(dayMonth(rotation.today));
+      await expect(today).toContainText(`${String(Number(rotation.today.slice(8, 10)))}.`);
 
       const first = await calendarPage.cellOf(fixture.team.name, rotation.today);
-      await expect(first).toContainText(expectedType(rotation, rotation.today));
-      // From 640 px up the full names are DRAWN, not merely read out: the
-      // `sm:not-sr-only` spans have a real box.
-      for (const drawn of [
-        calendarPage.drawnText(calendarPage.columnHeader(fixture.team.name), fixture.team.name),
-        calendarPage.drawnText(first, expectedType(rotation, rotation.today)),
-      ]) {
-        const box = await drawn.boundingBox();
-        expect(box, 'a full name has no box').not.toBeNull();
-        expect(box!.width).toBeGreaterThan(1);
-        expect(box!.height).toBeGreaterThan(1);
-      }
-      // Desktop: the range is shown beside the name — visible, not merely in the DOM.
-      await expect(calendarPage.drawnText(first, '07:00–19:00')).toBeVisible();
+      await expect(first).toHaveAccessibleName(calendarPage.typeNamed(expectedType(rotation, rotation.today)));
+      await expect(first).toHaveAttribute('data-today', 'true');
+      // The team's name is DRAWN in its row head; the cell draws the type's
+      // letter, which the key above the grid names (`D Dan`).
+      const box = await calendarPage.drawnText(calendarPage.teamHeader(fixture.team.name), fixture.team.name).boundingBox();
+      expect(box, 'the team name has no box').not.toBeNull();
+      expect(box!.width).toBeGreaterThan(1);
+      await expect(
+        calendarPage.letters.getByText(
+          new RegExp(` ${escapeRegExp(expectedType(rotation, rotation.today))}$`),
+        ),
+      ).toBeVisible();
+      // The range is in the cell's name, read at every width.
+      await expect(first).toHaveAccessibleName(/07:00–19:00/);
 
       // The next month, through the URL: every date projected from today.
       const next = firstOfNextMonth(rotation.today);
@@ -220,14 +224,16 @@ for (const [role, storageState] of [
       await expect(calendarPage.monthHeading(monthHeading(next))).toBeVisible();
       for (const offset of [0, 1, 2, 3]) {
         const date = addDays(next, offset);
-        await expect(await calendarPage.cellOf(fixture.team.name, date), date).toContainText(expectedType(rotation, date));
+        await expect(await calendarPage.cellOf(fixture.team.name, date), date).toHaveAccessibleName(
+          calendarPage.typeNamed(expectedType(rotation, date)),
+        );
       }
-      // A crossing shift is shown once, with both clock times.
+      // A crossing shift is named once, with both clock times, on its start date.
       const night = [0, 1, 2, 3].map((offset) => addDays(next, offset)).find(
         (date) => expectedType(rotation, date) === rotation.steps[1],
       );
       if (night === undefined) throw new Error('E2E: no night in four days');
-      await expect(calendarPage.drawnText(await calendarPage.cellOf(fixture.team.name, night), '19:00–07:00')).toBeVisible();
+      await expect(await calendarPage.cellOf(fixture.team.name, night)).toHaveAccessibleName(/19:00–07:00/);
     });
   });
 }
@@ -241,8 +247,8 @@ test.describe('month navigation', () => {
 
     await calendarPage.goto();
     await expect(calendarPage.monthHeading(monthHeading(rotation.today))).toBeVisible();
-    await expect(await calendarPage.cellOf(fixture.team.name, rotation.today)).toContainText(
-      expectedType(rotation, rotation.today),
+    await expect(await calendarPage.cellOf(fixture.team.name, rotation.today)).toHaveAccessibleName(
+      calendarPage.typeNamed(expectedType(rotation, rotation.today)),
     );
 
     const reads: string[] = [];
@@ -258,10 +264,10 @@ test.describe('month navigation', () => {
     await expect(page).toHaveURL(new RegExp(`mjesec=${next.slice(0, 7)}`));
     await calendarPage.nextButton.click();
     await expect(calendarPage.monthHeading(monthHeading(afterNext))).toBeVisible();
-    await expect(await calendarPage.cellOf(fixture.team.name, afterNext)).toContainText(expectedType(rotation, afterNext));
+    await expect(await calendarPage.cellOf(fixture.team.name, afterNext)).toHaveAccessibleName(calendarPage.typeNamed(expectedType(rotation, afterNext)));
     await calendarPage.previousButton.click();
     await expect(calendarPage.monthHeading(monthHeading(next))).toBeVisible();
-    await expect(await calendarPage.cellOf(fixture.team.name, next)).toContainText(expectedType(rotation, next));
+    await expect(await calendarPage.cellOf(fixture.team.name, next)).toHaveAccessibleName(calendarPage.typeNamed(expectedType(rotation, next)));
 
     // Back to the current month through the picker footer's Ovaj mjesec (story 15.7b).
     await calendarPage.monthTrigger.click();
@@ -752,7 +758,7 @@ test.describe('on a phone, as an admin', () => {
 
     // Crossing 640 px swaps the form: the grid from 640 px, the list below.
     await page.setViewportSize({ width: 1280, height: 800 });
-    await expect(calendarPage.columnHeader(fixture.team.name)).toBeAttached();
+    await expect(calendarPage.teamHeader(fixture.team.name)).toBeAttached();
     await expect(calendarPage.dayList).toHaveCount(0);
   });
 });
@@ -804,12 +810,14 @@ for (const [width, height, name] of [
       // legend: no list, no tooltip, no icon.
       await expect(calendarPage.legendOf().heading).toHaveCount(0);
 
-      // Exactly one tab stop, on today's first team.
+      // Exactly one tab stop, on the first row's cell on today (story 21.25:
+      // the rows are the teams, then the people; the columns the dates).
       const stops = calendarPage.tabStops;
       await expect(stops).toHaveCount(1);
       await expect(calendarPage.todayFirstCell).toHaveAttribute('tabindex', '0');
-      const rows = await calendarPage.rowCount();
-      const columns = await calendarPage.columnCount();
+      const rows = await calendarPage.gridRowCount();
+      const columns = await calendarPage.dateCount();
+      expect(columns).toBeGreaterThanOrEqual(28);
       const cells = calendarPage.cells;
       await expect(cells).toHaveCount(rows * columns);
 
@@ -819,7 +827,7 @@ for (const [width, height, name] of [
       await page.keyboard.press('Tab');
       await expect(calendarPage.todayFirstCell).toBeFocused();
       const start = await calendarPage.focusedCell();
-      expect(start?.column).toBe(0);
+      expect(start?.row).toBe(0);
       expect(await calendarPage.focusIsVisible(), 'no visible focus').toBe(true);
       await page.keyboard.press('Tab');
       expect(await calendarPage.focusedCell(), 'a second Tab stayed in the grid').toBeNull();
@@ -840,26 +848,28 @@ for (const [width, height, name] of [
 
       const lastRow = rows - 1;
       const lastColumn = columns - 1;
+      // A month has 28+ dates; the rows may be a single team.
+      const second = Math.min(1, lastRow);
       for (const [key, expected] of [
         ['Control+Home', { row: 0, column: 0 }],
         ['ArrowLeft', { row: 0, column: 0 }],
         ['ArrowUp', { row: 0, column: 0 }],
-        ['ArrowDown', { row: 1, column: 0 }],
-        ['End', { row: 1, column: lastColumn }],
-        ['ArrowRight', { row: 1, column: lastColumn }],
-        ['Home', { row: 1, column: 0 }],
-        ['ArrowRight', { row: 1, column: Math.min(1, lastColumn) }],
-        ['ArrowLeft', { row: 1, column: 0 }],
+        ['ArrowRight', { row: 0, column: 1 }],
+        ['End', { row: 0, column: lastColumn }],
+        ['ArrowRight', { row: 0, column: lastColumn }],
+        ['Home', { row: 0, column: 0 }],
+        ['ArrowDown', { row: second, column: 0 }],
+        ['ArrowUp', { row: 0, column: 0 }],
         ['Control+End', { row: lastRow, column: lastColumn }],
         ['ArrowDown', { row: lastRow, column: lastColumn }],
-        ['ArrowUp', { row: lastRow - 1, column: lastColumn }],
+        ['ArrowLeft', { row: lastRow, column: lastColumn - 1 }],
       ] as const) {
         await page.keyboard.press(key);
         expect(await calendarPage.focusedCell(), key).toEqual(expected);
         // The roving tab stop follows focus: still exactly one.
         await expect(stops).toHaveCount(1);
       }
-      const here = { row: lastRow - 1, column: lastColumn };
+      const here = { row: lastRow, column: lastColumn - 1 };
       // Enter and Space open the focused cell's detail (story 3.4b): the URL
       // stays, Space never scrolls the page, and Escape returns focus.
       const url = page.url();
@@ -893,7 +903,7 @@ for (const [width, height, name] of [
       await expect(calendarPage.monthHeading(monthHeading(rotation.today))).toBeVisible();
       await expect(stops).toHaveCount(1);
       await expect(calendarPage.todayFirstCell).toHaveAttribute('tabindex', '0');
-      await expect(stops).toHaveAttribute('data-column', '0');
+      await expect(stops).toHaveAttribute('data-row', '0');
 
       await expectNoHorizontalScroll(page);
     });
@@ -1165,7 +1175,7 @@ test.describe('a shift-type override at 1280 px, as an admin', () => {
     await calendarPage.goto(gridMonthOf(rotation.today));
     const cell = await calendarPage.cellOf(fixture.team.name, rotation.today);
     // The mark is on the cell itself, without opening anything.
-    await expect(cell).toContainText(override.typeName);
+    await expect(cell).toHaveAccessibleName(calendarPage.typeNamed(override.typeName));
     await expect(cell).toContainText('\u270E');
     await expect(cell).toHaveAccessibleName(
       `${weekdayOf(rotation.today)} ${dayMonth(rotation.today)}, ${fixture.team.name}, ${override.typeName}, 19:00–07:00, ${kalendar.modifier.overridden}`,
@@ -1211,7 +1221,7 @@ test.describe('a shift-type override at 1280 px, as an admin', () => {
 
     await calendarPage.goto(gridMonthOf(rotation.today));
     const cell = await calendarPage.cellOf(fixture.team.name, rotation.today);
-    await expect(cell).toContainText(override.typeName);
+    await expect(cell).toHaveAccessibleName(calendarPage.typeNamed(override.typeName));
     await expect(cell).toContainText('\u270E');
     await cell.click();
     const detail = calendarPage.detailOf(fixture.team.name, rotation.today);
@@ -1280,7 +1290,7 @@ test.describe('a roster override at 1280 px, as an admin', () => {
     await calendarPage.goto(gridMonthOf(rotation.today));
     const cell = await calendarPage.cellOf(fixture.team.name, rotation.today);
     // The type is the projection's; the mark is the roster's, on the cell itself.
-    await expect(cell).toContainText(expectedType(rotation, rotation.today));
+    await expect(cell).toHaveAccessibleName(calendarPage.typeNamed(expectedType(rotation, rotation.today)));
     await expect(cell).toContainText('\u270E');
     await expect(cell).toHaveAccessibleName(
       `${weekdayOf(rotation.today)} ${dayMonth(rotation.today)}, ${fixture.team.name}, ${expectedType(rotation, rotation.today)}, ${range}, ${kalendar.modifier.overridden}`,
@@ -1450,7 +1460,7 @@ test.describe('a roster override a rotation change left pending, at 1280 px, as 
 
     await calendarPage.goto(gridMonthOf(date));
     const cell = await calendarPage.cellOf(fixture.team.name, date);
-    await expect(cell).toContainText(rotation.steps[0]);
+    await expect(cell).toHaveAccessibleName(calendarPage.typeNamed(rotation.steps[0]));
     await expect(cell).not.toContainText('\u270E');
 
     await cell.click();
@@ -1978,7 +1988,7 @@ test.describe('an admin sets and removes a shift-type override at 1280 px', () =
     await expect(calendarPage.overrideOpenerIn(detail)).toHaveCount(0);
     const remove = calendarPage.overrideRemoveIn(detail);
     await expect(remove).toBeFocused();
-    await expect(cell).toContainText(worked);
+    await expect(cell).toHaveAccessibleName(calendarPage.typeNamed(worked));
     await expect(cell).toContainText('\u270E');
 
     // Remove: one neutral confirmation naming the team, the date and the type restored.
@@ -2004,7 +2014,7 @@ test.describe('an admin sets and removes a shift-type override at 1280 px', () =
     // The cell is back to its projection.
     await page.keyboard.press('Escape');
     await expect(detail).toHaveCount(0);
-    await expect(cell).toContainText(projected);
+    await expect(cell).toHaveAccessibleName(calendarPage.typeNamed(projected));
     await expect(cell).not.toContainText('\u270E');
   });
 
@@ -2201,7 +2211,7 @@ async function expectTabStopOnToday(calendarPage: CalendarPage): Promise<void> {
   const stops = calendarPage.tabStops;
   await expect(stops).toHaveCount(1);
   await expect(calendarPage.todayFirstCell).toHaveAttribute('tabindex', '0');
-  await expect(stops).toHaveAttribute('data-column', '0');
+  await expect(stops).toHaveAttribute('data-row', '0');
 }
 
 /** `Prikazano: sve smjene (4)` — the unfiltered summary up to its person count. */
@@ -2223,10 +2233,13 @@ test.describe('the team filter at 1280 px', () => {
     fixture,
   }) => {
     await calendarPage.goto();
-    await expect(calendarPage.columnHeader(fixture.team.name)).toBeVisible();
+    await expect(calendarPage.teamHeader(fixture.team.name)).toBeVisible();
     // The run organization may hold teams other specs created: count, never assume.
-    const columns = await calendarPage.columnCount();
-    expect(columns).toBeGreaterThan(0);
+    // Story 21.25: the teams are the rows; the summary names every active team, the Tim options.
+    const turnus = await calendarPage.teamCount();
+    const columns = await calendarPage.activeTeamCount();
+    expect(turnus).toBeGreaterThan(0);
+    expect(columns).toBeGreaterThanOrEqual(turnus);
     const team = searchParamPattern('smjena', fixture.team.id);
     const filters = calendarPage.filters;
 
@@ -2285,8 +2298,8 @@ test.describe('the team filter at 1280 px', () => {
     await filters.showResults();
     await expect(filters.filtriButton).toBeFocused();
     await expect(filters.filtriButton).toHaveAccessibleName(filters.filtriName(1));
-    await expect(calendarPage.headerCells).toHaveCount(2);
-    await expect(calendarPage.columnHeader(fixture.team.name)).toBeVisible();
+    await expect(calendarPage.teamRows).toHaveCount(1);
+    await expect(calendarPage.teamHeader(fixture.team.name)).toBeVisible();
     await expect(filters.teamChip).toHaveAccessibleName(filters.teamChipText(fixture.team.name));
     await expect(filters.removeTeam(fixture.team.name)).toBeVisible();
     await expect(filters.summary).toContainText(summaryTeamOf(fixture.team.name));
@@ -2296,7 +2309,7 @@ test.describe('the team filter at 1280 px', () => {
     // The ✕ on the only chip drops the team, and focus moves to `Filtri`.
     await filters.removeTeam(fixture.team.name).click();
     await expect(page).not.toHaveURL(anySearchParamPattern('smjena'));
-    await expect(calendarPage.headerCells).toHaveCount(columns + 1);
+    await expect(calendarPage.teamRows).toHaveCount(turnus);
     await expect(filters.teamChip).toHaveCount(0);
     await expect(filters.filtriButton).toBeFocused();
     await expect(filters.clearButton).toHaveCount(0);
@@ -2309,7 +2322,7 @@ test.describe('the team filter at 1280 px', () => {
     await filters.clearButton.click();
     await expect(page).not.toHaveURL(anySearchParamPattern('smjena'));
     await expect(page).toHaveURL(/\/kalendar(\?|$)/);
-    await expect(calendarPage.headerCells).toHaveCount(columns + 1);
+    await expect(calendarPage.teamRows).toHaveCount(turnus);
     await expect(filters.teamChip).toHaveCount(0);
     await expect(filters.clearButton).toHaveCount(0);
     await expect(filters.filtriButton).toBeFocused();
@@ -2324,7 +2337,7 @@ test.describe('the team filter at 1280 px', () => {
     await expect(heading).not.toHaveText(thisMonth);
     await expect(page).toHaveURL(anySearchParamPattern('mjesec'));
     await expect(page).toHaveURL(team);
-    await expect(calendarPage.headerCells).toHaveCount(2);
+    await expect(calendarPage.teamRows).toHaveCount(1);
     await expect(filters.teamChip).toHaveAccessibleName(filters.teamChipText(fixture.team.name));
 
     // `Očisti sve` there drops the team and keeps the month, and Back undoes
@@ -2334,19 +2347,19 @@ test.describe('the team filter at 1280 px', () => {
     await filters.clearButton.click();
     await expect(page).not.toHaveURL(anySearchParamPattern('smjena'));
     await expect(page).toHaveURL(searchParamPattern('mjesec', mjesec));
-    await expect(calendarPage.headerCells).toHaveCount(columns + 1);
+    await expect(calendarPage.teamRows).toHaveCount(turnus);
     await expect(filters.filtriButton).toBeFocused();
     await page.goBack();
     await expect(page).toHaveURL(team);
-    await expect(calendarPage.headerCells).toHaveCount(2);
+    await expect(calendarPage.teamRows).toHaveCount(1);
   });
 
   test('an unknown team id shows every column, draws no chip, and offers no ✕', async ({ page, calendarPage, fixture }) => {
     const unknown = randomUUID();
     await calendarPage.goto(`?smjena=${unknown}`);
-    await expect(calendarPage.columnHeader(fixture.team.name)).toBeVisible();
+    await expect(calendarPage.teamHeader(fixture.team.name)).toBeVisible();
     const filters = calendarPage.filters;
-    const columns = await calendarPage.columnCount();
+    const columns = await calendarPage.activeTeamCount();
     await expect(filters.teamChip).toHaveCount(0);
     await expect(filters.filtriButton).toHaveAccessibleName(filters.filtriName(0));
     await expect(filters.summary).toContainText(summaryAllOf(columns));
@@ -2376,8 +2389,8 @@ test.describe('the person filter at 1280 px', () => {
     fixture,
   }) => {
     await calendarPage.goto();
-    await expect(calendarPage.columnHeader(fixture.team.name)).toBeVisible();
-    const columns = await calendarPage.columnCount();
+    await expect(calendarPage.teamHeader(fixture.team.name)).toBeVisible();
+    const turnus = await calendarPage.teamCount();
     const filters = calendarPage.filters;
 
     // The Osoba picker: a search, every person grouped by team, the spare under Bez smjene.
@@ -2443,7 +2456,7 @@ test.describe('the person filter at 1280 px', () => {
     await expect(page).not.toHaveURL(anySearchParamPattern('osoba'));
     await expect(page).not.toHaveURL(anySearchParamPattern('smjena'));
     await expect(page).toHaveURL(searchParamPattern('mjesec', mjesec));
-    await expect(calendarPage.headerCells).toHaveCount(columns + 1);
+    await expect(calendarPage.teamRows).toHaveCount(turnus);
     await expect(filters.filtriButton).toBeFocused();
     await expect(filters.clearButton).toHaveCount(0);
   });
@@ -2453,7 +2466,7 @@ test.describe('the person filter at 1280 px', () => {
     fixture,
   }) => {
     await calendarPage.goto();
-    await expect(calendarPage.columnHeader(fixture.team.name)).toBeVisible();
+    await expect(calendarPage.teamHeader(fixture.team.name)).toBeVisible();
     const filters = calendarPage.filters;
 
     await filters.choosePerson(fixture.member.name);
@@ -2466,7 +2479,7 @@ test.describe('the person filter at 1280 px', () => {
 
   test('a press on the backdrop with a picker open closes the picker only', async ({ page, calendarPage, fixture }) => {
     await calendarPage.goto();
-    await expect(calendarPage.columnHeader(fixture.team.name)).toBeVisible();
+    await expect(calendarPage.teamHeader(fixture.team.name)).toBeVisible();
     const filters = calendarPage.filters;
 
     await filters.openSheet();
@@ -2483,7 +2496,7 @@ test.describe('the person filter at 1280 px', () => {
 
   test('Očisti sve with a person chosen puts focus on Filtri', async ({ page, calendarPage, fixture }) => {
     await calendarPage.goto();
-    await expect(calendarPage.columnHeader(fixture.team.name)).toBeVisible();
+    await expect(calendarPage.teamHeader(fixture.team.name)).toBeVisible();
     const filters = calendarPage.filters;
 
     await filters.choosePerson(fixture.member.name);
@@ -2501,9 +2514,9 @@ test.describe('the person filter at 1280 px', () => {
     fixture,
   }) => {
     await calendarPage.goto();
-    await expect(calendarPage.columnHeader(fixture.team.name)).toBeVisible();
+    await expect(calendarPage.teamHeader(fixture.team.name)).toBeVisible();
     const filters = calendarPage.filters;
-    const columns = await calendarPage.columnCount();
+    const columns = await calendarPage.activeTeamCount();
 
     await filters.openSheet();
     await filters.teamField.click();
@@ -2554,7 +2567,7 @@ test.describe('the person filter at 1280 px', () => {
 
   test('forgets the grid tab stop when a person is chosen and the filters cleared', async ({ page, calendarPage, fixture }) => {
     await calendarPage.goto();
-    await expect(calendarPage.columnHeader(fixture.team.name)).toBeVisible();
+    await expect(calendarPage.teamHeader(fixture.team.name)).toBeVisible();
 
     await calendarPage.moveTabStopOffToday();
     await calendarPage.filters.choosePerson(fixture.member.name);
@@ -2584,7 +2597,7 @@ test.describe('the person filter at 1280 px', () => {
   test('an unknown person id is ignored: the grid, and no chip', async ({ page, calendarPage, fixture }) => {
     const unknown = randomUUID();
     await calendarPage.goto(`?osoba=${unknown}`);
-    await expect(calendarPage.columnHeader(fixture.team.name)).toBeVisible();
+    await expect(calendarPage.teamHeader(fixture.team.name)).toBeVisible();
     await expect(calendarPage.filters.personChip).toHaveCount(0);
     await expect(calendarPage.filters.teamChip).toHaveCount(0);
     await expect(calendarPage.filters.clearButton).toHaveCount(0);
@@ -2616,7 +2629,7 @@ test.describe('the filter bar while the month loads', () => {
     await expect(calendarPage.filters.summary).toHaveCount(0);
 
     release();
-    await expect(calendarPage.columnHeader(fixture.team.name)).toBeVisible();
+    await expect(calendarPage.teamHeader(fixture.team.name)).toBeVisible();
     await expect(calendarPage.filters.bar).toBeVisible();
     await expect(calendarPage.filters.summary).toBeVisible();
   });
@@ -2822,7 +2835,7 @@ test.describe('the filters on a wide screen turning narrow', () => {
 
   test('the side sheet closes when the viewport crosses 1024 px', async ({ page, calendarPage, fixture }) => {
     await calendarPage.goto('?prikaz=sve');
-    await expect(calendarPage.columnHeader(fixture.team.name)).toBeVisible();
+    await expect(calendarPage.teamHeader(fixture.team.name)).toBeVisible();
     const filters = calendarPage.filters;
 
     await filters.openSheet();
@@ -2891,7 +2904,7 @@ test.describe('an override a rotation change left pending, at 1280 px, as an adm
 
     await calendarPage.goto(gridMonthOf(date));
     const cell = await calendarPage.cellOf(fixture.team.name, date);
-    await expect(cell).toContainText(projected);
+    await expect(cell).toHaveAccessibleName(calendarPage.typeNamed(projected));
     await expect(cell).not.toContainText('\u270E');
 
     await cell.click();
@@ -2920,7 +2933,7 @@ test.describe('an override a rotation change left pending, at 1280 px, as an adm
     // With nothing pending, the type dialog's opener is back.
     await expect(calendarPage.overrideOpenerIn(detail)).toBeVisible();
     await calendarPage.closeIn(detail).click();
-    await expect(cell).toContainText(projected);
+    await expect(cell).toHaveAccessibleName(calendarPage.typeNamed(projected));
     await expect(cell).not.toContainText('\u270E');
   });
 

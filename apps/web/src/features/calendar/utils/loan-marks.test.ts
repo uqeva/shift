@@ -268,7 +268,7 @@ describe("Kalendar's Osoba picker (the Team filter)", () => {
     const month = calendarMonthOf(lent, calendarSearchOf({}), '2026-09-11');
     const zoran = month.filter.people.find((one) => one.id === ZORAN);
 
-    expect(zoran).toEqual({ id: ZORAN, name: 'Zoran Zorić', teamId: C, teamName: 'Smjena C', lentFrom: { teamName: 'Smjena A' } });
+    expect(zoran).toEqual({ id: ZORAN, name: 'Zoran Zorić', teamId: C, teamName: 'Smjena C', roleId: null, lentFrom: { teamName: 'Smjena A' } });
     const plainMonth = calendarMonthOf(plain, calendarSearchOf({}), '2026-09-11');
 
     expect(month.filter.teamCounts[C]).toBe((plainMonth.filter.teamCounts[C] ?? 0) + 1);

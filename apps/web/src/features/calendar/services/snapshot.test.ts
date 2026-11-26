@@ -1606,6 +1606,8 @@ describe('the calendar only reads, and projects nothing of its own', () => {
   const swapProposedLine = `${srcRoot}${CALENDAR_SCREEN_PARTS.swapProposedLine.join('/')}`;
   // STORY 18.5: the loan mark, shared from `@/components`.
   const loanMark = `${srcRoot}${CALENDAR_SCREEN_PARTS.loanMark.join('/')}`;
+  // STORY 21.25: the paper grid's frame and heads, shared with *Ručni raspored* from `@/components`.
+  const dateGrid = `${srcRoot}${CALENDAR_SCREEN_PARTS.dateGrid.join('/')}`;
   const files = [
     ...readdirSync(directory, { recursive: true, encoding: 'utf8' })
       .map(slashed)
@@ -1617,6 +1619,7 @@ describe('the calendar only reads, and projects nothing of its own', () => {
     swapProposedHook,
     swapProposedLine,
     loanMark,
+    dateGrid,
   ];
   const stripped = (file: string) =>
     readFileSync(file, 'utf8')

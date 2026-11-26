@@ -9,11 +9,13 @@ import {
   DAY_RANGE_CLASS,
   GRID_RANGE_CLASS,
   NO_ROTATION_SHOWN,
+  cellFillClassOf,
   type CalendarCell,
   type CalendarCellGroup,
 } from '@/features/calendar/utils/month';
 import { translateCellLabel } from '@/features/calendar/utils/cell-label';
 import { t } from '@/lib/i18n';
+import { cn } from '@/lib/utils';
 
 /** A cell's name or letter; in the grid, every part `aria-hidden` and the letter first. */
 function renderCellName(cell: CalendarCell, inGrid: boolean): ReactNode {
@@ -148,5 +150,63 @@ export function CalendarCellBox({
         <span className="sr-only">{modifierNamesTextOf(treatment.modifiers, translateCellLabel)}</span>
       )}
     </div>
+  );
+}
+
+/**
+ * STORY 21.25 (UX-DR83): a cell of the PAPER GRID, a column per date — the
+ * type's LETTER in its fill, square, with any mark's ring or hatch over it
+ * and its glyphs small at the corner, and the pencil of an assigned day
+ * (UX-DR73), and a team cell's staffing groups (story 21.6) as `+N`.
+ * `aria-hidden`: the `gridcell` is named in full. `null` draws an
+ * empty box: no shift, or *Slobodno* (`off`, its mark) — and `inactive` the
+ * hatch of a date the person is not active on, as *Ručni raspored* draws it.
+ */
+export function CalendarLetterBox({
+  cell,
+  off = false,
+  assigned = false,
+  inactive = false,
+}: {
+  readonly cell: CalendarCell | null;
+  readonly off?: boolean;
+  readonly assigned?: boolean;
+  readonly inactive?: boolean;
+}): ReactNode {
+  const treatment = modifierTreatmentOf(cell?.modifiers ?? []);
+  const groups = cell?.groups ?? [];
+
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        'relative flex h-9 min-w-9 items-center justify-center rounded-cell px-1 text-xs font-semibold tabular-nums print:h-6 print:min-w-0',
+        cell === null ? 'text-muted-foreground' : cellFillClassOf(cell),
+        treatment.className,
+        inactive && 'opacity-50 [background-image:repeating-linear-gradient(135deg,transparent_0_4px,var(--border)_4px_5px)]',
+      )}
+    >
+      {cell === null
+        ? off
+          ? t('kalendar.paper.offMark')
+          : null
+        : cell.name === null
+          ? groups.length === 0
+            ? NO_ROTATION_SHOWN
+            : null
+          : cell.letter}
+      {/* STORY 21.6 (R14.6): each staffing group's letter after the team's, smaller, the pencil marking them assigned. */}
+      {groups.map((group) => (
+        <span key={group.shiftTypeId} className="ml-0.5 text-[0.625rem] font-normal">
+          {cell?.name === null ? group.letter : t('kalendar.paper.groupMark', { letter: group.letter ?? group.name })}
+        </span>
+      ))}
+      {treatment.glyphs.length === 0 ? null : (
+        <span className="absolute -right-1 -top-1.5 text-[0.625rem] leading-none">
+          <ModifierGlyphs glyphs={treatment.glyphs} />
+        </span>
+      )}
+      {assigned || groups.length !== 0 ? <PencilSimple className="absolute -bottom-0.5 -right-0.5 size-2.5" /> : null}
+    </span>
   );
 }

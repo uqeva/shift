@@ -941,7 +941,8 @@ export const KEY_SOURCES = [
     // `Filtri` group, trigger and count, `Aktivni filtri` and `Primijeni`.
     // 207 SINCE STORY 21.6: the cell's `ručno`, `bez tima` and a group's `dodijeljeno ručno`, the legend's pencil, a staffing group's heading, an assigned member's `ručno` and `dodijeljeno ručno`, and the overlap hint's `bez tima`.
     // 206 SINCE ITS REVIEW: the off and no-rotation sentences moved to `dayNotWorkingMessageKey` (the day detail's rules).
-    strings: 206,
+    // 231 SINCE STORY 21.25 (*Kalendar kao papir*): the paper grid's calls — its corner, the teams' heading, a person's no role, no team and unreadable days (its line and its cells' names), a filter or a month that leaves nothing (twice), the key of letters, its entry, *Slobodno* with its mark, a letter box's off mark and a staffing group's `+N`, a person's cell's three words — less the date column head; and the shared filter bar's *Posao* field, picker, *Svi poslovi* (twice), *Bez posla* and the summary with a role.
+    strings: 231,
   },
   {
     // STORY 12.2. On the swap proposal: its heading (twice, once while the
@@ -1134,7 +1135,8 @@ export const KEY_SOURCES = [
     // separator before a lent person's mark.
     // ONE HUNDRED AND ELEVEN SINCE STORY 21.23: the shared bar's toolbar
     // `Filtri` (its group, word and count) and the `Aktivni filtri` group.
-    strings: 111,
+    // 120 SINCE STORY 21.25: the shared filter bar's *Posao* calls (its field and picker, *Svi poslovi* twice, *Bez posla*, the summary with a role, the picker's search and count), drawn on *Sati* never but held in its source.
+    strings: 120,
   },
   {
     // STORY 5.2c. THREE on Godišnji: its own `nav.godisnji` heading, the
@@ -1256,7 +1258,8 @@ export const KEY_SOURCES = [
     file: RUCNI_RASPORED,
     keys: translationKeys,
     // 120 SINCE STORY 21.6: *Dodaj smjenu*'s alert for a member with no row.
-    strings: 120,
+    // 128 SINCE STORY 21.25: the *Posao* filter's chip, ✕, picker, heading, *Svi poslovi*, *Bez posla*, count and result count (`manual-filters.tsx`).
+    strings: 128,
   },
   {
     // STORY 21.4: the preview's shift and inert-override lines, and the save's refusals.
@@ -1640,7 +1643,8 @@ export const KEY_SOURCES = [
     name: 'the filter bar rules',
     file: FILTER_BAR_KEYS,
     keys: messageKeyUnions,
-    strings: 21,
+    // 23 SINCE STORY 21.25: the *Posao* chip's text and its ✕'s name.
+    strings: 23,
   },
   {
     // STORY 4.3: the export's sheet — its eight `t()` calls: the five fixed
