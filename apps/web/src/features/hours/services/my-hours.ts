@@ -15,6 +15,7 @@ import { isAnnualLeave, type AbsenceTypeRow } from '@/features/absence-types/ser
 import {
   absenceTypesOfCalendar,
   calendarRetryStateOf,
+  holidayNamesOfCalendar,
   type CalendarQueryAnswer,
   type CalendarSnapshot,
   type CalendarSurfaceState,
@@ -167,13 +168,24 @@ export interface HoursSnapshotInput extends SnapshotScheduleInput {
  * The snapshot-wide part of every member's hours input: the calendar's
  * ({@link snapshotScheduleInputOf}), every hour band, and every shift type
  * with its versions. `schedule`, when the caller already holds it.
+ *
+ * HOLIDAY HOURS (story 21.19, R13.7): EVERY holiday's date, by date, absent
+ * with none — not `holidayRuleOfCalendar`'s, which is `{}` with no team off,
+ * while a 24-hour crew's worked holiday is exactly what the figure counts.
+ * With no team off the rule still decides nothing (R13.5). These dates WIN
+ * over `schedule`'s own `holidays`: whenever a team is off, the rule's list
+ * is the same one (every `calendar.holidays` date, by date), so only the
+ * case with no team off differs, where the rule carries none.
  */
 export function hoursSnapshotInputOf(
   snapshot: CalendarSnapshot,
   schedule: SnapshotScheduleInput = snapshotScheduleInputOf(snapshot),
 ): HoursSnapshotInput {
+  const holidays = [...holidayNamesOfCalendar(snapshot).keys()].sort();
+
   return {
     ...schedule,
+    ...(holidays.length === 0 ? {} : { holidays }),
     bands: snapshot.bands,
     shiftTypes: snapshot.types.map((type) => ({ type, versions: type.versions })),
   };
@@ -421,6 +433,11 @@ export interface MyHoursView {
    */
   readonly untimedShiftCount: number | null;
   /**
+   * The worked hours inside a holiday (story 21.19, R13.7, *Sati na
+   * blagdan*), already inside the total; absent with none, so not shown.
+   */
+  readonly holiday?: HoursFigure;
+  /**
    * The month's working shifts in unresolved conflict (story 5.3d) — still
    * counted in every figure above — or `null` when there are none, so the
    * line is not shown.
@@ -482,6 +499,7 @@ export function myHoursViewOf(
     }),
     leave,
     untimedShiftCount: hours.untimedShiftCount > 0 ? hours.untimedShiftCount : null,
+    ...(hours.holidayMinutes === undefined ? {} : { holiday: figureOf(hours.holidayMinutes) }),
     conflictCount: conflictCount > 0 ? conflictCount : null,
   };
 }

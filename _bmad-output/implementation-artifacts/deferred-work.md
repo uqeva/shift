@@ -2457,3 +2457,9 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-21-18-holidays-show-on-the-calendar-the-schedule-and-the-grid.md`
   summary: OWNER the founder (confirm). Story 21.18 took three display readings unattended. (1) In the 36 px boxes (the paper grid's letter box, *Danas*' admin week cell, *Ručni raspored*'s mark) an emptied team cell is the star alone, with *blagdan* in the cell's accessible name and the key naming the star; the day lists and the today card show the word. (2) A date head draws the star with the holiday's name for screen readers only; the visible name is the key line under the letters (`★ 18.11. {naziv}`). (3) A holiday a team works (a 24-hour crew's) is still named everywhere a date is read, though nothing about that team's day changes.
   evidence: Spec 21.18 § Epic AC Deviations and Design Notes 1; story 21.18 review pass 1.
+
+## Deferred from: story 21.19, worked holiday hours are their own figure (2026-11-26)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-19-worked-holiday-hours-are-their-own-figure.md`
+  summary: OWNER a later e2e pass. No rendered test or e2e draws *Sati na blagdan*: the organization table's column, a row's cell and `—`, the footer cell, the phone's stacked field and the member's tile with its ⓘ are proven only through the node-only view models and the export cells (the web suite is node-only). An hours e2e spec that seeds a holiday a 24-hour team works should read the column, the footer, the phone rows and the downloaded file.
+  evidence: Spec 21.19 § Verification; story 21.19 review pass 1.

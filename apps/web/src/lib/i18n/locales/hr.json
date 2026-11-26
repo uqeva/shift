@@ -1120,6 +1120,7 @@
   },
   "sati": {
     "total": "Ukupno sati",
+    "holiday": "Sati na blagdan",
     "shifts": "Broj smjena",
     "shiftCount": "{count, plural, one {# smjena} few {# smjene} other {# smjena}}",
     "bands": "Po satnim pojasevima",

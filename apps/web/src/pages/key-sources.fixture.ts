@@ -1158,7 +1158,8 @@ export const KEY_SOURCES = [
     // ONE HUNDRED AND ELEVEN SINCE STORY 21.23: the shared bar's toolbar
     // `Filtri` (its group, word and count) and the `Aktivni filtri` group.
     // 120 SINCE STORY 21.25: the shared filter bar's *Posao* calls (its field and picker, *Svi poslovi* twice, *Bez posla*, the summary with a role, the picker's search and count), drawn on *Sati* never but held in its source.
-    strings: 120,
+    // 128 SINCE STORY 21.19: *Sati na blagdan* — the summary's label and its ⓘ's name (two); the table's heading, a row's `—` and its ⓘ's name (three); the stacked rows' label, `—` and ⓘ's name (three).
+    strings: 128,
   },
   {
     // STORY 5.2c. THREE on Godišnji: its own `nav.godisnji` heading, the
@@ -1706,10 +1707,11 @@ export const KEY_SOURCES = [
     // TWELVE SINCE E922: the footer row's label, the table's own.
     // STILL TWELVE SINCE STORY 13.2: the one leave heading became one per
     // leave column, `{name} (dani)`, a single key with the column's name.
+    // THIRTEEN SINCE STORY 21.19: the *Sati na blagdan* column's heading, the table's own.
     name: 'the hours export rules',
     file: HOURS_EXPORT_KEYS,
     keys: (text: string) => [...translationKeys(text), ...messageKeyUnions(text)],
-    strings: 12,
+    strings: 13,
   },
   {
     // STORY 7.14: the figure's name — the total's and the leave's words —
@@ -1728,7 +1730,8 @@ export const KEY_SOURCES = [
     file: HOURS_EXPLANATION_KEYS,
     keys: (text: string) => [...translationKeys(text), ...messageKeyUnions(text)],
     // 14 SINCE STORY 21.6: a teamless line's `bez tima`.
-    strings: 14,
+    // 15 SINCE STORY 21.19: the holiday figure's name, *Sati na blagdan*.
+    strings: 15,
   },
   {
     // STORY 18.5: a member's own loan, covering today or ahead, off

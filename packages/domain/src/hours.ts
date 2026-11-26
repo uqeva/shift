@@ -40,13 +40,22 @@
  * no half day were named. The invariant holds: the worked half's band minutes
  * sum to the minutes it adds to the total.
  *
+ * HOLIDAY HOURS (story 21.19, R13.7). A worked term's interval (the worked
+ * half of a half day included) intersected with `[00:00, 24:00)` of every
+ * holiday it touches: its own date and, for a shift past midnight, the next
+ * date, a holiday after the month included. They are a view over the total,
+ * never a partition of it: no other figure changes, and with no worked
+ * holiday `holidayMinutes` is absent, so every output is as before (R13.5).
+ *
  * The result is numbers and ids only; nothing here reads a name.
  *
  * Every breached precondition throws a `RangeError` naming the offending value.
  */
 
 import { MINUTES_PER_DAY, deriveHourBands, partitionOfDay, type DayPartition, type HourBand } from './bands.js';
+import { civilDayNumber, dateOfCivilDay } from './calendar.js';
 import { deriveShiftTimes, shiftDurationOn, shiftTypeVersionOn, type ShiftType, type ShiftTypeVersion } from './duration.js';
+import { holidayDatesOf } from './holidays.js';
 import { LEAVE_HALF_FIRST, LEAVE_HALF_SECOND, type LeaveHalf } from './leave.js';
 import { datesOfMonth, memberScheduleOfMonth, type MemberScheduleInput, type MemberShift } from './schedule.js';
 
@@ -160,6 +169,11 @@ export interface MemberHours {
   readonly leaveMinutes: number;
   /** Working shifts on a date before their type's first version: counted in `shiftCount`, in no minutes. */
   readonly untimedShiftCount: number;
+  /**
+   * The worked minutes inside a holiday's civil date (story 21.19, R13.7), a
+   * view over `totalMinutes`. Present only when more than 0 (R13.5).
+   */
+  readonly holidayMinutes?: number;
 }
 
 /**
@@ -273,17 +287,22 @@ interface HoursTerm {
   readonly kind: HoursKind;
   readonly minutes: number;
   readonly shares: readonly HoursShare[];
+  /** A worked term's minutes inside a holiday's civil date (story 21.19, R13.7); 0 otherwise. */
+  readonly holidayMinutes: number;
 }
 
 /** Which figure of the month an explanation is of. */
 export const HOURS_FIGURE_TOTAL = 'TOTAL';
 export const HOURS_FIGURE_BAND = 'BAND';
 export const HOURS_FIGURE_LEAVE = 'LEAVE';
+/** Story 21.19 (R13.7): the worked minutes inside a holiday's civil date. */
+export const HOURS_FIGURE_HOLIDAY = 'HOLIDAY';
 
 export type HoursFigureCode =
   | { readonly code: typeof HOURS_FIGURE_TOTAL }
   | { readonly code: typeof HOURS_FIGURE_BAND; readonly bandId: string }
-  | { readonly code: typeof HOURS_FIGURE_LEAVE };
+  | { readonly code: typeof HOURS_FIGURE_LEAVE }
+  | { readonly code: typeof HOURS_FIGURE_HOLIDAY };
 
 /** One operand of an equation: a shift and the minutes it adds to the figure. */
 export interface HoursOperand {
@@ -342,6 +361,20 @@ function walkMonth(input: MemberHoursInput, month: string): MonthWalk {
     if (halfDays.has(halfDay.date)) throw new RangeError(`two half days are given on ${halfDay.date}`);
     halfDays.set(halfDay.date, halfDay.half);
   }
+  const holidays = holidayDatesOf(input);
+  // The minutes of `[start, start + duration)` inside `[0, 1440)` when the date
+  // is a holiday and inside `[1440, 2880)` when the next date is (R13.7).
+  const holidayMinutesOf = (date: string, startMinute: number, durationMinutes: number): number => {
+    if (holidays.size === 0) return 0;
+    const end = startMinute + durationMinutes;
+    const next = dateOfCivilDay(civilDayNumber(date) + 1);
+    let minutes = 0;
+    if (holidays.has(date)) minutes += Math.max(0, Math.min(end, MINUTES_PER_DAY) - Math.max(startMinute, 0));
+    if (next !== null && holidays.has(next)) {
+      minutes += Math.max(0, Math.min(end, 2 * MINUTES_PER_DAY) - Math.max(startMinute, MINUTES_PER_DAY));
+    }
+    return minutes;
+  };
   const terms: HoursTerm[] = [];
   const sharesOf = (startMinute: number, durationMinutes: number): readonly HoursShare[] =>
     [...minutesByBand(partition, startMinute, durationMinutes)].map(([bandId, minutes]) => ({ bandId, minutes }));
@@ -369,31 +402,34 @@ function walkMonth(input: MemberHoursInput, month: string): MonthWalk {
         const halves = shiftHalvesOf(version.startMinute, version.endMinute);
         const absent = half === LEAVE_HALF_FIRST ? halves.first : halves.second;
         const worked = half === LEAVE_HALF_FIRST ? halves.second : halves.first;
-        if (absent.durationMinutes > 0) terms.push({ ...base, kind: HOURS_KIND_LEAVE, minutes: absent.durationMinutes, shares: [] });
+        if (absent.durationMinutes > 0) {
+          terms.push({ ...base, kind: HOURS_KIND_LEAVE, minutes: absent.durationMinutes, shares: [], holidayMinutes: 0 });
+        }
         terms.push({
           ...base,
           kind: HOURS_KIND_WORKED,
           minutes: worked.durationMinutes,
           shares: sharesOf(worked.startMinute, worked.durationMinutes),
+          holidayMinutes: holidayMinutesOf(day.date, worked.startMinute, worked.durationMinutes),
         });
         continue;
       }
       if (half !== undefined && workingShifts === 1) {
         // An untimed shift on a half day is untimed, as ever: no leave minutes.
-        terms.push({ ...base, kind: HOURS_KIND_UNTIMED, minutes: 0, shares: [] });
+        terms.push({ ...base, kind: HOURS_KIND_UNTIMED, minutes: 0, shares: [], holidayMinutes: 0 });
         continue;
       }
       if (leaveShifts.has(JSON.stringify([day.date, shift.teamId]))) {
         // A leave shift is not worked: only its duration, as leave.
         if (version !== null) {
           const { durationMinutes } = deriveShiftTimes(version.startMinute, version.endMinute);
-          terms.push({ ...base, kind: HOURS_KIND_LEAVE, minutes: durationMinutes, shares: [] });
+          terms.push({ ...base, kind: HOURS_KIND_LEAVE, minutes: durationMinutes, shares: [], holidayMinutes: 0 });
         }
         continue;
       }
 
       if (version === null) {
-        terms.push({ ...base, kind: HOURS_KIND_UNTIMED, minutes: 0, shares: [] });
+        terms.push({ ...base, kind: HOURS_KIND_UNTIMED, minutes: 0, shares: [], holidayMinutes: 0 });
         continue;
       }
       const times = deriveShiftTimes(version.startMinute, version.endMinute);
@@ -402,6 +438,7 @@ function walkMonth(input: MemberHoursInput, month: string): MonthWalk {
         kind: HOURS_KIND_WORKED,
         minutes: times.durationMinutes,
         shares: sharesOf(times.startMinute, times.durationMinutes),
+        holidayMinutes: holidayMinutesOf(day.date, times.startMinute, times.durationMinutes),
       });
     }
   }
@@ -432,6 +469,7 @@ export function memberHoursOfMonth(input: MemberHoursInput, month: string): Memb
   let unbandedMinutes = 0;
   let totalMinutes = 0;
   let leaveMinutes = 0;
+  let holidayMinutes = 0;
 
   for (const term of terms) {
     if (term.kind === HOURS_KIND_LEAVE) {
@@ -444,6 +482,7 @@ export function memberHoursOfMonth(input: MemberHoursInput, month: string): Memb
       continue;
     }
     totalMinutes += term.minutes;
+    holidayMinutes += term.holidayMinutes;
     for (const share of term.shares) {
       if (share.bandId === null) {
         unbandedMinutes += share.minutes;
@@ -465,6 +504,7 @@ export function memberHoursOfMonth(input: MemberHoursInput, month: string): Memb
     totalMinutes,
     leaveMinutes,
     untimedShiftCount,
+    ...(holidayMinutes > 0 ? { holidayMinutes } : {}),
   };
 }
 
@@ -473,7 +513,8 @@ export function memberHoursOfMonth(input: MemberHoursInput, month: string): Memb
  * compose it, each with the minutes it adds. The total is every worked
  * shift's duration, a band's the part of each worked shift inside it (a
  * shift across a band edge appears in each band it touches), the leave the
- * duration of each leave shift. The operands sum exactly to
+ * duration of each leave shift, the holiday figure each worked shift's
+ * minutes inside a holiday's civil date (story 21.19). The operands sum exactly to
  * `memberHoursOfMonth`'s figure — both come from one walk.
  *
  * @throws RangeError on any precondition of {@link memberHoursOfMonth}, and
@@ -490,6 +531,8 @@ export function explainMemberHours(input: MemberHoursInput, month: string, figur
     let minutes = 0;
     if (figure.code === HOURS_FIGURE_LEAVE) {
       if (term.kind === HOURS_KIND_LEAVE) minutes = term.minutes;
+    } else if (figure.code === HOURS_FIGURE_HOLIDAY) {
+      if (term.kind === HOURS_KIND_WORKED) minutes = term.holidayMinutes;
     } else if (term.kind === HOURS_KIND_WORKED) {
       minutes =
         figure.code === HOURS_FIGURE_TOTAL

@@ -43,6 +43,10 @@ import { formatIsoMonthName } from '@/lib/i18n/format';
  * its counts as numbers, so a column still reads and sums as one. Its label
  * stands in the Member column; the Team column, which the screen's label
  * spans, is empty.
+ *
+ * *SATI NA BLAGDAN* (story 21.19, R13.7) is a column after *Ukupno* exactly
+ * when the table shows it (`view.holidayColumn`): each row's holiday hours
+ * as a duration, 0 for none, and the footer's sum.
  */
 
 /** Whole hours: the screen's `192 h`. */
@@ -83,7 +87,8 @@ export interface HoursExport {
   readonly sheetName: string;
   /**
    * The header row: Member, Team, shifts, one per band (its name as stored),
-   * Total, one per leave column (`{name} (dani)`), unresolved conflicts.
+   * Total, *Sati na blagdan* when the table shows it (story 21.19), one per
+   * leave column (`{name} (dani)`), unresolved conflicts.
    */
   readonly columns: readonly string[];
   /** One row per `view.rows` entry, in order; each as long as `columns`. */
@@ -148,13 +153,14 @@ function leaveCellsOf(cells: readonly HoursLeaveCell[]): readonly HoursExportCel
  * read by the table's own rule (`bandMinutesOf`), so the file and the screen
  * cannot read a band differently.
  */
-function cellsOf(row: OrganizationHoursRow, bandIds: readonly string[]): readonly HoursExportCell[] {
+function cellsOf(row: OrganizationHoursRow, bandIds: readonly string[], holidayColumn: boolean): readonly HoursExportCell[] {
   return [
     text(row.name),
     text(row.team === null ? t('sati.organization.noTeam') : row.team.name),
     { kind: 'count', value: row.shiftCount },
     ...bandIds.map((bandId) => hours(bandMinutesOf(row, bandId))),
     hours(row.hours.totalMinutes),
+    ...(holidayColumn ? [hours(row.hours.holidayMinutes ?? 0)] : []),
     ...leaveCellsOf(row.leave),
     // Story 5.3d: the state is the column and the number, 0 included — never a colour.
     { kind: 'count', value: row.conflictCount },
@@ -169,6 +175,7 @@ function footerCellsOf(footer: HoursFooter): readonly HoursExportCell[] {
     { kind: 'count', value: footer.shiftCount },
     ...footer.bands.map((band) => hours(band.minutes)),
     hours(footer.totalMinutes),
+    ...(footer.holidayMinutes === undefined ? [] : [hours(footer.holidayMinutes)]),
     ...leaveCellsOf(footer.leave),
     { kind: 'count', value: footer.conflictCount },
   ];
@@ -201,10 +208,11 @@ export function hoursExportOf(view: OrganizationHoursView, organizationName: str
       t('sati.organization.shifts'),
       ...view.bands.map((band) => band.name),
       t('sati.organization.total'),
+      ...(view.holidayColumn === true ? [t('sati.holiday')] : []),
       ...view.leaveColumns.map((column) => t('sati.organization.export.days', { name: leaveColumnNameOf(column) })),
       t('sati.organization.conflicts'),
     ],
-    rows: view.rows.map((row) => cellsOf(row, bandIds)),
+    rows: view.rows.map((row) => cellsOf(row, bandIds, view.holidayColumn === true)),
     footer: view.footer === null ? null : footerCellsOf(view.footer),
   };
 }

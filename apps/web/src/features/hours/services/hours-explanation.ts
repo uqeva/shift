@@ -1,4 +1,5 @@
 import {
+  HOURS_FIGURE_HOLIDAY,
   HOURS_FIGURE_LEAVE,
   HOURS_FIGURE_TOTAL,
   HOURS_SOURCE_CHANGE,
@@ -387,12 +388,14 @@ function leaveEquationOf(
   return { total, lines };
 }
 
-/** An hours figure's name: the total's words, a band's name as stored. */
+/** An hours figure's name: the total's words, the holiday's, a band's name as stored. */
 function figureNameOf(
   snapshot: CalendarSnapshot,
   figure: Exclude<HoursExplainFigure, { readonly code: typeof HOURS_FIGURE_LEAVE }>,
 ): string {
   if (figure.code === HOURS_FIGURE_TOTAL) return t('sati.total');
+  // Story 21.19 (R13.7): *Sati na blagdan*.
+  if (figure.code === HOURS_FIGURE_HOLIDAY) return t('sati.holiday');
 
   const band = snapshot.bands.find((one) => one.id === figure.bandId);
 

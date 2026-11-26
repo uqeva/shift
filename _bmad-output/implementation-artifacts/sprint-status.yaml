@@ -762,7 +762,7 @@ development_status:
   21-16-holidays-are-organization-data: done  # PR #380, squash 69ef8fc, CI green (run 45758802426); 0080
   21-17-an-admin-enters-holidays-and-imports-the-official-list: done  # PR #380, squash 69ef8fc, CI green (run 45758802426); no migration
   21-18-holidays-show-on-the-calendar-the-schedule-and-the-grid: review  # built, CI pending; feat/21-18-21-19-holidays-shown, no migration, no PR yet
-  21-19-worked-holiday-hours-are-their-own-figure: ready-for-dev  # after 21.16; cuttable to a follow-up (proposal 3)
+  21-19-worked-holiday-hours-are-their-own-figure: review  # built, CI pending; feat/21-18-21-19-holidays-shown, no migration, no PR yet
   21-20-each-team-has-its-own-minimum: ready-for-dev  # independent
   21-21-smjenko-the-public-page: review  # built, CI pending; feat/21-21-landing (no PR yet); independent; publishing waits: apex DNS and the info@<domain> mail route (founder; address decided 2026-11-25, a build input)
   21-22-teams-are-called-timovi: review  # built, CI pending; on feat/smjenko-brand with 21.24 (spec-21-24); founder chose Timovi (E-6, 2026-11-25); reverses epic 18 retro A2

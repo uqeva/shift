@@ -1705,6 +1705,8 @@ const SANCTIONED_SCREEN_KEYS = [
   // named by its stored name, and *Ostala odsutnost* for every type that does
   // not draw, which names no type.
   'sati.total',
+  // Story 21.19 (R13.7): *Sati na blagdan*, the worked hours inside a holiday.
+  'sati.holiday',
   'sati.shifts',
   'sati.bands',
   'sati.otherAbsence',

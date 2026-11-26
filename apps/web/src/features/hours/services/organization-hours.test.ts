@@ -1,4 +1,4 @@
-import { leaveCostOf, memberHoursOfMonth, type Collision } from '@shift/domain';
+import { HOURS_FIGURE_HOLIDAY, leaveCostOf, memberHoursOfMonth, type Collision } from '@shift/domain';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { ANNUAL_LEAVE_ID } from '@/features/absence-types/services/list';
@@ -6,8 +6,11 @@ import { CALENDAR_UNAVAILABLE, readCalendar, type CalendarSnapshot } from '@/fea
 import { calendarDayListOf, calendarMonthOf, memberScheduleInputOf, monthHeaderOf } from '@/features/calendar/utils/month';
 import { HOURS_CONFLICTS_READY, NO_LEAVE_RECORDS, type HoursConflictsState, type LeaveRecordsByMember } from '@/features/hours/services/hours-conflicts';
 import { SORT_CONFLICTS, hoursSearchOf, hoursSearchTo, type HoursSearch } from '@/features/hours/services/hours-search';
+import { EXPLANATION_HOURS, hoursExplanationOf } from '@/features/hours/services/hours-explanation';
 import {
   HOURS_UNAVAILABLE,
+  figureOf,
+  hoursSnapshotInputOf,
   memberHoursInputOf,
   myHoursOf,
   myHoursSurfaceOf,
@@ -927,5 +930,163 @@ describe('one days column per drawing absence type, and one for the rest (story 
       code: HOURS_UNAVAILABLE,
     });
     expect(errors).toHaveBeenCalledWith(HOURS_UNAVAILABLE, expect.any(RangeError));
+  });
+});
+
+describe('Sati na blagdan (story 21.19, R13.7)', () => {
+  // 10.09. is the viewer's Dan, 07:00–19:00 (the half-day case above).
+  const HOLIDAY = '2026-09-10';
+
+  /** `snapshot` with `dates` as holidays, and `offTeams` off on them. */
+  function withHolidays(snapshot: CalendarSnapshot, dates: readonly string[], offTeams: readonly string[] = []): CalendarSnapshot {
+    return {
+      ...snapshot,
+      holidays: dates.map((date, index) => ({ id: `holiday-${String(index)}`, date, name: 'Dan sjećanja na sve što je ikad bilo' })),
+      teams: snapshot.teams.map((team) => ({ ...team, offOnHolidays: offTeams.includes(team.id) })),
+    };
+  }
+
+  const viewerRowOf = (view: OrganizationHoursView) => view.rows.find((row) => row.memberId === VIEWER_MEMBER)!;
+  const columnOf = (columns: readonly string[]) => columns.indexOf(t('sati.holiday'));
+
+  it('no holiday: no column, no figure, the file as before', () => {
+    const view = viewOf(pilot, NO_LEAVE_RECORDS);
+
+    expect(view).not.toHaveProperty('holidayColumn');
+    expect(view.rows.every((row) => !Object.hasOwn(row, 'holiday') && !Object.hasOwn(row.hours, 'holidayMinutes'))).toBe(true);
+    expect(view.footer).not.toHaveProperty('holidayMinutes');
+    expect(columnOf(hoursExportOf(view, 'Org').columns)).toBe(-1);
+    expect(hoursSnapshotInputOf(pilot)).not.toHaveProperty('holidays');
+  });
+
+  it("carries every holiday's date into the input, by date, a worked one included", () => {
+    const snapshot = withHolidays(pilot, ['2026-12-25', HOLIDAY]);
+
+    expect(hoursSnapshotInputOf(snapshot).holidays).toEqual([HOLIDAY, '2026-12-25']);
+    // No team off: the rule decides nothing, and every other figure is as before.
+    const before = viewOf(pilot, NO_LEAVE_RECORDS);
+    const after = viewOf(snapshot, NO_LEAVE_RECORDS);
+
+    expect(after.rows.map((row) => [row.memberId, row.total, row.bands, row.shiftCount])).toEqual(
+      before.rows.map((row) => [row.memberId, row.total, row.bands, row.shiftCount]),
+    );
+  });
+
+  it("a worked holiday: each row's figure is the domain's, the column after Ukupno, the footer its sum", () => {
+    const snapshot = withHolidays(pilot, [HOLIDAY]);
+    const view = viewOf(snapshot, NO_LEAVE_RECORDS);
+
+    expect(view.holidayColumn).toBe(true);
+    expect(view.columnCount).toBe(viewOf(pilot, NO_LEAVE_RECORDS).columnCount + 1);
+    expect(viewerRowOf(view).holiday).toEqual(figureOf(12 * 60));
+    for (const row of view.rows) {
+      const member = snapshot.members.find((one) => one.id === row.memberId)!;
+      const minutes = memberHoursOfMonth(memberHoursInputOf(snapshot, { ...member, memberId: member.id }), MONTH).holidayMinutes;
+
+      expect(row.hours.holidayMinutes, row.name).toBe(minutes);
+      expect(row.holiday, row.name).toEqual(minutes === undefined ? undefined : figureOf(minutes));
+    }
+    expect(view.rows.some((row) => row.holiday === undefined)).toBe(true);
+    const sum = view.rows.reduce((total, row) => total + (row.hours.holidayMinutes ?? 0), 0);
+
+    expect(view.footer?.holidayMinutes).toBe(sum);
+    expect(view.footer?.holiday).toEqual(figureOf(sum));
+
+    const sheet = hoursExportOf(view, 'Org');
+    const at = columnOf(sheet.columns);
+
+    expect(at).toBe(sheet.columns.indexOf(t('sati.organization.total')) + 1);
+    view.rows.forEach((row, index) => {
+      const minutes = row.hours.holidayMinutes ?? 0;
+
+      expect(sheet.rows[index]?.[at]).toEqual({ kind: 'hours', value: minutes / 1440, shape: minutes % 60 === 0 ? 'hours' : 'hoursMinutes' });
+      expect(sheet.rows[index]).toHaveLength(sheet.columns.length);
+    });
+    expect(sheet.footer?.[at]).toMatchObject({ kind: 'hours', value: sum / 1440 });
+    expect(sheet.footer).toHaveLength(sheet.columns.length);
+  });
+
+  it('the column stays under a filter that shows nobody with holiday hours; such a row has none', () => {
+    const snapshot = withHolidays(pilot, [HOLIDAY]);
+    const without = viewOf(snapshot, NO_LEAVE_RECORDS).rows.find((row) => row.holiday === undefined)!;
+    const view = viewOf(snapshot, NO_LEAVE_RECORDS, { mjesec: MONTH, osoba: without.memberId });
+
+    expect(view.holidayColumn).toBe(true);
+    expect(view.rows.map((row) => row.holiday)).toEqual([undefined]);
+    expect(view.footer?.holidayMinutes).toBe(0);
+    expect(hoursExportOf(view, 'Org').rows[0]?.[columnOf(hoursExportOf(view, 'Org').columns)]).toEqual({ kind: 'hours', value: 0, shape: 'hours' });
+  });
+
+  it('a holiday the team is off for: no worked minute, no column; leave on it costs nothing, on a worked one a day', () => {
+    const team = teamOf(PILOT, 0);
+    const record = new Map([[VIEWER_MEMBER, [{ from: HOLIDAY, to: HOLIDAY, absenceTypeId: ANNUAL_LEAVE_ID, drawsAllowance: true }]]]);
+    const off = viewOf(withHolidays(pilot, [HOLIDAY], [team]), record);
+    const worked = viewOf(withHolidays(pilot, [HOLIDAY]), record);
+
+    expect(viewerRowOf(off)).not.toHaveProperty('holiday');
+    expect(viewerRowOf(off).leave[0]?.days).toBe(0);
+    expect(viewerRowOf(worked).leave[0]?.days).toBe(1);
+    // The leave day takes nothing out of the hours: no shift was accepted as uncovered.
+    expect(viewerRowOf(worked).holiday).toEqual(figureOf(12 * 60));
+  });
+
+  it("the figure's ⓘ: one line per shift, summing to the figure, named Sati na blagdan", () => {
+    const snapshot = withHolidays(pilot, [HOLIDAY]);
+    const explanation = hoursExplanationOf(
+      snapshot,
+      { memberId: VIEWER_MEMBER, figure: { code: HOURS_FIGURE_HOLIDAY } },
+      { month: MONTH, monthName: 'rujan', year: '2026' },
+      [],
+      NO_COLLISIONS,
+      NO_LEAVE_RECORDS,
+      [],
+    );
+
+    expect(explanation?.kind).toBe(EXPLANATION_HOURS);
+    expect(explanation?.figureName).toBe('Sati na blagdan');
+    expect(explanation?.total).toEqual(figureOf(12 * 60));
+    expect(explanation?.lines.map((line) => [line.date, line.amount])).toEqual([['10.09.2026', figureOf(12 * 60)]]);
+  });
+
+  it("a Noć's ⓘ line is dated by the shift's start, the day before the holiday, with its part after midnight", () => {
+    // The viewer's Dan of 10.09. is followed by Noć 19:00–07:00 on 11.09.; 12.09. is the holiday.
+    const explanation = hoursExplanationOf(
+      withHolidays(pilot, ['2026-09-12']),
+      { memberId: VIEWER_MEMBER, figure: { code: HOURS_FIGURE_HOLIDAY } },
+      { month: MONTH, monthName: 'rujan', year: '2026' },
+      [],
+      NO_COLLISIONS,
+      NO_LEAVE_RECORDS,
+      [],
+    );
+
+    expect(explanation?.total).toEqual(figureOf(7 * 60));
+    expect(explanation?.lines.map((line) => [line.date, line.amount])).toEqual([['11.09.2026', figureOf(7 * 60)]]);
+  });
+
+  it('a decided leave on a worked holiday takes the figure away; an undecided record leaves it, as it leaves the total', () => {
+    const snapshot = withHolidays(pilot, [HOLIDAY]);
+    const team = teamOf(PILOT, 0);
+    const record = new Map([[VIEWER_MEMBER, [{ from: HOLIDAY, to: HOLIDAY, absenceTypeId: ANNUAL_LEAVE_ID, drawsAllowance: true }]]]);
+    const decided = organizationHoursOf(snapshot, { mjesec: MONTH }, TODAY, NO_COLLISIONS, [{ memberId: VIEWER_MEMBER, date: HOLIDAY, teamId: team }], record);
+
+    if (!decided.ok) throw new Error(decided.code);
+    const row = viewerRowOf(decided.view);
+
+    expect(row).not.toHaveProperty('holiday');
+    expect(row.hours.leaveMinutes).toBe(12 * 60);
+    expect(row.leave[0]?.days).toBe(1);
+    // Undecided: the shift is still worked, so its 12 hours stay in the total and in the holiday figure.
+    expect(viewerRowOf(viewOf(snapshot, record)).holiday).toEqual(figureOf(12 * 60));
+  });
+
+  it("the viewer's own Sati: the figure only with holiday hours", () => {
+    const own = myHoursOf(withHolidays(pilot, [HOLIDAY]), { mjesec: MONTH }, TODAY, NO_COLLISIONS, [], NO_LEAVE_RECORDS);
+    const none = myHoursOf(pilot, { mjesec: MONTH }, TODAY, NO_COLLISIONS, [], NO_LEAVE_RECORDS);
+
+    if (!own.ok || !none.ok) throw new Error('unavailable');
+    expect(own.view.holiday).toEqual(figureOf(12 * 60));
+    expect(none.view).not.toHaveProperty('holiday');
+    expect(t(own.view.holiday!.key, own.view.holiday!.values)).toBe('12 h');
   });
 });
