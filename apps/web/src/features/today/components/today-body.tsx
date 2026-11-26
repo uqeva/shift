@@ -69,9 +69,14 @@ export function TodayBody({
 
   if (today.kind === TODAY_UNSCHEDULED) {
     return (
-      <Card className="min-w-0 p-4 sm:p-6">
-        <p>{t(todayMessageKey(today.kind))}</p>
-      </Card>
+      <>
+        <Card className="min-w-0 p-4 sm:p-6">
+          <p>{t(todayMessageKey(today.kind))}</p>
+        </Card>
+        {/* STORY 21.8: a member on no team may still be asked to take a swap, a Personal Shift's
+            above all: *Zamjene* reads its own rows, only while there is one. */}
+        <MySwapsCard surfaceKeys={MEMBER_TODAY_SURFACE_KEYS} />
+      </>
     );
   }
 

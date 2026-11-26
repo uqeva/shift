@@ -28,7 +28,7 @@ import { durationValuesOf } from '@/utils/time';
 
 /** A shift's words for a message: its day, and its team's name or the words for one the snapshot does not hold. */
 function shiftNamed(shift: SwapShiftShown): { readonly day: string; readonly team: string } {
-  return { day: shift.day, team: shift.team ?? t('danas.swaps.unknownTeam') };
+  return { day: shift.day, team: shift.noTeam ? t('kalendar.cell.noTeam') : (shift.team ?? t('danas.swaps.unknownTeam')) };
 }
 
 /** `−12 h`, `+12 h 30 min` or `bez promjene`: the proposal preview's own words, signed. */

@@ -1147,6 +1147,8 @@ describe('every real change names a field (retro A4)', () => {
         'suspended',
         // Story 21.7 (0081): a replacement's link to the assignment the same save writes.
         'personal_assignment_id',
+        // Story 21.8 (0083): a swap approval's return-side assignment, as the given side's.
+        'return_personal_assignment_id',
       ]),
     );
   });

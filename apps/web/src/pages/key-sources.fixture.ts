@@ -549,7 +549,8 @@ export const KEY_SOURCES = [
     // 114 SINCE STORY 21.18: the holiday's calls — the shared mark's `blagdan {name}` and an emptied shift's `blagdan` (`holiday-mark.tsx`), and the admin week's head and cell label `blagdan {name}`, an emptied cell's `blagdan`, and its legend's word and key line.
     // 115 SINCE STORY 21.7: a teamless conflict's `bez tima` in *Treba tebe*.
     // 116 SINCE STORY 21.20: *Premalo ljudi*'s calm line when the teams' own minimums differ (`calmEach`).
-    strings: 116,
+    // 117 SINCE STORY 21.8: a teamless swap shift's `bez tima` on *Zamjene*.
+    strings: 117,
   },
   {
     // STORY 6.1a: today's three cases, the next shift's two headings, and
@@ -985,7 +986,8 @@ export const KEY_SOURCES = [
     // 233 SINCE STORY 21.10: a day detail member's `osobna rotacija`, after the line's separator.
     // 240 SINCE STORY 21.18: the holiday's calls — the shared mark's `blagdan {name}` and an emptied cell's `blagdan` (`holiday-mark.tsx`), the date head's `blagdan {name}` (`date-grid.tsx`), the key's word and line, and the day detail's `{team} ne radi na blagdan.` and `Prema rotaciji: {type}.`.
     // 239 SINCE ITS REVIEW: the emptied day's sentence moved to `holidayOffMessageKey` (the day detail's rules).
-    strings: 239,
+    // 244 SINCE STORY 21.8: a teamless Personal Shift's *Predloži zamjenu*, named by its date, and the sent line's `bez tima`.
+    strings: 244,
   },
   {
     // STORY 12.2. On the swap proposal: its heading (twice, once while the
@@ -1004,7 +1006,8 @@ export const KEY_SOURCES = [
     name: 'the swap proposal',
     file: SWAP_PROPOSAL,
     keys: translationKeys,
-    strings: 39,
+    // 40 SINCE STORY 21.8: a shift with no team, `bez tima`.
+    strings: 40,
   },
   {
     // STORY 12.2: the refusals a send says, off `swapSendMessageKey` — NINE
@@ -1014,7 +1017,8 @@ export const KEY_SOURCES = [
     name: 'the swap proposal rules',
     file: SWAP_PROPOSAL_KEYS,
     keys: messageKeyUnions,
-    strings: 11,
+    // 15 SINCE STORY 21.8: a roster refusal's and a taker's assignment's line and preview words (`swapBlockedLineMessageKey`, `swapBlockedMessageKey`).
+    strings: 15,
   },
   {
     // STORY 12.3: *Zamjene*'s eight status words (`swapWordMessageKey`), and
@@ -1040,7 +1044,8 @@ export const KEY_SOURCES = [
     name: 'the swap decision screen',
     file: SWAP_DECISION,
     keys: translationKeys,
-    strings: 40,
+    // 44 SINCE STORY 21.8: a shift with no team, `bez tima`, and the proposal rules' words it reaches.
+    strings: 44,
   },
   {
     // STORY 12.4: the decision screen's seven status words, off
@@ -1293,7 +1298,8 @@ export const KEY_SOURCES = [
     // 169 SINCE STORY 21.12: the job role record, its field label and the unknown role.
     // 174 SINCE STORY 21.10: the schedule version record, its source field and the three sources.
     // 176 SINCE STORY 21.16: the holiday record, `Blagdan`, and a team's field, `Ne radi na blagdane`.
-    strings: 176,
+    // 179 SINCE STORY 21.8: a swap's Personal Shift fields (0083).
+    strings: 179,
   },
   {
     // STORY 21.4: *Ručni raspored* — the page, the grid and its legend, the
@@ -1375,7 +1381,8 @@ export const KEY_SOURCES = [
     // *Zatvorena deaktivacijom*) and *Zamjena je naknadno izmijenjena u
     // kalendaru.*
     // 51 SINCE STORY 21.7: `bez tima` for a teamless conflict on Čeka odluku, on Odlučeno and in the status line.
-    strings: 51,
+    // 52 SINCE STORY 21.8: a swap shift's `bez tima`.
+    strings: 52,
   },
   {
     // STORY 5.4b. On one conflict's screen, through `t('…')`: the way back

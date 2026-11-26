@@ -68,7 +68,7 @@ Make Smjenko plan the first production pilot's real month without workarounds. T
   - `conflict_resolutions.team_id` becomes nullable, under a `NULLS NOT DISTINCT` key.
   - Replace Member gains a `personal_assignment_id` form. It matches only while that assignment is live, of the same date and type, and counted with the collision's team.
   - `resolve_with_personal_assignment(p_items)` writes the assignments and the resolutions in one transaction. As built by 21.7 (`0081`): 1–366 items `{ memberId, date, teamId|null, shiftTypeId, replacementId, note? }`, the assignments through 0077's save (one notice per replacement per call), an equal live `SHIFT` reused, an `OFF` replaced, another `SHIFT` 23505 `CONFLICT_REPLACEMENT_TAKEN`; a trigger ends the resolution when its assignment is removed. A Personal Shift (team or none) is replaced by assignment, a rotation shift by override; a teamless one only by a member with no team that date.
-  - A swap approval writes assignments through the same save: the taker gets the shift, the giver gets `OFF`.
+  - A swap approval writes assignments through the same save: the taker gets the shift, the giver gets `OFF`. As built by 21.8 (`0083`): a personal side stores its counted team (or none) and its type (`given_personal`/`shift_type_id`, `return_personal`/`return_shift_type_id`); `decide_swap_request` sends every personal item to ONE `save_personal_assignments` call and refuses a taker already holding a live `SHIFT` that date (23505 `SWAP_REQUEST_TAKER_ASSIGNED`); the decision names the takers' assignments; a swap with a personal side never names one date twice. The web's `SwapShiftKey` carries `personal: { shiftTypeId }`, a teamless one is proposed from *Moj raspored* (`smjena=bez-tima`).
 - **Holidays and minimums (AD-27).**
   - `organization_holidays` holds one row per date, with a `name` of 1–100 code points. Every member reads it. An admin inserts, renames (`name` only) and deletes.
   - The import is one PostgREST insert with `Prefer: resolution=ignore-duplicates`. There is no RPC.
@@ -118,7 +118,8 @@ Make Smjenko plan the first production pilot's real month without workarounds. T
 
 ## Cross-Story Dependencies
 
-- **Status (2026-11-26).** Done, merged with CI green: 21.1–21.5, 21.9, 21.10 (PR #377, `0079`), 21.12, 21.15 (PR #378), and 21.16 with 21.17 (PR #380, `0080`). 21.6 (PR #374) and 21.25 (PR #376) are merged on `main` and still `review` in the sprint status until their specs are rewritten. 21.18 and 21.19 are built and in review, CI pending (no migration; branch `feat/21-18-21-19-holidays-shown`). 21.21, 21.22, 21.23 and 21.24 are built and in review, waiting on CI. The rest are ready-for-dev.
+- **Status (2026-11-26, story 21.8).** 21.6 (PR #374) and 21.7 (PR #381, `0081`) are done with CI green. 21.8 is built on `feat/21-8-personal-swaps` (`0083`, merging after 21.20's `0082`), CI pending.
+- **Status (2026-11-26, earlier; superseded by the line above for 21.6 and 21.7).** Done, merged with CI green: 21.1–21.5, 21.9, 21.10 (PR #377, `0079`), 21.12, 21.15 (PR #378), and 21.16 with 21.17 (PR #380, `0080`). 21.6 (PR #374) and 21.25 (PR #376) are merged on `main` and still `review` in the sprint status until their specs are rewritten. 21.18 and 21.19 are built and in review, CI pending (no migration; branch `feat/21-18-21-19-holidays-shown`). 21.21, 21.22, 21.23 and 21.24 are built and in review, waiting on CI. The rest are ready-for-dev.
 - **Personal track.** 21.1 → 21.2 → 21.3 → 21.4 → 21.5. 21.6 needs 21.2. 21.7 and 21.8 need 21.6.
   - 21.5 reuses 21.4's draft, preview and save.
   - No e2e opens `/rucni-raspored` yet. One is owed with 21.5.

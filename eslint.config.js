@@ -395,6 +395,9 @@ export const FEATURE_PUBLIC = {
   planning: [
     'components/manual-preview-dialog', // members
     'services/manual-preview', // members
+    // Story 21.8: a swap of a Personal Shift builds its "after" as the grid's
+    // draft does (`draftAppliedOf`), never a second assignment "after".
+    'services/manual-grid', // swaps
   ],
   rotation: [
     'services/list', // calendar, members, onboarding, shift-types, teams
@@ -434,7 +437,8 @@ export const FEATURE_PUBLIC = {
     'hooks/use-organization-swaps', // conflicts, today
     'services/my-swaps', // calendar, teams, today
     'services/organization-swaps', // conflicts, teams, today
-    'services/swap-proposal', // pages
+    // Story 21.8: *Moj raspored* offers a teamless Personal Shift's swap by the surface's own rule.
+    'services/swap-proposal', // calendar, pages
     'utils/element-ids', // pages
   ],
   // Story 6.1b: *Danas*'s retry reads the team line's key again with the rest.

@@ -503,9 +503,16 @@ describe('a decision whose request has no event read is named through the reques
     await expect(queryFn({ signal: new AbortController().signal })).rejects.toThrow(HISTORY_UNAVAILABLE);
   });
 
-  it('makes the whole read unavailable on a swap request missing its team', async () => {
+  it('story 21.8: reads a swap request whose Personal Shift counts with no team', async () => {
+    const row = { id: 'swap-1', proposer_id: 'member-ana', addressee_id: 'member-ivo', team_id: null, return_team_id: null };
+    const stub = source([decisionRow(5, 'swap_request_decisions', 'swap-1')], { swap_requests: [row] });
+
+    expect((await read(stub)).requests).toEqual([{ tableName: 'swap_requests', id: 'swap-1', row }]);
+  });
+
+  it('makes the whole read unavailable on a swap request missing its addressee (story 21.8: a teamless one names no team)', async () => {
     const stub = source([decisionRow(5, 'swap_request_decisions', 'swap-1')], {
-      swap_requests: [{ id: 'swap-1', proposer_id: 'a', addressee_id: 'b', team_id: null, return_team_id: null }],
+      swap_requests: [{ id: 'swap-1', proposer_id: 'a', addressee_id: null, team_id: null, return_team_id: null }],
     });
 
     await expect(read(stub)).rejects.toThrow(HISTORY_UNAVAILABLE);

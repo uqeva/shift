@@ -50,6 +50,27 @@ export async function connect(url: string = DATABASE_URL): Promise<pg.Client> {
   return client;
 }
 
+/**
+ * STORY 21.8 (0083): a swap approval's decision names the TAKER's Personal
+ * Assignment on each personal side, by a key that does not cascade. Before
+ * any assignment `assignments` selects (a subquery over `params`) is deleted,
+ * the swaps whose decision names one go — their notifications (0050, 0051),
+ * the decision, then the swap — in the caller's transaction, so no closed swap
+ * is left that reads as withdrawn.
+ */
+async function removeSwapsNamingAssignments(client: pg.Client, assignments: string, params: readonly unknown[]): Promise<void> {
+  const naming = `select d.request_id from swap_request_decisions d
+                   where d.personal_assignment_id in (${assignments}) or d.return_personal_assignment_id in (${assignments})`;
+  await client.query(`delete from notification_outbox where subject_id in (${naming})`, [...params]);
+  const removed = await client.query<{ request_id: string }>(
+    `delete from swap_request_decisions d
+      where d.personal_assignment_id in (${assignments}) or d.return_personal_assignment_id in (${assignments})
+      returning d.request_id`,
+    [...params],
+  );
+  await client.query('delete from swap_requests where id = any($1::uuid[])', [removed.rows.map((row) => row.request_id)]);
+}
+
 /** The address domain every member of the run organization `slug` signs in under. */
 export function addressDomain(slug: string): string {
   return `${slug}.shift.invalid`;
@@ -257,6 +278,12 @@ export async function removeFormerMemberInSql(slug: string, memberId: string): P
       `delete from conflict_resolutions c
         using personal_assignments p, organizations o
         where o.slug = $1 and p.organization_id = o.id and p.member_id = $2 and c.personal_assignment_id = p.id`,
+      [slug, memberId],
+    );
+    // Story 21.8: so does a swap approval's decision (0083).
+    await removeSwapsNamingAssignments(
+      client,
+      `select p.id from personal_assignments p join organizations o on o.id = p.organization_id where o.slug = $1 and p.member_id = $2`,
       [slug, memberId],
     );
     await client.query(
@@ -492,6 +519,12 @@ export async function removeLeaveMemberInSql(slug: string, memberId: string): Pr
           and personal_assignment_id in (select id from personal_assignments where organization_id = $1 and member_id = $2)`,
       scope,
     );
+    // Story 21.8: and any swap approval's decision naming one (0083).
+    await removeSwapsNamingAssignments(
+      client,
+      'select id from personal_assignments where organization_id = $1 and member_id = $2',
+      scope,
+    );
     await client.query('delete from personal_assignments where organization_id = $1 and member_id = $2', scope);
     // Story 21.10: the member's schedule versions (0079), whose member key does not cascade.
     await client.query('delete from member_schedule_versions where organization_id = $1 and member_id = $2', scope);
@@ -587,7 +620,8 @@ export async function removeLeaveMemberInSql(slug: string, memberId: string): Pr
 /** One swap proposal as 0049 stores it (story 12.2): the given shift, the addressee and the return shift. */
 export interface StoredSwapRequest {
   readonly addresseeId: string;
-  readonly teamId: string;
+  /** Story 21.8: `null` for a Personal Shift counted with no team. */
+  readonly teamId: string | null;
   readonly date: string;
   readonly returnTeamId: string | null;
   readonly returnDate: string | null;
@@ -600,7 +634,7 @@ export async function swapRequestsOfInSql(slug: string, proposerId: string): Pro
   try {
     const found = await client.query<{
       addressee_id: string;
-      team_id: string;
+      team_id: string | null;
       date: string;
       return_team_id: string | null;
       return_date: string | null;
@@ -641,21 +675,38 @@ export async function seedSwapRequestInSql(
   swap: {
     readonly proposerId: string;
     readonly addresseeId: string;
-    readonly teamId: string;
+    /** Story 21.8: `null` for a Personal Shift counted with no team. */
+    readonly teamId: string | null;
     readonly date: string;
     readonly returnTeamId?: string | null;
     readonly returnDate?: string | null;
+    /** Story 21.8 (0083): the given shift is the proposer's Personal Shift, of this type. */
+    readonly shiftTypeId?: string | null;
+    /** Story 21.8 (0083): the return shift is the addressee's Personal Shift, of this type. */
+    readonly returnShiftTypeId?: string | null;
   },
 ): Promise<string> {
   const client = await connect();
   try {
+    // The columns the browser's parse reads (`SWAP_SHIFT_COLUMNS`), each side's form named as 0083 stores it.
     const inserted = await client.query<{ id: string }>(
-      `insert into swap_requests (organization_id, proposer_id, addressee_id, team_id, date, return_team_id, return_date, created_by)
-       select o.id, $2, $3, $4, $5::date, $6, $7::date, m.auth_user_id
+      `insert into swap_requests (organization_id, proposer_id, addressee_id, team_id, date, return_team_id, return_date,
+                                  given_personal, shift_type_id, return_personal, return_shift_type_id, created_by)
+       select o.id, $2, $3, $4, $5::date, $6, $7::date, $8::uuid is not null, $8, $9::uuid is not null, $9, m.auth_user_id
          from organizations o join members m on m.organization_id = o.id and m.id = $2
         where o.slug = $1
        returning id`,
-      [slug, swap.proposerId, swap.addresseeId, swap.teamId, swap.date, swap.returnTeamId ?? null, swap.returnDate ?? null],
+      [
+        slug,
+        swap.proposerId,
+        swap.addresseeId,
+        swap.teamId,
+        swap.date,
+        swap.returnTeamId ?? null,
+        swap.returnDate ?? null,
+        swap.shiftTypeId ?? null,
+        swap.returnShiftTypeId ?? null,
+      ],
     );
     const id = inserted.rows[0]?.id;
 
@@ -796,6 +847,13 @@ export async function removeOfflineMemberInSql(slug: string, username: string): 
       `delete from conflict_resolutions c using personal_assignments p, members m, organizations o
         where c.personal_assignment_id = p.id and p.organization_id = m.organization_id and p.member_id = m.id
           and o.id = m.organization_id and o.slug = $1 and m.username = $2`,
+      [slug, username],
+    );
+    // Story 21.8: so does a swap approval's decision (0083).
+    await removeSwapsNamingAssignments(
+      client,
+      `select p.id from personal_assignments p join members m on m.organization_id = p.organization_id and m.id = p.member_id
+         join organizations o on o.id = m.organization_id where o.slug = $1 and m.username = $2`,
       [slug, username],
     );
     await client.query(
@@ -2082,6 +2140,12 @@ export async function removeTeamInSql(slug: string, teamId: string): Promise<voi
           and (c.team_id = $2 or c.personal_assignment_id in (select p.id from personal_assignments p where p.organization_id = o.id and p.team_id = $2))`,
       scope,
     );
+    // Story 21.8: and any swap approval's decision naming such an assignment (0083).
+    await removeSwapsNamingAssignments(
+      client,
+      'select p.id from personal_assignments p join organizations o on o.id = p.organization_id where o.slug = $1 and p.team_id = $2',
+      scope,
+    );
     await client.query(
       `delete from personal_assignments p using organizations o
         where o.slug = $1 and p.organization_id = o.id and p.team_id = $2`,
@@ -2513,17 +2577,18 @@ export async function removeSeededRotation(seeded: SeededRotation): Promise<void
     // Before the overrides, too: an approved swap's decision keys to the
     // overrides its approval wrote (0049, no cascade). The decision goes, and
     // its swap with it (and the swap's notifications, 0050 and 0051), so no
-    // closed swap is left that reads as withdrawn.
+    // closed swap is left that reads as withdrawn. Story 21.8 (0083): an
+    // approval with a personal given side names only its return override.
     await client.query(
       `delete from notification_outbox
         where organization_id = $1
           and subject_id in (select request_id from swap_request_decisions
-                              where organization_id = $1 and roster_override_id is not null)`,
+                              where organization_id = $1 and (roster_override_id is not null or return_roster_override_id is not null))`,
       [seeded.organizationId],
     );
     const approved = await client.query<{ request_id: string }>(
       `delete from swap_request_decisions
-        where organization_id = $1 and roster_override_id is not null
+        where organization_id = $1 and (roster_override_id is not null or return_roster_override_id is not null)
         returning request_id`,
       [seeded.organizationId],
     );
@@ -2558,11 +2623,24 @@ export async function removeSeededRotation(seeded: SeededRotation): Promise<void
       'delete from shift_type_overrides where organization_id = $1 and shift_type_id = any($2::uuid[])',
       types,
     );
+    // Story 21.8: a swap of a Personal Shift names its type (0083), with no cascade: its
+    // notifications, its decision, then the swap.
+    const typed = `select r.id from swap_requests r
+                    where r.organization_id = $1 and (r.shift_type_id = any($2::uuid[]) or r.return_shift_type_id = any($2::uuid[]))`;
+    await client.query(`delete from notification_outbox where subject_id in (${typed})`, types);
+    await client.query(`delete from swap_request_decisions where request_id in (${typed})`, types);
+    await client.query(`delete from swap_requests where id in (${typed})`, types);
     // Story 21.2: so does a Personal Assignment (0077); story 21.7: first any decision naming one (0081).
     await client.query(
       `delete from conflict_resolutions
         where organization_id = $1
           and personal_assignment_id in (select id from personal_assignments where organization_id = $1 and shift_type_id = any($2::uuid[]))`,
+      types,
+    );
+    // Story 21.8: and any swap approval's decision naming one (0083).
+    await removeSwapsNamingAssignments(
+      client,
+      'select id from personal_assignments where organization_id = $1 and shift_type_id = any($2::uuid[])',
       types,
     );
     await client.query(

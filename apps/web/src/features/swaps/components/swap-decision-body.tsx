@@ -76,10 +76,10 @@ function SwapFacts({ facts }: { readonly facts: SwapDecisionFacts }): ReactNode 
       </p>
       <p className="min-w-0 break-words text-sm tabular-nums text-muted-foreground">
         {facts.returnShift === null
-          ? t('zaOdluku.swap.shift', { date: facts.given.day, team: facts.given.teamName })
+          ? t('zaOdluku.swap.shift', { date: facts.given.day, team: facts.given.teamName ?? t('kalendar.cell.noTeam') })
           : t('zaOdluku.swap.shifts', {
-              given: t('zaOdluku.swap.shift', { date: facts.given.day, team: facts.given.teamName }),
-              back: t('zaOdluku.swap.shift', { date: facts.returnShift.day, team: facts.returnShift.teamName }),
+              given: t('zaOdluku.swap.shift', { date: facts.given.day, team: facts.given.teamName ?? t('kalendar.cell.noTeam') }),
+              back: t('zaOdluku.swap.shift', { date: facts.returnShift.day, team: facts.returnShift.teamName ?? t('kalendar.cell.noTeam') }),
             })}
       </p>
     </div>
@@ -102,7 +102,7 @@ function SwapPreview({ preview }: { readonly preview: SwapDecisionPreview | null
       <span className="grid gap-1 rounded-md border bg-muted p-3">
         {preview.lines.map((line) => (
           <span key={`${line.day}/${line.teamName}`} className="block break-words tabular-nums">
-            {t('zaOdluku.swap.worksInstead', { day: line.day, team: line.teamName, in: line.inName, out: line.outName })}
+            {t('zaOdluku.swap.worksInstead', { day: line.day, team: line.teamName ?? t('kalendar.cell.noTeam'), in: line.inName, out: line.outName })}
           </span>
         ))}
         {preview.hours.map((delta) => {

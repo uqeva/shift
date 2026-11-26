@@ -7937,3 +7937,55 @@ describe('each team has its own minimum (0082, story 21.20)', () => {
     expect(text).not.toMatch(/member_schedule_inputs|notify_members|notification_outbox|enqueue/);
   });
 });
+
+describe('swaps give and take personal shifts (0083, story 21.8)', () => {
+  const MIGRATION = '0083_personal_swaps.sql';
+  const sql = (): string => stripLineComments(readFileSync(join(supabaseRoot, 'migrations', MIGRATION), 'utf8'));
+  const decide = (): string => {
+    const lines = sql().split('\n');
+    const start = lines.findIndex((line) => /^create or replace function public\.decide_swap_request\(/.test(line));
+    const end = lines.findIndex((line, index) => index > start && line === '$$;');
+    return start < 0 ? '' : lines.slice(start, end + 1).join('\n');
+  };
+
+  it('stores a personal side by its counted team or none and its type, and keeps one open swap per side NULLS NOT DISTINCT', () => {
+    const text = sql();
+    expect(text).toMatch(/alter table public\.swap_requests\s+alter column team_id drop not null;/);
+    expect(text).toMatch(/add column given_personal boolean not null default false,/);
+    expect(text).toMatch(/add column return_personal boolean not null default false,/);
+    expect(text).toMatch(/foreign key \(organization_id, shift_type_id\)\s+references public\.shift_types \(organization_id, id\)/);
+    expect(text).toMatch(/on public\.swap_requests \(organization_id, proposer_id, team_id, date\) nulls not distinct\s+where closed_at is null;/);
+    expect(text).toMatch(
+      /on public\.swap_requests \(organization_id, addressee_id, return_team_id, return_date\) nulls not distinct\s+where closed_at is null and return_date is not null;/,
+    );
+    expect(text).toMatch(/grant insert \(given_personal, shift_type_id, return_personal, return_shift_type_id\) on table public\.swap_requests\s+to authenticated;/);
+    // No new table, policy or function: 0049's insert policy and definers stand.
+    expect(text).not.toMatch(/create table|create policy|create (?:or replace )?function (?!public\.decide_swap_request\()/);
+  });
+
+  it('writes a personal side through ONE save, after the taker refusal and before the decision, and a team side as 0049 did', () => {
+    const body = decide();
+    expect(body, 'decide_swap_request is not re-created').not.toBe('');
+    expect(body.match(/perform public\.save_personal_assignments\(changes\);/g)?.length, 'not one save').toBe(1);
+    expect(body).toMatch(/errcode = 'unique_violation',\s+message = 'SWAP_REQUEST_TAKER_ASSIGNED'/);
+    expect(body.indexOf('SWAP_REQUEST_TAKER_ASSIGNED'), 'the taker refusal runs after an override is written').toBeLessThan(
+      body.indexOf('insert into public.roster_overrides'),
+    );
+    expect(body.indexOf('save_personal_assignments'), 'the decision is written before the assignments are saved').toBeLessThan(
+      body.indexOf('insert into public.swap_request_decisions'),
+    );
+    // 0049's refusals, unchanged.
+    for (const message of ['SWAP_REQUEST_DECISION_REFUSED', 'SWAP_REQUEST_OUTCOME_UNKNOWN', 'SWAP_REQUEST_NOT_OPEN', 'SWAP_REQUEST_MEMBER_INACTIVE']) {
+      expect(body, message).toContain(`message = '${message}'`);
+    }
+    expect(body).toMatch(
+      /values \(claimed, swap\.team_id, swap\.date, swap\.proposer_id, swap\.addressee_id, p_reason\)/,
+    );
+    expect(body).toMatch(/'set', pg_catalog\.jsonb_build_object\('kind', 'OFF'\)/);
+    expect(body, 'an exception is swallowed').not.toMatch(/\bexception\s+when\b/i);
+    for (const role of ['public', 'anon', 'service_role']) {
+      expect(sql()).toContain(`revoke execute on function public.decide_swap_request(uuid, text, text) from ${role};`);
+    }
+    expect(sql()).toContain('grant execute on function public.decide_swap_request(uuid, text, text) to authenticated;');
+  });
+});

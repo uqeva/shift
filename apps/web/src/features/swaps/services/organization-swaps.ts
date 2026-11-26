@@ -67,6 +67,10 @@ export type SwapOutcome = typeof SWAP_APPROVED | typeof SWAP_REJECTED | typeof S
 /** The decisions embedded through their composite key (0049). */
 export const DECISIONS_EMBED = 'swap_request_decisions';
 
+/** STORY 21.8: the columns a swap's two shifts are read from — 0049's team and date, 0083's form and type. */
+export const SWAP_SHIFT_COLUMNS =
+  'team_id,date,given_personal,shift_type_id,return_team_id,return_date,return_personal,return_shift_type_id';
+
 /** Whether the swap is still open: proposed, or accepted and waiting for an admin. */
 export function swapOpen(status: SwapStatus): boolean {
   return status === SWAP_PROPOSED || status === SWAP_ACCEPTED;
@@ -142,7 +146,7 @@ export const ORGANIZATION_SWAPS_TABLE = SWAP_REQUESTS_TABLE;
  * close, and its decision — the outcome, the overrides an approval wrote,
  * and who decided and when (AD-11).
  */
-export const ORGANIZATION_SWAP_REQUESTS_COLUMNS = `id,proposer_id,addressee_id,team_id,date,return_team_id,return_date,answer,closed_at,created_at,${DECISIONS_EMBED}(outcome,roster_override_id,return_roster_override_id,decided_by,decided_at)`;
+export const ORGANIZATION_SWAP_REQUESTS_COLUMNS = `id,proposer_id,addressee_id,${SWAP_SHIFT_COLUMNS},answer,closed_at,created_at,${DECISIONS_EMBED}(outcome,roster_override_id,return_roster_override_id,personal_assignment_id,return_personal_assignment_id,decided_by,decided_at)`;
 
 /** The read could not be answered, or answered something that is not every row. */
 export const ORGANIZATION_SWAPS_UNAVAILABLE = 'ORGANIZATION_SWAPS_UNAVAILABLE';
@@ -212,13 +216,66 @@ export function organizationSwapRequestsQueryOptions(table: () => OrganizationSw
 
 // ------------------------------------------------------------------ the parse
 
+/**
+ * One side of a swap row as a shift, or `undefined` when it cannot be
+ * trusted: a team shift names its team and no type; a Personal Shift (story
+ * 21.8, `personal` true) names its type and its team or none. An absent flag
+ * reads as a team shift, as a row before 0083 is one.
+ */
+function sideOf(team: unknown, date: unknown, personal: unknown, type: unknown): SwapShiftKey | undefined {
+  if (typeof date !== 'string' || !isIsoDate(date)) return undefined;
+
+  const teamId = optionalIdOf(team);
+  const shiftTypeId = optionalIdOf(type);
+
+  if (teamId === undefined || shiftTypeId === undefined) return undefined;
+  if (personal === true) return shiftTypeId === null ? undefined : { teamId, date, personal: { shiftTypeId } };
+  if (personal !== false && personal !== null && personal !== undefined) return undefined;
+
+  return teamId === null || shiftTypeId !== null ? undefined : { teamId, date };
+}
+
+/**
+ * A swap row's given and return shift (0049; 0083's Personal Shifts, story
+ * 21.8), or `null` when they cannot be trusted: either side malformed, a
+ * return shift named in part, or a return team shift equal to the given one.
+ * The one parse both the viewer's and the organization's read use.
+ */
+export function swapShiftsOfRow(
+  row: Readonly<Record<string, unknown>>,
+): { readonly given: SwapShiftKey; readonly returnShift: SwapShiftKey | null } | null {
+  const given = sideOf(row['team_id'], row['date'], row['given_personal'], row['shift_type_id']);
+
+  if (given === undefined) return null;
+
+  const returnDate = row['return_date'];
+  const named = [row['return_team_id'], returnDate, row['return_shift_type_id']].some((value) => value !== null && value !== undefined);
+
+  if (!named && row['return_personal'] !== true) return { given, returnShift: null };
+
+  const returnShift = sideOf(row['return_team_id'], returnDate, row['return_personal'], row['return_shift_type_id']);
+
+  if (returnShift === undefined) return null;
+  if (given.personal === undefined && returnShift.personal === undefined && returnShift.teamId === given.teamId && returnShift.date === given.date) {
+    return null;
+  }
+  // 0083's `swap_requests_personal_dates_distinct`: a swap with a personal side never names one date twice.
+  if ((given.personal !== undefined || returnShift.personal !== undefined) && returnShift.date === given.date) return null;
+
+  return { given, returnShift };
+}
+
 /** A swap's decision as 0049 stores it (AD-11): the outcome, an approval's overrides, and who decided and when. */
 export interface SwapDecision {
   readonly outcome: SwapOutcome;
-  /** The override an approval wrote on the given shift; `null` unless approved. */
+  /** The override an approval wrote on the given team shift; `null` unless approved, or for a personal given shift. */
   readonly rosterOverrideId: string | null;
-  /** The override an approval wrote on the return shift; `null` unless approved with a return shift. */
+  /** The override an approval wrote on the return team shift; `null` unless approved with one. */
   readonly returnRosterOverrideId: string | null;
+  /** STORY 21.8 (0083): the taker's assignment an approval wrote on a personal given shift; `null` otherwise. */
+  readonly personalAssignmentId: string | null;
+  /** STORY 21.8 (0083): the taker's assignment an approval wrote on a personal return shift; `null` otherwise. */
+  readonly returnPersonalAssignmentId: string | null;
   /** The deciding admin's auth user (`decided_by`); for a deactivation close, the deactivating admin. */
   readonly decidedBy: string;
   /** The instant, as the database answered it. */
@@ -261,7 +318,12 @@ function instantOf(value: unknown): string | null {
  * return shift's exactly when there is one; a rejection or deactivation close
  * names neither; every decision names its author and instant.
  */
-function decisionOf(embedded: unknown, status: SwapStatus, hasReturn: boolean): SwapDecision | null | undefined {
+function decisionOf(
+  embedded: unknown,
+  status: SwapStatus,
+  given: SwapShiftKey,
+  returnShift: SwapShiftKey | null,
+): SwapDecision | null | undefined {
   const [decision] = decisionsOf(embedded);
 
   if (status !== SWAP_APPROVED && status !== SWAP_REJECTED && status !== SWAP_DEACTIVATED) {
@@ -272,19 +334,42 @@ function decisionOf(embedded: unknown, status: SwapStatus, hasReturn: boolean): 
 
   const rosterOverrideId = optionalIdOf(decision['roster_override_id']);
   const returnRosterOverrideId = optionalIdOf(decision['return_roster_override_id']);
+  // STORY 21.8 (0083): absent from a row read before 0083, which names none.
+  const personalAssignmentId = optionalIdOf(decision['personal_assignment_id']);
+  const returnPersonalAssignmentId = optionalIdOf(decision['return_personal_assignment_id']);
   const decidedBy = idOf(decision['decided_by']);
   const decidedAt = instantOf(decision['decided_at']);
 
   if (rosterOverrideId === undefined || returnRosterOverrideId === undefined) return undefined;
+  if (personalAssignmentId === undefined || returnPersonalAssignmentId === undefined) return undefined;
   if (decidedBy === null || decidedAt === null) return undefined;
 
   if (status === SWAP_APPROVED) {
-    if (rosterOverrideId === null || (returnRosterOverrideId !== null) !== hasReturn) return undefined;
-  } else if (rosterOverrideId !== null || returnRosterOverrideId !== null) {
+    // Each side names what its form writes: an override for a team shift, an assignment for a Personal Shift.
+    const givenPersonal = given.personal !== undefined;
+    const returnPersonal = returnShift?.personal !== undefined;
+
+    if ((rosterOverrideId !== null) === givenPersonal || (personalAssignmentId !== null) !== givenPersonal) return undefined;
+    if ((returnRosterOverrideId !== null) !== (returnShift !== null && !returnPersonal)) return undefined;
+    if ((returnPersonalAssignmentId !== null) !== returnPersonal) return undefined;
+  } else if (
+    rosterOverrideId !== null ||
+    returnRosterOverrideId !== null ||
+    personalAssignmentId !== null ||
+    returnPersonalAssignmentId !== null
+  ) {
     return undefined;
   }
 
-  return { outcome: status, rosterOverrideId, returnRosterOverrideId, decidedBy, decidedAt };
+  return {
+    outcome: status,
+    rosterOverrideId,
+    returnRosterOverrideId,
+    personalAssignmentId,
+    returnPersonalAssignmentId,
+    decidedBy,
+    decidedAt,
+  };
 }
 
 /** One row as a swap of the organization, or `null` when it cannot be trusted. */
@@ -294,28 +379,14 @@ export function organizationSwapOf(row: unknown): OrganizationSwap | null {
   const id = idOf(row['id']);
   const proposerId = idOf(row['proposer_id']);
   const addresseeId = idOf(row['addressee_id']);
-  const teamId = idOf(row['team_id']);
-  const date = row['date'];
-  const returnTeamId = row['return_team_id'];
-  const returnDate = row['return_date'];
+  const shifts = swapShiftsOfRow(row);
   const status = swapStatusOf(row['closed_at'], row['answer'], row[DECISIONS_EMBED]);
 
-  if (id === null || proposerId === null || addresseeId === null || teamId === null || status === null) return null;
+  if (id === null || proposerId === null || addresseeId === null || shifts === null || status === null) return null;
   if (proposerId === addresseeId) return null;
-  if (typeof date !== 'string' || !isIsoDate(date)) return null;
 
-  let returnShift: SwapShiftKey | null = null;
-
-  if (returnTeamId !== null || returnDate !== null) {
-    const backTeam = idOf(returnTeamId);
-
-    if (backTeam === null || typeof returnDate !== 'string' || !isIsoDate(returnDate)) return null;
-    if (backTeam === teamId && returnDate === date) return null;
-
-    returnShift = { teamId: backTeam, date: returnDate };
-  }
-
-  const decision = decisionOf(row[DECISIONS_EMBED], status, returnShift !== null);
+  const { given, returnShift } = shifts;
+  const decision = decisionOf(row[DECISIONS_EMBED], status, given, returnShift);
 
   if (decision === undefined) return null;
 
@@ -329,7 +400,7 @@ export function organizationSwapOf(row: unknown): OrganizationSwap | null {
     id,
     proposerId,
     addresseeId,
-    given: { teamId, date },
+    given,
     returnShift,
     status,
     createdAt,
@@ -383,7 +454,8 @@ export interface SwapShiftNamed {
   readonly date: string;
   /** `12.09.2026`. */
   readonly dateShown: string;
-  readonly teamName: string;
+  /** `null`: a Personal Shift counted with no team (story 21.8), worded `bez tima`. */
+  readonly teamName: string | null;
 }
 
 /** What every listed swap names: whose it is, the shifts, and the date it is dated by. */
@@ -415,10 +487,10 @@ export function swapLastDateOf(swap: { readonly given: SwapShiftKey; readonly re
  * @throws RangeError when the snapshot lacks its team, or the date cannot be formatted.
  */
 function shiftNamedOf(snapshot: CalendarSnapshot, shift: SwapShiftKey): SwapShiftNamed {
-  const teamName = snapshot.teams.find((team) => team.id === shift.teamId)?.name;
+  const teamName = shift.teamId === null ? null : snapshot.teams.find((team) => team.id === shift.teamId)?.name;
   const dateShown = formatIsoDate(shift.date);
 
-  if (teamName === undefined) throw new RangeError(`team ${shift.teamId} is not in the snapshot`);
+  if (teamName === undefined) throw new RangeError(`team ${String(shift.teamId)} is not in the snapshot`);
   if (dateShown === null) throw new RangeError(`the date ${shift.date} cannot be formatted`);
 
   return { date: shift.date, dateShown, teamName };
@@ -525,8 +597,13 @@ export function swapChangedLaterOf(snapshot: CalendarSnapshot, decision: SwapDec
   if (decision.outcome !== SWAP_APPROVED) return false;
 
   const live = new Set(snapshot.rosterOverrides.map((override) => override.id));
+  // STORY 21.8: an assignment an approval wrote is replaced or cleared by a later save (0077 soft-removes it).
+  const assigned = new Set(snapshot.members.flatMap((member) => member.personalAssignments.map((assignment) => assignment.id)));
 
-  return [decision.rosterOverrideId, decision.returnRosterOverrideId].some((id) => id !== null && !live.has(id));
+  return (
+    [decision.rosterOverrideId, decision.returnRosterOverrideId].some((id) => id !== null && !live.has(id)) ||
+    [decision.personalAssignmentId, decision.returnPersonalAssignmentId].some((id) => id !== null && !assigned.has(id))
+  );
 }
 
 /**

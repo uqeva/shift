@@ -8,12 +8,14 @@ import { TodayPage } from '../../pages/today.page.ts';
 import {
   API_URL,
   holdRotation,
+  personalAssignmentsOfInSql,
   removeLeaveMemberInSql,
   seedLeaveRecord,
   removeSeededRotation,
   removeTeamInSql,
   seedExtraTeam,
   seedLeaveMember,
+  seedPersonalAssignmentInSql,
   seedSwapRequestInSql,
   seedTeamRotation,
   swapRequestStateInSql,
@@ -49,7 +51,13 @@ import { expect, test } from '../../utils/custom-fixtures.ts';
  * refused as no longer waiting; offline both decisions are gated and nothing
  * is sent.
  *
- * RUN IN CI ONLY: it needs 0049 on a fresh stack.
+ * STORY 21.8: a swap of a teamless Personal Shift — two members on no team,
+ * the proposer's assignment of the seeded Dan given one way — reads `bez
+ * tima` on the colleague's *Danas* and on the admin's screen, and *Odobri*
+ * writes the colleague's `SHIFT` and the proposer's `OFF` through 0077's one
+ * save (0083), as Personal Assignments, never a roster override.
+ *
+ * RUN IN CI ONLY: it needs 0049 and 0083 on a fresh stack.
  */
 
 test.describe.configure({ timeout: 120_000 });
@@ -382,5 +390,69 @@ test.describe("an admin's swap decision screen", () => {
     }
     expect(sent(), 'the reconnect sent a decision').toEqual([]);
     expect(await swapRequestStateInSql(fixture.slug, swap.swapId)).toEqual({ answer: 'accepted', open: true, decided: false });
+  });
+});
+
+test.describe('story 21.8: a swap of a Personal Shift', () => {
+  test.use({ storageState: ADMIN_STATE });
+
+  test('a teamless Personal Shift is accepted as bez tima, and Odobri gives the colleague the shift and the proposer OFF', async ({
+    page,
+    browser,
+    fixture,
+  }) => {
+    // THE ROTATION HOLD, only for the seeded types: neither member is on its team.
+    hold = holdRotation(fixture.slug);
+    await hold.ready;
+    const suffix = randomBytes(3).toString('hex');
+    const typesTeam = await seedExtraTeam(fixture.slug, `Smjena ${suffix} T`);
+    written = { slug: fixture.slug, members: [], teams: [typesTeam.id] };
+    const rotation = await seedTeamRotation(fixture.slug, typesTeam.id, `${suffix}t`);
+    seeds.push(rotation);
+    const proposer = await seedLeaveMember(fixture.slug, null, rotation.today, 20);
+    written.members.push(proposer.id);
+    const colleague = await seedLeaveMember(fixture.slug, null, rotation.today, 20);
+    written.members.push(colleague.id);
+    const given = addDays(rotation.today, 4);
+    const dan = rotation.shiftTypeIds[0];
+
+    if (dan === undefined) throw new Error('no seeded Dan');
+
+    await seedPersonalAssignmentInSql(fixture.slug, proposer.id, given, dan);
+    const swapId = await seedSwapRequestInSql(fixture.slug, {
+      proposerId: proposer.id,
+      addresseeId: colleague.id,
+      teamId: null,
+      date: given,
+      shiftTypeId: dan,
+    });
+    const noTeam = hr.kalendar.cell.noTeam;
+
+    // The colleague reads it on *Danas* with no team, and accepts.
+    const danas = await danasOf(browser, fixture.slug, colleague);
+
+    await expect(danas.swapsCard).toBeVisible();
+    await expect(danas.swapsText(fill(hr.kalendar.swap.youWorkInstead, { day: detailDate(given), team: noTeam, name: proposer.name }))).toBeVisible();
+    await danas.swapButton(swaps.acceptName, detailDate(given), noTeam).click();
+    await expect(danas.swapsText(swaps.status.waitingDecision)).toBeVisible();
+    await expect.poll(() => swapRequestStateInSql(fixture.slug, swapId)).toEqual({ answer: 'accepted', open: true, decided: false });
+
+    // The admin's screen names the shift with no team, and Odobri writes it.
+    const screen = new SwapDecisionPage(page);
+
+    await page.goto(`/za-odluku/zamjena/${swapId}`);
+    await expect(screen.swapHeading).toBeVisible();
+    await expect(
+      screen.line(fill(swapWords.worksInstead, { day: detailDate(given), team: noTeam, in: colleague.name, out: proposer.name })),
+    ).toBeVisible();
+    await screen.approveButton.click();
+    await expect(page).toHaveURL(/\/za-odluku$/);
+    await expect.poll(() => swapRequestStateInSql(fixture.slug, swapId)).toEqual({ answer: 'accepted', open: false, decided: true });
+
+    // THE ASSIGNMENTS ARE WRITTEN: the colleague's shift of the type with no team, the proposer's day off.
+    expect((await personalAssignmentsOfInSql(fixture.slug, colleague.id)).map((row) => [row.date, row.kind, row.shiftTypeId, row.teamId])).toEqual([
+      [given, 'SHIFT', dan, null],
+    ]);
+    expect((await personalAssignmentsOfInSql(fixture.slug, proposer.id)).map((row) => [row.date, row.kind])).toEqual([[given, 'OFF']]);
   });
 });

@@ -1247,7 +1247,9 @@ export const SCREENS = [
   // every shown team, each team's day a button (`CalendarTeamDays`), written
   // once inside the map over a date's cells.
   // THIRTY-EIGHT SINCE STORY 21.23: the compact toolbar's `Filtri` (`FilterTrigger`).
-  { name: 'the Kalendar destination', file: KALENDAR, expectedFields: 6, expectedButtons: 38 },
+  // THIRTY-NINE SINCE STORY 21.8: *Moj raspored*'s *Predloži zamjenu* on a
+  // teamless Personal Shift's row, a `<Button asChild>` link, as the footer's.
+  { name: 'the Kalendar destination', file: KALENDAR, expectedFields: 6, expectedButtons: 39 },
   // STORY 12.2. On the swap proposal: the colleague and return `<Select>`s,
   // *Pošalji*, *Odustani* (a `<Button asChild>` link back to Kalendar), the
   // snapshot's unavailable alert's retry, *Natrag na Kalendar* above the title

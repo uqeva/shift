@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 
 import { useCalendarSnapshot } from '@/features/calendar/hooks/use-calendar-snapshot';
 import { CALENDAR_KEY, calendarSurfaceStateOf } from '@/features/calendar/services/snapshot';
-import { swapProposalMarkOf, type OpenSwapProposal } from '@/features/calendar/utils/day-detail';
+import type { OpenSwapProposal } from '@/features/calendar/utils/day-detail';
 import {
   MY_CONFLICT_RESOLUTIONS_KEY,
   myConflictResolutionsQueryOptions,
@@ -27,7 +27,7 @@ import {
   SWAP_VIEW_UNAVAILABLE,
   ownSwapShiftOf,
   sendSwapProposal,
-  swapDayOf,
+  swapAlreadyProposedOf,
   swapChoiceOf,
   swapChoiceOnColleague,
   swapColleaguesOf,
@@ -187,11 +187,10 @@ export function useSwapProposal(search: SwapSearch) {
     [snapshot, search, today, proposals],
   );
   // STORY 12.3: the shift the URL names, already proposed by the viewer in an open swap.
-  const alreadyProposed = useMemo(() => {
-    if (snapshot === null || search.dan === undefined || search.smjena === undefined) return null;
-
-    return swapProposalMarkOf(snapshot, swapDayOf(snapshot, { teamId: search.smjena, date: search.dan }), today, proposals);
-  }, [snapshot, search, today, proposals]);
+  const alreadyProposed = useMemo(
+    () => (snapshot === null ? null : swapAlreadyProposedOf(snapshot, search, today, proposals)),
+    [snapshot, search, today, proposals],
+  );
   const colleagues = useMemo(
     () => (snapshot === null || given === null ? [] : swapColleaguesOf(snapshot, given)),
     [snapshot, given],
@@ -239,7 +238,7 @@ export function useSwapProposal(search: SwapSearch) {
 
     setFailure(null);
 
-    const checked = swapSendCheckOf(snapshot, { teamId: given.teamId, date: given.isoDate }, choice, today);
+    const checked = swapSendCheckOf(snapshot, given.key, choice, today);
 
     if (!checked.ok) {
       setFailure(checked.code);
@@ -256,7 +255,7 @@ export function useSwapProposal(search: SwapSearch) {
       date: given.isoDate,
       teamName: given.teamName,
       colleagueName: colleague.name,
-      returnShift: returnShift === null ? null : { date: returnShift.date, teamName: back?.teamName ?? returnShift.teamId },
+      returnShift: returnShift === null ? null : { date: returnShift.date, teamName: back?.teamName ?? null },
     };
 
     sending.current = true;
@@ -270,7 +269,7 @@ export function useSwapProposal(search: SwapSearch) {
           organizationId: snapshot.organizationId,
           proposerId: snapshot.viewer.memberId,
           addresseeId: colleague.id,
-          given: { teamId: given.teamId, date: given.isoDate },
+          given: given.key,
           returnShift,
         },
       );

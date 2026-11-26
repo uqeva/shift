@@ -17,6 +17,8 @@ import {
   SWAP_NO_COLLEAGUE,
   SWAP_NO_RETURN,
   SWAP_PREVIEW_READY,
+  swapBlockedLineMessageKey,
+  swapBlockedMessageKey,
   swapMonthOf,
   swapReturnValueOf,
   swapSendMessageKey,
@@ -91,15 +93,15 @@ function deltaShown(deltaMinutes: number): string {
 function colleagueLabel(colleague: SwapColleague, usesFireRanks: boolean): string {
   const { label } = outOptionOf(colleague, ranksShown({ usesFireRanks }), positionsShown({ usesFireRanks }), LINE_WORDS);
 
-  return colleague.blocked === null ? label : t('kalendar.swap.taken', { line: label });
+  return colleague.blocked === null ? label : t(swapBlockedLineMessageKey(colleague.blocked), { line: label });
 }
 
 /** A return option's line: `subota 26.09.2026 · Smjena B · Noć 19:00–07:00`, and why it cannot be chosen where it cannot. */
 function returnLabel(option: SwapReturnOption): string {
   const type = option.range === null ? option.typeName : t('kalendar.detail.typeTimes', { name: option.typeName, range: option.range });
-  const line = t('kalendar.swap.shiftLine', { day: option.day, team: option.teamName, type });
+  const line = t('kalendar.swap.shiftLine', { day: option.day, team: option.teamName ?? t('kalendar.cell.noTeam'), type });
 
-  return option.blocked === null ? line : t('kalendar.swap.taken', { line });
+  return option.blocked === null ? line : t(swapBlockedLineMessageKey(option.blocked), { line });
 }
 
 /**
@@ -119,7 +121,7 @@ function renderPreview(
   }
 
   if (preview.kind !== SWAP_PREVIEW_READY) {
-    return <p className="text-sm font-medium">{t('kalendar.swap.blocked')}</p>;
+    return <p className="text-sm font-medium">{t(swapBlockedMessageKey(preview.code))}</p>;
   }
 
   return (
@@ -129,8 +131,8 @@ function renderPreview(
         {preview.lines.map((line) => (
           <span key={`${line.day}/${line.teamName}`} className="block break-words tabular-nums">
             {line.outId === viewerId
-              ? t('kalendar.swap.worksInstead', { day: line.day, team: line.teamName, name: nameOf(line.inId) })
-              : t('kalendar.swap.youWorkInstead', { day: line.day, team: line.teamName, name: nameOf(line.outId) })}
+              ? t('kalendar.swap.worksInstead', { day: line.day, team: line.teamName ?? t('kalendar.cell.noTeam'), name: nameOf(line.inId) })
+              : t('kalendar.swap.youWorkInstead', { day: line.day, team: line.teamName ?? t('kalendar.cell.noTeam'), name: nameOf(line.outId) })}
           </span>
         ))}
         {preview.hours.map((delta) => (
@@ -225,7 +227,7 @@ export function SwapProposalFormBody({ form }: { readonly form: SwapProposalForm
       <div className="grid min-w-0 gap-1">
         <span className="text-xs text-muted-foreground">{t('kalendar.swap.given')}</span>
         <p className="text-base font-semibold tabular-nums">
-          {t('kalendar.swap.shiftLine', { day: given.date, team: given.teamName, type: givenType ?? t('kalendar.detail.preview.noType') })}
+          {t('kalendar.swap.shiftLine', { day: given.date, team: given.teamName ?? t('kalendar.cell.noTeam'), type: givenType ?? t('kalendar.detail.preview.noType') })}
         </p>
       </div>
       {/* DISABLED WHILE THE SEND IS OUTSTANDING, the fields included. */}

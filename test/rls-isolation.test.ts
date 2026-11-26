@@ -29858,3 +29858,225 @@ describe("each team has its own minimum (story 21.20, 0082)", () => {
     },
   );
 });
+
+describe('swaps give and take personal shifts (story 21.8, 0083)', () => {
+  /** A swap with a personal side, written as whoever the connection currently is: 0049's seven columns and 0083's four. */
+  async function insertPersonalSwap(
+    client: Client,
+    swap: {
+      readonly organization: string;
+      readonly proposer: string;
+      readonly addressee: string;
+      readonly team: string | null;
+      readonly date: string;
+      readonly givenPersonal: boolean;
+      readonly shiftType: string | null;
+      readonly returnTeam?: string | null;
+      readonly returnDate?: string | null;
+      readonly returnPersonal?: boolean;
+      readonly returnShiftType?: string | null;
+    },
+  ): Promise<string> {
+    const { rows } = await client.query<{ id: string }>(
+      `insert into swap_requests (organization_id, proposer_id, addressee_id, team_id, date, given_personal, shift_type_id,
+                                  return_team_id, return_date, return_personal, return_shift_type_id)
+       values ($1, $2, $3, $4, $5::date, $6, $7, $8, $9::date, $10, $11)
+       returning id::text as id`,
+      [
+        swap.organization,
+        swap.proposer,
+        swap.addressee,
+        swap.team,
+        swap.date,
+        swap.givenPersonal,
+        swap.shiftType,
+        swap.returnTeam ?? null,
+        swap.returnDate ?? null,
+        swap.returnPersonal ?? false,
+        swap.returnShiftType ?? null,
+      ],
+    );
+    const id = rows[0]?.id;
+    if (id === undefined) throw new Error('the personal swap insert returned no id');
+    return id;
+  }
+
+  interface LiveAssignment {
+    id: string;
+    date: string;
+    kind: string;
+    type: string | null;
+    team: string | null;
+  }
+
+  /** A member's live assignments, by date, as the owner sees them. */
+  async function liveAssignments(client: Client, member: string): Promise<LiveAssignment[]> {
+    const { rows } = await client.query<LiveAssignment>(
+      `select id::text as id, date::text as date, kind, shift_type_id::text as type, team_id::text as team
+         from personal_assignments where member_id = $1 and removed_at is null order by date`,
+      [member],
+    );
+    return rows;
+  }
+
+  it.skipIf(noDatabase).each(FIXTURES)(
+    'approves a $fixture swap of a teamless Personal Shift for one in return through ONE save: each taker a SHIFT, each giver OFF, both assignments named, no override, one SCHEDULE_ASSIGNED each',
+    async (fixture) => {
+      await inRolledBackTransaction(async (client) => {
+        const { owner, self, other, organization } = await swapCast(client, fixture);
+        // The scene, as the owner, before any `actAs`.
+        const working = await addThrowawayShiftType(client, organization, owner.authUserId);
+        await client.query('update organizations set email_notifications = true where id = $1', [organization]);
+        for (const member of [self, other]) {
+          await client.query('update members set email = $2 where id = $1', [member.id, `${member.id}@example.org`]);
+        }
+
+        await actAs(client, self.authUserId, organization);
+        const id = await insertPersonalSwap(client, {
+          organization,
+          proposer: self.id,
+          addressee: other.id,
+          team: null,
+          date: SWAP_GIVEN,
+          givenPersonal: true,
+          shiftType: working,
+          returnTeam: null,
+          returnDate: SWAP_RETURN,
+          returnPersonal: true,
+          returnShiftType: working,
+        });
+        await actAs(client, other.authUserId, organization);
+        await answerSwap(client, id, 'accepted');
+        await actAs(client, owner.authUserId, organization);
+        const answered = await decideSwap(client, id, 'approved');
+        await actAsOwner(client);
+
+        const taker = await liveAssignments(client, other.id);
+        const giver = await liveAssignments(client, self.id);
+        expect(taker.map(({ date, kind, type, team }) => [date, kind, type, team]), fixture.slug).toEqual([
+          [SWAP_GIVEN, 'SHIFT', working, null],
+          [SWAP_RETURN, 'OFF', null, null],
+        ]);
+        expect(giver.map(({ date, kind, type, team }) => [date, kind, type, team]), fixture.slug).toEqual([
+          [SWAP_GIVEN, 'OFF', null, null],
+          [SWAP_RETURN, 'SHIFT', working, null],
+        ]);
+        expect(answered, `${fixture.slug}: the answer is not the given side's assignment`).toBe(taker[0]?.id);
+
+        const { rows: decisions } = await client.query<{
+          outcome: string;
+          override: string | null;
+          returnOverride: string | null;
+          given: string | null;
+          back: string | null;
+        }>(
+          `select outcome, roster_override_id::text as override, return_roster_override_id::text as "returnOverride",
+                  personal_assignment_id::text as given, return_personal_assignment_id::text as back
+             from swap_request_decisions where request_id = $1`,
+          [id],
+        );
+        expect(decisions, fixture.slug).toEqual([
+          { outcome: 'approved', override: null, returnOverride: null, given: taker[0]?.id, back: giver[1]?.id },
+        ]);
+        const { rows: overrides } = await client.query<{ total: number }>(
+          `select count(*)::int as total from roster_overrides
+            where organization_id = $1 and date in ($2::date, $3::date) and $4 in (member_in_id, member_out_id)`,
+          [organization, SWAP_GIVEN, SWAP_RETURN, self.id],
+        );
+        expect(overrides[0]?.total, `${fixture.slug}: a personal side wrote a roster override`).toBe(0);
+        const { rows: notices } = await client.query<{ recipient: string }>(
+          `select recipient_member_id::text as recipient from notification_outbox
+            where code = 'SCHEDULE_ASSIGNED' and recipient_member_id = any($1::uuid[]) order by 1`,
+          [[self.id, other.id]],
+        );
+        expect(notices.map((row) => row.recipient), `${fixture.slug}: not one notice per member`).toEqual([self.id, other.id].sort());
+      });
+    },
+  );
+
+  it.skipIf(noDatabase).each(FIXTURES)(
+    'refuses a $fixture personal side named in part, a team side with no team, one date twice, and a second open swap of one teamless shift',
+    async (fixture) => {
+      await inRolledBackTransaction(async (client) => {
+        const { owner, self, other, organization, team } = await swapCast(client, fixture);
+        const working = await addThrowawayShiftType(client, organization, owner.authUserId);
+        const base = {
+          organization,
+          proposer: self.id,
+          addressee: other.id,
+          team: null,
+          date: SWAP_GIVEN,
+          givenPersonal: true,
+          shiftType: working,
+        };
+
+        await actAs(client, self.authUserId, organization);
+        const refusal = async (swap: Parameters<typeof insertPersonalSwap>[1]): Promise<string | undefined> =>
+          (await refusedThenContinue(client, () => insertPersonalSwap(client, swap))).code;
+        const codes = {
+          noType: await refusal({ ...base, shiftType: null }),
+          typeOnTeamShift: await refusal({ ...base, team, givenPersonal: false }),
+          noTeamOnTeamShift: await refusal({ ...base, givenPersonal: false, shiftType: null }),
+          sameDate: await refusal({ ...base, returnTeam: team, returnDate: SWAP_GIVEN }),
+          returnPersonalNoDate: await refusal({ ...base, returnPersonal: true, returnShiftType: working }),
+        };
+        await insertPersonalSwap(client, base);
+        const duplicate = (await refusedThenContinue(client, () => insertPersonalSwap(client, base))).code;
+        await actAsOwner(client);
+
+        expect(codes, fixture.slug).toEqual({
+          noType: '23514',
+          typeOnTeamShift: '23514',
+          noTeamOnTeamShift: '23514',
+          sameDate: '23514',
+          returnPersonalNoDate: '23514',
+        });
+        expect(duplicate, `${fixture.slug}: a second open swap of one teamless shift was stored`).toBe('23505');
+      });
+    },
+  );
+
+  it.skipIf(noDatabase).each(FIXTURES)(
+    'refuses a $fixture approval whose taker already holds a working assignment that date (23505 SWAP_REQUEST_TAKER_ASSIGNED), writes nothing, and lets it be rejected',
+    async (fixture) => {
+      await inRolledBackTransaction(async (client) => {
+        const { owner, self, other, organization } = await swapCast(client, fixture);
+        const working = await addThrowawayShiftType(client, organization, owner.authUserId);
+        // The taker's own shift that date, written as the owner before any `actAs`.
+        await client.query(
+          `insert into personal_assignments (organization_id, member_id, date, kind, shift_type_id, created_by)
+           values ($1, $2, $3::date, 'SHIFT', $4, $5)`,
+          [organization, other.id, SWAP_GIVEN, working, owner.authUserId],
+        );
+
+        await actAs(client, self.authUserId, organization);
+        const id = await insertPersonalSwap(client, {
+          organization,
+          proposer: self.id,
+          addressee: other.id,
+          team: null,
+          date: SWAP_GIVEN,
+          givenPersonal: true,
+          shiftType: working,
+        });
+        await actAs(client, other.authUserId, organization);
+        await answerSwap(client, id, 'accepted');
+        await actAs(client, owner.authUserId, organization);
+        const refusal = await refusedThenContinue(client, () => decideSwap(client, id, 'approved'));
+        await actAsOwner(client);
+
+        expect({ code: refusal.code, message: refusal.message }, fixture.slug).toEqual({
+          code: '23505',
+          message: 'SWAP_REQUEST_TAKER_ASSIGNED',
+        });
+        expect(await swapState(client, id), `${fixture.slug}: the refused approval closed the swap`).toEqual(accepted(other.authUserId));
+        expect((await liveAssignments(client, self.id)).length, `${fixture.slug}: the giver was written OFF`).toBe(0);
+
+        await actAs(client, owner.authUserId, organization);
+        await decideSwap(client, id, 'rejected');
+        await actAsOwner(client);
+        expect((await swapState(client, id)).outcome, fixture.slug).toBe('rejected');
+      });
+    },
+  );
+});

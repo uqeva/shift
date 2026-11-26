@@ -227,7 +227,7 @@ describe('a loan read by the snapshot is followed by every mapper (story 18.2)',
 
       return swapReturnOptionsOf(snapshot, given, IVO, '2026-09-08')
         .filter((one) => one.date <= '2026-09-14')
-        .map((one) => [one.date, one.teamId, one.typeName]);
+        .map((one) => [one.date, one.key.teamId, one.typeName]);
     };
 
     expect(optionsOf(own)).toEqual([

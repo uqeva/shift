@@ -305,7 +305,8 @@ function isText(value: unknown): value is string {
 /** The subject columns each request table must hold: required, or `null` allowed. */
 const REQUEST_SHAPES: Readonly<Record<HistoryRequestTable, { readonly required: readonly string[]; readonly nullable: readonly string[] }>> = {
   leave_requests: { required: ['member_id'], nullable: [] },
-  swap_requests: { required: ['proposer_id', 'addressee_id', 'team_id'], nullable: ['return_team_id'] },
+  // Story 21.8 (0083): a Personal Shift counted with no team names none.
+  swap_requests: { required: ['proposer_id', 'addressee_id'], nullable: ['team_id', 'return_team_id'] },
 };
 
 /**

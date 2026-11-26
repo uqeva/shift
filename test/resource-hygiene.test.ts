@@ -2661,6 +2661,8 @@ const SANCTIONED_SCREEN_KEYS = [
   // status line on *Kalendar*, with the return shift where there was one.
   // No "konflikt" anywhere (story 9.1).
   'kalendar.swap.action',
+  // Story 21.8: the teamless Personal Shift's own *Predloži zamjenu*, named by its date.
+  'kalendar.swap.actionOn',
   'kalendar.swap.heading',
   'kalendar.swap.back',
   'kalendar.swap.lede',
@@ -2673,8 +2675,11 @@ const SANCTIONED_SCREEN_KEYS = [
   'kalendar.swap.returnNone',
   'kalendar.swap.returnHint',
   'kalendar.swap.taken',
+  // Story 21.8: a Personal Shift's taker already holds an assignment that date.
+  'kalendar.swap.takerAssigned',
   'kalendar.swap.chooseColleague',
   'kalendar.swap.blocked',
+  'kalendar.swap.takerAssignedBlocked',
   'kalendar.swap.previewHeading',
   'kalendar.swap.worksInstead',
   'kalendar.swap.youWorkInstead',
@@ -3076,6 +3081,10 @@ const SANCTIONED_SCREEN_KEYS = [
   'history.field.addressee',
   'history.field.team',
   'history.field.returnTeam',
+  // Story 21.8 (0083): a swap's Personal Shift sides.
+  'history.field.givenPersonal',
+  'history.field.returnPersonal',
+  'history.field.returnShiftType',
   'history.field.active',
   'history.field.position',
   'history.field.archived',
