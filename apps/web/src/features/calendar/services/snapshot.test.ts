@@ -205,7 +205,7 @@ describe('the read', () => {
 
   it('selects what a member may read and nothing more', () => {
     // STORY 21.16: each team says whether it is off on holidays.
-    expect(CALENDAR_COLUMNS).toContain('teams(organization_id,id,name,archived,off_on_holidays)');
+    expect(CALENDAR_COLUMNS).toContain('teams(organization_id,id,name,archived,off_on_holidays,minimum_members)');
     expect(CALENDAR_COLUMNS).toContain('shift_types(');
     expect(CALENDAR_COLUMNS).toContain('shift_type_versions(');
     expect(CALENDAR_COLUMNS).toContain('rotation_steps(');

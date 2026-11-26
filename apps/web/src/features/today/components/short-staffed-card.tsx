@@ -66,7 +66,10 @@ export function ShortStaffedCountCard({ card }: { readonly card: ShortStaffedCar
             </h2>
             <p className="text-2xl font-bold tabular-nums">{t('danas.admin.shortStaffed.count', { count: card.count })}</p>
             {short ? null : (
-              <p className="text-sm text-muted-foreground">{t('danas.admin.shortStaffed.calm', { minimum: card.minimum })}</p>
+              <p className="text-sm text-muted-foreground">
+                {/* Story 21.20: the teams' own minimums differ, so the calm line names no number. */}
+                {card.minimum === null ? t('danas.admin.shortStaffed.calmEach') : t('danas.admin.shortStaffed.calm', { minimum: card.minimum })}
+              </p>
             )}
           </div>
         </div>

@@ -70,6 +70,8 @@ async function widenWithTeams(page: Page, count: number): Promise<void> {
           archived: false,
           // Story 21.16 (0080): every team row carries its holiday flag, and the read refuses one without it.
           off_on_holidays: false,
+          // Story 21.20 (0082): and its own minimum, `null` for none; the read refuses a row without it.
+          minimum_members: null,
         });
       }
     }

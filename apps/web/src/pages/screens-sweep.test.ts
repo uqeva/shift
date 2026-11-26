@@ -335,7 +335,8 @@ describe('the screen is read at all, so every sweep below means something', () =
     // FORTY-THREE SINCE STORY 16.5: *Kalendar na mobitelu* and the member page's card.
     // FORTY-FOUR SINCE STORY 19.4: the setup frame and the *Danas* card.
     // FORTY-FIVE SINCE STORY 21.4: *Ručni raspored*.
-    expect(SCREENS).toHaveLength(45);
+    // FORTY-SIX SINCE STORY 21.20: the team dialog's *Najmanje ljudi*.
+    expect(SCREENS).toHaveLength(46);
     //
     // FORTY-NINE SINCE STORY 3.6b: `@/features/calendar/services/roster-write`.
     //
@@ -426,7 +427,8 @@ describe('the screen is read at all, so every sweep below means something', () =
     // A HUNDRED AND FIFTEEN SINCE STORY 21.6: the day detail's rules (`dayNotWorkingMessageKey`).
     // A HUNDRED AND SIXTEEN SINCE STORY 21.10: *Raspored osobe*'s rules.
     // A HUNDRED AND EIGHTEEN SINCE STORY 21.17: the holidays' rules and *Što se mijenja*'s body.
-    expect(KEY_SOURCES).toHaveLength(118);
+    // A HUNDRED AND TWENTY SINCE STORY 21.20: *Najmanje ljudi* and its rules.
+    expect(KEY_SOURCES).toHaveLength(120);
   });
 
   // Vacuous-pass guard. A renamed or moved file would make each "contains no"
@@ -1264,6 +1266,11 @@ describe('the screen is read at all, so every sweep below means something', () =
         'components/member-directory.tsx',
         // STORY 21.17: the team dialog's *Ne radi na blagdane* element ids.
         'utils/element-ids.ts',
+        // STORY 21.20: *Najmanje ljudi*'s rules, and its two parts, which are the
+        // sign-in suite's TEAM_MINIMUM set rather than the edit form's.
+        'services/minimum.ts',
+        'hooks/use-team-minimum.ts',
+        'components/team-minimum.tsx',
       ]
         .map((file) => join(TEAM_FEATURE, ...file.split('/')))
         .sort(),

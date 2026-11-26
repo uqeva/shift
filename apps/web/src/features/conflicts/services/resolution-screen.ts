@@ -1,4 +1,4 @@
-import { collisionKeyOf, daysBetween, effectiveTeamOn, deriveShiftTimes, isHalfDay, leaveBalanceOf, leaveRangeCostOf, leaveSpanOf, shiftTypeVersionOn, type Collision, type LeaveHalf } from '@shift/domain';
+import { collisionKeyOf, daysBetween, effectiveTeamOn, deriveShiftTimes, isHalfDay, leaveBalanceOf, leaveRangeCostOf, leaveSpanOf, PERSONAL_ASSIGNMENT_SHIFT, shiftTypeVersionOn, type Collision, type LeaveHalf } from '@shift/domain';
 
 import type { CalendarSnapshot, CalendarSurfaceState } from '@/features/calendar/services/snapshot';
 import { dayDetailOf, type DayDetailMember } from '@/features/calendar/utils/day-detail';
@@ -58,7 +58,7 @@ import { durationValuesOf, type DurationValues } from '@/utils/time';
 import { ROSTER_CHANGE_SAVE, rosterChangeSnapshotOf } from '@/features/calendar/services/roster-erasures';
 import {
   coverageAgainstMinimumOf,
-  minimumOfCalendar,
+  staffingAppliesOf,
   type CoverageAgainstMinimum,
 } from '@/features/staffing/services/short-staffed';
 
@@ -459,6 +459,66 @@ function replacedCoverageOf(
   }
 }
 
+/** The id of the assignment the replace card's after gives the cover (no live row's). */
+export const STAFFING_ASSIGNMENT_ID = 'staffing-assignment';
+
+/**
+ * STORY 21.20 (the 21.7 deferral): the replace card's figure for a Personal
+ * Shift's conflict, with `memberInId` given the assignment the cover writes —
+ * a `SHIFT` of the collision's type counted with its team that date (R14.3),
+ * in place of any assignment they hold that date — through the domain's
+ * `peopleAtWorkOn` of that type (the team's Scheduled Shift, or its staffing
+ * group, R14.6). Before a pick, a placeholder member holding only that
+ * assignment: no member's id, so on no leave, active, on no base roster. A
+ * candidate on leave that day is not counted. `null` on a `RangeError`
+ * (logged).
+ */
+function assignedCoverageOf(
+  snapshot: CalendarSnapshot,
+  records: readonly OrganizationLeaveRecord[],
+  collision: Collision & { readonly teamId: string },
+  memberInId: string,
+): CoverageAgainstMinimum | null {
+  try {
+    const assignment = {
+      id: STAFFING_ASSIGNMENT_ID,
+      date: collision.date,
+      kind: PERSONAL_ASSIGNMENT_SHIFT,
+      shiftTypeId: collision.shiftTypeId,
+      teamId: collision.teamId,
+    } as const;
+    const known = snapshot.members.some((one) => one.id === memberInId);
+    const members = known
+      ? snapshot.members.map((one) =>
+          one.id === memberInId
+            ? { ...one, personalAssignments: [...one.personalAssignments.filter((held) => held.date !== collision.date), assignment] }
+            : one,
+        )
+      : [
+          ...snapshot.members,
+          {
+            id: memberInId,
+            name: memberInId,
+            fireRank: null,
+            jobRole: null,
+            memberships: [],
+            statuses: [],
+            loans: [],
+            personalAssignments: [assignment],
+            scheduleVersions: [],
+          },
+        ];
+
+    return coverageAgainstMinimumOf({ ...snapshot, members }, records, collision.teamId, collision.date, collision.shiftTypeId);
+  } catch (cause) {
+    if (!(cause instanceof RangeError)) throw cause;
+
+    console.error(cause);
+
+    return null;
+  }
+}
+
 /**
  * {@link ResolutionStaffing} for `collision` over the organization's
  * `records`, or `null` while the minimum is empty — and `null` too when any
@@ -468,6 +528,12 @@ function replacedCoverageOf(
  * the day as read; replace puts someone on in the absent member's place — a
  * placeholder before a pick, and each candidate in `candidateIds` once picked;
  * amend is the records with this one's range amended, or without it.
+ *
+ * STORY 21.20: `form` {@link REPLACE_BY_ASSIGNMENT}, a Personal Shift's
+ * conflict counted with a team: replace is the cover's assignment
+ * ({@link assignedCoverageOf}) rather than a roster change, and every figure
+ * is the team's shift of the collision's type against the team's own minimum
+ * or the organization's.
  */
 export function resolutionStaffingOf(
   snapshot: CalendarSnapshot,
@@ -476,11 +542,13 @@ export function resolutionStaffingOf(
   record: LeaveRecord,
   target: ResolutionAmendTarget,
   candidateIds: readonly string[] = [],
+  form: ReplaceForm = REPLACE_BY_OVERRIDE,
 ): ResolutionStaffing | null {
-  if (minimumOfCalendar(snapshot) === null) return null;
+  if (!staffingAppliesOf(snapshot)) return null;
 
+  const replacedOf = form === REPLACE_BY_ASSIGNMENT ? assignedCoverageOf : replacedCoverageOf;
   const accept = coverageAgainstMinimumOf(snapshot, records, collision.teamId, collision.date, collision.shiftTypeId);
-  const replace = replacedCoverageOf(snapshot, records, collision, STAFFING_REPLACEMENT_ID);
+  const replace = replacedOf(snapshot, records, collision, STAFFING_REPLACEMENT_ID);
   const others = records.filter((one) => one.id !== record.id);
   const amended =
     target.kind === AMEND_REMOVES
@@ -493,7 +561,7 @@ export function resolutionStaffingOf(
   const replaceBy: Record<string, CoverageAgainstMinimum> = {};
 
   for (const id of candidateIds) {
-    const figure = replacedCoverageOf(snapshot, records, collision, id);
+    const figure = replacedOf(snapshot, records, collision, id);
 
     if (figure === null) return null;
 
@@ -1002,17 +1070,20 @@ function resolutionScreenFrom(
       dayMonth: dayMonthOf(collision.date),
       leaveRecordId: record.record.id,
       amend,
-      // STORY 21.7: the minimum is a team rotation shift's figure; a Personal Shift's cards keep the shipped terms.
-      staffing: byAssignment
-        ? null
-        : resolutionStaffingOf(
-            snapshot,
-            records,
-            { ...collision, teamId },
-            record.record,
-            amend.target,
-            candidates.flatMap((group) => group.candidates.map((candidate) => candidate.id)),
-          ),
+      // STORY 21.20 (the 21.7 deferral): a Personal Shift counted with a team is held to its team's
+      // minimum too, the cover's assignment applied; one with no team has no minimum and keeps the shipped terms.
+      staffing:
+        teamId === null
+          ? null
+          : resolutionStaffingOf(
+              snapshot,
+              records,
+              { ...collision, teamId },
+              record.record,
+              amend.target,
+              candidates.flatMap((group) => group.candidates.map((candidate) => candidate.id)),
+              byAssignment ? REPLACE_BY_ASSIGNMENT : REPLACE_BY_OVERRIDE,
+            ),
       held,
       heldCalendar: heldCalendarSearchOf(collision),
       organizationId: snapshot.organizationId,

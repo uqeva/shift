@@ -29729,3 +29729,132 @@ describe('a leave over a personal shift is a conflict, and a replacement is an a
     },
   );
 });
+
+// ------------------------------------------------- story 21.20: a team's own minimum
+
+/**
+ * STORY 21.20 (`0082`). A team's own `minimum_members`, a nullable smallint of
+ * at least 1 with no default: every team starts with none, so the
+ * organization's applies. Written through `teams`' own update policy by an
+ * active admin of the organization, never named on insert, refused below 1 by
+ * `teams_minimum_members_check` (23514), recorded by the teams audit
+ * triggers. Nothing notifies (E-3). Every case runs in a rolled-back
+ * transaction; every scene is built as the owner before `actAs`. Each expected
+ * code and constraint name is 0082's own.
+ */
+describe("each team has its own minimum (story 21.20, 0082)", () => {
+  async function firstActiveTeamOf(client: Client, organization: string): Promise<string> {
+    const { rows } = await client.query<{ id: string }>(
+      'select id from teams where organization_id = $1 and not archived order by id limit 1',
+      [organization],
+    );
+    const team = rows[0]?.id;
+    if (team === undefined) throw new Error(`${organization} has no active team`);
+    return team;
+  }
+
+  async function teamMinimumOf(client: Client, team: string): Promise<number | null | undefined> {
+    const { rows } = await client.query<{ minimum: number | null }>('select minimum_members as minimum from teams where id = $1', [team]);
+    return rows[0]?.minimum;
+  }
+
+  it.skipIf(noDatabase).each(FIXTURES)(
+    'starts every $fixture team with no minimum of its own, lets the admin set and clear one, and refuses a member-role account',
+    async ({ slug, admin, member }) => {
+      await inRolledBackTransaction(async (client) => {
+        const caller = await memberByUsername(client, slug, admin);
+        const memberRole = await memberByUsername(client, slug, member);
+        const { rows: set } = await client.query<{ count: number }>(
+          'select count(*)::int as count from teams where organization_id = $1 and minimum_members is not null',
+          [caller.organizationId],
+        );
+        expect(set[0]?.count, `${slug}: a team holds a minimum nobody set (DI-8)`).toBe(0);
+        const team = await firstActiveTeamOf(client, caller.organizationId);
+        const { rows: outboxBefore } = await client.query<{ count: number }>(
+          'select count(*)::int as count from notification_outbox where organization_id = $1',
+          [caller.organizationId],
+        );
+
+        await actAs(client, caller.authUserId, caller.organizationId);
+        const raised = await client.query('update teams set minimum_members = 1 where id = $1', [team]);
+        expect(raised.rowCount, `${slug}: an admin cannot set a team's minimum`).toBe(1);
+        const cleared = await client.query('update teams set minimum_members = null where id = $1', [team]);
+        expect(cleared.rowCount, `${slug}: an admin cannot clear a team's minimum`).toBe(1);
+
+        await actAs(client, memberRole.authUserId, memberRole.organizationId);
+        const memberSet = await client.query('update teams set minimum_members = 2 where id = $1', [team]);
+        expect(memberSet.rowCount, `${slug}: a member-role account set a team's minimum`).toBe(0);
+
+        await actAsOwner(client);
+        expect(await teamMinimumOf(client, team)).toBeNull();
+        const { rows: outboxAfter } = await client.query<{ count: number }>(
+          'select count(*)::int as count from notification_outbox where organization_id = $1',
+          [caller.organizationId],
+        );
+        expect(outboxAfter[0]?.count, `${slug}: a minimum change notified someone (E-3)`).toBe(outboxBefore[0]?.count);
+      });
+    },
+  );
+
+  it.skipIf(noDatabase).each([0, -1])('refuses %i by the named check', (value) => {
+    return inRolledBackTransaction(async (client) => {
+      const team = await firstActiveTeamOf(client, await organizationId(client, PILOT.slug));
+      await client.query('savepoint before_refusal');
+      const failure = await client
+        .query('update teams set minimum_members = $1 where id = $2', [value, team])
+        .then(() => null, (error: unknown) => error as { code?: string; constraint?: string });
+      expect(failure?.code).toBe('23514');
+      expect(failure?.constraint).toBe('teams_minimum_members_check');
+      await client.query('rollback to savepoint before_refusal');
+      expect(await teamMinimumOf(client, team)).toBeNull();
+    });
+  });
+
+  it.skipIf(noDatabase).each(CROSS_TENANT)(
+    "refuses the $fixture admin $otherFixture's team minimum, and a team insert naming one",
+    async ({ slug, admin, otherSlug }) => {
+      await inRolledBackTransaction(async (client) => {
+        const other = await organizationId(client, otherSlug);
+        const caller = await memberByUsername(client, slug, admin);
+        const foreignTeam = await firstActiveTeamOf(client, other);
+
+        await actAs(client, caller.authUserId, caller.organizationId);
+        const foreign = await client.query('update teams set minimum_members = 2 where id = $1', [foreignTeam]);
+        expect(foreign.rowCount, `${slug}: an admin set ${otherSlug}'s team minimum`).toBe(0);
+        // 0082 grants UPDATE on the minimum alone: the insert grant (0009) names no such column.
+        const named = await refusedThenContinue(client, () =>
+          client.query('insert into teams (organization_id, name, minimum_members) values ($1, $2, 2)', [
+            caller.organizationId,
+            `${THROWAWAY} tim`,
+          ]),
+        );
+        expect(named.code, `${slug}: a team was inserted naming its minimum`).toBe('42501');
+        await actAsOwner(client);
+        expect(await teamMinimumOf(client, foreignTeam)).toBeNull();
+      });
+    },
+  );
+
+  it.skipIf(noDatabase).each(FIXTURES)(
+    "records the $fixture admin's team minimum change in the change history (AD-3)",
+    async ({ slug, admin }) => {
+      await inRolledBackTransaction(async (client) => {
+        const caller = await memberByUsername(client, slug, admin);
+        const team = await firstActiveTeamOf(client, caller.organizationId);
+
+        await actAs(client, caller.authUserId, caller.organizationId);
+        const raised = await client.query('update teams set minimum_members = 2 where id = $1', [team]);
+        expect(raised.rowCount, `${slug}: the minimum was not written`).toBe(1);
+
+        await actAsOwner(client);
+        const events = (await auditEventsOf(client, 'teams', team)).filter(
+          (event) => event.operation === 'UPDATE' && event.newRow?.['minimum_members'] === 2,
+        );
+        expect(
+          events.map((event) => [event.oldRow?.['minimum_members'], event.actor]),
+          `${slug}: the minimum change is not recorded through the teams trigger`,
+        ).toEqual([[null, caller.authUserId]]);
+      });
+    },
+  );
+});

@@ -38,6 +38,13 @@ import { expect, test } from '../../utils/custom-fixtures.ts';
  * label ends `Premalo ljudi`, the legend lists it, and the detail says
  * `Premalo ljudi: rade 2 od najmanje 3`. With the setting empty, none of them
  * does.
+ *
+ * Story 21.20: the same team with the organization's setting empty and its
+ * OWN *Najmanje ljudi* set to 3 in the team dialog: the save shows *Što se
+ * mijenja* with the shift it makes short, lands, and the grid marks it; set
+ * to 1, the preview lists it as cleared and the mark goes. The team (and so
+ * its minimum) is removed in `afterEach`; the organization's setting is
+ * restored in each case's `finally`.
  */
 
 test.use({ storageState: ADMIN_STATE, viewport: { width: 1280, height: 900 } });
@@ -260,6 +267,61 @@ test('one of four away, the minimum at 3: no mark, and the detail states the bar
     await expect(staffingLineIn(detail, false)).toHaveText(icu(staffing.atWork, { atWork: 3, minimum: 3 }));
     await expect(staffingLineIn(detail, false).locator('[data-icon]')).toHaveCount(0);
     await expect(detail.getByText(SHORT, { exact: false })).toHaveCount(0);
+  } finally {
+    await setMinimumMembersInSql(fixture.slug, was);
+  }
+});
+
+test("a team's own minimum, set in the team dialog, marks the shift; set to 1 it clears it (story 21.20)", async ({
+  fixture,
+  calendarPage,
+  teamsPage,
+}) => {
+  test.slow(); // the shared rotation lock (`holdRotation`) can take longer than the default timeout
+  const { team, rotation, date } = await teamOfFourTwoOnLeave(fixture.slug);
+  const minimum = hr.smjene.minimum;
+  const was = await setMinimumMembersInSql(fixture.slug, null);
+  try {
+    await teamsPage.goto();
+    await teamsPage.openTeam(team.name);
+    await expect(teamsPage.minimumField).toHaveValue('');
+    await expect(teamsPage.editDialog.getByText(minimum.hintNotSet, { exact: true })).toBeVisible();
+
+    // THREE: two of four at work, so *Što se mijenja* names the shift it makes short.
+    await teamsPage.minimumField.fill('3');
+    await teamsPage.minimumSave.click();
+    await expect(teamsPage.minimumPreview).toBeVisible();
+    await expect(
+      teamsPage.minimumPreview.getByText(
+        fill(staffing.row, { team: team.name, date: dayMonth(date), type: rotation.steps[0], atWork: icu(staffing.atWork, { atWork: 2, minimum: 3 }) }),
+        { exact: true },
+      ),
+    ).toBeVisible();
+    await teamsPage.minimumPreviewSave.click();
+    await expect(teamsPage.minimumStatus).toHaveText(fill(minimum.saved, { count: '3' }));
+    await expect(teamsPage.minimumField).toHaveValue('3');
+    await teamsPage.closeButton.click();
+
+    await calendarPage.goto(`?prikaz=sve&mjesec=${date.slice(0, 7)}`);
+    await expect(await calendarPage.cellOf(team.name, date)).toHaveAccessibleName(new RegExp(`, ${escapeRegExp(SHORT)}$`));
+
+    // ONE, the one-person team's setting: the shift is listed as cleared, and the mark goes.
+    await teamsPage.goto();
+    await teamsPage.openTeam(team.name);
+    await teamsPage.minimumField.fill('1');
+    await teamsPage.minimumSave.click();
+    await expect(teamsPage.minimumPreview.getByText(minimum.preview.clearedHeading, { exact: true })).toBeVisible();
+    await expect(
+      teamsPage.minimumPreview.getByText(fill(minimum.preview.clearedRow, { team: team.name, date: dayMonth(date), type: rotation.steps[0] }), {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await teamsPage.minimumPreviewSave.click();
+    await expect(teamsPage.minimumStatus).toHaveText(fill(minimum.saved, { count: '1' }));
+    await teamsPage.closeButton.click();
+
+    await calendarPage.goto(`?prikaz=sve&mjesec=${date.slice(0, 7)}`);
+    await expect(await calendarPage.cellOf(team.name, date)).not.toHaveAccessibleName(new RegExp(`, ${escapeRegExp(SHORT)}(,|$)`));
   } finally {
     await setMinimumMembersInSql(fixture.slug, was);
   }

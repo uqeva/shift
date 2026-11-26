@@ -919,18 +919,26 @@ describe('every organization table carries row level security, and only its revi
       const { rows: columns } = await client.query<{ column: string; verb: string; held: boolean }>(
         `select column_name as column, verb,
                 has_column_privilege('authenticated', 'public.teams', column_name, verb) as held
-           from unnest(array['organization_id', 'id', 'name', 'archived', 'off_on_holidays', 'created_by', 'created_at'])
+           from unnest(array['organization_id', 'id', 'name', 'archived', 'off_on_holidays', 'minimum_members', 'created_by', 'created_at'])
                   as column_name,
                 unnest(array['INSERT', 'UPDATE']) as verb`,
       );
       // STORY 21.16 (0080): a team's off-on-holidays flag is updated, never named on insert (it defaults false).
+      // STORY 21.20 (0082): so is its own minimum, never named on insert (it starts empty).
       expect(
         columns
           .filter((row) => row.held)
           .map((row) => `${row.verb}:${row.column}`)
           .sort(),
         'the writable team columns changed',
-      ).toEqual(['INSERT:name', 'INSERT:organization_id', 'UPDATE:archived', 'UPDATE:name', 'UPDATE:off_on_holidays']);
+      ).toEqual([
+        'INSERT:name',
+        'INSERT:organization_id',
+        'UPDATE:archived',
+        'UPDATE:minimum_members',
+        'UPDATE:name',
+        'UPDATE:off_on_holidays',
+      ]);
     } finally {
       await client.end();
     }
@@ -2110,6 +2118,18 @@ describe('every organization table carries row level security, and only its revi
           where table_schema = 'public' and table_name = 'teams' and column_name = 'off_on_holidays'`,
       );
       expect(flag).toEqual([{ data_type: 'boolean', is_nullable: 'NO', column_default: 'false' }]);
+
+      // STORY 21.20 (0082): a team's own minimum, a nullable smallint with no default, refused below 1 by name.
+      const { rows: minimum } = await client.query<{ data_type: string; is_nullable: string; column_default: string | null }>(
+        `select data_type, is_nullable, column_default from information_schema.columns
+          where table_schema = 'public' and table_name = 'teams' and column_name = 'minimum_members'`,
+      );
+      expect(minimum).toEqual([{ data_type: 'smallint', is_nullable: 'YES', column_default: null }]);
+      const { rows: check } = await client.query<{ definition: string }>(
+        `select pg_get_constraintdef(oid) as definition from pg_constraint
+          where conrelid = 'public.teams'::regclass and conname = 'teams_minimum_members_check'`,
+      );
+      expect(check).toEqual([{ definition: 'CHECK ((minimum_members >= 1))' }]);
     } finally {
       await client.end();
     }

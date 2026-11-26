@@ -108,7 +108,7 @@ describe('the read', () => {
       [ROTATION_COLUMNS, ROTATION_COUNT],
       ['shift_type_overrides.removed_at', 'is', 'null'],
     ]);
-    expect(ROTATION_COLUMNS).toContain('teams(organization_id,id,name,archived,off_on_holidays)');
+    expect(ROTATION_COLUMNS).toContain('teams(organization_id,id,name,archived,off_on_holidays,minimum_members)');
     expect(ROTATION_COLUMNS).toContain('shift_types(');
     expect(ROTATION_COLUMNS).toContain('rotation_steps:rotation_steps_in_view(');
     expect(ROTATION_COLUMNS).toContain('rotation_assignments:rotation_assignments_in_view(');

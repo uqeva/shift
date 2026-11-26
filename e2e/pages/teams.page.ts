@@ -87,6 +87,31 @@ export class TeamsPage extends BasePage {
     return this.offOnHolidaysPreview.getByRole('button', { name: hr.smjene.offOnHolidays.preview.save, exact: true });
   }
 
+  /** The edit dialog's *Najmanje ljudi* field (story 21.20). */
+  get minimumField(): Locator {
+    return this.editDialog.getByLabel(hr.smjene.minimum.label, { exact: true });
+  }
+
+  /** Its own save, *Spremi najmanje ljudi*. */
+  get minimumSave(): Locator {
+    return this.editDialog.getByRole('button', { name: hr.smjene.minimum.save, exact: true });
+  }
+
+  /** Its *Što se mijenja*, shown in place of the field when the change creates or clears a short-staffed shift. */
+  get minimumPreview(): Locator {
+    return this.editDialog.locator('section[aria-labelledby="team-minimum-members-preview-heading"]');
+  }
+
+  /** That preview's *Spremi*. */
+  get minimumPreviewSave(): Locator {
+    return this.minimumPreview.getByRole('button', { name: hr.smjene.minimum.preview.save, exact: true });
+  }
+
+  /** The field's own confirmation line. */
+  get minimumStatus(): Locator {
+    return this.editDialog.locator('#team-minimum-members-status');
+  }
+
   /** The archive offer, named for the team as stored. */
   archiveButton(teamName: string): Locator {
     return this.editDialog.getByRole('button', { name: fill(hr.smjene.archive, { name: teamName }), exact: true });

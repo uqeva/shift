@@ -175,6 +175,7 @@ export {
 export {
   SHORT_STAFFED,
   isShortStaffed,
+  minimumOf,
   newlyShortStaffedOf,
   peopleAtWorkOn,
   shortStaffedShiftsOf,

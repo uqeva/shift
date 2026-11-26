@@ -7905,3 +7905,35 @@ describe('a plpgsql function names nothing a trigger record or a column already 
     expect(offences).toEqual([]);
   });
 });
+
+describe('each team has its own minimum (0082, story 21.20)', () => {
+  const MIGRATION = '0082_team_minimum_members.sql';
+  const sql = (): string => stripLineComments(readFileSync(join(supabaseRoot, 'migrations', MIGRATION), 'utf8'));
+
+  it("adds teams.minimum_members, a nullable smallint of at least 1 with no default, writable through teams' own update policy", () => {
+    const text = sql();
+    expect(text).toMatch(
+      /alter table public\.teams\s+add column minimum_members smallint\s+constraint teams_minimum_members_check check \(minimum_members >= 1\);/,
+    );
+    expect(text).not.toMatch(/minimum_members[^;]*\bdefault\b/);
+    expect(text).toContain('grant update (minimum_members) on table public.teams to authenticated;');
+    expect(text).not.toMatch(/grant insert/);
+  });
+
+  it("widens 0080's lock and re-check on teams to the minimum, same functions and levels", () => {
+    const text = sql();
+    expect(text).toMatch(
+      /create trigger teams_serialize_organization_writes\s+before update of archived, off_on_holidays, minimum_members on public\.teams\s+for each statement\s+execute function public\.serialize_organization_writes\(\);/,
+    );
+    expect(text).toMatch(
+      /create trigger teams_refuse_write_by_stale_admin\s+before update of archived, off_on_holidays, minimum_members on public\.teams\s+for each row\s+execute function public\.refuse_write_by_stale_admin\(\);/,
+    );
+  });
+
+  it('creates no function, policy or table, re-creates no assembly, and notifies nobody (E-3)', () => {
+    const text = sql();
+    expect(text).not.toMatch(/create (or replace )?function/);
+    expect(text).not.toMatch(/create policy|alter policy|create table/);
+    expect(text).not.toMatch(/member_schedule_inputs|notify_members|notification_outbox|enqueue/);
+  });
+});

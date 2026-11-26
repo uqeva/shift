@@ -7,7 +7,7 @@ import { DEACTIVATE, type REACTIVATE } from '@/features/members/services/wire';
 import {
   configurationReportOf,
   horizonWindowOf,
-  minimumOfCalendar,
+  staffingAppliesOf,
   unknownReportOf,
   type ShortStaffedReport,
   type StaffingLeaveSource,
@@ -179,7 +179,7 @@ export function shownDeactivationShortStaffedOf(
   today: string | null,
   leave: StaffingLeaveSource | null,
 ): ShortStaffedReport | null {
-  if (snapshot === null || minimumOfCalendar(snapshot) === null) return null;
+  if (snapshot === null || !staffingAppliesOf(snapshot)) return null;
   if (offer === null || offer.change !== DEACTIVATE || today === null || !shortStaffedAskedOf(offer, day, today)) return null;
 
   try {

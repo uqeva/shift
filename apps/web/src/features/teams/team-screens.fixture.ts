@@ -95,6 +95,18 @@ export const TEAM_SCREENS_EXEMPT: readonly { readonly file: string; readonly why
     why: 'the team dialog\'s *Ne radi na blagdane* element ids (story 21.17), named once; identifiers rather than copy, as the settings page\'s are',
   },
   {
+    file: 'services/minimum.ts',
+    why: "a team's own minimum (story 21.20): the field's parse, the AD-5 check, the write and its refusals; renders nothing, a key source of its own in the sign-in suite, executed by minimum.test.ts",
+  },
+  {
+    file: 'hooks/use-team-minimum.ts',
+    why: "*Najmanje ljudi*'s state, its fresh check and its write (story 21.20); swept as the sign-in suite's TEAM_MINIMUM set, composed by the team edit body",
+  },
+  {
+    file: 'components/team-minimum.tsx',
+    why: "*Najmanje ljudi*'s markup and its *Što se mijenja* (story 21.20); swept as the sign-in suite's TEAM_MINIMUM set, composed by the team edit body",
+  },
+  {
     file: 'services/surface-keys.ts',
     why: "the directory's and a team roster's reads as one snapshot each (story 8.2b), the keys their offline freshness is decided over; renders nothing and declares no key, executed by surface-keys.test.ts",
   },

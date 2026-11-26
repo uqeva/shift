@@ -18,10 +18,17 @@
  * member on a half day counts as at work.
  *
  * SHORT-STAFFED (R10.2): the scheduled shift type is a working one AND the
- * people at work number fewer than `minimumMembers`. A non-working day, a team
- * whose rotation has not started, and a `minimumMembers` of `null` are never
- * short-staffed. Minimum Members is current-state (AD-2), so the same input
- * with another minimum re-reports past dates too (R10.4).
+ * people at work number fewer than the team's minimum ({@link minimumOf}). A
+ * non-working day, a team whose rotation has not started, and a team whose
+ * minimum is `null` are never short-staffed. Minimum Members is current-state
+ * (AD-2), so the same input with another minimum re-reports past dates too
+ * (R10.4).
+ *
+ * A TEAM'S OWN MINIMUM (story 21.20, R10.2 as amended, AD-27): `teamMinimums`
+ * holds the teams that set one (`teams.minimum_members`, 0082), and it wins over
+ * the organization's `minimumMembers` for that team only; a team absent from it
+ * takes the organization's. With neither, nothing of the team is short-staffed.
+ * Absent or empty, every answer is what it was before, byte for byte.
  *
  * PERSONAL SHIFTS (story 21.1, R14.6, amending R10.1): the shifts of team T on
  * a date are T's working Scheduled Shift, if any, and one GROUP for each other
@@ -64,6 +71,39 @@ export interface StaffingInput extends ScheduleInput {
   readonly leaveRecords: readonly CollisionLeaveRecord[];
   /** The organization's Minimum Members: a whole number from 1, or `null` when the setting is empty. */
   readonly minimumMembers: number | null;
+  /**
+   * Story 21.20 (R10.2 as amended): each team's own Minimum Members, by team
+   * id, for the teams that set one — a whole number from 1. A team absent here
+   * takes {@link minimumMembers}. Absent or empty, nothing changes.
+   */
+  readonly teamMinimums?: Readonly<Record<string, number>>;
+}
+
+/**
+ * THE MINIMUM OF A TEAM'S SHIFTS (story 21.20, R10.2 as amended): the team's
+ * own Minimum Members when `teamMinimums` holds one, else the organization's
+ * `minimumMembers`; `null` when neither is set, and then nothing of the team is
+ * short-staffed. Checks nothing: the derivations check their input first.
+ */
+export function minimumOf(input: Pick<StaffingInput, 'minimumMembers' | 'teamMinimums'>, teamId: string): number | null {
+  const own = input.teamMinimums;
+
+  if (own !== undefined && Object.hasOwn(own, teamId)) {
+    const minimum = own[teamId];
+
+    if (minimum !== undefined) return minimum;
+  }
+
+  return input.minimumMembers;
+}
+
+/**
+ * Whether any team of `input` can be short-staffed: the organization's minimum
+ * is set, or a team ASKED FOR (`teamIds`) sets its own — a minimum of a team
+ * not asked for turns nothing on.
+ */
+function anyMinimumOf(input: Pick<StaffingInput, 'minimumMembers' | 'teamMinimums' | 'teamIds'>): boolean {
+  return input.minimumMembers !== null || input.teamIds.some((teamId) => minimumOf(input, teamId) !== null);
 }
 
 /** A working shift's staffing: the type it works and the people at work on it. */
@@ -97,12 +137,19 @@ export function isShortStaffed(atWork: number, minimum: number | null): boolean 
 
 /**
  * @throws RangeError when `minimumMembers` is neither `null` nor a whole
+ *   number of at least 1, or a team's own minimum (story 21.20) is not a whole
  *   number of at least 1.
  */
-function checkMinimum(minimumMembers: number | null): void {
-  if (minimumMembers === null) return;
-  if (!Number.isInteger(minimumMembers) || minimumMembers < 1) {
+function checkMinimum(input: Pick<StaffingInput, 'minimumMembers' | 'teamMinimums'>): void {
+  const { minimumMembers } = input;
+
+  if (minimumMembers !== null && (!Number.isInteger(minimumMembers) || minimumMembers < 1)) {
     throw new RangeError(`the minimum members is ${String(minimumMembers)}, not a whole number of at least 1 or empty`);
+  }
+  for (const [teamId, minimum] of Object.entries(input.teamMinimums ?? {})) {
+    if (!Number.isInteger(minimum) || minimum < 1) {
+      throw new RangeError(`the minimum members of team ${JSON.stringify(teamId)} is ${String(minimum)}, not a whole number of at least 1`);
+    }
   }
 }
 
@@ -261,7 +308,7 @@ function staffedShiftsOf(input: StaffingInput, from: string, to: string): readon
  */
 export function peopleAtWorkOn(input: StaffingInput, teamId: string, date: string, shiftTypeId?: string): Staffing | null {
   checkDate('the date', date);
-  checkMinimum(input.minimumMembers);
+  checkMinimum(input);
   const shifts = staffedShiftsOf({ ...input, teamIds: [teamId] }, date, date);
   const shift = shiftTypeId === undefined ? shifts.find((one) => !one.group) : shifts.find((one) => one.shiftTypeId === shiftTypeId);
   return shift === undefined ? null : { shiftTypeId: shift.shiftTypeId, atWork: shift.atWork };
@@ -278,7 +325,7 @@ export function peopleAtWorkOn(input: StaffingInput, teamId: string, date: strin
  */
 export function staffingOn(input: StaffingInput, teamId: string, date: string): readonly Staffing[] {
   checkDate('the date', date);
-  checkMinimum(input.minimumMembers);
+  checkMinimum(input);
   return staffedShiftsOf({ ...input, teamIds: [teamId] }, date, date).map((shift) => ({
     shiftTypeId: shift.shiftTypeId,
     atWork: shift.atWork,
@@ -288,12 +335,14 @@ export function staffingOn(input: StaffingInput, teamId: string, date: string): 
 /** {@link shortStaffedShiftsOf} with each shift's `group` flag kept, for matching across a change. */
 function shortStaffedOf(input: StaffingInput, from: string, to: string): readonly (ShortStaffedShift & { readonly group: boolean })[] {
   checkWindow(from, to);
-  checkMinimum(input.minimumMembers);
-  const minimum = input.minimumMembers;
-  if (minimum === null) return [];
-  return staffedShiftsOf(input, from, to)
-    .filter((shift) => isShortStaffed(shift.atWork, minimum))
-    .map((shift) => ({
+  checkMinimum(input);
+  if (!anyMinimumOf(input)) return [];
+  const short: (ShortStaffedShift & { readonly group: boolean })[] = [];
+  for (const shift of staffedShiftsOf(input, from, to)) {
+    // Story 21.20: each team's own minimum, else the organization's (R10.2 as amended).
+    const minimum = minimumOf(input, shift.teamId);
+    if (minimum === null || !isShortStaffed(shift.atWork, minimum)) continue;
+    short.push({
       code: SHORT_STAFFED,
       date: shift.date,
       teamId: shift.teamId,
@@ -301,14 +350,17 @@ function shortStaffedOf(input: StaffingInput, from: string, to: string): readonl
       atWork: shift.atWork,
       minimum,
       group: shift.group,
-    }));
+    });
+  }
+  return short;
 }
 
 /**
  * Every short-staffed shift from `from` to `to` (R10.2) of the teams of
  * `input.teamIds`: each working shift — a Scheduled Shift or a group of
- * Personal Shifts (R14.6) — whose people at work number fewer than
- * `input.minimumMembers`. None at all when the minimum is `null`. Soonest
+ * Personal Shifts (R14.6) — whose people at work number fewer than its
+ * team's minimum ({@link minimumOf}: the team's own, else
+ * `input.minimumMembers`). None at all when no minimum is set. Soonest
  * first, then in the order of `teamIds`, then a team's Scheduled Shift before
  * its groups. Reads its input and writes nothing.
  *

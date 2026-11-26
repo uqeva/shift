@@ -2470,7 +2470,7 @@
   summary: OWNER story 21.13 (or a later polish). A conflict key held by a replacement by assignment that no longer applies (the cover moved onto a team, or made inactive) says the shared held line, "Ukloni je u kalendaru", and links the calendar; the assignment is removed in *Ručni raspored*. A held line and link of its own for the second form would say where.
   evidence: Spec 21.7 Design Note 6.
 - source_spec: `_bmad-output/implementation-artifacts/spec-21-7-a-leave-over-a-personal-shift-is-a-conflict-and-a-replacement-is-an-assignment.md`
-  summary: OWNER story 21.20 (each team's own minimum) or 21.13. The resolution screen's cards show no coverage against the minimum for a Personal Shift's conflict (`staffing: null`, the shipped terms): `coverageAgainstMinimumOf` and `rosterChangeSnapshotOf` are a team rotation shift's figures. A day team's staffing group could be counted with the cover's assignment applied.
+  summary: RESOLVED by 21.20 (2026-11-26) — a Personal Shift's conflict counted with a team shows every card's coverage against the team's own minimum or the organization's (`resolutionStaffingOf(…, REPLACE_BY_ASSIGNMENT)`: the replace card is the cover's `SHIFT` assignment applied, `assignedCoverageOf`); a teamless one has no minimum and keeps the shipped terms. Original: OWNER story 21.20 (each team's own minimum) or 21.13. The resolution screen's cards show no coverage against the minimum for a Personal Shift's conflict (`staffing: null`, the shipped terms): `coverageAgainstMinimumOf` and `rosterChangeSnapshotOf` are a team rotation shift's figures. A day team's staffing group could be counted with the cover's assignment applied.
   evidence: Spec 21.7 Code Map (`resolution-screen.ts`).
 - source_spec: `_bmad-output/implementation-artifacts/spec-21-7-a-leave-over-a-personal-shift-is-a-conflict-and-a-replacement-is-an-assignment.md`
   summary: OWNER story 21.14 (a leave's cover). When the absent member's leave is shortened or removed, 0031's lifetime ends a replacement by assignment, but the cover's `SHIFT` assignment stays; 5.4e's leave guard lists only override links (`replacementLinksOf`), so nobody is told to remove it. The same holds when a new decision on another type supersedes one (0038).
@@ -2487,3 +2487,19 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-21-7-a-leave-over-a-personal-shift-is-a-conflict-and-a-replacement-is-an-assignment.md`
   summary: OWNER a later story. The refusals `CONFLICT_REPLACEMENT_INVALID`, `CONFLICT_REPLACEMENT_IS_ABSENT_MEMBER` and the save's `PERSONAL_ASSIGNMENTS_INVALID` (an archived type or team) read as the generic failed line on the resolution screen; only `taken`, `gone`, `held` and `denied` have their own.
   evidence: Story 21.7 review (edge-case); `resolution-write.ts` `resolutionReplaceFailureOf`.
+
+## Deferred from: story 21.20, each team has its own minimum (2026-11-26)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-20-each-team-has-its-own-minimum.md`
+  summary: OWNER a later polish story. The organization's *Najmanje ljudi u smjeni* card (0048, story 11.1) still saves at once with no *Što se mijenja*, while a team's own minimum (21.20) previews the shifts it makes short-staffed or clears. One check (`teamMinimumCheckFromReads`'s shape, the snapshot's `minimumMembers` changed) would give the organization's the same preview.
+  evidence: Spec 21.20 Epic AC Deviations; the founder's instruction named the team minimum's change.
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-20-each-team-has-its-own-minimum.md`
+  summary: OWNER a later polish story. The *Timovi* list and the team rows name no team's own minimum: an admin sees it only in the team dialog. A column or a chip (`najmanje 1`) would show which teams override the organization's.
+  evidence: Spec 21.20 Design Notes; UX-DR79 names the dialog only.
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-20-each-team-has-its-own-minimum.md`
+  summary: OWNER a later polish story. The team dialog can be closed while *Najmanje ljudi*'s check or write is in flight (the page's `dismissible` reads only the edit hook's `pending`), so a write may land unseen and its saved line is lost; the hook's `pending` could be lifted to the page as the flag's is.
+  evidence: Story 21.20 review (edge-case hunter).
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-20-each-team-has-its-own-minimum.md`
+  summary: OWNER a later e2e sweep. 21.20's e2e covers the minimum's preview path only; the no-effect save, clearing to empty, an invalid entry, *Natrag*, a changed preview, the archived team's line and *Danas*'s `calmEach` line (asserted only on the model) have no browser case.
+  evidence: Story 21.20 review (blind, verification gap).
+

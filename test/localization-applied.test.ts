@@ -1035,8 +1035,9 @@ describe('the build being read reflects the current localization source', () => 
     // seventeen since story 7.17: the roster lines, and the member directory's
     // rules, hook and component; eighteen since story 8.2b: the directory's
     // and the roster's offline surface keys; nineteen since story 21.17: the
-    // team dialog's *Ne radi na blagdane* element ids.
-    expect(parts, 'the teams feature grew or lost a module').toHaveLength(19);
+    // team dialog's *Ne radi na blagdane* element ids; twenty-two since story
+    // 21.20: *Najmanje ljudi*'s rules, hook and component.
+    expect(parts, 'the teams feature grew or lost a module').toHaveLength(22);
     for (const page of TEAM_PAGES) expect(SOURCES, `${page} is not in SOURCES`).toContain(page);
     expect([...parts].sort(), 'the feature holds a module no set and no rule list names').toEqual(
       [...TEAMS_SOURCES_REQUIRED].sort(),

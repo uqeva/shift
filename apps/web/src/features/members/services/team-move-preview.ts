@@ -8,7 +8,7 @@ import { chosenTeam, type TeamMoveOffer } from '@/features/members/services/writ
 import {
   configurationReportOf,
   horizonWindowOf,
-  minimumOfCalendar,
+  staffingAppliesOf,
   unknownReportOf,
   type ShortStaffedReport,
   type StaffingLeaveSource,
@@ -206,7 +206,7 @@ export function shownTeamMoveShortStaffedOf(
   today: string | null,
   leave: StaffingLeaveSource | null,
 ): ShortStaffedReport | null {
-  if (snapshot === null || minimumOfCalendar(snapshot) === null) return null;
+  if (snapshot === null || !staffingAppliesOf(snapshot)) return null;
   if (offer === null || today === null || !shortStaffedAskedOf(offer, day, today)) return null;
 
   const choice = chosenTeam(picked, offer);

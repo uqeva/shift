@@ -308,6 +308,36 @@ describe('the resolution screen of a Personal Shift', () => {
     expect(candidateIdsOf(view)).not.toContain(DORA);
   });
 
+  it("a Personal Shift counted with a team is held to the team's own minimum, the cover's assignment applied (story 21.20)", async () => {
+    const plain = await planningSnapshotOf({ assignments: [calendarPersonalAssignmentRow(DORA_SHIFT, DORA, DATE, 'SHIFT', DAN)] });
+    const leave = [leaveRowOf('00000000-0000-4000-8000-00000000f104', DORA, DATE, '2026-10-11')];
+
+    // With no minimum anywhere the cards keep the shipped terms.
+    expect(viewOf(plain, DORA, DAY_TEAM, leave).staffing).toBeNull();
+
+    const own: CalendarSnapshot = {
+      ...plain,
+      teams: plain.teams.map((team) => (team.id === DAY_TEAM ? { ...team, minimumMembers: 1 } : team)),
+    };
+    const view = viewOf(own, DORA, DAY_TEAM, leave);
+
+    // DORA alone works *Dnevni*'s Dan group, and is on leave: nobody at work against the team's 1.
+    expect(view.staffing?.accept).toEqual({ atWork: 0, minimum: 1, short: true });
+    // The cover's assignment puts one on the group, a placeholder before a pick and IVA once picked.
+    expect(view.staffing?.replace).toEqual({ atWork: 1, minimum: 1, short: false });
+    expect(view.staffing?.replaceBy[IVA]).toEqual({ atWork: 1, minimum: 1, short: false });
+    // Removing the leave gives DORA back.
+    expect(view.staffing?.amend).toEqual({ atWork: 1, minimum: 1, short: false });
+
+    // THE ORGANIZATION'S ALONE (no team minimum) holds it too: the cards gain the figures they lacked
+    // since 21.7, a listed change of the strip's output (spec 21.20, Epic AC Deviations).
+    const organizations = await planningSnapshotOf({
+      assignments: [calendarPersonalAssignmentRow(DORA_SHIFT, DORA, DATE, 'SHIFT', DAN)],
+      minimumMembers: 2,
+    });
+    expect(viewOf(organizations, DORA, DAY_TEAM, leave).staffing?.accept).toEqual({ atWork: 0, minimum: 2, short: true });
+  });
+
   it('leaves out a candidate who already holds a shift that date, and keeps one with a day off', async () => {
     const snapshot = await planningSnapshotOf({
       assignments: [

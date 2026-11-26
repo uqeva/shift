@@ -217,6 +217,21 @@ export const MEMBER_DIRECTORY: readonly string[] = [
 ];
 
 /**
+ * Story 21.20: *Najmanje ljudi*, the team dialog's own minimum. Its markup and
+ * hook live in the teams feature and are composed by the team edit body; a
+ * DISJOINT set of its own, so the edit form's one-field and one-form sweeps
+ * keep meaning the rename. Its rules are `@/features/teams/services/minimum`
+ * ({@link TEAM_MINIMUM_KEYS}), executed by `minimum.test.ts`.
+ */
+export const TEAM_MINIMUM: readonly string[] = [
+  join(srcRoot, 'features', 'teams', 'components', 'team-minimum.tsx'),
+  join(srcRoot, 'features', 'teams', 'hooks', 'use-team-minimum.ts'),
+];
+
+/** Story 21.20: the minimum's refusals, one `\w*MessageKey` union. */
+export const TEAM_MINIMUM_KEYS = join(srcRoot, 'features', 'teams', 'services', 'minimum.ts');
+
+/**
  * The member list's rules, as a `.ts` module that renders nothing.
  *
  * It declares keys in TWO shapes — three `\w*MessageKey` return-type unions and
@@ -1167,6 +1182,9 @@ export const SCREENS = [
   // unavailable notice's retry and *Poništi pretragu*. No line is a link and
   // nothing writes.
   { name: 'the member directory', file: MEMBER_DIRECTORY, expectedFields: 1, expectedButtons: 2 },
+  // STORY 21.20. ONE field and THREE buttons on *Najmanje ljudi*: the field,
+  // *Spremi najmanje ljudi*, and its preview's *Natrag* and *Spremi*.
+  { name: 'the team minimum', file: TEAM_MINIMUM, expectedFields: 1, expectedButtons: 3 },
   // FIVE SINCE STORY 12.3: *Zamjene*'s *Prihvati*, *Odbij* and *Povuci*,
   // each written once inside the map over the swaps.
   { name: 'the Danas destination', file: DANAS, expectedFields: 0, expectedButtons: 5 },

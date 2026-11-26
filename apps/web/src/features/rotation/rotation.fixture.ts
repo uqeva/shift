@@ -75,10 +75,11 @@ export function memberRow(
 export function teamRow(
   id: string,
   name: string,
-  { archived = false, organization = ORGANIZATION, offOnHolidays = false as unknown } = {},
+  { archived = false, organization = ORGANIZATION, offOnHolidays = false as unknown, minimumMembers = null as unknown } = {},
 ): Row {
   // STORY 21.16 (0080): every team carries whether it is off on holidays; by default not.
-  return { organization_id: organization, id, name, archived, off_on_holidays: offOnHolidays };
+  // STORY 21.20 (0082): and its own minimum; by default none, so the organization's applies.
+  return { organization_id: organization, id, name, archived, off_on_holidays: offOnHolidays, minimum_members: minimumMembers };
 }
 
 /** A type with, for a working one, one version from `SEEDED` unless `times` is `null`. */

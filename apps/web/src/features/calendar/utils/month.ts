@@ -52,6 +52,7 @@ import {
   holidayNamesOfCalendar,
   holidayRuleOfCalendar,
   minimumOfCalendar,
+  teamMinimumsOfCalendar,
 } from '@/features/calendar/services/snapshot';
 import { lentFromShownOf, loanNoticeShownOf, type LentFrom, type LoanNotice } from '@/features/calendar/utils/loan-marks';
 import {
@@ -1321,13 +1322,21 @@ export function snapshotScheduleInputOf(snapshot: CalendarSnapshot): SnapshotSch
   };
 }
 
+/** Story 21.20: the active teams' own minimums as the staffing input carries them, `{}` with none. */
+function teamMinimumsOf(calendar: CalendarSnapshot): Pick<StaffingInput, 'teamMinimums'> {
+  const teamMinimums = teamMinimumsOfCalendar(calendar);
+
+  return teamMinimums === undefined ? {} : { teamMinimums };
+}
+
 /**
  * STORY 11.2: what the staffing rule derives from — the ONE input recipe of
  * the save report, the calendar's marks, the day detail's line and admin
  * *Danas*'s card: the snapshot's schedule fields ({@link snapshotScheduleInputOf},
  * which `collisionInputOf` spreads too), `records` as the leave, the ACTIVE
  * teams (archived ones show no shift) in the calendar's order, and the
- * snapshot's minimum.
+ * snapshot's minimum — the organization's, and (story 21.20) each active
+ * team's own, which wins for that team (`minimumOf`).
  *
  * Here, not in `staffing/services/short-staffed` (which re-exports it), so
  * this module imports nothing that imports it back (Epic 11 retro A2, R2;
@@ -1340,6 +1349,8 @@ export function staffingInputOf(calendar: CalendarSnapshot, records: readonly Co
     leaveRecords: records.map((record) => ({ id: record.id, memberId: record.memberId, ...leaveSpanOf(record) })),
     teamIds: splitTeams(calendar.teams).active.map((team) => team.id),
     minimumMembers: minimumOfCalendar(calendar),
+    // Story 21.20: each active team's own minimum, absent with none (the input as before).
+    ...teamMinimumsOf(calendar),
   };
 }
 

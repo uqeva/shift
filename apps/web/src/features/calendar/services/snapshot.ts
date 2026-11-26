@@ -531,6 +531,39 @@ export function minimumOfCalendar(calendar: CalendarSnapshot): number | null {
 }
 
 /**
+ * STORY 21.20 (R10.2 as amended, AD-27): the ACTIVE teams' own minimums, by
+ * team id, for the teams that set one, or `undefined` when none does — so a
+ * staffing input built with none is key for key what it was. An archived
+ * team shows no shift, and its minimum is never read.
+ */
+export function teamMinimumsOfCalendar(calendar: Pick<CalendarSnapshot, 'teams'>): Readonly<Record<string, number>> | undefined {
+  const own: Record<string, number> = {};
+  let any = false;
+
+  for (const team of calendar.teams) {
+    const minimum = calendarMinimumMembersOf((team as { readonly minimumMembers?: unknown }).minimumMembers);
+
+    if (team.archived || minimum === null) continue;
+
+    own[team.id] = minimum;
+    any = true;
+  }
+
+  return any ? own : undefined;
+}
+
+/**
+ * STORY 21.20: whether any shift of the snapshot can be short-staffed — the
+ * organization's minimum is set, or an active team's own is. Every staffing
+ * surface (the save reports, the calendar's marks, the day detail's line,
+ * *Danas*'s card, the resolution strip) reads nothing more while this is
+ * false, exactly as with the organization's setting empty before.
+ */
+export function staffingAppliesOf(calendar: CalendarSnapshot): boolean {
+  return minimumOfCalendar(calendar) !== null || teamMinimumsOfCalendar(calendar) !== undefined;
+}
+
+/**
  * The snapshot's absence types, or `null` for a snapshot cached before story
  * 13.2, which carries none: *Sati* is then unavailable until it is read
  * again, never a guess at which leave draws.

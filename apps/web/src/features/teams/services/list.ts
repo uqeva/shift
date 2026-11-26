@@ -32,7 +32,7 @@ export const TEAMS_LIST_KEY = ['teams'] as const;
  * The columns this read selects. `organization_id` renders nowhere and is the
  * tripwire {@link readTeams} uses to refuse an answer spanning two tenants.
  */
-export const TEAMS_COLUMNS = 'organization_id,id,name,archived,off_on_holidays';
+export const TEAMS_COLUMNS = 'organization_id,id,name,archived,off_on_holidays,minimum_members';
 
 /** The exact count, so a truncated answer is caught rather than rendered. */
 export const TEAMS_COUNT: TeamsCountOptions = { count: 'exact' };
@@ -92,6 +92,23 @@ export interface TeamRow {
    * by default. On an organization's holiday the team works no shift.
    */
   readonly offOnHolidays: boolean;
+  /**
+   * The team's own Minimum Members (story 21.20, 0082, R10.2 as amended): a
+   * whole number from 1, or `null` when the team sets none and the
+   * organization's applies. Current-state.
+   */
+  readonly minimumMembers: number | null;
+}
+
+/** The largest number `teams.minimum_members` (a `smallint`) holds. */
+const TEAM_MINIMUM_MAX = 32767;
+
+/** A stored team minimum: `null`, or a whole number from 1 the column can hold; anything else is no value. */
+function teamMinimumOf(value: unknown): number | null | undefined {
+  if (value === null) return null;
+  if (typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= TEAM_MINIMUM_MAX) return value;
+
+  return undefined;
 }
 
 function textAt(row: Record<string, unknown>, column: string): string | null {
@@ -114,12 +131,15 @@ export function teamRowOf(row: unknown): TeamRow | null {
   const name = textAt(fields, 'name');
   const archived = fields['archived'];
   const offOnHolidays = fields['off_on_holidays'];
+  // Story 21.20 (0082): present on every row, `null` included; a row without it refuses the answer.
+  const minimumMembers = teamMinimumOf(fields['minimum_members']);
 
   if (id === null || organizationId === null || name === null) return null;
   if (typeof archived !== 'boolean') return null;
   if (typeof offOnHolidays !== 'boolean') return null;
+  if (minimumMembers === undefined) return null;
 
-  return { id, organizationId, name, archived, offOnHolidays };
+  return { id, organizationId, name, archived, offOnHolidays, minimumMembers };
 }
 
 /**

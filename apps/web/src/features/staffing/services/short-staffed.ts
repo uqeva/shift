@@ -1,5 +1,6 @@
 import {
   isShortStaffed,
+  minimumOf,
   newlyShortStaffedOf,
   leaveSpanOf,
   peopleAtWorkOn,
@@ -7,7 +8,7 @@ import {
   type LeaveHalf,
 } from '@shift/domain';
 
-import { minimumOfCalendar, type CalendarSnapshot } from '@/features/calendar/services/snapshot';
+import { minimumOfCalendar, staffingAppliesOf, type CalendarSnapshot } from '@/features/calendar/services/snapshot';
 import { readsOrganizationLeave } from '@/features/calendar/services/snapshot-skew';
 import { dayMonthOf, staffingInputOf } from '@/features/calendar/utils/month';
 import { organizationLeaveRecordsOf, type OrganizationLeaveRecord } from '@/features/leave/services/leave-list';
@@ -31,7 +32,8 @@ import { nextIsoDate } from '@/lib/i18n/format';
  *
  * THE SETTING EMPTY REPORTS NOTHING: `null` — no block, no line — before any
  * leave is looked at, so a surface reads the organization's leave only while
- * the minimum is set ({@link readsStaffingLeaveOf}).
+ * a minimum is set ({@link readsStaffingLeaveOf}): the organization's, or
+ * (story 21.20) an active team's own (`staffingAppliesOf`).
  *
  * NEVER A GUESS, NEVER A GATE. The leave read pending or failed, a row that
  * cannot be trusted, or any `RangeError` of the derivation is *unknown*: one
@@ -108,12 +110,13 @@ export interface StaffingLeaveSource {
 }
 
 /**
- * The snapshot's Minimum Members and the staffing rule's one input recipe,
- * re-exported from their homes beside `calendarMinimumMembersOf` and
- * `snapshotScheduleInputOf` (Epic 11 retro A2, R2), so `calendar/utils/month`
- * reads them without importing this module back.
+ * The snapshot's Minimum Members, whether any minimum applies (story 21.20:
+ * the organization's or an active team's own) and the staffing rule's one
+ * input recipe, re-exported from their homes beside `calendarMinimumMembersOf`
+ * and `snapshotScheduleInputOf` (Epic 11 retro A2, R2), so
+ * `calendar/utils/month` reads them without importing this module back.
  */
-export { minimumOfCalendar, staffingInputOf };
+export { minimumOfCalendar, staffingAppliesOf, staffingInputOf };
 
 /**
  * Whether a surface over `calendar` reads the organization's leave for the
@@ -121,7 +124,7 @@ export { minimumOfCalendar, staffingInputOf };
  * the minimum is set. The setting empty reads nothing more.
  */
 export function readsStaffingLeaveOf(calendar: CalendarSnapshot | null): boolean {
-  return calendar !== null && readsOrganizationLeave(calendar.viewer.role) && minimumOfCalendar(calendar) !== null;
+  return calendar !== null && readsOrganizationLeave(calendar.viewer.role) && staffingAppliesOf(calendar);
 }
 
 /** The member a leave row names, when it names one as text. */
@@ -220,7 +223,7 @@ export function shortStaffedReportOf(
   after: StaffingSide,
   window: StaffingWindow,
 ): ShortStaffedReport | null {
-  if (minimumOfCalendar(after.calendar) === null) return null;
+  if (!staffingAppliesOf(after.calendar)) return null;
   if (before.records === null || after.records === null) return SHORT_STAFFED_UNKNOWN_REPORT;
 
   try {
@@ -272,7 +275,7 @@ export function configurationReportOf(
   window: StaffingWindow,
   leave: StaffingLeaveSource | null,
 ): ShortStaffedReport | null {
-  if (minimumOfCalendar(after) === null || !readsStaffingLeaveOf(before)) return null;
+  if (!staffingAppliesOf(after) || !readsStaffingLeaveOf(before)) return null;
 
   const records = staffingRecordsOf(before, leave);
 
@@ -309,7 +312,7 @@ export function leaveChangeReportOf(
   leave: StaffingLeaveSource | null,
   change: StaffingLeaveChange,
 ): ShortStaffedReport | null {
-  if (minimumOfCalendar(calendar) === null || !readsStaffingLeaveOf(calendar)) return null;
+  if (!staffingAppliesOf(calendar) || !readsStaffingLeaveOf(calendar)) return null;
 
   const records = staffingRecordsOf(calendar, leave);
   const id = change.targetId ?? change.candidateId;
@@ -358,12 +361,16 @@ export function coverageAgainstMinimumOf(
   date: string,
   shiftTypeId?: string,
 ): CoverageAgainstMinimum | null {
-  const minimum = minimumOfCalendar(calendar);
-
-  if (minimum === null) return null;
+  if (!staffingAppliesOf(calendar)) return null;
 
   try {
-    const staffing = peopleAtWorkOn(staffingInputOf(calendar, records), teamId, date, shiftTypeId);
+    const input = staffingInputOf(calendar, records);
+    // Story 21.20: the team's own minimum, else the organization's (R10.2 as amended); none, no line.
+    const minimum = minimumOf(input, teamId);
+
+    if (minimum === null) return null;
+
+    const staffing = peopleAtWorkOn(input, teamId, date, shiftTypeId);
 
     if (staffing === null) return null;
 
