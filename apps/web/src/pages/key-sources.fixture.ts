@@ -42,6 +42,8 @@ import {
   LOCKUP,
   MEMBER_CREATE,
   MEMBER_DIRECTORY,
+  TEAM_MINIMUM,
+  TEAM_MINIMUM_KEYS,
   MEMBER_EDIT,
   MEMBER_FACTS_KEYS,
   MEMBER_LIST,
@@ -442,6 +444,25 @@ export const KEY_SOURCES = [
     strings: 9,
   },
   {
+    // STORY 21.20: *Najmanje ljudi* — the label, three hints (the
+    // organization's number, not set, not known), the save and its two
+    // confirmations, an archived team's two lines, and its *Što se mijenja*:
+    // title, two ledes, the window, the changed line, the cleared heading and
+    // row, the shared unknown and `i još` lines, *Natrag* and *Spremi*.
+    name: 'the team minimum',
+    file: TEAM_MINIMUM,
+    keys: translationKeys,
+    strings: 20,
+  },
+  {
+    // STORY 21.20: the minimum's five refusals (the field, a stale team, the
+    // outright refusal, the service and the unchecked change).
+    name: 'the team minimum rules',
+    file: TEAM_MINIMUM_KEYS,
+    keys: messageKeyUnions,
+    strings: 5,
+  },
+  {
     // ONE on Danas: its own `nav.danas` heading. The line's words and its
     // refusal reach `t()` through `@/features/teams/services/roster`, below.
     //
@@ -527,7 +548,8 @@ export const KEY_SOURCES = [
     // 109 SINCE ITS REVIEW: a duty leg's `ručno` and `dodijeljeno ručno`.
     // 114 SINCE STORY 21.18: the holiday's calls — the shared mark's `blagdan {name}` and an emptied shift's `blagdan` (`holiday-mark.tsx`), and the admin week's head and cell label `blagdan {name}`, an emptied cell's `blagdan`, and its legend's word and key line.
     // 115 SINCE STORY 21.7: a teamless conflict's `bez tima` in *Treba tebe*.
-    strings: 115,
+    // 116 SINCE STORY 21.20: *Premalo ljudi*'s calm line when the teams' own minimums differ (`calmEach`).
+    strings: 116,
   },
   {
     // STORY 6.1a: today's three cases, the next shift's two headings, and

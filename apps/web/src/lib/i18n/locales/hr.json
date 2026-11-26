@@ -140,6 +140,7 @@
         "heading": "Premalo ljudi",
         "count": "{count, plural, one {# smjena} few {# smjene} other {# smjena}} ovaj tjedan",
         "calm": "{minimum, plural, one {Svaka smjena ovaj tjedan ima najmanje # čovjeka.} few {Svaka smjena ovaj tjedan ima najmanje # čovjeka.} other {Svaka smjena ovaj tjedan ima najmanje # ljudi.}}",
+        "calmEach": "Nijedna smjena ovaj tjedan nema manje ljudi od najmanjeg broja svojeg tima.",
         "row": "{weekday} {date} · {team} · {type}: {atWork}",
         "more": "i još {count}",
         "open": "Otvori kalendar"
@@ -2305,6 +2306,35 @@
         "save": "Spremi"
       },
       "error": {
+        "stale": "Tim se u međuvremenu promijenio. Provjeri ga i pokušaj ponovno.",
+        "refused": "Promjena nije spremljena. Odjavi se i prijavi ponovno.",
+        "saveUnavailable": "Spremanje trenutačno nije moguće. Pokušaj ponovno.",
+        "unchecked": "Ne mogu provjeriti što se mijenja. Pokušaj ponovno."
+      }
+    },
+    "minimum": {
+      "label": "Najmanje ljudi",
+      "hint": "Prazno: vrijedi za organizaciju ({n})",
+      "hintNotSet": "Prazno: vrijedi za organizaciju (nije postavljeno)",
+      "hintUnknown": "Prazno: vrijedi za organizaciju",
+      "save": "Spremi najmanje ljudi",
+      "saved": "Najmanje ljudi za tim: {count}.",
+      "savedNotSet": "Za tim vrijedi najmanje ljudi organizacije.",
+      "archived": "Najmanje ljudi: {count}.",
+      "archivedNotSet": "Najmanje ljudi: vrijedi za organizaciju.",
+      "preview": {
+        "title": "Što se mijenja",
+        "lede": "Najmanje ljudi za {team}: {count}.",
+        "ledeNotSet": "Za {team} vrijedi najmanje ljudi organizacije.",
+        "window": "Prikazano od {date} godinu dana unaprijed. Najmanje ljudi vrijedi i za prošle dane.",
+        "clearedHeading": "Više nemaju premalo ljudi",
+        "clearedRow": "{team}, {date} {type}",
+        "changed": "Nešto se u međuvremenu promijenilo. Provjeri ponovno.",
+        "back": "Natrag",
+        "save": "Spremi najmanje ljudi"
+      },
+      "error": {
+        "invalid": "Upiši cijeli broj od 1 do 32767 ili ostavi polje prazno.",
         "stale": "Tim se u međuvremenu promijenio. Provjeri ga i pokušaj ponovno.",
         "refused": "Promjena nije spremljena. Odjavi se i prijavi ponovno.",
         "saveUnavailable": "Spremanje trenutačno nije moguće. Pokušaj ponovno.",

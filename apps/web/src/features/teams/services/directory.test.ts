@@ -36,7 +36,7 @@ const C = '00000000-0000-4000-8000-00000000000c';
 const ARCHIVED = '00000000-0000-4000-8000-00000000000d';
 
 function team(id: string, name: string, archived = false): TeamRow {
-  return { id, organizationId: 'org', name, archived, offOnHolidays: false };
+  return { id, organizationId: 'org', name, archived, offOnHolidays: false, minimumMembers: null };
 }
 
 function member(id: string, name: string, fireRank: string | null = null, position: string | null = null): TeamRosterMember {

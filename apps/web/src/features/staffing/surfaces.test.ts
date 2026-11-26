@@ -294,6 +294,55 @@ describe.each(STAFFING_FIXTURES)('$name', (fixture) => {
     });
   });
 
+  describe("a team's own minimum with the organization's empty (story 21.20)", () => {
+    /** `snapshot` with the first team's own minimum set: the organization's stays as read. */
+    const own = (snapshot: CalendarSnapshot, minimum: number): CalendarSnapshot => ({
+      ...snapshot,
+      teams: snapshot.teams.map((team) => (team.id === fixture.team ? { ...team, minimumMembers: minimum } : team)),
+    });
+
+    it("the day detail's roster change is held to the team's own minimum", () => {
+      const leave = leaveRead([leaveRow(ONE, member(2), day.date, day.date)]);
+      const snapshot = own(empty, 3);
+
+      expect(rowsOf(rosterShortStaffedOf(snapshot, detailOf(snapshot, fixture.team, day.date), member(1), ROSTER_NOBODY, leave))).toMatchObject([
+        { date: day.date, teamId: fixture.team, atWork: 2, minimum: 3 },
+      ]);
+    });
+
+    it('a deactivation and a team move out of a team of 3 report against its own 3', async () => {
+      const three = own(await staffingSnapshotOf(fixture, { size: 3, minimum: null }), 3);
+      const report = shownDeactivationShortStaffedOf(three, member(2), { change: DEACTIVATE, minimum: TODAY } as const, day.date, TODAY, leaveRead([]));
+
+      expect(rowsOf(report).every((row) => row.teamId === fixture.team && row.minimum === 3)).toBe(true);
+      expect(rowsOf(report).length).toBeGreaterThan(0);
+      const offer: TeamMoveOffer = {
+        change: TEAM_MOVE,
+        state: { team: { id: fixture.team, name: fixture.teamName }, scheduled: null },
+        today: TODAY,
+        choices: [{ id: fixture.otherTeam, name: 'Smjena B' }],
+        offersNoTeam: true,
+        positions: false,
+        current: { id: fixture.team, name: fixture.teamName },
+        currentPosition: null,
+        minimum: TODAY,
+      };
+
+      expect(rowsOf(shownTeamMoveShortStaffedOf(three, member(2), offer, fixture.otherTeam, day.date, TODAY, leaveRead([])))[0]).toMatchObject({
+        teamId: fixture.team,
+        minimum: 3,
+      });
+    });
+
+    it('a leave save makes the team short against its own minimum, and a team set to 1 never is', () => {
+      const change = { memberId: member(2), targetId: null, candidateId: LEAVE_CANDIDATE_ID, next: dayWindowOf(day.date) } as const;
+      const leave = leaveRead([leaveRow(ONE, member(1), day.date, day.date)]);
+
+      expect(rowsOf(leaveChangeReportOf(own(empty, 3), leave, change))).toMatchObject([{ teamId: fixture.team, atWork: 2, minimum: 3 }]);
+      expect(rowsOf(leaveChangeReportOf(own(four, 1), leave, change))).toEqual([]);
+    });
+  });
+
   describe('the rotation save', () => {
     let rotation: RotationSnapshot;
 

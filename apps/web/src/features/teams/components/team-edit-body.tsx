@@ -25,6 +25,7 @@ import {
   TeamArchiveConfirm,
   TeamArchiveRefusal,
 } from '@/features/teams/components/team-archive';
+import { TeamMinimum, TeamMinimumArchived } from '@/features/teams/components/team-minimum';
 import type { TeamEditScreen } from '@/features/teams/hooks/use-team-edit';
 import type { TeamRow } from '@/features/teams/services/list';
 import { teamFormKey } from '@/features/teams/services/write';
@@ -39,6 +40,9 @@ import { NAME_MAX_LENGTH } from '@/utils/name';
  * STORY 21.17: below the form, *Ne radi na blagdane*, on its own save: the
  * switch asks the check, and *Što se mijenja* replaces the form until its
  * *Spremi* or *Natrag*. An archived team states the setting, read-only.
+ *
+ * STORY 21.20: below the flag, *Najmanje ljudi* (`TeamMinimum`, its own part,
+ * hook and save), hidden while the form is; an archived team states it.
  *
  * The helpers are declared inside the component, at its two-space
  * indentation, so the sign-in suite's scoped extraction reads each one.
@@ -56,6 +60,7 @@ export function TeamEditBody({ screen }: { readonly screen: TeamEditScreen }): R
         <p className="break-words text-base font-medium">{team.name}</p>
         <p className="text-sm text-muted-foreground">{t('smjene.archivedNote')}</p>
         <p className="text-sm">{team.offOnHolidays ? t('smjene.offOnHolidays.archivedOn') : t('smjene.offOnHolidays.archivedOff')}</p>
+        <TeamMinimumArchived team={team} />
       </div>
     );
   }
@@ -210,6 +215,7 @@ export function TeamEditBody({ screen }: { readonly screen: TeamEditScreen }): R
         </form>
         {confirming ? <TeamArchiveConfirm screen={screen} team={team} /> : null}
         {confirming || flagChecked !== null ? null : renderFlag(team)}
+        <TeamMinimum team={team} hidden={confirming || flagChecked !== null} gate={gate} />
         {flagChecked === null ? null : renderFlagPreview(team)}
       </>
     );

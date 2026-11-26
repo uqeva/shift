@@ -214,7 +214,7 @@ describe('step 7’s summary (UX-DR68)', () => {
 });
 
 describe('the queries as the hook reads them (review 1)', () => {
-  const team = (id: string, archived: boolean): TeamRow => ({ id, organizationId: 'org', name: id, archived, offOnHolidays: false });
+  const team = (id: string, archived: boolean): TeamRow => ({ id, organizationId: 'org', name: id, archived, offOnHolidays: false, minimumMembers: null });
   const types = (rows: readonly { archived: boolean; isWorking: boolean }[]): ShiftTypesSnapshot =>
     ({
       organizationId: 'org',

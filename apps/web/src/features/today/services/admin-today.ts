@@ -4,6 +4,7 @@ import {
   deriveShiftTimes,
   effectiveTeamOn,
   isHalfDay,
+  minimumOf,
   shiftTypeVersionOn,
   shortStaffedShiftsOf,
   type LeaveHalf,
@@ -48,8 +49,9 @@ import {
 import { ACCEPT_UNCOVERED, REPLACE_MEMBER } from '@/features/conflicts/services/resolutions';
 import { organizationLeaveRecordsOf, type OrganizationLeaveRecord } from '@/features/leave/services/leave-list';
 import type { MemberRole } from '@/features/navigation/utils/destinations';
-import { minimumOfCalendar, staffingInputOf } from '@/features/staffing/services/short-staffed';
+import { staffingAppliesOf, staffingInputOf } from '@/features/staffing/services/short-staffed';
 import type { SwapShiftNamed } from '@/features/swaps/services/organization-swaps';
+import { splitTeams } from '@/features/teams/services/list';
 import {
   CASE_DUTY,
   CASE_FREE,
@@ -421,8 +423,13 @@ export interface ShortStaffedTodayRow {
 export interface ShortStaffedCard {
   /** Every short-staffed shift from today to the week's last day; 0 is shown. */
   readonly count: number;
-  /** *Najmanje ljudi u smjeni*, which the calm line names at zero. */
-  readonly minimum: number;
+  /**
+   * *Najmanje ljudi u smjeni*, which the calm line names at zero: the one
+   * minimum every active team is held to, or (story 21.20) `null` when the
+   * teams' own minimums differ, or some team has none, and the calm line
+   * names no number.
+   */
+  readonly minimum: number | null;
   /** At most {@link SHORT_STAFFED_TODAY_ROWS}, soonest first and then in team order. */
   readonly rows: readonly ShortStaffedTodayRow[];
   /** How many more there are beyond `rows`: the `i još {n}`. */
@@ -651,14 +658,19 @@ export function shortStaffedCardOf(
   marks: CalendarMarks,
   dates: readonly string[],
 ): ShortStaffedCard | null {
-  const minimum = minimumOfCalendar(snapshot);
   const from = dates[0];
   const to = dates.at(-1);
 
-  if (marks.staffingLeave === null || minimum === null) return null;
+  if (marks.staffingLeave === null || !staffingAppliesOf(snapshot)) return null;
   if (from === undefined || to === undefined) throw new RangeError('the week has no dates');
 
-  const shifts = shortStaffedShiftsOf(staffingInputOf(snapshot, marks.staffingLeave), from, to);
+  const input = staffingInputOf(snapshot, marks.staffingLeave);
+  const shifts = shortStaffedShiftsOf(input, from, to);
+  // Story 21.20: with no team minimum, the organization's, as before; else a number only when every
+  // active team is held to the same one.
+  const minimums = new Set(splitTeams(snapshot.teams).active.map((team) => minimumOf(input, team.id)));
+  const [only] = minimums;
+  const minimum = input.teamMinimums === undefined ? input.minimumMembers : minimums.size === 1 && only !== undefined ? only : null;
   const teams = new Map(snapshot.teams.map((team) => [team.id, team.name]));
   const types = new Map(snapshot.types.map((type) => [type.id, type.name]));
   const rows = shifts.slice(0, SHORT_STAFFED_TODAY_ROWS).map((shift): ShortStaffedTodayRow => {

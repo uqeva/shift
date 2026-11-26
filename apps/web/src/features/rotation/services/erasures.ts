@@ -19,7 +19,7 @@ import {
 import {
   configurationReportOf,
   horizonWindowOf,
-  minimumOfCalendar,
+  staffingAppliesOf,
   unknownReportOf,
   type ShortStaffedReport,
   type StaffingLeaveSource,
@@ -163,7 +163,7 @@ export function draftShortStaffedOf(
   leave: StaffingLeaveSource | null,
 ): ShortStaffedReport | null {
   if (calendar === null || rotation === null || entered === null || today === null) return null;
-  if (minimumOfCalendar(calendar) === null) return null;
+  if (!staffingAppliesOf(calendar)) return null;
 
   try {
     // ONE NORMALISED DRAFT for the refusal, the after and the window, as the save binds it.
@@ -360,7 +360,7 @@ export function cancelShortStaffedOf(
   const calendar = builderCalendarOf(scheduled !== null, calendarRead);
 
   if (calendar === null || rotation === null || scheduled === null) return null;
-  if (minimumOfCalendar(calendar) === null) return null;
+  if (!staffingAppliesOf(calendar)) return null;
 
   try {
     sameScheduledChangeOf(calendar, rotation, scheduled);

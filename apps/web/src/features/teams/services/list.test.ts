@@ -51,6 +51,7 @@ function rows(count: number, archivedEvery = 0): Record<string, unknown>[] {
     name: `Tim ${String(index + 1)}`,
     archived: archivedEvery > 0 && index % archivedEvery === 0,
     off_on_holidays: false,
+    minimum_members: null,
   }));
 }
 
@@ -81,8 +82,8 @@ describe('the team read', () => {
   it('names one table, one key, and selects the tenant it checks', () => {
     expect(TEAMS_TABLE).toBe('teams');
     expect(TEAMS_LIST_KEY).toEqual(['teams']);
-    // STORY 21.16 (0080): whether the team is off on holidays.
-    expect(TEAMS_COLUMNS.split(',')).toEqual(['organization_id', 'id', 'name', 'archived', 'off_on_holidays']);
+    // STORY 21.16 (0080): whether the team is off on holidays; STORY 21.20 (0082): its own minimum.
+    expect(TEAMS_COLUMNS.split(',')).toEqual(['organization_id', 'id', 'name', 'archived', 'off_on_holidays', 'minimum_members']);
     expect(TEAMS_COUNT).toEqual({ count: 'exact' });
   });
 
@@ -107,12 +108,12 @@ describe('the team read', () => {
   });
 
   it('returns an archived team unchanged, flag and all', async () => {
-    const archived = { organization_id: ORGANIZATION, id: 'a', name: 'Stari tim', archived: true, off_on_holidays: true };
+    const archived = { organization_id: ORGANIZATION, id: 'a', name: 'Stari tim', archived: true, off_on_holidays: true, minimum_members: 2 };
     const outcome = await readTeams(tableAnswering({ data: [archived], error: null, count: 1 }));
 
     expect(outcome).toEqual({
       ok: true,
-      teams: [{ id: 'a', organizationId: ORGANIZATION, name: 'Stari tim', archived: true, offOnHolidays: true }],
+      teams: [{ id: 'a', organizationId: ORGANIZATION, name: 'Stari tim', archived: true, offOnHolidays: true, minimumMembers: 2 }],
     });
   });
 
@@ -148,12 +149,15 @@ describe('the team read', () => {
 });
 
 describe('a team row validates field by field', () => {
-  const good = { organization_id: ORGANIZATION, id: 'a', name: 'A', archived: false, off_on_holidays: false };
+  const good = { organization_id: ORGANIZATION, id: 'a', name: 'A', archived: false, off_on_holidays: false, minimum_members: null };
 
   it('admits a well-formed row', () => {
-    expect(teamRowOf(good)).toEqual({ id: 'a', organizationId: ORGANIZATION, name: 'A', archived: false, offOnHolidays: false });
+    expect(teamRowOf(good)).toEqual({ id: 'a', organizationId: ORGANIZATION, name: 'A', archived: false, offOnHolidays: false, minimumMembers: null });
     // STORY 21.16: a team off on holidays says so.
-    expect(teamRowOf({ ...good, off_on_holidays: true })).toMatchObject({ offOnHolidays: true });
+    expect(teamRowOf({ ...good, off_on_holidays: true })).toMatchObject({ offOnHolidays: true, minimumMembers: null });
+    // STORY 21.20: a team's own minimum, from 1 to the smallint's largest.
+    expect(teamRowOf({ ...good, minimum_members: 1 })).toMatchObject({ minimumMembers: 1 });
+    expect(teamRowOf({ ...good, minimum_members: 32767 })).toMatchObject({ minimumMembers: 32767 });
   });
 
   it.each([
@@ -168,6 +172,12 @@ describe('a team row validates field by field', () => {
     ['no holiday flag', { ...good, off_on_holidays: undefined }],
     ['a holiday flag that is not a boolean', { ...good, off_on_holidays: 'true' }],
     ['a null holiday flag', { ...good, off_on_holidays: null }],
+    // STORY 21.20: a team without its minimum (a read before 0082), or one that is no whole number from 1.
+    ['no minimum', { ...good, minimum_members: undefined }],
+    ['a minimum of zero', { ...good, minimum_members: 0 }],
+    ['a fractional minimum', { ...good, minimum_members: 1.5 }],
+    ['a minimum as text', { ...good, minimum_members: '2' }],
+    ['a minimum the column cannot hold', { ...good, minimum_members: 32768 }],
   ])('refuses %s', (_what, row) => {
     expect(teamRowOf(row)).toBeNull();
   });
@@ -190,6 +200,7 @@ describe('the list splits into active and archived, and any count is just a coun
       name,
       archived,
       offOnHolidays: false,
+      minimumMembers: null,
     });
     const split = splitTeams([
       team('1', 'Čvor'),
@@ -509,7 +520,7 @@ describe('the surface state, driven through the one query definition', () => {
 });
 
 describe('an archived team is viewed, never edited', () => {
-  const active: TeamRow = { id: 'a', organizationId: ORGANIZATION, name: 'A', archived: false, offOnHolidays: false };
+  const active: TeamRow = { id: 'a', organizationId: ORGANIZATION, name: 'A', archived: false, offOnHolidays: false, minimumMembers: null };
   const archived: TeamRow = { ...active, archived: true };
 
   it('lists an active team to edit and an archived one to view', () => {

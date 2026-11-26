@@ -2163,9 +2163,10 @@ describe('every write verb 0023, 0035 and 0036 name waits on the lock', () => {
         { table: 'team_membership_versions', trigger: 'team_membership_versions_refuse_truncate', type: 2 | 32, columns: null },
         { table: 'team_membership_versions', trigger: 'team_membership_versions_refuse_write_by_stale_admin', type: 1 | 2 | 4 | 8 | 16, columns: null },
         { table: 'team_membership_versions', trigger: 'team_membership_versions_serialize_organization_writes', type: 2 | 4 | 8 | 16, columns: null },
-        // 0080 (story 21.16): widened to the off-on-holidays flag, same functions and levels.
-        { table: 'teams', trigger: 'teams_refuse_write_by_stale_admin', type: 1 | 2 | 16, columns: ['archived', 'off_on_holidays'] },
-        { table: 'teams', trigger: 'teams_serialize_organization_writes', type: 2 | 16, columns: ['archived', 'off_on_holidays'] },
+        // 0080 (story 21.16): widened to the off-on-holidays flag, and 0082 (story 21.20) to the team's own
+        // minimum, same functions and levels. The columns are read `order by attname`, so by name.
+        { table: 'teams', trigger: 'teams_refuse_write_by_stale_admin', type: 1 | 2 | 16, columns: ['archived', 'minimum_members', 'off_on_holidays'] },
+        { table: 'teams', trigger: 'teams_serialize_organization_writes', type: 2 | 16, columns: ['archived', 'minimum_members', 'off_on_holidays'] },
       ]);
     } finally {
       await client.end();

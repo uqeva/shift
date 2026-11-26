@@ -13,7 +13,7 @@ import { memberHoursInputOf } from '@/features/hours/services/my-hours';
 import {
   configurationReportOf,
   dayWindowOf,
-  minimumOfCalendar,
+  staffingAppliesOf,
   unknownReportOf,
   type ShortStaffedReport,
   type StaffingLeaveSource,
@@ -303,7 +303,7 @@ export function dayReportOf(
   leave: StaffingLeaveSource | null,
   apply: () => { readonly ok: true; readonly after: CalendarSnapshot } | { readonly ok: false },
 ): ShortStaffedReport | null {
-  if (minimumOfCalendar(snapshot) === null) return null;
+  if (!staffingAppliesOf(snapshot)) return null;
 
   let applied: ReturnType<typeof apply>;
 

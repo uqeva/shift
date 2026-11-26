@@ -26,7 +26,7 @@ import { erasuresOf, erasuresOutcomeOf, type ErasureRow } from '@/features/confl
 import { memberTeamOf, type MemberListRow } from '@/features/members/services/list';
 import {
   configurationReportOf,
-  minimumOfCalendar,
+  staffingAppliesOf,
   unknownReportOf,
   type ShortStaffedReport,
   type StaffingLeaveSource,
@@ -768,7 +768,7 @@ export function shownLoanShortStaffedOf(
 ): ShortStaffedReport | null {
   const window = change === null ? null : loanEditWindowOf(change);
 
-  if (snapshot === null || change === null || !previewableSpanOf(window) || minimumOfCalendar(snapshot) === null) return null;
+  if (snapshot === null || change === null || !previewableSpanOf(window) || !staffingAppliesOf(snapshot)) return null;
 
   try {
     const applied = loanEditSnapshotOf(snapshot, change);

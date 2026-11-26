@@ -12,7 +12,7 @@ import type { CalendarMarks } from '@/features/calendar/utils/month';
 import { resolutionsOf, unresolvedOf, type LeaveRowsAnswer } from '@/features/conflicts/services/conflicts-queue';
 import { acceptedUncoveredOf } from '@/features/conflicts/services/resolutions';
 import { leaveRecordsOf, organizationLeaveRecordsOf } from '@/features/leave/services/leave-list';
-import { minimumOfCalendar } from '@/features/staffing/services/short-staffed';
+import { staffingAppliesOf } from '@/features/staffing/services/short-staffed';
 
 /**
  * The calendar's conflict and leave marks (story 5.3c; UX-DR8, Q21), as a
@@ -128,7 +128,7 @@ export function calendarMarksOf(
     collisions: unresolvedOf(snapshot, records, resolutionRows),
     uncovered: acceptedUncoveredOf(resolutionsOf(snapshot, resolutionRows)),
     leave,
-    staffingLeave: minimumOfCalendar(snapshot) === null ? null : records,
+    staffingLeave: staffingAppliesOf(snapshot) ? records : null,
   };
 }
 

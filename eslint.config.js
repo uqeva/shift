@@ -384,6 +384,8 @@ export const FEATURE_PUBLIC = {
     'hooks/logo-url', // navigation, onboarding
     'services/snapshot', // conflicts, history, hour-bands, leave, members, navigation, onboarding, teams, today
     'utils/accent', // navigation
+    // STORY 21.20: a team's own minimum is entered as the organization's is, one parse.
+    'utils/minimum-members', // teams
   ],
   // Story 8.2d: `services/surface-keys` is *Postavke rotacije*'s one key set,
   // which the shift type hooks decide their offline freshness over with the builder.

@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   isShortStaffed,
+  minimumOf,
   newlyShortStaffedOf,
   peopleAtWorkOn,
   scheduleOfMonth,
@@ -316,6 +317,92 @@ describe.each(FIXTURES)('newlyShortStaffedOf under $fixture (R10.4)', (fx) => {
     const frozen = JSON.stringify([oneOff, twoOff]);
     newlyShortStaffedOf(oneOff, twoOff, `${MONTH}-01`, `${MONTH}-31`);
     expect(JSON.stringify([oneOff, twoOff])).toBe(frozen);
+  });
+});
+
+describe.each(FIXTURES)("a team's own minimum under $fixture (story 21.20, R10.2 as amended)", (fx) => {
+  const { date, teamId, shiftTypeId } = workingDayOf(fx);
+  const other = fx.teams[1]!.id;
+  const twoOff = [leave('l0', memberIdOf(teamId, 0), date), leave('l1', memberIdOf(teamId, 1), date)];
+  const month = { from: `${MONTH}-01`, to: `${MONTH}-31` };
+
+  it("minimumOf gives the team's own minimum, else the organization's, else null", () => {
+    expect(minimumOf({ minimumMembers: 3, teamMinimums: { [teamId]: 1 } }, teamId)).toBe(1);
+    expect(minimumOf({ minimumMembers: 3, teamMinimums: { [teamId]: 1 } }, other)).toBe(3);
+    expect(minimumOf({ minimumMembers: 3 }, teamId)).toBe(3);
+    expect(minimumOf({ minimumMembers: null, teamMinimums: { [teamId]: 2 } }, teamId)).toBe(2);
+    expect(minimumOf({ minimumMembers: null, teamMinimums: { [teamId]: 2 } }, other)).toBeNull();
+    // A prototype key is no team's minimum.
+    expect(minimumOf({ minimumMembers: 3, teamMinimums: {} }, 'toString')).toBe(3);
+  });
+
+  it('absent or empty, every answer is byte-identical over the month', () => {
+    const plain = inputOf(fx, { leaveRecords: twoOff });
+    const expected = JSON.stringify(shortStaffedShiftsOf(plain, month.from, month.to));
+    expect(JSON.stringify(shortStaffedShiftsOf({ ...plain, teamMinimums: {} }, month.from, month.to))).toBe(expected);
+    expect(JSON.stringify(newlyShortStaffedOf(inputOf(fx), { ...plain, teamMinimums: {} }, month.from, month.to))).toBe(
+      JSON.stringify(newlyShortStaffedOf(inputOf(fx), plain, month.from, month.to)),
+    );
+  });
+
+  it("a one-person team set to 1 is not flagged while the organization's 3 still flags the others", () => {
+    const input = inputOf(fx, { leaveRecords: twoOff, members: [], teamMinimums: { [teamId]: 1 } });
+    const shifts = shortStaffedShiftsOf(input, month.from, month.to);
+    // Nobody is rostered at all: every working shift of the other teams is short against 3, and the
+    // team set to 1 is short only where nobody works, against its own 1.
+    expect(shifts.filter((shift) => shift.teamId === teamId).every((shift) => shift.minimum === 1 && shift.atWork === 0)).toBe(true);
+    expect(shifts.filter((shift) => shift.teamId !== teamId).every((shift) => shift.minimum === 3)).toBe(true);
+  });
+
+  it('a team minimum below the people at work clears the report; above it reports against its own', () => {
+    expect(shortStaffedShiftsOf(inputOf(fx, { leaveRecords: twoOff, teamMinimums: { [teamId]: 2 } }), date, date)).toEqual([]);
+    expect(shortStaffedShiftsOf(inputOf(fx, { leaveRecords: twoOff, minimumMembers: 1, teamMinimums: { [teamId]: 4 } }), date, date)).toEqual([
+      { code: SHORT_STAFFED, date, teamId, shiftTypeId, atWork: 2, minimum: 4 },
+    ]);
+  });
+
+  it("with the organization's empty, only the teams that set one are reported", () => {
+    const input = inputOf(fx, { leaveRecords: twoOff, minimumMembers: null, teamMinimums: { [teamId]: 3 } });
+    expect(shortStaffedShiftsOf(input, date, date)).toEqual([{ code: SHORT_STAFFED, date, teamId, shiftTypeId, atWork: 2, minimum: 3 }]);
+    expect(shortStaffedShiftsOf({ ...input, members: [] }, month.from, month.to).every((shift) => shift.teamId === teamId)).toBe(true);
+  });
+
+  it("a team's minimum changed between before and after is the change: newly short, and cleared the other way", () => {
+    const before = inputOf(fx, { leaveRecords: twoOff, teamMinimums: { [teamId]: 2 } });
+    const after = inputOf(fx, { leaveRecords: twoOff });
+    expect(newlyShortStaffedOf(before, after, date, date)).toEqual([{ code: SHORT_STAFFED, date, teamId, shiftTypeId, atWork: 2, minimum: 3 }]);
+    expect(newlyShortStaffedOf(after, before, date, date)).toEqual([]);
+  });
+
+  it("a staffing group of Personal Shifts counted with the team is held to the team's minimum (R14.6)", () => {
+    const dayType = fx.types.find((type) => type.isWorking && type.id !== shiftTypeId)!.id;
+    const floater: RosterMember = {
+      id: 'floater',
+      memberships: [{ teamId, position: null, effectiveFrom: SEEDED_EFFECTIVE_FROM }],
+      statuses: [],
+      personalAssignments: [{ id: 'a', date, kind: 'SHIFT', shiftTypeId: dayType, teamId }],
+    };
+    const input = inputOf(fx, { members: [...membersOf(fx), floater], teamMinimums: { [teamId]: 2 } });
+    expect(shortStaffedShiftsOf(input, date, date)).toContainEqual({ code: SHORT_STAFFED, date, teamId, shiftTypeId: dayType, atWork: 1, minimum: 2 });
+    expect(shortStaffedShiftsOf({ ...input, teamMinimums: { [teamId]: 1 } }, date, date).some((shift) => shift.teamId === teamId)).toBe(false);
+  });
+
+  it('refuses a team minimum that is not a whole number of at least 1, naming the team', () => {
+    for (const minimum of [0, -1, 1.5, Number.NaN]) {
+      expect(() => shortStaffedShiftsOf(inputOf(fx, { teamMinimums: { [teamId]: minimum } }), date, date)).toThrow(RangeError);
+      expect(() => peopleAtWorkOn(inputOf(fx, { teamMinimums: { [teamId]: minimum } }), teamId, date)).toThrow(teamId);
+    }
+  });
+
+  it('a minimum of a team not asked for turns nothing on', () => {
+    const input = inputOf(fx, { leaveRecords: twoOff, members: [], minimumMembers: null, teamMinimums: { 'not-asked': 3 } });
+    expect(shortStaffedShiftsOf(input, month.from, month.to)).toEqual([]);
+  });
+
+  it('people at work never read a minimum', () => {
+    expect(peopleAtWorkOn(inputOf(fx, { leaveRecords: twoOff, teamMinimums: { [teamId]: 7 } }), teamId, date)).toEqual(
+      peopleAtWorkOn(inputOf(fx, { leaveRecords: twoOff }), teamId, date),
+    );
   });
 });
 
