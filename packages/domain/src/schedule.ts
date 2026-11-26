@@ -23,7 +23,8 @@
  */
 
 import { checkDate, civilDayNumber, dateOfCivilDay } from './calendar.js';
-import { applyOverride, overridesByTeamAndDate, type ScheduledShiftType, type ShiftTypeOverride } from './overrides.js';
+import { emptiedByHoliday, holidayOffOf, type HolidayRule } from './holidays.js';
+import { applyOverride, overridesByTeamAndDate, type LayeredShiftType, type ShiftTypeOverride } from './overrides.js';
 import {
   SCHEDULE_SOURCE_PERSONAL,
   SCHEDULE_SOURCE_TEAM,
@@ -55,8 +56,12 @@ import {
 
 const MONTH_SHAPE = /^(\d{4})-(\d{2})$/;
 
-/** What a month of the schedule is derived from: the configuration alone. */
-export interface ScheduleInput {
+/**
+ * What a month of the schedule is derived from: the configuration alone. The
+ * holiday rule's two lists (story 21.15, R13) are optional: absent or empty,
+ * nothing changes (R13.5).
+ */
+export interface ScheduleInput extends HolidayRule {
   /** The teams to show, in column order. Each at most once. */
   readonly teamIds: readonly string[];
   /** Every rotation version, of any team; versions of teams not asked for are ignored. */
@@ -85,6 +90,18 @@ export interface ScheduleCell {
   readonly projectedShiftTypeId: string | null;
   readonly overridden: boolean;
   readonly rosterChanged: boolean;
+  /**
+   * Set only where the holiday rule touched the team that date (story 21.15,
+   * R13.3): the date is a holiday, the team is off on holidays and a rotation
+   * is in effect. ABSENT otherwise, so a team that works the holiday, and every
+   * cell with no holiday or no team off, is what it was before (R13.5).
+   */
+  readonly holiday?: true;
+  /**
+   * Set only where the holiday emptied the cell (R13.2): no override won, so
+   * `shiftTypeId` is `null` and `projectedShiftTypeId` is kept. ABSENT otherwise.
+   */
+  readonly offForHoliday?: true;
 }
 
 /** One date of a month, with a cell per team in the order asked for. */
@@ -187,11 +204,18 @@ export function scheduleOfMonth(input: ScheduleInput, month: string): readonly S
   const overrides = overridesByTeamAndDate(input.overrides);
   const rosterOverrides = rosterOverridesByTeamAndDate(input.rosterOverrides);
   const working = new Set(input.workingShiftTypeIds);
+  const holidayOff = holidayOffOf(input);
 
   return dates.map((date) => ({
     date,
     cells: input.teamIds.map((teamId) => {
-      const scheduled = applyOverride(overrides, teamId, date, projectedShiftTypeOn(versionsOf.get(teamId) ?? [], input.steps, date));
+      const scheduled = applyOverride(
+        overrides,
+        teamId,
+        date,
+        projectedShiftTypeOn(versionsOf.get(teamId) ?? [], input.steps, date),
+        holidayOff,
+      );
       const changed = appliedRosterOverrides(rosterOverrides, input.members, working, scheduled, teamId, date).length > 0;
       return { ...cellOf(teamId, scheduled), rosterChanged: changed };
     }),
@@ -208,12 +232,15 @@ function appliedRosterOverrides(
   indexed: ReadonlyMap<string, readonly RosterOverride[]>,
   members: readonly RosterMember[],
   working: ReadonlySet<string>,
-  scheduled: ScheduledShiftType | null,
+  scheduled: LayeredShiftType | null,
   teamId: string,
   date: string,
 ): readonly RosterOverride[] {
   const candidates = rosterOverridesAt(indexed, teamId, date);
-  if (candidates.length === 0 || scheduled === null || !working.has(scheduled.shiftTypeId)) return [];
+  // A type a holiday emptied (`null`, story 21.15) is no working shift: no roster override applies on it (R13.4).
+  if (candidates.length === 0 || scheduled === null || scheduled.shiftTypeId === null || !working.has(scheduled.shiftTypeId)) {
+    return [];
+  }
   const base = shiftRoster(members, teamId, date);
   return candidates.filter((override) => rosterOverrideApplies(base, members, override));
 }
@@ -246,6 +273,7 @@ export function rosterOverridesMadeInertOf(
     const indexed = rosterOverridesByTeamAndDate(input.rosterOverrides);
     const overrides = overridesByTeamAndDate(input.overrides);
     const working = new Set(input.workingShiftTypeIds);
+    const holidayOff = holidayOffOf(input);
 
     return (override: RosterOverride): boolean => {
       const versions = input.assignments.filter((assignment) => assignment.teamId === override.teamId);
@@ -254,6 +282,7 @@ export function rosterOverridesMadeInertOf(
         override.teamId,
         override.date,
         projectedShiftTypeOn(versions, input.steps, override.date),
+        holidayOff,
       );
       const applied = appliedRosterOverrides(indexed, input.members, working, scheduled, override.teamId, override.date);
 
@@ -268,8 +297,12 @@ export function rosterOverridesMadeInertOf(
   );
 }
 
-/** What one member's month is derived from: their membership and status histories and the configuration. */
-export interface MemberScheduleInput {
+/**
+ * What one member's month is derived from: their membership and status
+ * histories and the configuration, the holiday rule's optional lists included
+ * (story 21.15, R13).
+ */
+export interface MemberScheduleInput extends HolidayRule {
   /** The member's id, which a roster override names (story 3.6a). */
   readonly memberId: string;
   /** Every membership version of ONE member, in any order. */
@@ -414,7 +447,8 @@ function scheduleVersionsOf(input: MemberScheduleInput): readonly ScheduleVersio
 /**
  * One shift of a member's day (story 3.6a): the team, the shift type it works
  * and the one its rotation projects (both `null` when no rotation version is
- * in effect yet), whether a shift-type override replaced it, whether a roster
+ * in effect yet; the type alone `null`, the projected one kept, on a shift a
+ * holiday emptied, story 21.15), whether a shift-type override replaced it, whether a roster
  * override applies on it, and whether the member holds it only through a
  * roster override (`viaOverride`) rather than as a member of the team.
  */
@@ -452,13 +486,19 @@ export interface MemberShift {
    * and is never overridden (R15.4); a roster override onto its team is inert (R15.8).
    */
   readonly personalRotation?: true;
+  /** As {@link ScheduleCell}'s (story 21.15): set only on their team's shift the holiday rule touched. */
+  readonly holiday?: true;
+  /** As {@link ScheduleCell}'s (story 21.15): set only on their team's shift a holiday emptied (`shiftTypeId` `null`). */
+  readonly offForHoliday?: true;
 }
 
 /**
  * One date of a member's month: their shifts on it. Their own team's comes
  * first — absent when they are on no team or inactive that day, or when a
  * roster override took them off its working shift — then each shift a roster
- * override put them on, in the overrides' order.
+ * override put them on, in the overrides' order. A team shift a holiday
+ * emptied stays, with no type and its marks (story 21.15); a personal
+ * rotation's shift a holiday emptied leaves nothing, as a day off does.
  */
 export interface MemberScheduleDay {
   readonly date: string;
@@ -541,8 +581,9 @@ export function memberScheduleOfMonth(input: MemberScheduleInput, month: string)
   const overrides = overridesByTeamAndDate(input.overrides);
   const rosterOverrides = rosterOverridesByTeamAndDate(input.rosterOverrides);
   const working = new Set(input.workingShiftTypeIds);
-  const scheduledOf = (teamId: string, date: string): ScheduledShiftType | null =>
-    applyOverride(overrides, teamId, date, projectedShiftTypeOn(versionsOf.get(teamId) ?? [], input.steps, date));
+  const holidayOff = holidayOffOf(input);
+  const scheduledOf = (teamId: string, date: string): LayeredShiftType | null =>
+    applyOverride(overrides, teamId, date, projectedShiftTypeOn(versionsOf.get(teamId) ?? [], input.steps, date), holidayOff);
 
   // The roster overrides putting this member on a shift, by date.
   const putOn = new Map<string, RosterOverride[]>();
@@ -571,7 +612,7 @@ export function memberScheduleOfMonth(input: MemberScheduleInput, month: string)
       // R15.3: a personal rotation is their own projection, counted with the effective team; manual only is nothing.
       if (source.source === SCHEDULE_SOURCE_PERSONAL) {
         const personal = personalRotationShiftOf(source, input.steps, date, active, teamId, working);
-        if (personal !== null) shifts.push(personalShiftOfDay(personal));
+        if (personal !== null && !emptiedByHoliday(holidayOff, personal, date)) shifts.push(personalShiftOfDay(personal));
       }
     } else if (teamId !== null) {
       const scheduled = scheduledOf(teamId, date);
@@ -615,11 +656,18 @@ function personalShiftOfDay(personal: PersonalShift): MemberShift {
   return { ...shift, personalRotation: true };
 }
 
-/** A cell's type fields from a scheduled type, or the empty cell when there is none. */
+/** A cell's type fields from a scheduled type, or the empty cell when there is none; a holiday's marks ride along (story 21.15). */
 function cellOf<Team extends string | null>(
   teamId: Team,
-  scheduled: ScheduledShiftType | null,
-): { readonly teamId: Team; readonly shiftTypeId: string | null; readonly projectedShiftTypeId: string | null; readonly overridden: boolean } {
+  scheduled: LayeredShiftType | null,
+): {
+  readonly teamId: Team;
+  readonly shiftTypeId: string | null;
+  readonly projectedShiftTypeId: string | null;
+  readonly overridden: boolean;
+  readonly holiday?: true;
+  readonly offForHoliday?: true;
+} {
   return scheduled === null
     ? { teamId, shiftTypeId: null, projectedShiftTypeId: null, overridden: false }
     : { teamId, ...scheduled };

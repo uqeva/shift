@@ -2,7 +2,7 @@
 title: '21.9 The schedule-source rule in the domain'
 type: 'feature'
 created: '2026-11-25'
-status: 'in-review'
+status: 'done'
 baseline_commit: 'e1b6a65826f7564729928776ce1a227140a33415'
 review_loop_iteration: 0
 context:
@@ -10,7 +10,7 @@ context:
   - '{project-root}/_bmad-output/specs/spec-shift/engine-rules.md'
 ---
 
-Status: built, CI pending (PR #373, branch `feat/21-9-schedule-source-rule`; rebased on 21.5 (#372)). Baseline: `main` at `e1b6a65` (21.12 merged). 21.6 (web readers) is built in parallel; this story touches `packages/domain` and documents only, no hot file.
+Status: done. PR #373 merged 2026-11-25 as squash `0163497`, CI green (branch `feat/21-9-schedule-source-rule`; rebased on 21.5 (#372)). Set done by 21.15. Baseline: `main` at `e1b6a65` (21.12 merged). 21.6 (web readers) is built in parallel; this story touches `packages/domain` and documents only, no hot file.
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 
@@ -138,7 +138,7 @@ Status: built, CI pending (PR #373, branch `feat/21-9-schedule-source-rule`; reb
 - `pnpm exec vitest run test/resource-hygiene.test.ts test/supabase-scaffold.test.ts` -- 2 files, 2600 tests passed.
 - Digest provenance: `BEFORE_SCHEDULE_SOURCE` was computed by `schedule-source.test.ts` with `packages/domain/src` untouched at `e1b6a65` (only the helper move in `test/` done). 21.1's `BEFORE_PERSONAL` digests still pass after the move.
 - Rebased on 21.5 (#372) and re-run: typecheck and lint clean; domain 25 files, 1099 tests; ICS 33; web 193 files, 7113 tests; DB-free root 2647; the R15.6 and R14.7 digests unchanged. CI on the pre-rebase head (#373) was green, 14 of 14.
-- Not run locally: the DB-connecting root tests, read and runtime parity, and e2e (STRICT DATABASE RULE). No migration, parity fixture, assembly or surface changed. CI is their gate.
+- Not run locally: the DB-connecting root tests, read and runtime parity, and e2e (STRICT DATABASE RULE). No migration, parity fixture, assembly or surface changed. CI ran them: run 45693482874 (head `4bc25ad`, before the rebase) and run 45696214982 (head `c4f06f6`, the merged head) both passed, with no failed run and no CI-only fix. `CI passed` was green on the merged head, with Test (Vitest, local Supabase), Runtime parity (Node and edge-runtime) and E2E shards 1–4 all successful.
 
 **Residual risks:**
 - R15.8, the inert roster override onto a personal rotation's own team (even on its day off), is a product decision taken unattended. It mirrors R14.9 and is listed for the founder to confirm.

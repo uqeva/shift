@@ -36,6 +36,7 @@
  */
 
 import { checkDate } from './calendar.js';
+import { emptiedByHoliday, holidayOffOf, type HolidayOff, type HolidayRule } from './holidays.js';
 import {
   PERSONAL_ASSIGNMENT_SHIFT,
   SCHEDULE_SOURCE_PERSONAL,
@@ -333,18 +334,37 @@ function followsTeamOn(member: Pick<RosterMember, 'scheduleVersions'>, date: str
  *    effective team, else no team;
  *
  * and `null` otherwise: a non-working type or step, a day off, an inactive
- * date, their team's rotation or manual only.
+ * date, their team's rotation or manual only, and a personal rotation's
+ * shift counted with a team off on holidays on a holiday of `holidays` (story
+ * 21.15, R13.2, R15.4). An assignment's shift is never emptied (R14.4).
+ * `holidays` absent, no holiday applies, as before.
  *
  * @throws RangeError on any precondition of {@link activeOn},
  *   {@link effectiveTeamOn}, `checkPersonalAssignments`,
  *   `checkScheduleVersions` or `personalRotationShiftTypeOf` (among them a
- *   personal rotation whose pattern has no steps among `steps`).
+ *   personal rotation whose pattern has no steps among `steps`), and of
+ *   `holidayOffOf` for `holidays`.
  */
 export function personalShiftOn(
   member: Pick<RosterMember, 'memberships' | 'statuses' | 'loans' | 'personalAssignments' | 'scheduleVersions'>,
   date: string,
   workingShiftTypeIds: ReadonlySet<string>,
   steps: readonly RotationStep[],
+  holidays: HolidayRule = {},
+): PersonalShift | null {
+  return personalShiftWith(member, date, workingShiftTypeIds, steps, holidayOffOf(holidays));
+}
+
+/**
+ * {@link personalShiftOn} with the holiday rule already built (`holidayOffOf`),
+ * so a caller reading many members and dates checks the lists once. INTERNAL.
+ */
+export function personalShiftWith(
+  member: Pick<RosterMember, 'memberships' | 'statuses' | 'loans' | 'personalAssignments' | 'scheduleVersions'>,
+  date: string,
+  workingShiftTypeIds: ReadonlySet<string>,
+  steps: readonly RotationStep[],
+  holidayOff: HolidayOff | null,
 ): PersonalShift | null {
   const assignment = personalAssignmentOn(member.personalAssignments ?? [], date);
   if (assignment !== null) {
@@ -354,7 +374,7 @@ export function personalShiftOn(
   if (versions.length === 0) return null;
   const version = scheduleSourceOn(versions, date);
   if (version.source !== SCHEDULE_SOURCE_PERSONAL) return null;
-  return personalRotationShiftOf(
+  const shift = personalRotationShiftOf(
     version,
     steps,
     date,
@@ -362,6 +382,7 @@ export function personalShiftOn(
     effectiveTeamOn(member, date)?.teamId ?? null,
     workingShiftTypeIds,
   );
+  return shift !== null && emptiedByHoliday(holidayOff, shift, date) ? null : shift;
 }
 
 /**

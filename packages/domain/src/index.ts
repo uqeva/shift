@@ -22,6 +22,17 @@ export {
 } from './bands.js';
 
 export {
+  FIRST_GREGORIAN_YEAR,
+  FIRST_HR_HOLIDAY_YEAR,
+  easterSundayOf,
+  nationalHolidaysOf,
+  type HolidayCountry,
+  type HolidayRule,
+  type NationalHoliday,
+  type NationalHolidayCode,
+} from './holidays.js';
+
+export {
   collisionKeyOf,
   collisionsOf,
   erasedCollisionsOf,
@@ -136,6 +147,8 @@ export {
   overrideStandingOf,
   overridesByTeamAndDate,
   scheduledShiftTypeOn,
+  type HolidayEmptiedShiftType,
+  type LayeredShiftType,
   type OverrideStanding,
   type RotationVersionStamp,
   type ScheduledShiftType,
