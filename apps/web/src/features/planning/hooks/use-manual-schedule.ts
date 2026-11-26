@@ -64,18 +64,10 @@ import { writesOnline } from '@/lib/offline/use-write-gate';
 import { supabaseClient } from '@/lib/supabase/client';
 import { focusLater } from '@/utils/focus-later';
 
-/**
- * `?mjesec=2026-12&osoba=<id>`: the month shown, and on a phone the member
- * edited. STORY 21.6: `&dan=2026-12-06` opens the picker on that member's
- * cell once (*Dodaj smjenu*), then leaves the URL. STORY 21.25: `&posao=`
- * the job role shown.
- */
-export interface ManualSearch {
-  readonly mjesec?: string;
-  readonly osoba?: string;
-  readonly dan?: string;
-  readonly posao?: string;
-}
+import type { ManualSearch } from '@/features/planning/services/manual-search';
+
+/** The search, written once in `services/manual-search` (story 21.13 shares it with *Za odluku*). */
+export type { ManualSearch };
 
 /** The search as the route validates it: a month of the wrong shape, a person that is not text, or a day that is no date, dropped. */
 export function manualSearchOf(search: Record<string, unknown>): ManualSearch {

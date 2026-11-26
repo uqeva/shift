@@ -307,6 +307,13 @@ export async function removeFormerMemberInSql(slug: string, memberId: string): P
         where o.slug = $1 and v.organization_id = o.id and v.member_id = $2`,
       [slug, memberId],
     );
+    // Story 21.13: the roles the member covers as a floater (0084), whose member key does not cascade.
+    await client.query(
+      `delete from floater_roles f
+        using organizations o
+        where o.slug = $1 and f.organization_id = o.id and f.member_id = $2`,
+      [slug, memberId],
+    );
     await client.query(
       `delete from auth.users u
         using members m join organizations o on o.id = m.organization_id
@@ -528,6 +535,8 @@ export async function removeLeaveMemberInSql(slug: string, memberId: string): Pr
     await client.query('delete from personal_assignments where organization_id = $1 and member_id = $2', scope);
     // Story 21.10: the member's schedule versions (0079), whose member key does not cascade.
     await client.query('delete from member_schedule_versions where organization_id = $1 and member_id = $2', scope);
+    // Story 21.13: the roles the member covers as a floater (0084), whose member key does not cascade.
+    await client.query('delete from floater_roles where organization_id = $1 and member_id = $2', scope);
     // Story 10.2: the notifications their requests and leave wrote to OTHER
     // members (the admins' new-request rows), which no recipient key removes.
     await client.query(
@@ -870,6 +879,13 @@ export async function removeOfflineMemberInSql(slug: string, username: string): 
           and o.id = m.organization_id and o.slug = $1 and m.username = $2`,
       [slug, username],
     );
+    // Story 21.13: the roles the member covers as a floater (0084), whose member key does not cascade.
+    await client.query(
+      `delete from floater_roles f using members m, organizations o
+        where f.organization_id = m.organization_id and f.member_id = m.id
+          and o.id = m.organization_id and o.slug = $1 and m.username = $2`,
+      [slug, username],
+    );
     await client.query(
       `delete from auth.users u using members m, organizations o
         where m.auth_user_id = u.id and o.id = m.organization_id and o.slug = $1 and m.username = $2`,
@@ -1022,6 +1038,97 @@ export async function seedPersonalAssignmentInSql(
     if (id === undefined) throw new Error(`E2E: the assignment of ${memberId} on ${date} was not inserted`);
 
     return id;
+  } finally {
+    await client.end();
+  }
+}
+
+/**
+ * Makes `memberId` of the run organization a floater covering `roleIds`
+ * (story 21.13, 0084), as the owner and attributed to the run's admin, in one
+ * transaction. {@link removeLeaveMemberInSql} deletes the roles with the
+ * member, and {@link cleanUpJobRolesInSql} with the role.
+ */
+export async function seedFloaterInSql(slug: string, memberId: string, roleIds: readonly string[] = []): Promise<void> {
+  const client = await connect();
+  try {
+    await client.query('begin');
+    await client.query(
+      `update members m set is_floater = true
+         from organizations o
+        where o.slug = $1 and m.organization_id = o.id and m.id = $2`,
+      [slug, memberId],
+    );
+    await client.query(
+      `insert into floater_roles (organization_id, member_id, job_role_id, created_by)
+       select o.id, $2, role_id,
+              (select a.auth_user_id from members a where a.organization_id = o.id and a.role = 'admin' order by a.created_at, a.id limit 1)
+         from organizations o, unnest($3::uuid[]) as role_id
+        where o.slug = $1`,
+      [slug, memberId, roleIds],
+    );
+    await client.query('commit');
+  } catch (cause) {
+    await client.query('rollback').catch(() => undefined);
+    throw cause;
+  } finally {
+    await client.end();
+  }
+}
+
+/**
+ * A job role of the run organization named `${E2E_JOB_ROLE_PREFIX} <suffix>`
+ * (story 21.13), as the owner and attributed to the run's admin, so
+ * {@link cleanUpJobRolesInSql} sweeps it (and every floater row and member
+ * holding it). `holderId`, when given, is given the role.
+ */
+export async function seedJobRoleInSql(slug: string, suffix: string, holderId: string | null = null): Promise<{ readonly id: string; readonly name: string }> {
+  const name = `${E2E_JOB_ROLE_PREFIX} ${suffix}`;
+  const client = await connect();
+  try {
+    await client.query('begin');
+    const { rows } = await client.query<{ id: string }>(
+      `insert into job_roles (organization_id, name, created_by)
+       select o.id, $2,
+              (select a.auth_user_id from members a where a.organization_id = o.id and a.role = 'admin' order by a.created_at, a.id limit 1)
+         from organizations o where o.slug = $1
+       returning id::text as id`,
+      [slug, name],
+    );
+    const id = rows[0]?.id;
+    if (id === undefined) throw new Error(`E2E: no job role written in ${slug}`);
+    if (holderId !== null) {
+      await client.query(
+        `update members m set job_role_id = $3 from organizations o where o.slug = $1 and m.organization_id = o.id and m.id = $2`,
+        [slug, holderId, id],
+      );
+    }
+    await client.query('commit');
+    return { id, name };
+  } catch (cause) {
+    await client.query('rollback').catch(() => undefined);
+    throw cause;
+  } finally {
+    await client.end();
+  }
+}
+
+/** Whether `memberId` is stored a floater, and the roles they cover, sorted (story 21.13). */
+export async function floaterOfInSql(slug: string, memberId: string): Promise<{ readonly isFloater: boolean; readonly roleIds: string[] }> {
+  const client = await connect();
+  try {
+    const { rows } = await client.query<{ isFloater: boolean; roleIds: string[] }>(
+      `select m.is_floater as "isFloater",
+              coalesce((select array_agg(f.job_role_id::text order by f.job_role_id::text)
+                          from floater_roles f
+                         where f.organization_id = m.organization_id and f.member_id = m.id), '{}') as "roleIds"
+         from members m join organizations o on o.id = m.organization_id
+        where o.slug = $1 and m.id = $2`,
+      [slug, memberId],
+    );
+    const found = rows[0];
+    if (found === undefined) throw new Error(`E2E: member ${memberId} not found in ${slug}`);
+    return found;
   } finally {
     await client.end();
   }
@@ -1633,7 +1740,8 @@ export async function jobRoleIdInSql(slug: string, name: string): Promise<string
  * `0078`'s missing delete privilege: no session deletes a role. A member holds
  * a role with no cascade (`members_job_role_fkey`), so every member holding
  * one of them is set back to no role first, in the same transaction.
- * Idempotent.
+ * STORY 21.13: a floater's row covering one of them (`floater_roles`, 0084,
+ * no cascade) is deleted first too. Idempotent.
  */
 export async function cleanUpJobRolesInSql(slug: string, names: readonly string[]): Promise<void> {
   const client = await connect();
@@ -1646,6 +1754,13 @@ export async function cleanUpJobRolesInSql(slug: string, names: readonly string[
          from job_roles r, organizations o
         where ${doomed}
           and m.organization_id = r.organization_id and m.job_role_id = r.id`,
+      parameters,
+    );
+    await client.query(
+      `delete from floater_roles f
+         using job_roles r, organizations o
+        where ${doomed}
+          and f.organization_id = r.organization_id and f.job_role_id = r.id`,
       parameters,
     );
     await client.query(`delete from job_roles r using organizations o where ${doomed}`, parameters);

@@ -94,7 +94,7 @@ function sourcesOf(snapshot: CalendarSnapshot, resolutions: readonly Row[] = [],
     requests: settled([]),
     swaps: settled([]),
     members: {
-      members: snapshot.members.map((member) => ({ id: member.id, leaveAllowance: { startingDays: 20, versions: [] } })),
+      members: snapshot.members.map((member) => ({ id: member.id, leaveAllowance: { startingDays: 20, versions: [] }, isFloater: false, floaterRoleIds: [] })),
       refusal: null,
       loading: false,
       paused: false,
@@ -275,9 +275,9 @@ describe('Odlučeno and the re-read read the second form', () => {
 
 describe('the resolution screen of a Personal Shift', () => {
   it('writes by assignment for the second form or no team, and by override with the team otherwise', () => {
-    expect(replaceWriteOf({ replaceForm: REPLACE_BY_ASSIGNMENT, teamId: DAY_TEAM })).toEqual({ form: REPLACE_BY_ASSIGNMENT });
-    expect(replaceWriteOf({ replaceForm: REPLACE_BY_OVERRIDE, teamId: null })).toEqual({ form: REPLACE_BY_ASSIGNMENT });
-    expect(replaceWriteOf({ replaceForm: REPLACE_BY_OVERRIDE, teamId: DAY_TEAM })).toEqual({ form: REPLACE_BY_OVERRIDE, teamId: DAY_TEAM });
+    expect(replaceWriteOf({ replaceForm: REPLACE_BY_ASSIGNMENT, teamId: DAY_TEAM, suggestions: [] })).toEqual({ form: REPLACE_BY_ASSIGNMENT });
+    expect(replaceWriteOf({ replaceForm: REPLACE_BY_OVERRIDE, teamId: null, suggestions: [] })).toEqual({ form: REPLACE_BY_ASSIGNMENT });
+    expect(replaceWriteOf({ replaceForm: REPLACE_BY_OVERRIDE, teamId: DAY_TEAM, suggestions: [] })).toEqual({ form: REPLACE_BY_OVERRIDE, teamId: DAY_TEAM });
   });
 
   it('a teamless conflict is replaced by assignment, names no team, and offers only members with no team', async () => {

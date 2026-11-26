@@ -198,6 +198,11 @@ export class ConflictResolutionPage extends BasePage {
     return this.page.getByRole('link', { name: resolution.cancel, exact: true });
   }
 
+  /** STORY 21.13: the picker's line for no free floater, with none of the absent member's role (`Nema slobodne zamjene.`). */
+  get noSuggestionLine(): Locator {
+    return this.page.getByText(resolution.suggestionsNoneAny, { exact: true });
+  }
+
   /** The line a conflict no longer open states. */
   get missingLine(): Locator {
     return this.page.getByText(resolution.missing, { exact: true });

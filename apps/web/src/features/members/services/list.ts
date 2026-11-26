@@ -129,14 +129,21 @@ export const MEMBERS_LIST_KEY = ['members'] as const;
  * embed stays unambiguous once 21.13's `floater_roles` adds a second path
  * between the two tables. Shown beside the name and filtered on; never used.
  *
+ * STORY 21.13 ADDS THE FLOATER FLAG AND THE ROLES THEY COVER (`0084`):
+ * `is_floater`, and `floater_roles!floater_roles_member_fkey(job_role_id)`, hinted by its foreign key,
+ * the one path from a member to those rows. `floater_roles` is admin-only, so
+ * a member reading their own row embeds none. *Za odluku* suggests floaters
+ * from this read (`floater-suggestions.ts`); nothing derives from it.
+ *
  * STORY 13.3 EMBEDS THE ALLOWANCE VERSIONS (`0055`) and the organization's
  * leave-year start: `leave_allowance_days` is the starting allowance, and
  * every balance surface resolves the allowance of the leave year it counts
  * through `@shift/domain` from this one read (AD-7, AD-13).
  */
 export const MEMBERS_COLUMNS =
-  'organization_id,id,auth_user_id,name,username,email,role,leave_allowance_days,fire_rank,' +
+  'organization_id,id,auth_user_id,name,username,email,role,leave_allowance_days,fire_rank,is_floater,' +
   'job_role:job_roles!members_job_role_fkey(id,name,archived),' +
+  'floater_roles!floater_roles_member_fkey(job_role_id),' +
   'member_status_versions(active,effective_from),' +
   'team_membership_versions(team_id,position,effective_from,teams(name)),' +
   'leave_allowances(id,leave_year,days),' +
@@ -303,6 +310,14 @@ export interface MemberListRow {
    * for none. Shown beside the name and filtered on; never used.
    */
   readonly jobRole: MemberJobRole | null;
+  /** Whether the member covers gaps (`0084`, story 21.13): suggested for a conflict by R16. */
+  readonly isFloater: boolean;
+  /**
+   * The job roles the floater may cover (`floater_roles`, `0084`), by id,
+   * sorted; none for a member who is no floater, or covers only an absent
+   * member with no role (R16.1). Admin-only: a member's own row reads none.
+   */
+  readonly floaterRoleIds: readonly string[];
   /**
    * The account this member signs in with (`members.auth_user_id`). Rendered
    * nowhere; the edit screen compares it with the session's subject so the
@@ -366,6 +381,31 @@ export function memberJobRoleIn(row: Record<string, unknown>): MemberJobRole | n
   }
 
   return { id, name, archived };
+}
+
+/**
+ * The embedded `floater_roles` as their role ids, sorted and once each, or
+ * `undefined` when it is malformed: an array of rows each with a text
+ * `job_role_id` (story 21.13). Strict, as every embed: a row this build cannot
+ * read is refused, never read as "covers nothing".
+ */
+export function floaterRoleIdsIn(row: Record<string, unknown>): readonly string[] | undefined {
+  const rows = row['floater_roles'];
+
+  if (!Array.isArray(rows)) return undefined;
+
+  const ids = new Set<string>();
+
+  for (const one of rows as unknown[]) {
+    if (typeof one !== 'object' || one === null || Array.isArray(one)) return undefined;
+
+    const id = (one as Record<string, unknown>)['job_role_id'];
+
+    if (typeof id !== 'string' || id === '') return undefined;
+    ids.add(id);
+  }
+
+  return [...ids].sort();
 }
 
 /**
@@ -868,6 +908,15 @@ export function memberRowOutcomeOf(row: unknown): RowOutcome {
 
   if (jobRole === undefined) return { ok: false, malformed: { field: 'job_role', id } };
 
+  // STORY 21.13: the flag, and the roles covered, and nothing else.
+  const isFloater = fields['is_floater'];
+
+  if (typeof isFloater !== 'boolean') return { ok: false, malformed: { field: 'is_floater', id } };
+
+  const floaterRoleIds = floaterRoleIdsIn(fields);
+
+  if (floaterRoleIds === undefined) return { ok: false, malformed: { field: 'floater_roles', id } };
+
   const statusVersions = statusVersionsIn(fields);
 
   if (statusVersions === null) {
@@ -913,6 +962,8 @@ export function memberRowOutcomeOf(row: unknown): RowOutcome {
       leaveYearStart: leaveYearStart.start,
       fireRank,
       jobRole,
+      isFloater,
+      floaterRoleIds,
       authUserId,
       statusVersions,
       teamVersions,

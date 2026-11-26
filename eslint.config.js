@@ -182,7 +182,8 @@ export const FEATURE_PUBLIC = {
     'services/snapshot', // conflicts, hours, leave, members, pages, rotation, swaps, teams, today
     // Story 16.5: the month download builds R12's inputs through the browser's
     // one adapter (AD-19), never a second one.
-    'services/schedule-inputs', // calendar-feed
+    // Story 21.13: a floater's at-work shifts, for *Za odluku*'s suggestions.
+    'services/schedule-inputs', // calendar-feed, conflicts
     'services/snapshot-skew', // conflicts, hours, today
     'utils/day-detail', // conflicts, swaps
     'utils/empty-day', // today
@@ -398,6 +399,8 @@ export const FEATURE_PUBLIC = {
     // Story 21.8: a swap of a Personal Shift builds its "after" as the grid's
     // draft does (`draftAppliedOf`), never a second assignment "after".
     'services/manual-grid', // swaps
+    // Story 21.13: *Ručni raspored*'s search, for *Za odluku*'s held line on a cover's assignment.
+    'services/manual-search', // conflicts
   ],
   rotation: [
     'services/list', // calendar, members, onboarding, shift-types, teams

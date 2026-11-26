@@ -431,7 +431,8 @@ describe('the screen is read at all, so every sweep below means something', () =
     // A HUNDRED AND EIGHTEEN SINCE STORY 21.17: the holidays' rules and *Što se mijenja*'s body.
     // A HUNDRED AND TWENTY SINCE STORY 21.20: *Najmanje ljudi* and its rules.
     // A HUNDRED AND TWENTY-TWO SINCE STORY 21.26: *Timovi i raspored* and its rules.
-    expect(KEY_SOURCES).toHaveLength(122);
+    // A HUNDRED AND TWENTY-THREE SINCE STORY 21.13: *Zamjena*'s rules.
+    expect(KEY_SOURCES).toHaveLength(123);
   });
 
   // Vacuous-pass guard. A renamed or moved file would make each "contains no"

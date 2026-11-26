@@ -88,6 +88,8 @@ export const HISTORY_RECORDS = [
   'schedule-version',
   // Story 21.16: an organization's holiday (`organization_holidays`, 0080).
   'holiday',
+  // Story 21.13: a role a floater may cover (`floater_roles`, 0084).
+  'floater-role',
   // A table this build does not know yet (an audited table added after it):
   // drawn as a generic record, its fields as raw operands, never a failed read.
   'other',
@@ -210,6 +212,8 @@ export const HISTORY_FIELDS = [
   'fireRank',
   // Story 21.12 (0078): a member's job role.
   'jobRole',
+  // Story 21.13 (0084): whether a member is a floater.
+  'isFloater',
   'leaveAllowanceDays',
   'member',
   'memberOut',
@@ -324,6 +328,7 @@ const RECORD_OF_TABLE: Readonly<Record<string, HistoryRecord>> = {
   job_roles: 'job-role',
   member_schedule_versions: 'schedule-version',
   organization_holidays: 'holiday',
+  floater_roles: 'floater-role',
 };
 
 /** The record an audited table holds, or `null` for a table this build does not know. */
@@ -454,6 +459,7 @@ const FIELD_OF_COLUMN: Readonly<Record<string, readonly [HistoryField, FieldType
   role: ['role', 'enum'],
   fire_rank: ['fireRank', 'text'],
   job_role_id: ['jobRole', 'job-role'],
+  is_floater: ['isFloater', 'boolean'],
   leave_allowance_days: ['leaveAllowanceDays', 'number'],
   member_id: ['member', 'member'],
   member_out_id: ['memberOut', 'member'],

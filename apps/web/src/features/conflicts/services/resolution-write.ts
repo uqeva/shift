@@ -42,7 +42,13 @@ import { isIsoDate } from '@/lib/i18n/format';
  * override no longer applies (`ResolutionView.held`), the caller passes
  * `held`, and a 23505 on the resolution's live key — from either write — is
  * {@link RESOLUTION_HELD}: the override must be removed in the calendar
- * first, which ends that resolution (0033).
+ * first, which ends that resolution (0033). STORY 21.13: when a cover's
+ * assignment holds it, the line says to remove it in *Ručni raspored*
+ * (`heldByAssignment`), which ends the resolution too (0081).
+ *
+ * 0084's two refusals (`CONFLICT_REPLACEMENT_INACTIVE`,
+ * `CONFLICT_REPLACEMENT_ON_TEAM`, 23514) are met only by a direct call: the
+ * screen never offers such a cover, so they read as {@link RESOLUTION_FAILED}.
  */
 
 /** The conflict is no longer open: resolved meanwhile, or its leave removed. */
@@ -352,9 +358,15 @@ export interface ResolutionFailureLine {
  * was already on the shift, and without a name falls back to the failed line
  * — the taken key is never rendered without one.
  */
-export function resolutionFailureLineOf(failure: ResolutionWriteFailure, taken: string | null): ResolutionFailureLine {
+export function resolutionFailureLineOf(
+  failure: ResolutionWriteFailure,
+  taken: string | null,
+  heldByAssignment = false,
+): ResolutionFailureLine {
   switch (failure) {
+    // STORY 21.13: a cover's assignment holds the key: removed in *Ručni raspored*, never the calendar.
     case RESOLUTION_HELD:
+      return { key: resolutionFailureMessageKey(failure, heldByAssignment) };
     case RESOLUTION_GONE:
     case RESOLUTION_DENIED:
     case RESOLUTION_FAILED:
@@ -371,11 +383,16 @@ export function resolutionFailureLineOf(failure: ResolutionWriteFailure, taken: 
   }
 }
 
-/** The line a failure renders as. Exhaustive. */
+/**
+ * The line a failure renders as. Exhaustive. `heldByAssignment` (story 21.13):
+ * the held line of a key a cover's assignment holds, removed in *Ručni raspored*.
+ */
 export function resolutionFailureMessageKey(
   failure: ResolutionWriteFailure,
+  heldByAssignment = false,
 ):
   | 'zaOdluku.resolution.held'
+  | 'zaOdluku.resolution.heldAssignment'
   | 'zaOdluku.resolution.error.gone'
   | 'zaOdluku.resolution.error.denied'
   | 'zaOdluku.resolution.error.failed'
@@ -383,7 +400,7 @@ export function resolutionFailureMessageKey(
   switch (failure) {
     // The same line the screen states while the key is held (story 5.5d).
     case RESOLUTION_HELD:
-      return 'zaOdluku.resolution.held';
+      return heldByAssignment ? 'zaOdluku.resolution.heldAssignment' : 'zaOdluku.resolution.held';
     case RESOLUTION_GONE:
       return 'zaOdluku.resolution.error.gone';
     case RESOLUTION_DENIED:

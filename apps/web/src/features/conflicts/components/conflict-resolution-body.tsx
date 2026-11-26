@@ -17,6 +17,7 @@ import { ReplacementPicker } from '@/features/conflicts/components/replacement-p
 import { ResolutionSkeleton } from '@/features/conflicts/components/resolution-skeleton';
 import type { ConflictResolutionState } from '@/features/conflicts/hooks/use-conflict-resolution';
 import {
+  HELD_BY_ASSIGNMENT,
   NO_OPTION,
   OPTION_REPLACE_MEMBER,
   RESOLUTION_CHOICE_HEADING_ID,
@@ -145,8 +146,16 @@ function ResolutionFacts({ view }: { readonly view: ResolutionView }): ReactNode
 }
 
 /** A refusal's line: the taken one names who was already on the shift (story 5.4c), and is never drawn without the name. */
-function FailureNotice({ failure, taken }: { readonly failure: ResolutionWriteFailure; readonly taken: string | null }): ReactNode {
-  const line = resolutionFailureLineOf(failure, taken);
+function FailureNotice({
+  failure,
+  taken,
+  heldByAssignment,
+}: {
+  readonly failure: ResolutionWriteFailure;
+  readonly taken: string | null;
+  readonly heldByAssignment: boolean;
+}): ReactNode {
+  const line = resolutionFailureLineOf(failure, taken, heldByAssignment);
 
   return <Notice role="alert">{line.values === undefined ? t(line.key) : t(line.key, line.values)}</Notice>;
 }
@@ -158,6 +167,9 @@ function ResolutionReady({ state, view }: { readonly state: ConflictResolutionSt
   const pickedId = replacement?.id ?? null;
   const waiting = !readyToSave(choice, pickedId, view.held);
   const held = heldHintPartsOf((action) => t('zaOdluku.resolution.heldHint', { action }));
+  // STORY 21.13: a cover's assignment holds the key: removed in *Ručni raspored*, on the cover's cell.
+  const heldBy = view.heldBy;
+  const heldManual = heldBy?.kind === HELD_BY_ASSIGNMENT ? heldBy.manual : null;
   const gone = failure === RESOLUTION_GONE;
   // STORY 8.3a: offline, Spremi is gated and the note says why.
   const gate = useWriteGate();
@@ -212,7 +224,7 @@ function ResolutionReady({ state, view }: { readonly state: ConflictResolutionSt
           />
         ) : null}
         {/* A held refusal whose re-read finds the key free again says nothing: saving again may land (story 5.5d). */}
-        {failure === null || (failure === RESOLUTION_HELD && !view.held) ? null : <FailureNotice failure={failure} taken={taken} />}
+        {failure === null || (failure === RESOLUTION_HELD && !view.held) ? null : <FailureNotice failure={failure} taken={taken} heldByAssignment={heldManual !== null} />}
         {/* GONE: nothing left to save, and the header's way back is the one way on. */}
         {gone ? null : <OfflineWriteNote gate={gate} />}
         {gone ? null : (
@@ -221,9 +233,15 @@ function ResolutionReady({ state, view }: { readonly state: ConflictResolutionSt
               // STORY 5.5d: a replacement the snapshot holds pending or inert keeps the key; Spremi waits.
               <p id={RESOLUTION_SAVE_HINT_ID} className="min-w-0 flex-1 break-words text-sm text-muted-foreground">
                 {held.before}
-                <Link to="/kalendar" search={view.heldCalendar} className="font-medium text-foreground underline underline-offset-4">
-                  {t('zaOdluku.resolution.heldAction')}
-                </Link>
+                {heldManual === null ? (
+                  <Link to="/kalendar" search={view.heldCalendar} className="font-medium text-foreground underline underline-offset-4">
+                    {t('zaOdluku.resolution.heldAction')}
+                  </Link>
+                ) : (
+                  <Link to="/rucni-raspored" search={heldManual} className="font-medium text-foreground underline underline-offset-4">
+                    {t('zaOdluku.resolution.heldAssignmentAction')}
+                  </Link>
+                )}
                 {held.after}
               </p>
             ) : (

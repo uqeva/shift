@@ -960,6 +960,11 @@ describe('the access-control layer is present, so nothing below passes vacuously
         // 0031's re-created leave definer functions.
         'conflict_resolutions_insert_by_own_active_admin',
         'conflict_resolutions_select_own_active_admin',
+        // STORY 21.13 (0084): the roles a floater covers, an active admin's
+        // alone to read, insert and delete. No update.
+        'floater_roles_delete_by_own_active_admin',
+        'floater_roles_insert_by_own_active_admin',
+        'floater_roles_select_by_own_active_admin',
         // STORY 2.1a: read, and all three writes for an active admin. Bands are
         // current-state and any of them may be deleted, the last one included.
         'hour_bands_delete_by_own_active_admin',
@@ -28102,13 +28107,14 @@ describe('a loan is amended, ended early or removed (story 18.4, 0064)', () => {
  * backfill block is run again here, DML only, in a rolled-back transaction.
  */
 
-/** The 26 audited tables (AD-11; `team_loans` since story 18.2, `personal_assignments` since 21.2, `job_roles` since 21.12, `member_schedule_versions` since 21.10, `organization_holidays` since 21.16). */
+/** The 27 tables audited through 0061's shared recorder (AD-11; `team_loans` since story 18.2, `personal_assignments` since 21.2, `job_roles` since 21.12, `member_schedule_versions` since 21.10, `organization_holidays` since 21.16, `floater_roles` since 21.13). `calendar_feed_tokens` has its own recorder (0067) and is not listed, so the domain's history names 28 records. */
 const AUDITED_TABLES = [
   'organizations', 'members', 'member_status_versions', 'team_membership_versions', 'teams', 'hour_bands',
   'shift_types', 'shift_type_versions', 'rotation_patterns', 'rotation_steps', 'rotation_assignments',
   'shift_type_overrides', 'roster_overrides', 'leave_records', 'conflict_resolutions', 'leave_requests',
   'leave_request_decisions', 'swap_requests', 'swap_request_decisions', 'absence_types', 'leave_allowances',
   'team_loans', 'personal_assignments', 'job_roles', 'member_schedule_versions', 'organization_holidays',
+  'floater_roles',
 ] as const;
 
 interface AuditEvent {
@@ -30079,4 +30085,320 @@ describe('swaps give and take personal shifts (story 21.8, 0083)', () => {
       });
     },
   );
+});
+
+// --------------- story 21.13: floaters are suggested for an uncovered shift, by role
+
+/**
+ * STORY 21.13 (`0084`). `members.is_floater` is written through `members`'
+ * own update policy (an active admin), and `floater_roles` lists the job roles
+ * a floater may cover: read, inserted and deleted by an active admin alone,
+ * never updated, never truncated, nothing for `anon`, nothing notified (E-3).
+ * 0081's `resolve_with_personal_assignment` is re-created with two refusals a
+ * direct call alone meets: a cover inactive that date, and a teamless item's
+ * cover with a team or a live loan that date. Every scene that writes past a
+ * policy is built as the owner before the case's first `actAs`; every case
+ * runs in a rolled-back transaction; every code and message is 0084's own.
+ * Written unrun: CI is their first run.
+ */
+describe('floaters and the roles they cover (story 21.13, 0084)', () => {
+  /** Owner scene: a throwaway member and a job role of `organization`. */
+  async function floaterScene(client: Client, organization: string, by: string) {
+    const floater = await addThrowawayMember(client, organization);
+    const { rows } = await client.query<{ id: string }>(
+      `insert into job_roles (organization_id, name, created_by) values ($1, $2 || ' ' || gen_random_uuid()::text, $3)
+       returning id::text as id`,
+      [organization, `${THROWAWAY} Dispečer`, by],
+    );
+    const role = rows[0]?.id;
+    if (role === undefined) throw new Error('the job role insert returned no id');
+    return { floater, role };
+  }
+
+  /** `resolve_with_personal_assignment`, as whoever the connection currently is. */
+  async function resolve(client: Client, items: unknown): Promise<unknown> {
+    const { rows } = await client.query<{ answer: unknown }>(
+      'select public.resolve_with_personal_assignment(p_items => $1::jsonb) as answer',
+      [JSON.stringify(items)],
+    );
+    return rows[0]?.answer;
+  }
+
+  it.skipIf(noDatabase).each(FIXTURES)(
+    'lets the $fixture admin mark a floater and list, read and drop the roles they cover, and refuses a role twice, an update and a truncate',
+    async ({ slug, admin }) => {
+      await inRolledBackTransaction(async (client) => {
+        const caller = await memberByUsername(client, slug, admin);
+        const organization = caller.organizationId;
+        const { floater, role } = await floaterScene(client, organization, caller.authUserId);
+        const { rows: outboxBefore } = await client.query<{ count: number }>(
+          'select count(*)::int as count from notification_outbox where organization_id = $1',
+          [organization],
+        );
+
+        await actAs(client, caller.authUserId, organization);
+        const marked = await client.query('update members set is_floater = true where id = $1', [floater.id]);
+        const { rows } = await client.query<{ id: string; createdBy: string }>(
+          `insert into floater_roles (organization_id, member_id, job_role_id) values ($1, $2, $3)
+           returning id::text as id, created_by::text as "createdBy"`,
+          [organization, floater.id, role],
+        );
+        const listed = rows[0]?.id;
+        if (listed === undefined) throw new Error('the floater role insert returned no id');
+        const twice = await refusedThenContinue(client, () =>
+          client.query('insert into floater_roles (organization_id, member_id, job_role_id) values ($1, $2, $3)', [
+            organization,
+            floater.id,
+            role,
+          ]),
+        );
+        const updated = await refusedThenContinue(client, () =>
+          client.query('update floater_roles set job_role_id = $1 where id = $2', [role, listed]),
+        );
+        const truncated = await refusedThenContinue(client, () => client.query('truncate floater_roles'));
+        const { rows: seen } = await client.query<{ total: number }>(
+          'select count(*)::int as total from floater_roles where member_id = $1',
+          [floater.id],
+        );
+        const dropped = await client.query('delete from floater_roles where id = $1', [listed]);
+        await actAsOwner(client);
+
+        expect(marked.rowCount, `${slug}: an admin cannot mark a floater`).toBe(1);
+        expect(rows[0]?.createdBy, `${slug}: the role is not attributed to its author`).toBe(caller.authUserId);
+        expect(twice.code, `${slug}: a role listed twice`).toBe('23505');
+        expect(twice.message).toContain('floater_roles_organization_member_role_key');
+        expect(updated.code, `${slug}: a floater role was updated`).toBe('42501');
+        expect(truncated.code, `${slug}: a session truncated the floater roles`).toBe('42501');
+        expect(seen[0]?.total, `${slug}: the admin does not read the role`).toBe(1);
+        expect(dropped.rowCount, `${slug}: the role cannot be dropped`).toBe(1);
+        // E-3: a floater setting notifies nobody.
+        const { rows: outboxAfter } = await client.query<{ count: number }>(
+          'select count(*)::int as count from notification_outbox where organization_id = $1',
+          [organization],
+        );
+        expect(outboxAfter[0]?.count, `${slug}: a floater setting enqueued a notification`).toBe(outboxBefore[0]?.count);
+      });
+    },
+  );
+
+  it.skipIf(noDatabase).each(FIXTURES)(
+    'reads a $fixture member-role account no floater role and refuses it every write, its own flag read and never written',
+    async ({ slug, admin, member }) => {
+      await inRolledBackTransaction(async (client) => {
+        const caller = await memberByUsername(client, slug, admin);
+        const memberRole = await memberByUsername(client, slug, member);
+        const organization = caller.organizationId;
+        const { floater, role } = await floaterScene(client, organization, caller.authUserId);
+        // Built as the owner before any `actAs`.
+        await client.query('update members set is_floater = true where id = $1', [floater.id]);
+        await client.query(
+          'insert into floater_roles (organization_id, member_id, job_role_id, created_by) values ($1, $2, $3, $4)',
+          [organization, floater.id, role, caller.authUserId],
+        );
+
+        await actAs(client, memberRole.authUserId, organization);
+        const { rows: seen } = await client.query<{ total: number }>('select count(*)::int as total from floater_roles');
+        // 0035's stale-admin row trigger (BEFORE INSERT) refuses a member-role
+        // caller with 42501 before the insert policy is reached: this proves
+        // the trigger, not the policy.
+        const insert = await refusedThenContinue(client, () =>
+          client.query('insert into floater_roles (organization_id, member_id, job_role_id) values ($1, $2, $3)', [
+            organization,
+            memberRole.id,
+            role,
+          ]),
+        );
+        const remove = await client.query('delete from floater_roles where member_id = $1', [floater.id]);
+        const mark = await client.query('update members set is_floater = true where id = $1', [memberRole.id]);
+        const { rows: own } = await client.query<{ flag: boolean }>('select is_floater as flag from members where id = $1', [
+          memberRole.id,
+        ]);
+        await actAsOwner(client);
+
+        expect(seen[0]?.total, `${slug}: a member-role account reads the floater roles`).toBe(0);
+        expect(insert.code, `${slug}: a member-role account listed a role past the stale-admin trigger`).toBe('42501');
+        expect(remove.rowCount, `${slug}: a member-role account dropped a role`).toBe(0);
+        expect(mark.rowCount, `${slug}: a member-role account marked themselves a floater`).toBe(0);
+        expect(own, `${slug}: a member reads their own flag`).toEqual([{ flag: false }]);
+      });
+    },
+  );
+
+  it.skipIf(noDatabase).each(CROSS_TENANT)(
+    "refuses the $fixture admin $otherFixture's floater roles: unread, and unwritable by tenant or by member",
+    async ({ slug, admin, otherSlug }) => {
+      await inRolledBackTransaction(async (client) => {
+        const other = await organizationId(client, otherSlug);
+        const caller = await memberByUsername(client, slug, admin);
+        // The other tenant's floater and role, built as the owner before any `actAs`.
+        const foreign = await floaterScene(client, other, caller.authUserId);
+        const own = await floaterScene(client, caller.organizationId, caller.authUserId);
+        const { rows: seeded } = await client.query<{ id: string }>(
+          `insert into floater_roles (organization_id, member_id, job_role_id, created_by) values ($1, $2, $3, $4)
+           returning id::text as id`,
+          [other, foreign.floater.id, foreign.role, caller.authUserId],
+        );
+        const foreignRow = seeded[0]?.id;
+        if (foreignRow === undefined) throw new Error(`no floater role seeded in ${otherSlug}`);
+
+        await actAs(client, caller.authUserId, caller.organizationId);
+        const { rows: seen } = await client.query<{ organizationId: string }>(
+          'select organization_id::text as "organizationId" from floater_roles',
+        );
+        // 0035's stale-admin row trigger refuses a row of another organization
+        // (the caller is no admin of it) with 42501 before the insert policy is
+        // reached: this proves the trigger, not the policy.
+        const inOther = await refusedThenContinue(client, () =>
+          client.query('insert into floater_roles (organization_id, member_id, job_role_id) values ($1, $2, $3)', [
+            other,
+            foreign.floater.id,
+            foreign.role,
+          ]),
+        );
+        const foreignMember = await refusedThenContinue(client, () =>
+          client.query('insert into floater_roles (organization_id, member_id, job_role_id) values ($1, $2, $3)', [
+            caller.organizationId,
+            foreign.floater.id,
+            own.role,
+          ]),
+        );
+        const foreignRole = await refusedThenContinue(client, () =>
+          client.query('insert into floater_roles (organization_id, member_id, job_role_id) values ($1, $2, $3)', [
+            caller.organizationId,
+            own.floater.id,
+            foreign.role,
+          ]),
+        );
+        const remove = await client.query('delete from floater_roles where id = $1', [foreignRow]);
+        await actAsOwner(client);
+
+        expect(seen.map((row) => row.organizationId), `${slug}: ${otherSlug}'s floater roles leaked`).not.toContain(other);
+        expect(inOther.code, `${slug}: a row in ${otherSlug} passed the stale-admin trigger`).toBe('42501');
+        expect(foreignMember.code, `${slug}: a role listed for ${otherSlug}'s member`).toBe('23503');
+        expect(foreignMember.message).toContain('floater_roles_member_fkey');
+        expect(foreignRole.code, `${slug}: ${otherSlug}'s role listed`).toBe('23503');
+        expect(foreignRole.message).toContain('floater_roles_job_role_fkey');
+        expect(remove.rowCount, `${slug}: an admin dropped ${otherSlug}'s floater role`).toBe(0);
+      });
+    },
+  );
+
+  it.skipIf(noDatabase).each(FIXTURES)(
+    "records the $fixture admin's floater role insert and delete, and the flag, in the change history (AD-3)",
+    async ({ slug, admin }) => {
+      await inRolledBackTransaction(async (client) => {
+        const caller = await memberByUsername(client, slug, admin);
+        const organization = caller.organizationId;
+        const { floater, role } = await floaterScene(client, organization, caller.authUserId);
+
+        await actAs(client, caller.authUserId, organization);
+        await client.query('update members set is_floater = true where id = $1', [floater.id]);
+        const { rows } = await client.query<{ id: string }>(
+          'insert into floater_roles (organization_id, member_id, job_role_id) values ($1, $2, $3) returning id::text as id',
+          [organization, floater.id, role],
+        );
+        const listed = rows[0]?.id;
+        if (listed === undefined) throw new Error('the floater role insert returned no id');
+        await client.query('delete from floater_roles where id = $1', [listed]);
+        await actAsOwner(client);
+
+        const events = await auditEventsOf(client, 'floater_roles', listed);
+        expect(
+          events.map((event) => [event.tableName, event.operation, event.organizationId, event.actor]),
+          `${slug}: the role's two writes are not each one event`,
+        ).toEqual([
+          ['floater_roles', 'INSERT', organization, caller.authUserId],
+          ['floater_roles', 'DELETE', organization, caller.authUserId],
+        ]);
+        const flagEvents = (await auditEventsOf(client, 'members', floater.id)).filter(
+          (event) => event.operation === 'UPDATE' && event.newRow?.['is_floater'] === true,
+        );
+        expect(
+          flagEvents.map((event) => [event.oldRow?.['is_floater'], event.actor]),
+          `${slug}: the flag change is not recorded through the members trigger`,
+        ).toEqual([[false, caller.authUserId]]);
+      });
+    },
+  );
+
+  it.skipIf(noDatabase).each(FIXTURES)(
+    'refuses a $fixture cover of another tenant as invalid, one inactive that date (team or none), and a teamless cover with a team or a live loan, before anything is written',
+    async ({ slug, admin }) => {
+      await inRolledBackTransaction(async (client) => {
+        const caller = await memberByUsername(client, slug, admin);
+        const organization = caller.organizationId;
+        const by = caller.authUserId;
+        // Owner scene: an absent member on leave over `date` with a teamless working assignment.
+        const absent = await addThrowawayMember(client, organization);
+        const working = await addThrowawayShiftType(client, organization, by);
+        const today = await organizationDay(client, organization, 0);
+        const date = await organizationDay(client, organization, 5);
+        const after = await organizationDay(client, organization, 6);
+        await client.query(
+          `insert into personal_assignments (organization_id, member_id, date, kind, shift_type_id, created_by)
+           values ($1, $2, $3::date, 'SHIFT', $4, $5)`,
+          [organization, absent.id, date, working, by],
+        );
+        await insertLeave(client, { organization, member: absent.id, during: `[${date},${after})`, by });
+        // An inactive cover (a season ended), a cover on a team, and a cover with no team lent to one.
+        const inactive = await addThrowawayMember(client, organization);
+        await ownerVersion(client, { organization, member: inactive.id, active: false, from: today, by });
+        const team = await addThrowawayTeam(client, organization, by);
+        const onTeam = await addThrowawayMember(client, organization);
+        await ownerMembership(client, { organization, member: onTeam.id, team: team.id, from: today, by });
+        const lent = await addThrowawayMember(client, organization);
+        await client.query(
+          `insert into team_loans (organization_id, member_id, team_id, during, reason, created_by)
+           values ($1, $2, $3, $4::daterange, 'Pojačanje.', $5)`,
+          [organization, lent.id, team.id, `[${date},${after})`, by],
+        );
+        // Another tenant's member, as a cover: malformed input before any status is read.
+        const otherSlug = FIXTURES.find((one) => one.slug !== slug)?.slug;
+        if (otherSlug === undefined) throw new Error('no second fixture');
+        const foreign = await addThrowawayMember(client, await organizationId(client, otherSlug));
+        const item = { memberId: absent.id, date, teamId: null, shiftTypeId: working };
+
+        await actAs(client, by, organization);
+        const asForeign = await refusedThenContinue(client, () => resolve(client, [{ ...item, replacementId: foreign.id }]));
+        const asInactive = await refusedThenContinue(client, () => resolve(client, [{ ...item, replacementId: inactive.id }]));
+        // A team's item: the inactive cover is refused whatever the key's team.
+        const asInactiveOnTeam = await refusedThenContinue(client, () =>
+          resolve(client, [{ ...item, teamId: team.id, replacementId: inactive.id }]),
+        );
+        const asTeamMember = await refusedThenContinue(client, () => resolve(client, [{ ...item, replacementId: onTeam.id }]));
+        const asLent = await refusedThenContinue(client, () => resolve(client, [{ ...item, replacementId: lent.id }]));
+        await actAsOwner(client);
+
+        const ON_TEAM = { code: '23514', message: 'CONFLICT_REPLACEMENT_ON_TEAM' };
+        const INACTIVE = { code: '23514', message: 'CONFLICT_REPLACEMENT_INACTIVE' };
+        expect(
+          [asForeign, asInactive, asInactiveOnTeam, asTeamMember, asLent].map((refusal) => ({ code: refusal.code, message: refusal.message })),
+          slug,
+        ).toEqual([{ code: '22023', message: 'CONFLICT_REPLACEMENT_INVALID' }, INACTIVE, INACTIVE, ON_TEAM, ON_TEAM]);
+        const { rows: written } = await client.query<{ total: number }>(
+          `select (select count(*) from conflict_resolutions where member_id = $1)::int
+                + (select count(*) from personal_assignments where member_id = any($2::uuid[]))::int as total`,
+          [absent.id, [inactive.id, onTeam.id, lent.id, foreign.id]],
+        );
+        expect(written[0]?.total, `${slug}: a refused call wrote`).toBe(0);
+      });
+    },
+  );
+
+  it.skipIf(noDatabase)('gives anon nothing on floater_roles', async () => {
+    await inRolledBackTransaction(async (client) => {
+      await client.query('set local role anon');
+      const read = await refusedThenContinue(client, () => client.query('select id from floater_roles'));
+      const insert = await refusedThenContinue(client, () =>
+        client.query(
+          'insert into floater_roles (organization_id, member_id, job_role_id) values (gen_random_uuid(), gen_random_uuid(), gen_random_uuid())',
+        ),
+      );
+      const remove = await refusedThenContinue(client, () => client.query('delete from floater_roles'));
+      expect(read.code).toBe('42501');
+      expect(insert.code, 'anon inserted a floater role').toBe('42501');
+      expect(remove.code, 'anon deleted floater roles').toBe('42501');
+      await client.query('reset role');
+    });
+  });
 });

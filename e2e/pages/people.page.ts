@@ -647,6 +647,38 @@ export class PeoplePage extends BasePage {
     return this.page.getByRole('dialog', { name: hr.rasporedOsobe.preview.title, exact: true });
   }
 
+  // ------------------------------------------------------- the floater
+
+  /** *Zamjena* (story 21.13): the card, by its heading. */
+  get floaterCard(): Locator {
+    return this.page.getByRole('region', { name: hr.ljudi.floater.title, exact: true });
+  }
+
+  /** The card's `Promijeni`, named for the member: it opens the dialog. */
+  floaterChangeButton(name: string): Locator {
+    return this.page.getByRole('button', { name: fill(hr.ljudi.floater.changeNamed, { name }), exact: true });
+  }
+
+  /** The card's dialog, titled as the card. */
+  get floaterDialog(): Locator {
+    return this.page.getByRole('dialog', { name: hr.ljudi.floater.dialogHeading, exact: true });
+  }
+
+  /** The dialog's *Uskače kao zamjena*. */
+  get floaterFlag(): Locator {
+    return this.floaterDialog.getByRole('checkbox', { name: hr.ljudi.floater.flag, exact: true });
+  }
+
+  /** The dialog's box for one role, by its name. */
+  floaterRole(roleName: string): Locator {
+    return this.floaterDialog.getByRole('checkbox', { name: roleName, exact: true });
+  }
+
+  /** The dialog's Spremi. */
+  get floaterSaveButton(): Locator {
+    return this.floaterDialog.getByRole('button', { name: hr.ljudi.form.save, exact: true });
+  }
+
   /** Opens a member's edit screen by id. */
   async gotoMember(id: string): Promise<void> {
     await this.page.goto(`${this.path}/${id}`);

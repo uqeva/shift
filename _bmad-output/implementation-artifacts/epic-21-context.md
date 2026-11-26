@@ -63,6 +63,7 @@ Make Smjenko plan the first production pilot's real month without workarounds. T
 - **Roles, floaters and seasons.**
   - `job_roles` has a unique name key, archive and no delete. `members.job_role_id` is nullable.
   - `members.is_floater` defaults to false. `floater_roles` is read by admins only. Neither feeds any derivation except eligibility.
+  - As built by 21.13 (`0084`): `members.is_floater` (UPDATE granted; 0023/0035's `members` lock and re-check widened to `update of is_floater, role`) and `floater_roles` (composite keys, no cascade, `floater_roles_organization_member_role_key`; select, insert, delete for an active admin; audited, `floater-role` in the history). `resolve_with_personal_assignment` refuses a cover inactive that date (23514 `CONFLICT_REPLACEMENT_INACTIVE`) and a teamless item's cover with a team or a live loan (23514 `CONFLICT_REPLACEMENT_ON_TEAM`). `domain/floaters`: `floaterEligibleFor`, `floaterStandingOn` (`free`, `inactive`, `on-leave`, `working`, `rest-gap`; 21.14 lists a whole leave by it), `floaterSuggestionsOf` (ids and counts). The browser's `MemberListRow.isFloater`/`.floaterRoleIds` (`DEVICE_SNAPSHOT_SHAPE` 9), the member page's *Zamjena* card (`use-member-floater.ts`, `services/floater.ts`) and *Timovi i raspored*'s `MemberFloaterButton`; *Za odluku*'s `floater-suggestions.ts` narrows to `assignmentCandidatesOf`, `ResolutionView.suggestions`/`.noSuggestion`/`.heldBy`, and `replaceWriteOf(view, replacementId)` writes a suggested pick by assignment counted with the conflict's team. 21.14 passes one item per covered date to the same call.
   - 21.11 relaxes 0008's one-scheduled-change rule. Versions still alternate, and only the latest is cancellable.
 - **Collisions and swaps (AD-4 amended).**
   - `conflict_resolutions.team_id` becomes nullable, under a `NULLS NOT DISTINCT` key.
@@ -118,6 +119,7 @@ Make Smjenko plan the first production pilot's real month without workarounds. T
 
 ## Cross-Story Dependencies
 
+- **Status (2026-11-26, story 21.13).** 21.13 is built on `feat/21-13-21-14-floaters` (`0084`), CI pending; 21.14 follows on that branch.
 - **Status (2026-11-26, story 21.8).** 21.6 (PR #374) and 21.7 (PR #381, `0081`) are done with CI green. 21.8 is built on `feat/21-8-personal-swaps` (`0083`, merging after 21.20's `0082`), CI pending.
 - **Status (2026-11-26, earlier; superseded by the line above for 21.6 and 21.7).** Done, merged with CI green: 21.1–21.5, 21.9, 21.10 (PR #377, `0079`), 21.12, 21.15 (PR #378), and 21.16 with 21.17 (PR #380, `0080`). 21.6 (PR #374) and 21.25 (PR #376) are merged on `main` and still `review` in the sprint status until their specs are rewritten. 21.18 and 21.19 are built and in review, CI pending (no migration; branch `feat/21-18-21-19-holidays-shown`). 21.21, 21.22, 21.23 and 21.24 are built and in review, waiting on CI. The rest are ready-for-dev.
 - **Personal track.** 21.1 → 21.2 → 21.3 → 21.4 → 21.5. 21.6 needs 21.2. 21.7 and 21.8 need 21.6.

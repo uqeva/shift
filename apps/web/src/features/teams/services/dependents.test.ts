@@ -48,6 +48,7 @@ import {
   ABSENCE_TYPE_WRITE_DEPENDENTS,
   HOLIDAY_WRITE_DEPENDENTS,
   JOB_ROLE_WRITE_DEPENDENTS,
+  MEMBER_FLOATER_SAVE_DEPENDENTS,
   MEMBER_JOB_ROLE_SAVE_DEPENDENTS,
   HOUR_BAND_WRITE_DEPENDENTS,
   LEAVE_REQUEST_APPROVAL_DEPENDENTS,
@@ -542,6 +543,13 @@ describe('the reads a team or membership write makes stale', () => {
         MY_CONFLICT_RESOLUTIONS_KEY,
         ORGANIZATION_CONFLICT_RESOLUTIONS_KEY,
       ],
+    },
+    {
+      write: 'a member\'s floater flag or roles saved (story 21.13)',
+      own: MEMBERS_LIST_KEY,
+      dependents: MEMBER_FLOATER_SAVE_DEPENDENTS,
+      // The member list alone: it embeds both, and nothing else reads them.
+      stale: [MEMBERS_LIST_KEY],
     },
     {
       write: 'a member saved with a changed job role (story 21.12)',

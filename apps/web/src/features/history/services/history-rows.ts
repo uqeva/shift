@@ -305,6 +305,7 @@ const RECORD_KEYS: Readonly<Record<HistoryRecord, ReturnType<typeof historyRecor
   'job-role': 'history.record.jobRole',
   'schedule-version': 'history.record.scheduleVersion',
   holiday: 'history.record.holiday',
+  'floater-role': 'history.record.floaterRole',
   other: 'history.record.other',
 };
 
@@ -339,6 +340,7 @@ export function historyRecordMessageKey(
   | 'history.record.jobRole'
   | 'history.record.scheduleVersion'
   | 'history.record.holiday'
+  | 'history.record.floaterRole'
   | 'history.record.other' {
   return RECORD_KEYS[record];
 }
@@ -407,6 +409,7 @@ const FIELD_KEYS: Readonly<Record<HistoryField, ReturnType<typeof historyFieldMe
   role: 'history.field.role',
   fireRank: 'history.field.fireRank',
   jobRole: 'history.field.jobRole',
+  isFloater: 'history.field.isFloater',
   leaveAllowanceDays: 'history.field.leaveAllowanceDays',
   member: 'history.field.member',
   memberOut: 'history.field.memberOut',
@@ -479,6 +482,7 @@ export function historyFieldMessageKey(
   | 'history.field.role'
   | 'history.field.fireRank'
   | 'history.field.jobRole'
+  | 'history.field.isFloater'
   | 'history.field.leaveAllowanceDays'
   | 'history.field.member'
   | 'history.field.memberOut'

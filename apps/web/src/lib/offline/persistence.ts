@@ -102,12 +102,17 @@ export const DEVICE_SNAPSHOT_KEY = 'shift-query-cache';
  * gained `minimumMembers`. A shape-7 snapshot has none, and every short-staffed
  * mark derived from it would ignore a team's own minimum.
  *
+ * 9 SINCE STORY 21.13: the `members` entry's rows gained `isFloater` and
+ * `floaterRoleIds`. A shape-8 row has neither, and *Za odluku*'s floater
+ * suggestions would read a floater's roles as `undefined`. The calendar entry
+ * is unchanged: no floater fact is in the snapshot.
+ *
  * TWO BUNDLES AT ONCE. While an old and a new bundle both run (a waiting
  * service worker under `registerType: 'prompt'`, or an old tab left open),
  * each deletes the other's blob on restore. That costs offline reading until
  * the next save, never correctness: neither hydrates the other's shape.
  */
-export const DEVICE_SNAPSHOT_SHAPE = 8;
+export const DEVICE_SNAPSHOT_SHAPE = 9;
 
 /**
  * The `buster` a snapshot of `userId`'s cache is saved and restored under:

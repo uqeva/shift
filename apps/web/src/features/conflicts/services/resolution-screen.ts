@@ -1,4 +1,4 @@
-import { collisionKeyOf, daysBetween, effectiveTeamOn, deriveShiftTimes, isHalfDay, leaveBalanceOf, leaveRangeCostOf, leaveSpanOf, PERSONAL_ASSIGNMENT_SHIFT, shiftTypeVersionOn, type Collision, type LeaveHalf } from '@shift/domain';
+import { collisionKeyOf, daysBetween, effectiveTeamOn, deriveShiftTimes, isHalfDay, leaveBalanceOf, leaveRangeCostOf, leaveSpanOf, PERSONAL_ASSIGNMENT_SHIFT, shiftTypeVersionOn, type Collision, type LeaveAllowance, type LeaveHalf } from '@shift/domain';
 
 import type { CalendarSnapshot, CalendarSurfaceState } from '@/features/calendar/services/snapshot';
 import { dayDetailOf, type DayDetailMember } from '@/features/calendar/utils/day-detail';
@@ -19,12 +19,18 @@ import {
   type LeaveRowsAnswer,
 } from '@/features/conflicts/services/conflicts-queue';
 import {
+  floaterSuggestionsOfConflict,
+  groupsLessSuggested,
+  type SuggestedCandidate,
+} from '@/features/conflicts/services/floater-suggestions';
+import {
   heldByReplacement,
   personalShiftCountedWith,
   replacementContextOf,
 } from '@/features/conflicts/services/replacement-effect';
 import { ACCEPT_UNCOVERED, REPLACE_MEMBER } from '@/features/conflicts/services/resolutions';
 import { durationMessageKey } from '@/features/hour-bands/services/list';
+import type { ManualSearch } from '@/features/planning/services/manual-search';
 import {
   leaveRecordFieldsOf,
   organizationLeaveRecordsOf,
@@ -119,6 +125,21 @@ import {
  * {@link ResolutionView.held} says so: the screen states it as Spremi's hint,
  * with the way to that day in the calendar, and Spremi waits.
  *
+ * FLOATERS FIRST (story 21.13; R16.2, UX-DR77). With a floater in the
+ * organization, the second card's picker lists *Predložene zamjene* first: the
+ * floaters `domain/floaters` suggests (eligible by role, active, free, by
+ * fewest shifts in the month, then name), narrowed to 21.7's
+ * `assignmentCandidatesOf` for the conflict, and left out of the other
+ * groups. None suggested says `Nema slobodne zamjene za posao {posao}.` (or
+ * with no role, *Nema slobodne zamjene.*). A suggested pick is written as a
+ * Personal Assignment counted with the conflict's team (R16.3,
+ * {@link replaceWriteOf}), a team rotation shift's too; any other pick keeps
+ * the conflict's own form. With no floater, nothing here changes.
+ *
+ * A KEY HELD BY AN ASSIGNMENT (story 21.13, the 21.7 deferral): a cover's
+ * assignment that no longer applies says to remove it in *Ručni raspored*,
+ * linking the cover's month, person and date ({@link ResolutionView.heldBy}).
+ *
  * NEVER A PARTIAL SCREEN. A read that failed or is paused offline, a row that
  * cannot be trusted, and any `RangeError` of a derivation make the screen
  * unavailable, logged, with a retry.
@@ -180,6 +201,9 @@ export function candidateGroupHeadingId(kind: CandidateGroupKind): string {
   return `resolution-candidates-${kind}`;
 }
 
+/** The id *Predložene zamjene*'s heading carries, which names that group (story 21.13). */
+export const RESOLUTION_SUGGESTIONS_HEADING_ID = 'resolution-candidates-suggested';
+
 /** The candidate picker's value while nobody is chosen: Radix's own "none". */
 export const NO_CANDIDATE = '';
 /** The id the save hint carries, which describes the save button. */
@@ -208,12 +232,18 @@ export type ReplaceForm = typeof REPLACE_BY_OVERRIDE | typeof REPLACE_BY_ASSIGNM
 /**
  * The one dispatch of a replacement's write (story 21.7): by assignment for
  * the second form, and always for a key with no team (an override needs a
- * team); else by 0032's override, naming the team.
+ * team); else by 0032's override, naming the team. STORY 21.13 (R16.3): a
+ * suggested floater (`replacementId` among `view.suggestions`) is always
+ * covered by assignment, counted with the conflict's team, a team rotation
+ * shift's too; any other pick keeps the conflict's form.
  */
 export function replaceWriteOf(
-  view: Pick<ResolutionView, 'replaceForm' | 'teamId'>,
+  view: Pick<ResolutionView, 'replaceForm' | 'teamId'> & { readonly suggestions: readonly { readonly id: string }[] },
+  replacementId: string | null = null,
 ): { readonly form: typeof REPLACE_BY_ASSIGNMENT } | { readonly form: typeof REPLACE_BY_OVERRIDE; readonly teamId: string } {
-  return view.replaceForm === REPLACE_BY_ASSIGNMENT || view.teamId === null
+  const suggested = replacementId !== null && view.suggestions.some((candidate) => candidate.id === replacementId);
+
+  return suggested || view.replaceForm === REPLACE_BY_ASSIGNMENT || view.teamId === null
     ? { form: REPLACE_BY_ASSIGNMENT }
     : { form: REPLACE_BY_OVERRIDE, teamId: view.teamId };
 }
@@ -543,6 +573,8 @@ export function resolutionStaffingOf(
   target: ResolutionAmendTarget,
   candidateIds: readonly string[] = [],
   form: ReplaceForm = REPLACE_BY_OVERRIDE,
+  /** STORY 21.13: the suggested floaters, whose cover is an assignment whatever `form` is (R16.3). */
+  assignedIds: readonly string[] = [],
 ): ResolutionStaffing | null {
   if (!staffingAppliesOf(snapshot)) return null;
 
@@ -568,8 +600,28 @@ export function resolutionStaffingOf(
     replaceBy[id] = figure;
   }
 
+  // A suggested floater whose figure cannot be derived keeps the card's
+  // placeholder figure: only that entry is skipped, never the whole block.
+  for (const id of assignedIds) {
+    const figure = assignedCoverageOf(snapshot, records, collision, id);
+
+    if (figure !== null) replaceBy[id] = figure;
+  }
+
   return { accept, replace, replaceBy, amend };
 }
+
+/** A key held by a replacement's roster override (story 5.5d): removed in the calendar. */
+export const HELD_BY_OVERRIDE = 'override';
+/** A key held by a cover's Personal Assignment (story 21.13): removed in *Ručni raspored*. */
+export const HELD_BY_ASSIGNMENT = 'assignment';
+
+/** *Ručni raspored*'s search for one cell: the month, the person and the date (its route's `mjesec`, `osoba`, `dan`). */
+export type HeldManualSearch = ManualSearch & { readonly mjesec: string; readonly dan: string };
+
+export type ResolutionHeldBy =
+  | { readonly kind: typeof HELD_BY_OVERRIDE }
+  | { readonly kind: typeof HELD_BY_ASSIGNMENT; readonly manual: HeldManualSearch };
 
 /** The screen, ready to render. */
 export interface ResolutionView {
@@ -630,8 +682,25 @@ export interface ResolutionView {
   readonly leaveDays: number;
   /** The absent member's balance in the leave year that holds the conflict's date, which neither outcome changes. */
   readonly balanceDays: number;
-  /** Who may be put on the shift (story 5.4c): the three groups, in their fixed order, each by name. */
+  /**
+   * Who may be put on the shift (story 5.4c): the three groups, in their fixed
+   * order, each by name — less the suggested floaters (story 21.13), listed
+   * once, first, in {@link ResolutionView.suggestions}.
+   */
   readonly candidates: readonly CandidateGroup[];
+  /**
+   * STORY 21.13 (R16.2): *Predložene zamjene*, the floaters suggested, in the
+   * domain's order, each with their shifts in the month; empty with no
+   * floater in the organization, or none free.
+   */
+  readonly suggestions: readonly SuggestedCandidate[];
+  /**
+   * STORY 21.13: the none line, when the organization has a floater and none
+   * is suggested — `Nema slobodne zamjene za posao {posao}.` with the absent
+   * member's role, or with none (`roleName: null`). `null` with a suggestion,
+   * or with no floater at all (no block).
+   */
+  readonly noSuggestion: { readonly roleName: string | null } | null;
   /** Whether rank and position are shown beside a candidate: where the organization uses them. */
   readonly rankShown: boolean;
   readonly positionShown: boolean;
@@ -660,6 +729,13 @@ export interface ResolutionView {
   readonly held: boolean;
   /** Where the held line's "Ukloni je u kalendaru" goes: the grid on the conflict's month, narrowed to its team. */
   readonly heldCalendar: CalendarSearch;
+  /**
+   * STORY 21.13 (the 21.7 deferral): what holds the key while `held` — a
+   * roster override (the calendar link, `heldCalendar`) or a cover's
+   * assignment, removed in *Ručni raspored* on the cover's month, person and
+   * date. `null` while nothing holds it.
+   */
+  readonly heldBy: ResolutionHeldBy | null;
   /** The insert's columns: the organization and the key. */
   readonly organizationId: string;
   /** The shift type the conflict is on, as derived: stored with the decision (0038). */
@@ -704,12 +780,28 @@ export interface ResolutionSources {
    * back link's count, on the request read's terms — never the screen's.
    */
   readonly swaps: LeaveRowsAnswer;
-  /** The member list: the allowance. */
-  readonly members: LeaveMembersSource;
+  /** The member list: the allowance, and (story 21.13) who is a floater, covering which roles. */
+  readonly members: ResolutionMembersSource;
   /** The organization snapshot: where the leave year begins. */
   readonly organization: LeaveOrganizationSource;
   /** Whether a failed read is being read again ({@link refetchingAfterFailure}): loading, never the alert. */
   readonly refetching?: boolean;
+}
+
+/**
+ * One member of the list as the screen reads them: the allowance, and the
+ * floater fields (story 21.13), which the list's parser always sets.
+ */
+export interface ResolutionMember {
+  readonly id: string;
+  readonly leaveAllowance: LeaveAllowance;
+  readonly isFloater: boolean;
+  readonly floaterRoleIds: readonly string[];
+}
+
+/** The member list's state, as the leave card's, over {@link ResolutionMember} rows. */
+export interface ResolutionMembersSource extends Omit<LeaveMembersSource, 'members'> {
+  readonly members: readonly ResolutionMember[] | null;
 }
 
 /** TanStack Query's names for a fetch in flight, and one it has not started (offline). */
@@ -717,7 +809,7 @@ const FETCH_FETCHING = 'fetching';
 const FETCH_PAUSED = 'paused';
 
 /** Whether the member list failed, is paused offline, or settled with nothing: the balance's allowance. */
-function membersReadFailed(members: LeaveMembersSource): boolean {
+function membersReadFailed(members: ResolutionMembersSource): boolean {
   return members.paused || (!members.loading && (members.refusal !== null || members.members === null));
 }
 
@@ -861,6 +953,23 @@ function shiftOfCollision(snapshot: CalendarSnapshot, collision: Collision): Col
     typeName: type.name,
     range: typeRangeOn(type, collision.date),
   };
+}
+
+/**
+ * STORY 21.13: the floater suggestions, or `null` (no block) when deriving
+ * them breaks a precondition: a bad floater row is logged and never makes the
+ * whole screen unavailable — the suggestions only inform.
+ */
+function suggestionsOrNone<T>(derive: () => T | null): T | null {
+  try {
+    return derive();
+  } catch (cause) {
+    if (!(cause instanceof RangeError)) throw cause;
+
+    console.error('floater suggestions', cause);
+
+    return null;
+  }
 }
 
 /**
@@ -1022,18 +1131,27 @@ function resolutionScreenFrom(
   const minutes = shiftMinutesOf(snapshot, collision);
   const teamId = collision.teamId;
   const byAssignment = shift.replaceForm === REPLACE_BY_ASSIGNMENT || teamId === null;
-  const candidates = byAssignment
-    ? assignmentCandidatesOf(snapshot, records, collision.memberId, teamId, collision.date, collision.shiftTypeId)
+  const assignmentGroups = assignmentCandidatesOf(snapshot, records, collision.memberId, teamId, collision.date, collision.shiftTypeId);
+  const groups = byAssignment
+    ? assignmentGroups
     : replacementCandidatesOf(snapshot, records, teamId, collision.date, collision.shiftTypeId);
+  // STORY 21.13: the floaters suggested, narrowed to whoever a cover by assignment may write (R16.2, R16.3).
+  const floaters = suggestionsOrNone(() =>
+    floaterSuggestionsOfConflict(snapshot, records, sources.members.members ?? [], collision, assignmentGroups),
+  );
+  const suggestions = floaters?.suggested ?? [];
+  const candidates = groupsLessSuggested(groups, suggestions);
   const range = leaveRangeValuesOf(record.record);
   const dateShown = shift.dateShown;
   const typeName = shift.typeName ?? type.name;
   const key = collisionKeyOf(collision);
   const amend = resolutionAmendOf(base.input, record.record, collision.date);
   // Unresolved, yet a live row holds this key: a replacement the snapshot holds pending or inert.
-  const held = liveResolutionsOf(snapshot, resolutionRows).some(
+  const holder = liveResolutionsOf(snapshot, resolutionRows).find(
     (resolution) => collisionKeyOf(resolution) === key && heldByReplacement(snapshot, resolution),
   );
+  const held = holder !== undefined;
+  const heldBy = holder === undefined ? null : heldByOf(snapshot, holder.personalAssignmentId, collision.date);
 
   return {
     kind: RESOLUTION_READY,
@@ -1064,6 +1182,8 @@ function resolutionScreenFrom(
       // THE LEAVE YEAR OF THE CONFLICT'S DATE, not today's: the balance the decision is about.
       balanceDays: leaveBalanceOf({ ...base.input, today: collision.date }).balanceDays,
       candidates,
+      suggestions,
+      noSuggestion: floaters !== null && suggestions.length === 0 ? { roleName: floaters.roleName } : null,
       rankShown: ranksShown(snapshot),
       positionShown: positionsShown(snapshot),
       replaceCovered: coworkers.length + 1,
@@ -1083,9 +1203,11 @@ function resolutionScreenFrom(
               amend.target,
               candidates.flatMap((group) => group.candidates.map((candidate) => candidate.id)),
               byAssignment ? REPLACE_BY_ASSIGNMENT : REPLACE_BY_OVERRIDE,
+              suggestions.map((candidate) => candidate.id),
             ),
       held,
       heldCalendar: heldCalendarSearchOf(collision),
+      heldBy,
       organizationId: snapshot.organizationId,
       shiftTypeId: collision.shiftTypeId,
       replaceForm: byAssignment ? REPLACE_BY_ASSIGNMENT : REPLACE_BY_OVERRIDE,
@@ -1161,6 +1283,23 @@ export function heldCalendarSearchOf(conflict: { readonly date: string; readonly
   return { prikaz: MODE_SVE, mjesec: conflict.date.slice(0, 7), smjena: conflict.teamId };
 }
 
+/**
+ * What holds a key (story 21.13): a cover's assignment — linking *Ručni
+ * raspored* on the conflict's month and date, narrowed to the cover the
+ * snapshot names (none when it no longer holds the row) — or else a roster
+ * override.
+ */
+export function heldByOf(snapshot: CalendarSnapshot, personalAssignmentId: string | null, date: string): ResolutionHeldBy {
+  if (personalAssignmentId === null) return { kind: HELD_BY_OVERRIDE };
+
+  const cover = snapshot.members.find((member) => member.personalAssignments.some((one) => one.id === personalAssignmentId));
+
+  return {
+    kind: HELD_BY_ASSIGNMENT,
+    manual: { mjesec: date.slice(0, 7), ...(cover === undefined ? {} : { osoba: cover.id }), dan: date },
+  };
+}
+
 /** Where the held hint's link goes in its sentence: a character no translation holds. */
 const HELD_ACTION_SLOT = '\u0000';
 
@@ -1214,6 +1353,11 @@ export function saveFocusOf(
 export function replacementOf(view: ResolutionView, id: string | null): ReplacementCandidate | null {
   if (id === null) return null;
 
+  // STORY 21.13: a suggested floater first, then the groups.
+  const suggested = view.suggestions.find((candidate) => candidate.id === id);
+
+  if (suggested !== undefined) return suggested;
+
   for (const group of view.candidates) {
     const found = group.candidates.find((candidate) => candidate.id === id);
 
@@ -1230,7 +1374,19 @@ export function candidateIdOf(value: string): string | null {
 
 /** Whether there is anybody at all to put on the shift. */
 export function hasCandidates(view: ResolutionView): boolean {
-  return view.candidates.some((group) => group.candidates.length > 0);
+  return view.suggestions.length > 0 || view.candidates.some((group) => group.candidates.length > 0);
+}
+
+/** A suggested floater's line (story 21.13): `{line} · 1 smjena`, with their at-work shifts in the month. */
+export function suggestionLineMessageKey(): 'zaOdluku.resolution.suggestionsLine' {
+  return 'zaOdluku.resolution.suggestionsLine';
+}
+
+/** The none line (story 21.13): with the absent member's role, or with none. */
+export function noSuggestionMessageKey(
+  roleName: string | null,
+): 'zaOdluku.resolution.suggestionsNone' | 'zaOdluku.resolution.suggestionsNoneAny' {
+  return roleName === null ? 'zaOdluku.resolution.suggestionsNoneAny' : 'zaOdluku.resolution.suggestionsNone';
 }
 
 /** What the queue's status line names once a replacement by `replacementName` lands (story 5.4c). */

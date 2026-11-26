@@ -127,6 +127,10 @@ export const CONFLICTS_SCREEN_EXEMPT: readonly { readonly file: string; readonly
     why: 'the two resolution writes (stories 5.4b, 5.4c) and their refusals; a key source of its own, executed by resolution-write.test.ts',
   },
   {
+    file: 'services/floater-suggestions.ts',
+    why: 'the floaters suggested for a conflict (story 21.13, R16.2): the adapter from the member list, the snapshot and the leave to the domain\'s floaterSuggestionsOf, narrowed to the cover candidates; renders nothing and declares no key, executed by floater-suggestions.test.ts',
+  },
+  {
     file: 'services/surface-keys.ts',
     why: "Za odluku's and the resolution page's reads as one snapshot each (story 8.2c), the keys their offline freshness is decided over; renders nothing and declares no key, executed by surface-keys.test.ts",
   },

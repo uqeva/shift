@@ -170,6 +170,10 @@ describe('the member list computes nothing it renders', () => {
       // STORY 21.12: the job role, shown under the name through
       // `jobRoleNoteOf` and guarded like the rest.
       'jobRole',
+      // STORY 21.13: the floater flag and the roles covered, read by *Zamjena*
+      // and *Za odluku*'s suggestions, never by the list; guarded like the rest.
+      'isFloater',
+      'floaterRoleIds',
       // STORY 1.6's THREE, all guarded: the account id the edit screen compares
       // with the session's subject, the status history the marker is read off,
       // and the organization's zone that "today" is read in. None may be

@@ -7,6 +7,7 @@ import {
   MEMBER_DIRECTORY,
   MEMBER_EDIT,
   MEMBER_FACTS_KEYS,
+  MEMBER_FLOATER_KEYS,
   MEMBER_LIST,
   MEMBER_LIST_KEYS,
   MEMBER_WRITE_KEYS,
@@ -92,6 +93,8 @@ describe('the keys rendered and the keys declared are the same set', () => {
       LEAVE_SECTION_KEYS,
       // STORY 7.8: `Kopiraj`'s two status lines.
       CREDENTIAL_COPY_KEYS,
+      // STORY 21.13: *Zamjena*'s facts lines and refusals.
+      MEMBER_FLOATER_KEYS,
     ]
       .map((file) => source(file))
       .join('\n');

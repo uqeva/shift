@@ -427,6 +427,7 @@
       "jobRole": "Posao",
       "scheduleVersion": "Raspored osobe",
       "holiday": "Blagdan",
+      "floaterRole": "Posao zamjene",
       "other": "Zapis"
     },
     "action": {
@@ -472,6 +473,7 @@
       "role": "Razina",
       "fireRank": "Zvanje",
       "jobRole": "Posao",
+      "isFloater": "Zamjena",
       "leaveAllowanceDays": "Početno pravo (dani)",
       "member": "Osoba",
       "memberOut": "Izlazi",
@@ -1091,6 +1093,10 @@
         "onLeave": "odsutnost taj dan"
       },
       "noCandidates": "Nema nikoga koga se može dodati na ovu smjenu.",
+      "suggestions": "Predložene zamjene",
+      "suggestionsLine": "{line} · {count, plural, one {# smjena} few {# smjene} other {# smjena}}",
+      "suggestionsNone": "Nema slobodne zamjene za posao {posao}.",
+      "suggestionsNoneAny": "Nema slobodne zamjene.",
       "coverageLabel": "Pokrivenost",
       "coverage": "{covered} od {total, plural, one {# člana} few {# člana} other {# članova}}",
       "replacementShown": "· {name}",
@@ -1120,6 +1126,8 @@
       "held": "Zamjena se ne primjenjuje. Ukloni je u kalendaru pa odluči ponovno.",
       "heldHint": "Zamjena se ne primjenjuje. {action} pa odluči ponovno.",
       "heldAction": "Ukloni je u kalendaru",
+      "heldAssignment": "Zamjena se ne primjenjuje. Ukloni je u Ručnom rasporedu pa odluči ponovno.",
+      "heldAssignmentAction": "Ukloni je u Ručnom rasporedu",
       "error": {
         "gone": "Ova stavka više ne čeka odluku: odluka je već zabilježena ili odsutnost više ne pokriva taj datum.",
         "denied": "Nemaš ovlasti odlučiti o ovoj stavci.",
@@ -1349,6 +1357,32 @@
     "jobRole": {
       "label": "Posao",
       "none": "Bez posla"
+    },
+    "floater": {
+      "title": "Zamjena",
+      "change": "Promijeni",
+      "changeNamed": "Promijeni zamjenu: {name}",
+      "none": "Ne uskače kao zamjena.",
+      "any": "Uskače kao zamjena za osobe bez posla.",
+      "factsLoading": "Uskače kao zamjena. Učitavanje poslova…",
+      "roles": "Uskače kao zamjena {count, plural, one {za posao} few {za poslove} other {za poslove}}: {roles}.",
+      "rolesPartlyUnknown": "Uskače kao zamjena {count, plural, one {za posao} few {za poslove} other {za poslove}}: {roles}, i za poslove koji se trenutno ne mogu pročitati.",
+      "rolesUnknown": "Uskače kao zamjena za poslove koji se trenutno ne mogu pročitati.",
+      "dialogHeading": "Zamjena",
+      "flag": "Uskače kao zamjena",
+      "flagHint": "Za odluku predlaže ovu osobu kad je netko odsutan. Nikad je ne raspoređuje sama.",
+      "rolesLegend": "Poslovi koje pokriva",
+      "rolesHint": "Bez odabranog posla predlaže se samo za osobe bez posla.",
+      "noRoles": "Organizacija još nema poslova. Dodaju se u Organizacija → Poslovi.",
+      "rolesLoading": "Učitavanje poslova…",
+      "rolesUnavailable": "Poslovi se ne mogu pročitati. Pokušaj ponovno kasnije.",
+      "saved": "Zamjena je spremljena.",
+      "error": {
+        "denied": "Nemaš ovlasti mijenjati zamjene.",
+        "failed": "Zamjena nije spremljena. Pokušaj ponovno.",
+        "partial": "Zamjena je spremljena samo djelomično. Provjeri i spremi ponovno.",
+        "stale": "Netko je u međuvremenu promijenio zamjenu ove osobe. Prikazano je spremljeno stanje; provjeri i spremi ponovno."
+      }
     },
     "status": {
       "heading": "Status",
@@ -3354,6 +3388,10 @@
       "roleNamed": "Posao osobe {name}",
       "roleNone": "Bez posla",
       "roleSaved": "Posao osobe {name} je spremljen.",
+      "floater": "Zamjena",
+      "floaterOn": "Zamjena · da",
+      "floaterNamed": "Zamjena: {name}",
+      "floaterNamedOn": "Zamjena: {name} · uskače kao zamjena",
       "scheduled": "Zakazano: {fact}"
     },
     "pick": {

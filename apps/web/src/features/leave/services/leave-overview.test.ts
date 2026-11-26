@@ -158,6 +158,8 @@ function member(fields: Partial<MemberListRow> & { readonly id: string; readonly
     leaveYearStart: { month: 1, day: 1 },
     fireRank: null,
     jobRole: null,
+    isFloater: false,
+    floaterRoleIds: [],
     authUserId: `account-${fields.id}`,
     statusVersions: [],
     teamVersions: [],

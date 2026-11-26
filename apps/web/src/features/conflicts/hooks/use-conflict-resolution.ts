@@ -131,6 +131,11 @@ import { writesOnline } from '@/lib/offline/use-write-gate';
  * the snapshot is re-read so the candidates drop them, the pick is cleared,
  * and the line names who was taken.
  *
+ * FLOATERS (story 21.13): the member list read already carries who is a
+ * floater and the roles they cover, so the suggestions add no read. A
+ * suggested pick is written by `resolve_with_personal_assignment` with one
+ * item counted with the conflict's team (`replaceWriteOf`).
+ *
  * A KEY STILL HELD (story 5.5d): when a replacement that no longer applies
  * holds the key, a refusal on it is HELD — the screen's own line, "remove it
  * in the calendar, then decide" — and the snapshot is re-read beside the
@@ -387,7 +392,8 @@ export function useConflictResolution(params: ResolutionParams) {
       shiftTypeId: view.shiftTypeId,
     };
     const replacing = choice === OPTION_REPLACE_MEMBER && replacement !== null ? replacement : null;
-    const write = replaceWriteOf(view);
+    // STORY 21.13 (R16.3): a suggested floater is covered by assignment, a rotation shift's too.
+    const write = replaceWriteOf(view, replacing?.id ?? null);
 
     saving.current = true;
     setPending(true);

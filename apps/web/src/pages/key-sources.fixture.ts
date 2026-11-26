@@ -53,6 +53,7 @@ import {
   MEMBER_MOVE_PREVIEW_KEYS,
   MEMBER_LOAN_KEYS,
   MEMBER_SCHEDULE_SOURCE_KEYS,
+  MEMBER_FLOATER_KEYS,
   STAFFING_BLOCK,
   MEMBER_WRITE_KEYS,
   memberListKeys,
@@ -1301,7 +1302,8 @@ export const KEY_SOURCES = [
     // 174 SINCE STORY 21.10: the schedule version record, its source field and the three sources.
     // 176 SINCE STORY 21.16: the holiday record, `Blagdan`, and a team's field, `Ne radi na blagdane`.
     // 179 SINCE STORY 21.8: a swap's Personal Shift fields (0083).
-    strings: 179,
+    // 181 SINCE STORY 21.13: the floater role record, `Posao zamjene`, and a member's field, `Zamjena` (0084).
+    strings: 181,
   },
   {
     // STORY 21.4: *Ručni raspored* — the page, the grid and its legend, the
@@ -1430,7 +1432,8 @@ export const KEY_SOURCES = [
     file: RESOLUTION,
     keys: translationKeys,
     // 43 SINCE STORY 21.7: the accept card's sentence for a shift with no team, and `bez tima` in the facts and the coworkers line.
-    strings: 43,
+    // 45 SINCE STORY 21.13: *Predložene zamjene*'s heading, and the held line's *Ukloni je u Ručnom rasporedu*.
+    strings: 45,
   },
   {
     // STORY 5.4b: the facts line with and without times, who else works or
@@ -1455,7 +1458,9 @@ export const KEY_SOURCES = [
     file: RESOLUTION_SCREEN_KEYS,
     keys: messageKeyUnions,
     // 28 SINCE STORY 21.7: the coworkers line and its empty sentence for a shift with no team.
-    strings: 28,
+    // 31 SINCE STORY 21.13: a suggested floater's line with their shifts (`suggestionLineMessageKey`) and the
+    // none line with a role and with none (`noSuggestionMessageKey`).
+    strings: 31,
   },
   {
     // STORY 9.4. On one leave request's decision screen, through `t('…')`:
@@ -1681,7 +1686,8 @@ export const KEY_SOURCES = [
     name: 'the conflict resolution write',
     file: RESOLUTION_WRITE_KEYS,
     keys: messageKeyUnions,
-    strings: 5,
+    // 6 SINCE STORY 21.13: the held line of a key a cover's assignment holds (*Ručni raspored*).
+    strings: 6,
   },
   {
     // STORY 5.2c: the two lines in place of the figures (unavailable,
@@ -2029,7 +2035,11 @@ export const KEY_SOURCES = [
     keys: translationKeys,
     // 218 SINCE STORY 21.6: the loan preview's `bez tima` (four) and *Dodaj smjenu*'s card (its title and opener, the hint) and dialog (title, *Zatvori*, *Datum*, the hint, *Odustani*, *Odaberi smjenu*).
     // 264 SINCE STORY 21.10: *Raspored osobe* — its card (title, *Promijeni raspored*, the facts and their four line shapes, a run and its separator, *Povuci* and its name, the two saved lines, *Učitava se*, the unchecked alert), its form (the three sources and their hints, its heading, *Vrijedi od* and its hint, *Uzorak*, *Odaberi*, *Novi uzorak*, the steps' legend, a step's type, count and removal, *Dodaj korak*, *Početni korak*, its option and hint, *Zatvori*, *Odustani*, *Dalje*) and its *Što se mijenja* (title, two ledes, the window, *Natrag na uređivanje*, *Spremi*, *Povuci promjenu*).
-    strings: 264,
+    // 282 SINCE STORY 21.13: *Zamjena* — its card (title, *Promijeni* and its name, the saved line) and dialog
+    // (its heading, *Uskače kao zamjena* and its hint, the roles' legend and hint, no roles, loading, unavailable),
+    // and *Timovi i raspored*'s button with its name.
+    // 284 SINCE ITS REVIEW: the people rows' button and its name for a floater (*Zamjena · da*).
+    strings: 284,
   },
   {
     // THIRTEEN on the member write path's rules: eleven `ljudi.form.error.*`
@@ -2147,6 +2157,16 @@ export const KEY_SOURCES = [
     file: MEMBER_LOAN_KEYS,
     keys: messageKeyUnions,
     strings: 22,
+  },
+  {
+    // STORY 21.13: *Zamjena*'s rules — the card's six facts lines
+    // (`floaterFactsMessageKey`: none, any, loading, roles, partly unknown,
+    // unknown) and the four refusals (`floaterRefusalMessageKey`: denied,
+    // failed, partial, stale).
+    name: 'the floater rules',
+    file: MEMBER_FLOATER_KEYS,
+    keys: messageKeyUnions,
+    strings: 10,
   },
   {
     // STORY 21.10: *Raspored osobe*'s rules — the three sources' names

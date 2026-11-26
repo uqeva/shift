@@ -10,6 +10,7 @@ import { MemberLeaveCard } from '@/features/leave/components/member-leave-card';
 import { leaveHandoffOf, leaveHandoffOriginOf } from '@/features/leave/services/leave-section';
 import { MemberAllowanceAction } from '@/features/members/components/member-allowance-dialog';
 import { MemberBasicsCard } from '@/features/members/components/member-basics-card';
+import { MemberFloaterCard } from '@/features/members/components/member-floater-card';
 import { MemberPageTitle } from '@/features/members/components/member-page-header';
 import { MemberResetCard } from '@/features/members/components/member-reset-card';
 import { MemberScheduleSourceCard } from '@/features/members/components/member-schedule-source-card';
@@ -24,7 +25,7 @@ import { appLayoutRoute } from '@/pages/_app';
  * `/ljudi/$id` — one member's page (story 1.5b; facts and dialogs since story
  * 7.11). Headed by the person's name, it reads as fact cards in the order of
  * the approved mockup — *Osnovni podaci*, *Smjena*, *Raspored osobe* (story
- * 21.10), *Godišnji odmor*, *Status*, *Kalendar na mobitelu* (story 16.5)
+ * 21.10), *Zamjena* (story 21.13), *Godišnji odmor*, *Status*, *Kalendar na mobitelu* (story 16.5)
  * and *Prijava* — and each
  * card's header button opens its own small dialog. This file composes the
  * screen; its state, reads and handlers are `useMemberEdit`, its cards are
@@ -92,6 +93,9 @@ export function LjudiMemberScreen() {
       {/* STORY 21.10 (UX-DR75): how the member is scheduled — their team's
           rotation, their own, or only by hand — from a date. */}
       <MemberScheduleSourceCard edit={edit} />
+      {/* STORY 21.13 (UX-DR77): whether the member covers gaps, and the job
+          roles they may cover — what *Za odluku* suggests them by. */}
+      <MemberFloaterCard edit={edit} />
       {/* STORY 5.1c: the member's leave — figures, the od–do form and what
           a range costs before it is saved. Keyed by the member, so nothing it
           raised about one member stands over another's. The allowance's

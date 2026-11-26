@@ -511,6 +511,11 @@ export const MEMBER_EDIT: readonly string[] = [
   // `MEMBER_SCHEDULE_SOURCE_KEYS`, a key source of its own.
   join(MEMBERS_FEATURE, 'hooks', 'use-member-schedule-source.ts'),
   join(MEMBERS_FEATURE, 'components', 'member-schedule-source-card.tsx'),
+  // STORY 21.13: *Zamjena*, its hook and its card (its dialog, and the
+  // button *Timovi i raspored*'s people rows open it with). Its rules are
+  // `MEMBER_FLOATER_KEYS`, a key source of its own.
+  join(MEMBERS_FEATURE, 'hooks', 'use-member-floater.ts'),
+  join(MEMBERS_FEATURE, 'components', 'member-floater-card.tsx'),
 ];
 
 /** The two team pages, which only compose (source structure B6), and their hooks. */
@@ -886,6 +891,9 @@ export const MEMBER_MOVE_PREVIEW_KEYS = join(srcRoot, 'features', 'members', 'se
 /** Story 18.3: the loan dialog's refusals, shift lines and inert-override lines, off `\w*MessageKey` unions. */
 export const MEMBER_LOAN_KEYS = join(srcRoot, 'features', 'members', 'services', 'loan.ts');
 
+/** Story 21.13: *Zamjena*'s rules — the card's facts lines and each refusal's words. */
+export const MEMBER_FLOATER_KEYS = join(srcRoot, 'features', 'members', 'services', 'floater.ts');
+
 /** Story 21.10: *Raspored osobe*'s rules — a source's name and each refusal's words. */
 export const MEMBER_SCHEDULE_SOURCE_KEYS = join(srcRoot, 'features', 'members', 'services', 'schedule-source.ts');
 
@@ -1169,7 +1177,9 @@ export const SCREENS = [
   // the amend dialog's *Završi danas*. *Ukloni posudbu* is the shared Switch.
   // EIGHTEEN FIELDS AND FORTY-SIX BUTTONS SINCE STORY 21.6: *Dodaj smjenu*'s card opener and its dialog's date, *Odustani* and *Odaberi smjenu*.
   // TWENTY-THREE FIELDS AND FIFTY-FOUR BUTTONS SINCE STORY 21.10: *Raspored osobe*'s *Vrijedi od*, *Uzorak*, a step's type and count, and *Početni korak*; its card's *Promijeni raspored* and *Povuci*, its form's *Ukloni korak*, *Dodaj korak*, *Odustani* and *Dalje*, and its preview's *Natrag na uređivanje* and *Spremi*.
-  { name: 'the member edit form', file: MEMBER_EDIT, expectedFields: 23, expectedButtons: 54 },
+  // 58 SINCE STORY 21.13: *Zamjena*'s card button and its dialog's three, with the one on
+  // *Timovi i raspored*'s people rows (the card's file holds both).
+  { name: 'the member edit form', file: MEMBER_EDIT, expectedFields: 23, expectedButtons: 58 },
   // STORY 1.7a. FOUR on the team list: the link back to `Ljudi`, the one name
   // `<Input>`, the add `<Button>`, and ONE row link written once inside the map
   // over the teams — the same count at zero teams as at nine. SIX on one team:

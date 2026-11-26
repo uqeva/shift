@@ -134,6 +134,24 @@ export {
 } from './leave.js';
 
 export {
+  FLOATER_FREE,
+  FLOATER_INACTIVE,
+  FLOATER_ON_LEAVE,
+  FLOATER_REST_GAP,
+  FLOATER_WORKING,
+  floaterEligibleFor,
+  floaterStandingOn,
+  floaterSuggestionsOf,
+  type Floater,
+  type FloaterLeave,
+  type FloaterShift,
+  type FloaterStanding,
+  type FloaterSuggestion,
+  type FloaterSuggestionInput,
+  type UncoveredShift,
+} from './floaters.js';
+
+export {
   daysBetween,
   projectedShiftType,
   projectedShiftTypeOn,

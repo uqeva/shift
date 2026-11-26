@@ -1,4 +1,4 @@
-import { leaveSpanOf, type LeaveRange, type ScheduleInputs } from '@shift/domain';
+import { leaveSpanOf, type LeaveRange, type ScheduleInputs, type ScheduleLeave } from '@shift/domain';
 
 import { instantMicrosOf } from '@/features/rotation/services/list';
 import type { CalendarSnapshot } from '@/features/calendar/services/snapshot';
@@ -46,6 +46,19 @@ const overlaps = (range: { readonly from: string; readonly to: string }, window:
 /** A stamp as the domain reads it: an unreadable one is `NaN`, which `overrideStandingOf` refuses. */
 const writtenAtOf = (override: { readonly createdAt: string; readonly confirmedAt: string | null }): number =>
   instantMicrosOf(override.confirmedAt ?? override.createdAt) ?? Number.NaN;
+
+/**
+ * One member's live leave as the assembly carries it over `window`: the
+ * records overlapping it, in their canonical order. The one recipe
+ * {@link scheduleInputsOfCalendar} and (story 21.13) *Za odluku*'s floater
+ * suggestions, which reuse one assembly per member, both read.
+ */
+export function scheduleLeaveOf(ownLeave: readonly OwnLeaveRecord[], window: ScheduleWindow): readonly ScheduleLeave[] {
+  return ownLeave
+    .filter((record) => overlaps(record, window))
+    .map((record) => ({ id: record.id, ...leaveSpanOf(record), absenceTypeId: record.absenceTypeId }))
+    .sort((left, right) => byText(left.from, right.from) || byText(left.id, right.id));
+}
 
 /**
  * The viewer's `ScheduleInputs` over `window`, from the calendar snapshot and
@@ -159,9 +172,6 @@ export function scheduleInputsOfCalendar(
       .filter((team) => team.offOnHolidays)
       .map((team) => team.id)
       .sort(byText),
-    leave: ownLeave
-      .filter((record) => overlaps(record, window))
-      .map((record) => ({ id: record.id, ...leaveSpanOf(record), absenceTypeId: record.absenceTypeId }))
-      .sort((left, right) => byText(left.from, right.from) || byText(left.id, right.id)),
+    leave: scheduleLeaveOf(ownLeave, window),
   };
 }
