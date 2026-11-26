@@ -26,6 +26,7 @@
  */
 
 import { checkDate } from './calendar.js';
+import type { HolidayOff } from './holidays.js';
 import { projectedShiftTypeOn, type RotationAssignment, type RotationStep } from './projection.js';
 
 /** One live stored override (`shift_type_overrides`): `teamId` works `shiftTypeId` on `date`. */
@@ -44,7 +45,30 @@ export interface ScheduledShiftType {
   readonly shiftTypeId: string;
   readonly projectedShiftTypeId: string;
   readonly overridden: boolean;
+  /**
+   * Set only where the holiday rule touched the team that date (story 21.15,
+   * R13.3): the date is a holiday, the team is off on holidays, and an
+   * override won over the holiday. ABSENT otherwise, so with no holiday or no
+   * team off every value is what it was before (R13.5).
+   */
+  readonly holiday?: true;
 }
+
+/**
+ * A team's scheduled type that a holiday emptied (story 21.15, R13.2, R13.3):
+ * no type, the projected one kept beside it as an override keeps it, and both
+ * marks. Every reader that treats a `null` type as no shift is already right.
+ */
+export interface HolidayEmptiedShiftType {
+  readonly shiftTypeId: null;
+  readonly projectedShiftTypeId: string;
+  readonly overridden: false;
+  readonly holiday: true;
+  readonly offForHoliday: true;
+}
+
+/** What the one layering function gives a team on a date: a scheduled type, or one a holiday emptied. */
+export type LayeredShiftType = ScheduledShiftType | HolidayEmptiedShiftType;
 
 function keyOf(teamId: string, date: string): string {
   return `${teamId}\u0000${date}`;
@@ -72,7 +96,13 @@ export function overridesByTeamAndDate(
 }
 
 /**
- * The scheduled type from an already projected one and the indexed overrides.
+ * THE ONE LAYERING of a team's scheduled type, from an already projected one,
+ * the indexed overrides and the holiday rule (R13.3, story 21.15):
+ * `override ?? (holiday ∧ off ? none : projection)`. `null` when no rotation
+ * is in effect, whatever the date holds. An override still wins on a holiday,
+ * marked `holiday`; a holiday the team is off on empties the type, keeping the
+ * projected one. With `holidayOff` `null` (no holiday or no team off), the
+ * result is exactly what it was before holidays existed (R13.5).
  * INTERNAL to the package's month derivations.
  */
 export function applyOverride(
@@ -80,13 +110,17 @@ export function applyOverride(
   teamId: string,
   date: string,
   projectedShiftTypeId: string | null,
-): ScheduledShiftType | null {
+  holidayOff: HolidayOff | null = null,
+): LayeredShiftType | null {
   if (projectedShiftTypeId === null) return null;
+  const off = holidayOff !== null && holidayOff(teamId, date);
   const override = indexed.get(keyOf(teamId, date));
-  if (override === undefined) {
-    return { shiftTypeId: projectedShiftTypeId, projectedShiftTypeId, overridden: false };
+  if (override !== undefined) {
+    const scheduled = { shiftTypeId: override.shiftTypeId, projectedShiftTypeId, overridden: true };
+    return off ? { ...scheduled, holiday: true } : scheduled;
   }
-  return { shiftTypeId: override.shiftTypeId, projectedShiftTypeId, overridden: true };
+  if (off) return { shiftTypeId: null, projectedShiftTypeId, overridden: false, holiday: true, offForHoliday: true };
+  return { shiftTypeId: projectedShiftTypeId, projectedShiftTypeId, overridden: false };
 }
 
 /**
@@ -95,6 +129,10 @@ export function applyOverride(
  * rotation `versions` — with the projected type alongside either way. `null`
  * when no rotation version is in effect on `date`; an override on such a date
  * is not applied (it is pending, story 3.5c).
+ *
+ * It applies NO holiday (story 21.15): it reads no holiday rule, so it is the
+ * scheduled type with no holiday or no team off. The month derivations of
+ * `schedule.ts` apply R13.3; the browser's callers read the rule from 21.16.
  *
  * `overrides` may name any team and date; only `teamId` on `date` is read, but
  * every override is checked.
@@ -115,7 +153,9 @@ export function scheduledShiftTypeOn(
     throw new RangeError(`a rotation assignment of team ${stranger.teamId} was given for team ${teamId}`);
   }
   const indexed = overridesByTeamAndDate(overrides);
-  return applyOverride(indexed, teamId, date, projectedShiftTypeOn(versions, steps, date));
+  const scheduled = applyOverride(indexed, teamId, date, projectedShiftTypeOn(versions, steps, date));
+  // Narrowing only: no holiday rule is given, so `applyOverride` never returns the emptied form here.
+  return scheduled === null || scheduled.shiftTypeId === null ? null : scheduled;
 }
 
 /**

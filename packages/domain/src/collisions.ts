@@ -68,7 +68,10 @@ export interface CollisionLeaveRecord extends LeaveRange {
  * and status histories, in `members` — and every live leave record.
  */
 export interface CollisionInput
-  extends Pick<MemberScheduleInput, 'assignments' | 'steps' | 'overrides' | 'members' | 'rosterOverrides' | 'workingShiftTypeIds'> {
+  extends Pick<
+    MemberScheduleInput,
+    'assignments' | 'steps' | 'overrides' | 'members' | 'rosterOverrides' | 'workingShiftTypeIds' | 'holidays' | 'teamsOffOnHolidays'
+  > {
   /** Every live leave record, of any member of `members`, in any order; no two of one member share a date. */
   readonly leaveRecords: readonly CollisionLeaveRecord[];
 }
@@ -191,6 +194,8 @@ export function collisionsOf(input: CollisionInput): readonly Collision[] {
       members: input.members,
       rosterOverrides: input.rosterOverrides,
       workingShiftTypeIds: input.workingShiftTypeIds,
+      holidays: input.holidays,
+      teamsOffOnHolidays: input.teamsOffOnHolidays,
     };
     const months = new Map<string, readonly MemberScheduleDay[]>();
     const scheduleOf = (month: string): readonly MemberScheduleDay[] => {

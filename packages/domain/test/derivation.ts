@@ -151,9 +151,17 @@ export function leaveRecordsOf(fixture: Fixture): readonly CollisionLeaveRecord[
   ];
 }
 
+/** The holiday rule's two lists (story 21.15, AD-27), as every schedule input carries them; absent, none. */
+export interface HolidayLists {
+  readonly holidays?: readonly string[];
+  readonly teamsOffOnHolidays?: readonly string[];
+}
+
 export interface Organization {
   readonly fixture: Fixture;
   readonly members: readonly RosterMember[];
+  /** Spread into every input when given (story 21.15); absent, the inputs are exactly as before. */
+  readonly holidays?: HolidayLists;
 }
 
 export function shared(organization: Organization) {
@@ -165,6 +173,7 @@ export function shared(organization: Organization) {
     members,
     rosterOverrides: rosterOverridesOf(fixture),
     workingShiftTypeIds: workingOf(fixture),
+    ...organization.holidays,
   };
 }
 

@@ -45,9 +45,10 @@
 
 import { checkDate } from './calendar.js';
 import type { CollisionLeaveRecord } from './collisions.js';
+import { holidayOffOf, type HolidayOff } from './holidays.js';
 import { checkRange, isHalfDay } from './leave.js';
 import type { PersonalShift } from './personal.js';
-import { personalShiftOn, rosterOn, type RosterMember } from './roster.js';
+import { personalShiftWith, rosterOn, type RosterMember } from './roster.js';
 import { adjacentMonth, monthOf, scheduleOfMonth, type ScheduleInput } from './schedule.js';
 
 export const SHORT_STAFFED = 'SHORT_STAFFED';
@@ -152,12 +153,14 @@ type MemberPersonalShift = PersonalShift & { readonly memberId: string };
  * The Personal Shifts counted with a team on a date (R14.3, R14.6, R15.3), in
  * the order of `members`, computed once per date and only over the members who
  * hold any assignment or schedule version: with none, every lookup is empty
- * and nothing is read. A personal rotation projects over `steps`.
+ * and nothing is read. A personal rotation projects over `steps`, and a
+ * holiday empties one counted with a team off on holidays (story 21.15, R15.4).
  */
 function personalShiftsIndexOf(
   members: readonly RosterMember[],
   working: ReadonlySet<string>,
   steps: ScheduleInput['steps'],
+  holidayOff: HolidayOff | null,
 ): (date: string, teamId: string) => readonly MemberPersonalShift[] {
   const assigned = members.filter(
     (member) => (member.personalAssignments ?? []).length > 0 || (member.scheduleVersions ?? []).length > 0,
@@ -169,7 +172,7 @@ function personalShiftsIndexOf(
     if (byTeam === undefined) {
       const indexed = new Map<string, MemberPersonalShift[]>();
       for (const member of assigned) {
-        const shift = personalShiftOn(member, date, working, steps);
+        const shift = personalShiftWith(member, date, working, steps, holidayOff);
         if (shift === null || shift.teamId === null) continue;
         const entry = { ...shift, memberId: member.id };
         const known = indexed.get(shift.teamId);
@@ -203,7 +206,7 @@ interface StaffedShift extends Staffing {
 function staffedShiftsOf(input: StaffingInput, from: string, to: string): readonly StaffedShift[] {
   const onLeave = leaveIndexOf(input.leaveRecords);
   const working = new Set(input.workingShiftTypeIds);
-  const personalOf = personalShiftsIndexOf(input.members, working, input.steps);
+  const personalOf = personalShiftsIndexOf(input.members, working, input.steps, holidayOffOf(input));
   const shifts: StaffedShift[] = [];
   // Each member once: a member put on by an override who also holds a Personal Shift of the type is one person.
   const atWorkOf = (memberIds: readonly string[], date: string): number =>

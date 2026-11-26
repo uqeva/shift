@@ -74,6 +74,7 @@ Make Smjenko plan the first production pilot's real month without workarounds. T
   - The import is one PostgREST insert with `Prefer: resolution=ignore-duplicates`. There is no RPC.
   - `teams.off_on_holidays` defaults to false. `teams.minimum_members` is a nullable `smallint` with `>= 1`.
   - Holiday names never enter derivation. A cell a holiday emptied keeps `projectedShiftTypeId`.
+  - As built by 21.15: every schedule input extends `HolidayRule` (`holidays?`, `teamsOffOnHolidays?`, optional lists of dates and team ids that 21.16 fills). `applyOverride` is the one layer (R13.3). `ScheduleCell` and `MemberShift` carry `holiday`/`offForHoliday` only where the rule touched the team, never on a team that works the holiday. A personal rotation counted with an off team is dropped that date, and an assignment never is. `scheduledShiftTypeOn` applies no holiday, so 21.16 gives its web callers the rule. `nationalHolidaysOf('HR', year)` serves years 2020–9999 as codes, and 21.17 names them in `hr.json`.
 - **AD-5 guard.**
   - Guarded writes: every assignment save (grid, fill, copy, single date, cover), schedule-version writes, holiday inserts, deletes and imports, and `off_on_holidays` changes.
   - *Što se mijenja* lists, per member, the shifts lost and gained, double bookings, rest gaps, newly short-staffed shifts and roster overrides left inapplicable. Only an erasure blocks.

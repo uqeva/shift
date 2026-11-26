@@ -42,6 +42,7 @@
 
 import { checkDate, civilDayNumber, dateOfCivilDay } from './calendar.js';
 import { deriveShiftTimes, shiftDurationOn, shiftTypeVersionOn } from './duration.js';
+import type { HolidayRule } from './holidays.js';
 import { shiftHalvesOf, type ShiftTypeWithVersions } from './hours.js';
 import { checkRange, LEAVE_HALF_FIRST, LEAVE_HALF_SECOND, type LeaveHalf } from './leave.js';
 import { overrideStandingOf, type RotationVersionStamp, type StampedShiftTypeOverride } from './overrides.js';
@@ -106,9 +107,11 @@ export interface ScheduleLeave {
  * assembly, in the domain's own input shapes. Versioned rules come whole;
  * overrides are those dated in the window, loans and leave those overlapping
  * it. Overrides of either kind are LIVE, in force or pending alike, each with
- * its `writtenAt` stamp (µs, `confirmed_at ?? created_at`).
+ * its `writtenAt` stamp (µs, `confirmed_at ?? created_at`). The holiday
+ * rule's two lists (story 21.15, R13) are optional until the assembly carries
+ * them (story 21.16); absent, no shift is emptied for a holiday.
  */
-export interface ScheduleInputs {
+export interface ScheduleInputs extends HolidayRule {
   readonly organizationId: string;
   /** The organization's IANA zone; the projection itself never reads it (AD-6). */
   readonly timeZone: string;
@@ -254,6 +257,8 @@ export function atWorkShiftsOf(inputs: ScheduleInputs, from: string, to: string)
     members: inputs.members,
     rosterOverrides: overrideStandingOf(inputs.assignmentStamps, inputs.rosterOverrides).inForce,
     workingShiftTypeIds,
+    holidays: inputs.holidays,
+    teamsOffOnHolidays: inputs.teamsOffOnHolidays,
   };
 
   const shifts: AtWorkShift[] = [];
