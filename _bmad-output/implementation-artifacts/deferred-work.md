@@ -2494,7 +2494,7 @@
   summary: OWNER a later polish story. The organization's *Najmanje ljudi u smjeni* card (0048, story 11.1) still saves at once with no *Što se mijenja*, while a team's own minimum (21.20) previews the shifts it makes short-staffed or clears. One check (`teamMinimumCheckFromReads`'s shape, the snapshot's `minimumMembers` changed) would give the organization's the same preview.
   evidence: Spec 21.20 Epic AC Deviations; the founder's instruction named the team minimum's change.
 - source_spec: `_bmad-output/implementation-artifacts/spec-21-20-each-team-has-its-own-minimum.md`
-  summary: OWNER a later polish story. The *Timovi* list and the team rows name no team's own minimum: an admin sees it only in the team dialog. A column or a chip (`najmanje 1`) would show which teams override the organization's.
+  summary: RESOLVED in part (each card on *Timovi i raspored* names the team's own minimum, or the organization's) by 21.26 (2026-11-26) — the `/ljudi/smjene` list itself still does not. OWNER a later polish story. The *Timovi* list and the team rows name no team's own minimum: an admin sees it only in the team dialog. A column or a chip (`najmanje 1`) would show which teams override the organization's.
   evidence: Spec 21.20 Design Notes; UX-DR79 names the dialog only.
 - source_spec: `_bmad-output/implementation-artifacts/spec-21-20-each-team-has-its-own-minimum.md`
   summary: OWNER a later polish story. The team dialog can be closed while *Najmanje ljudi*'s check or write is in flight (the page's `dismissible` reads only the edit hook's `pending`), so a write may land unseen and its saved line is lost; the hook's `pending` could be lifted to the page as the flag's is.
@@ -2514,3 +2514,15 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-21-8-swaps-give-and-take-personal-shifts.md`
   summary: OWNER a later polish story. A Personal Shift's taker whose day is a live `OFF` assignment (a day off an admin set on purpose) has it replaced by the approval's `SHIFT` with no word in the form or on the decision screen beyond the hour delta; and the decision screen words 0083's `SWAP_REQUEST_TAKER_ASSIGNED` with the generic *taken* line (23505), not the form's *taj dan već ima smjenu dodijeljenu ručno*. Decide whether an `OFF` taker is warned, and give the refusal its own words.
   evidence: Story 21.8 review (blind hunter).
+
+## Deferred from: story 21.26, set the schedule up in one place (2026-11-26)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-26-set-the-schedule-up-in-one-place.md`
+  summary: OWNER a later polish story. *Timovi i raspored* lists nowhere an active person on no team whose schedule source is still the team rotation (no card, not *Ljudi bez turnusa*); they are only offered in *Dodaj člana*. A *Bez tima* group would show who is still to be placed.
+  evidence: Story 21.26 review (blind hunter); the AC lists only personal and manual people.
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-26-set-the-schedule-up-in-one-place.md`
+  summary: OWNER a later polish story. The rotation builder's dialog on *Timovi i raspored* closes on Escape or the backdrop even while the builder's save is in flight (the page cannot read the builder's `pending`), unmounting it mid-write; the write lands, its outcome line is lost. Lifting the builder's `pending` to the dialog's `dismissible` would close it.
+  evidence: Story 21.26 review (blind hunter).
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-26-set-the-schedule-up-in-one-place.md`
+  summary: OWNER a later e2e sweep. 21.26's e2e does not exercise the inline *Posao* (seeding a job role would race `job-roles.spec.ts`'s prefix sweep), *Uredi rotaciju*, *Prvi koraci* (the run organization is set up), the blocked path of a person with a scheduled team change, or that `/ljudi/$id`'s *Promijeni* still opens on the placeholder after `openWith` was added; and *Posao* saves on every `change`, which some platforms fire per arrow key on a closed `<select>`.
+  evidence: Story 21.26 review (verification gap, blind hunter).

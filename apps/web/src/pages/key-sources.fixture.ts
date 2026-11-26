@@ -25,6 +25,8 @@ import {
   POVIJEST_PROMJENA,
   RUCNI_RASPORED,
   RUCNI_RASPORED_KEYS,
+  TIMOVI_I_RASPORED,
+  TIMOVI_I_RASPORED_KEYS,
   LEAVE_REQUEST,
   HOUR_BAND_EDIT,
   HOUR_BAND_LIST,
@@ -1319,6 +1321,23 @@ export const KEY_SOURCES = [
     strings: 138,
   },
   {
+    // STORY 21.26: *Timovi i raspored* — the toolbar, the outcome lines, *Prvi
+    // koraci*, the type strip, the team cards, *Ljudi bez turnusa* with its
+    // inline *Posao*, the person picker, the rotation dialog's head and the
+    // team dialog's frame.
+    name: 'the Timovi i raspored destination',
+    file: TIMOVI_I_RASPORED,
+    keys: translationKeys,
+    strings: 81,
+  },
+  {
+    // STORY 21.26: *Prvi koraci*'s four steps — each one's title, hint and action.
+    name: 'the Timovi i raspored rules',
+    file: TIMOVI_I_RASPORED_KEYS,
+    keys: messageKeyUnions,
+    strings: 12,
+  },
+  {
     // STORY 21.4: the preview's shift and inert-override lines, and the save's refusals.
     // 26 SINCE STORY 21.5: the ten refusals of a fill or copy.
     name: 'the Ručni raspored rules',
@@ -2259,10 +2278,12 @@ export const KEY_SOURCES = [
     // the one place *Više* names by a shorter word than the label.
     // TEN SINCE STORY 14.2: *Povijest promjena*'s description.
     // ELEVEN SINCE STORY 21.4: *Ručni raspored*'s description.
+    // THIRTEEN SINCE STORY 21.26: *Timovi i raspored*'s description, and its
+    // shorter place under *Više*, *Timovi*.
     name: 'the destination copy mapping',
     file: DESTINATION_COPY_KEYS,
     keys: messageKeyUnions,
-    strings: 11,
+    strings: 13,
   },
   // ONE each, exactly. The seven together are what make the set comparison
   // below hold once `hr.json` gained eight `nav.*` keys: a key declared and

@@ -331,6 +331,28 @@ export const RUCNI_RASPORED: readonly string[] = [
   join(srcRoot, 'components', 'date-grid.tsx'),
 ];
 
+/**
+ * Story 21.26's *Timovi i raspored*: the lazily loaded page, which composes;
+ * the setup feature's hook and parts; and the three pieces the page draws
+ * from the members and teams features — the member page's dialogs with no
+ * card, the inline *Posao* picker and its hook, and the team dialog over a
+ * page other than the team list. Each of those is in no other set, so none
+ * is counted twice. The page is first.
+ */
+export const TIMOVI_I_RASPORED: readonly string[] = [
+  join(srcRoot, 'pages', 'timovi-i-raspored.tsx'),
+  join(srcRoot, 'features', 'setup', 'hooks', 'use-setup.ts'),
+  join(srcRoot, 'features', 'setup', 'components', 'setup-parts.tsx'),
+  join(srcRoot, 'features', 'setup', 'components', 'setup-pick-dialog.tsx'),
+  join(MEMBERS_FEATURE, 'components', 'member-dialogs-host.tsx'),
+  join(MEMBERS_FEATURE, 'components', 'member-job-role-picker.tsx'),
+  join(MEMBERS_FEATURE, 'hooks', 'use-member-job-role.ts'),
+  join(srcRoot, 'features', 'teams', 'components', 'team-edit-dialog.tsx'),
+];
+
+/** Story 21.26's rules: *Prvi koraci*'s step titles, hints and actions, off their `\w*MessageKey` unions. */
+export const TIMOVI_I_RASPORED_KEYS = join(srcRoot, 'features', 'setup', 'services', 'setup.ts');
+
 /** Story 21.4's rules: the preview's line keys and the save's refusals, off their `\w*MessageKey` unions; 21.5's fill and copy refusals. */
 export const RUCNI_RASPORED_KEYS: readonly string[] = [
   join(srcRoot, 'features', 'planning', 'services', 'manual-preview.ts'),
@@ -1324,6 +1346,15 @@ export const SCREENS = [
   // *Dodaj korak*, and each dialog's *Odustani* and submit. The people's
   // checkboxes are native `<input>`s, inside 44 px labels.
   { name: 'the Ručni raspored destination', file: RUCNI_RASPORED, expectedFields: 11, expectedButtons: 18 },
+  // STORY 21.26. On *Timovi i raspored*: TWO fields, the person picker and the
+  // inline *Posao* (written once inside the map over the people); and the
+  // buttons — the toolbar's *Dodaj tip* and *Dodaj tim*, the read's retry,
+  // the rotation dialog's way to the person's page; the strip's *Dodaj tip*;
+  // a team card's *Uredi tim*, a member chip's link and ✕, *Dodaj člana* and
+  // *Uredi rotaciju*; a person's *Raspored osobe* and *Postavi raspored
+  // osobe*; *Prvi koraci*'s action; the picker's *Nova osoba*, *Odustani* and
+  // *Dalje*; and the team dialog's read retry.
+  { name: 'the Timovi i raspored destination', file: TIMOVI_I_RASPORED, expectedFields: 2, expectedButtons: 17 },
   // STORY 9.3. On the request form: the od and do `<Input>`s, *Pošalji*,
   // *Odustani* (a `<Button asChild>` link back to Godišnji), the figures'
   // unavailable alert's retry, *Natrag na Godišnji* above the title (written

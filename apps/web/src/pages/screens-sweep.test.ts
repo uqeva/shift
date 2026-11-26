@@ -76,6 +76,7 @@ import {
   MEMBER_CREATE,
   MEMBER_DIRECTORY,
   MEMBER_EDIT,
+  TIMOVI_I_RASPORED,
   MEMBER_FACTS_KEYS,
   MEMBER_LIST,
   MEMBERS_FEATURE,
@@ -336,7 +337,8 @@ describe('the screen is read at all, so every sweep below means something', () =
     // FORTY-FOUR SINCE STORY 19.4: the setup frame and the *Danas* card.
     // FORTY-FIVE SINCE STORY 21.4: *Ručni raspored*.
     // FORTY-SIX SINCE STORY 21.20: the team dialog's *Najmanje ljudi*.
-    expect(SCREENS).toHaveLength(46);
+    // FORTY-SEVEN SINCE STORY 21.26: *Timovi i raspored*.
+    expect(SCREENS).toHaveLength(47);
     //
     // FORTY-NINE SINCE STORY 3.6b: `@/features/calendar/services/roster-write`.
     //
@@ -428,7 +430,8 @@ describe('the screen is read at all, so every sweep below means something', () =
     // A HUNDRED AND SIXTEEN SINCE STORY 21.10: *Raspored osobe*'s rules.
     // A HUNDRED AND EIGHTEEN SINCE STORY 21.17: the holidays' rules and *Što se mijenja*'s body.
     // A HUNDRED AND TWENTY SINCE STORY 21.20: *Najmanje ljudi* and its rules.
-    expect(KEY_SOURCES).toHaveLength(120);
+    // A HUNDRED AND TWENTY-TWO SINCE STORY 21.26: *Timovi i raspored* and its rules.
+    expect(KEY_SOURCES).toHaveLength(122);
   });
 
   // Vacuous-pass guard. A renamed or moved file would make each "contains no"
@@ -474,7 +477,9 @@ describe('the screen is read at all, so every sweep below means something', () =
   it('sweeps every part of the member screens, so a new file cannot escape the sets', () => {
     // SOURCE STRUCTURE B1. A component, hook or helper added to the members
     // feature and named in no set would be read by no sweep in this file.
-    const swept = new Set([...MEMBER_LIST, ...MEMBER_CREATE, ...MEMBER_EDIT]);
+    // STORY 21.26: the member page's dialogs with no card and the inline
+    // *Posao* are *Timovi i raspored*'s parts.
+    const swept = new Set([...MEMBER_LIST, ...MEMBER_CREATE, ...MEMBER_EDIT, ...TIMOVI_I_RASPORED]);
     const parts = (folder: string): string[] =>
       readdirSync(join(MEMBERS_FEATURE, folder))
         .filter((name) => /\.tsx?$/.test(name) && !/\.test\.tsx?$/.test(name))
@@ -1271,6 +1276,9 @@ describe('the screen is read at all, so every sweep below means something', () =
         'services/minimum.ts',
         'hooks/use-team-minimum.ts',
         'components/team-minimum.tsx',
+        // STORY 21.26: the team dialog over *Timovi i raspored*, that page's
+        // TIMOVI_I_RASPORED set rather than the edit form's.
+        'components/team-edit-dialog.tsx',
       ]
         .map((file) => join(TEAM_FEATURE, ...file.split('/')))
         .sort(),

@@ -398,7 +398,9 @@ export function MemberTeamDialog({ edit }: { readonly edit: MemberEdit }): React
           key={teamSelectKey(offered)}
           id="member-team"
           name="team"
-          defaultValue={TEAM_UNPICKED_VALUE}
+          // STORY 21.26: the placeholder, unless the dialog was opened with a
+          // team picked (*Timovi i raspored*'s add and remove).
+          defaultValue={pickedTeam}
           disabled={teamPending}
           onChange={pickTeam}
           aria-invalid={teamPickInvalid}
@@ -670,7 +672,7 @@ function MemberTeamWithdrawal({ edit }: { readonly edit: MemberEdit }): ReactNod
  * returns to it. Its save is the confirmation's own words, `aria-disabled`
  * until every row is confirmed. The rows scroll inside it.
  */
-function MemberTeamErasures({ edit }: { readonly edit: MemberEdit }): ReactNode {
+export function MemberTeamErasures({ edit }: { readonly edit: MemberEdit }): ReactNode {
   const { form, teamErasures, teamPending, confirmTeamErasures, teamErasuresSave } = edit;
   const shown = teamErasures.shown;
   const gate = useWriteGate();

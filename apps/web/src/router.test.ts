@@ -70,6 +70,8 @@ import { zaboravljenaLozinkaRoute } from '@/pages/zaboravljena-lozinka';
 import { PostavkeRotacijeScreen, postavkeRotacijeRoute } from '@/pages/postavke-rotacije';
 import { PovijestPromjenaScreen, povijestPromjenaRoute } from '@/pages/povijest-promjena';
 import { RucniRasporedScreen, rucniRasporedRoute } from '@/pages/rucni-raspored';
+import { TimoviIRasporedLazy, timoviIRasporedRoute } from '@/pages/timovi-i-raspored.route';
+import { TimoviIRasporedScreen } from '@/pages/timovi-i-raspored';
 import {
   PostavkeRotacijeTipSmjeneScreen,
   postavkeRotacijeTipSmjeneRoute,
@@ -248,6 +250,15 @@ const DESTINATION_ROUTES = [
     route: povijestPromjenaRoute,
     component: PovijestPromjenaScreen,
   },
+  // STORY 21.26: *Timovi i raspored*, admin-only, the first LAZY screen: the
+  // route's component is the lazy wrapper, pinned by identity like the rest;
+  // the block below proves it loads the screen.
+  {
+    id: '/_app/timovi-i-raspored',
+    path: '/timovi-i-raspored',
+    route: timoviIRasporedRoute,
+    component: TimoviIRasporedLazy,
+  },
   {
     id: '/_app/postavke-rotacije',
     path: '/postavke-rotacije',
@@ -422,6 +433,13 @@ const LEVEL_GUARDED_ROUTES = [
   // STORY 21.4: the month planned by hand, a destination admin-only, a copy of
   // the same guard.
   { id: '/_app/rucni-raspored', path: '/rucni-raspored', route: rucniRasporedRoute, component: RucniRasporedScreen },
+  // STORY 21.26: *Timovi i raspored*, a destination admin-only, a copy of the same guard.
+  {
+    id: '/_app/timovi-i-raspored',
+    path: '/timovi-i-raspored',
+    route: timoviIRasporedRoute,
+    component: TimoviIRasporedLazy,
+  },
   // STORY 2.1b: the hour band list and one band, both admin-only, both copies
   // of the same guard, and neither a destination.
   {
@@ -518,6 +536,8 @@ describe('the shell route tree', () => {
       '/_app/sati',
       // STORY 1.8. One team's roster, for every role, reached from Danas only.
       '/_app/smjene/$id',
+      // STORY 21.26. The teams, their people and their rotation, an admin-only destination.
+      '/_app/timovi-i-raspored',
       '/_app/za-odluku',
       // STORY 5.4b. One conflict's resolution screen, reached from the queue only.
       '/_app/za-odluku/$memberId/$date/$teamId',
@@ -880,6 +900,20 @@ describe('the eight destinations are registered and each renders its own screen'
     expect([...DESTINATIONS.map((destination) => destination.path)].sort()).toEqual(
       [...DESTINATION_ROUTES.map((destination) => destination.path)].sort(),
     );
+  });
+});
+
+describe('the first lazy route (story 21.26)', () => {
+  it('loads *Timovi i raspored*’s own screen, from a module of its own', async () => {
+    // `lazyRouteComponent` keeps the screen out of the entry chunk; its
+    // `preload` fetches the module, and the module names the screen the
+    // route promises. A wrapper pointed at the wrong export would preload
+    // and render nothing.
+    const lazy = TimoviIRasporedLazy as typeof TimoviIRasporedLazy & { preload?: () => Promise<void> };
+
+    expect(lazy.preload).toBeTypeOf('function');
+    await expect(lazy.preload?.()).resolves.toBeUndefined();
+    expect((await import('@/pages/timovi-i-raspored')).TimoviIRasporedScreen).toBe(TimoviIRasporedScreen);
   });
 });
 
@@ -2691,8 +2725,9 @@ describe('/ljudi decides its content by permission level, and the admin screens 
       // STORY 9.1: the queue's two old URLs, now redirects. FOURTEEN SINCE
       // STORY 9.4: one leave request's decision screen. FIFTEEN SINCE STORY
       // 12.4: one swap's decision screen. SIXTEEN SINCE STORY 14.2: the change history.
-      // SEVENTEEN SINCE STORY 21.4: *Ručni raspored*.
-      expect(LEVEL_GUARDED_ROUTES).toHaveLength(17);
+      // SEVENTEEN SINCE STORY 21.4: *Ručni raspored*. EIGHTEEN SINCE STORY 21.26:
+      // *Timovi i raspored*.
+      expect(LEVEL_GUARDED_ROUTES).toHaveLength(18);
       for (const { path, route } of LEVEL_GUARDED_ROUTES) {
         expect(
           (route.options as { beforeLoad?: unknown }).beforeLoad,

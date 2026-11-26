@@ -90,11 +90,11 @@ function stringsOf(value: unknown): string[] {
 }
 
 describe('the table is read at all, so every count below means something', () => {
-  it('holds ten destinations and no more (story 21.4: Ručni raspored)', () => {
+  it('holds eleven destinations and no more (story 21.26: Timovi i raspored)', () => {
     // Vacuous-pass guard, and the story's own total. A table that failed to
     // load, or one narrowed to nothing, would satisfy "no entry carries a
     // label" and "Sati appears once" while proving neither.
-    expect(DESTINATIONS).toHaveLength(10);
+    expect(DESTINATIONS).toHaveLength(11);
   });
 
   it('gives every destination a distinct label, not merely a distinct key', () => {
@@ -135,7 +135,7 @@ describe('each role reaches exactly the destinations its rule names', () => {
     ]);
   });
 
-  it('gives the admin role ten, in binding order', () => {
+  it('gives the admin role eleven, in binding order', () => {
     // UX-DR32: the shared four, then the grouped destinations, Ljudi among
     // them although a member reaches it too (story 7.17). Same first four in the same order, which is what makes the
     // two layouts one architecture.
@@ -150,6 +150,8 @@ describe('each role reaches exactly the destinations its rule names', () => {
       'nav.ljudi',
       // STORY 14.2: the change history, admin-only, under Pregled after Ljudi.
       'nav.povijestPromjena',
+      // STORY 21.26: the teams, their people and their rotation, first under Postavke.
+      'nav.timoviIRaspored',
       'nav.postavkeRotacije',
       'nav.organizacija',
     ]);
@@ -160,7 +162,14 @@ describe('each role reaches exactly the destinations its rule names', () => {
     // five happened to be the wrong five, and the specific fear is a
     // configuration destination leaking into the member's list. `Ljudi` is not
     // one for a member: its content is the read-only directory (story 7.17).
-    for (const key of ['nav.zaOdluku', 'nav.rucniRaspored', 'nav.povijestPromjena', 'nav.postavkeRotacije', 'nav.organizacija']) {
+    for (const key of [
+      'nav.zaOdluku',
+      'nav.rucniRaspored',
+      'nav.povijestPromjena',
+      'nav.timoviIRaspored',
+      'nav.postavkeRotacije',
+      'nav.organizacija',
+    ]) {
       expect(keysFor('member_role'), `a member reaches ${key}`).not.toContain(key);
     }
   });
@@ -405,7 +414,7 @@ describe('the phone bar shows four tabs and puts the rest in Više (story 7.3)',
 
   it('gives the admin Sati, Godišnji, Ručni raspored and Povijest promjena under Pregled, and the settings under Postavke', () => {
     expect(phoneKeysFor('admin').overview).toEqual(['nav.sati', 'nav.godisnji', 'nav.rucniRaspored', 'nav.povijestPromjena']);
-    expect(phoneKeysFor('admin').settings).toEqual(['nav.postavkeRotacije', 'nav.organizacija']);
+    expect(phoneKeysFor('admin').settings).toEqual(['nav.timoviIRaspored', 'nav.postavkeRotacije', 'nav.organizacija']);
   });
 
   it('gives the member Ljudi under Pregled in Više, and nothing under Postavke (story 7.17)', () => {
@@ -425,12 +434,12 @@ describe('the sidebar and the sheet share two groups, Pregled and Postavke', () 
     return { overview: keys(overview), settings: keys(settings) };
   }
 
-  it('gives the admin sidebar eight places under Pregled and the two settings under Postavke', () => {
+  it('gives the admin sidebar eight places under Pregled and the three settings under Postavke', () => {
     // Za odluku is admin-only and still daily work: it stays under Pregled, in
     // binding order, rather than joining the settings.
     expect(groupKeys(destinationsFor('admin'))).toEqual({
       overview: ['nav.danas', 'nav.kalendar', 'nav.sati', 'nav.godisnji', 'nav.zaOdluku', 'nav.rucniRaspored', 'nav.ljudi', 'nav.povijestPromjena'],
-      settings: ['nav.postavkeRotacije', 'nav.organizacija'],
+      settings: ['nav.timoviIRaspored', 'nav.postavkeRotacije', 'nav.organizacija'],
     });
   });
 

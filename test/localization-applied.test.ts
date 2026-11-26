@@ -497,6 +497,16 @@ const SOURCES = [
   join(webRoot, 'src', 'features', 'planning', 'services', 'manual-grid.ts'),
   join(webRoot, 'src', 'components', 'date-grid.tsx'),
   join(webRoot, 'src', 'utils', 'grid-dates.ts'),
+  // Story 21.26: *Timovi i raspored*, the eleventh destination and the first
+  // lazy route — the route module, the lazily loaded page, and the setup
+  // feature's hook, parts and rules (its member and team pieces are those
+  // features' parts, read off their folders).
+  join(webRoot, 'src', 'pages', 'timovi-i-raspored.route.ts'),
+  join(webRoot, 'src', 'pages', 'timovi-i-raspored.tsx'),
+  join(webRoot, 'src', 'features', 'setup', 'hooks', 'use-setup.ts'),
+  join(webRoot, 'src', 'features', 'setup', 'components', 'setup-parts.tsx'),
+  join(webRoot, 'src', 'features', 'setup', 'components', 'setup-pick-dialog.tsx'),
+  join(webRoot, 'src', 'features', 'setup', 'services', 'setup.ts'),
   // Story 21.10: *Raspored osobe*'s rules module, which words its sources and refusals (its card and hook are member screen parts).
   join(webRoot, 'src', 'features', 'members', 'services', 'schedule-source.ts'),
   join(webRoot, 'src', 'features', 'history', 'hooks', 'use-change-history.ts'),
@@ -891,8 +901,36 @@ function entryChunkPath(): string {
   return path;
 }
 
+/**
+ * The chunks the page BOOTS: the entry, and every chunk it names as a
+ * `modulepreload` — the entry's static imports, which the browser loads
+ * before the application runs.
+ *
+ * STORY 21.26, the first lazy route: the code the entry shares with that
+ * route's screen is split into a chunk of its own, which the entry imports
+ * statically and the page preloads, and the localization layer is in it. What
+ * the browser runs at boot is the entry and those chunks together, so the
+ * wiring is asserted of them as one, never of any lazily loaded chunk: a
+ * chunk the page does not preload is not among them.
+ */
+function bootChunkPaths(): string[] {
+  const distRoot = join(webRoot, 'dist');
+  const page = readFileSync(join(distRoot, 'index.html'), 'utf8');
+  const preloads = [...page.matchAll(/<link\b([^>]*)>/gi)]
+    .map((found) => found[1] ?? '')
+    .filter((attributes) => /\brel\s*=\s*["']modulepreload["']/i.test(attributes))
+    .map((attributes) => /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(attributes))
+    .map((found) => join(distRoot, (found?.[1] ?? found?.[2] ?? '').replace(/^\.?\//, '')));
+
+  for (const path of preloads) expect(chunkPaths(), 'the page preloads a chunk the build did not write').toContain(path);
+
+  return [entryChunkPath(), ...preloads];
+}
+
 function entryChunk(): string {
-  return readFileSync(entryChunkPath(), 'utf8');
+  return bootChunkPaths()
+    .map((path) => readFileSync(path, 'utf8'))
+    .join('\n');
 }
 
 /** The concatenation of every chunk, for the vocabulary sweeps: a literal
@@ -1036,8 +1074,9 @@ describe('the build being read reflects the current localization source', () => 
     // rules, hook and component; eighteen since story 8.2b: the directory's
     // and the roster's offline surface keys; nineteen since story 21.17: the
     // team dialog's *Ne radi na blagdane* element ids; twenty-two since story
-    // 21.20: *Najmanje ljudi*'s rules, hook and component.
-    expect(parts, 'the teams feature grew or lost a module').toHaveLength(22);
+    // 21.20: *Najmanje ljudi*'s rules, hook and component; twenty-three since
+    // story 21.26: the team dialog over *Timovi i raspored*.
+    expect(parts, 'the teams feature grew or lost a module').toHaveLength(23);
     for (const page of TEAM_PAGES) expect(SOURCES, `${page} is not in SOURCES`).toContain(page);
     expect([...parts].sort(), 'the feature holds a module no set and no rule list names').toEqual(
       [...TEAMS_SOURCES_REQUIRED].sort(),
@@ -1171,7 +1210,7 @@ describe('the shipped bundle carries the localization wiring', () => {
     // Sanity on magnitude: i18next plus ICU plus intl-messageformat is ~80 kB
     // of the chunk. A build that had dropped them while keeping a stray marker
     // would be far smaller, and this notices without pinning an exact size.
-    expect(statSync(entryChunkPath()).size).toBeGreaterThan(300_000);
+    expect(entryChunk().length).toBeGreaterThan(300_000);
   });
 });
 
@@ -2058,6 +2097,24 @@ describe('the resource file is the only user-facing Croatian in the build', () =
 
     expect(entry, 'the entry does not load the writer lazily').toMatch(new RegExp(`import\\(\\s*${quoted}\\s*\\)`));
     expect(entry, 'the entry imports the writer statically').not.toMatch(new RegExp(`from\\s*${quoted}`));
+  });
+
+  it.skipIf(notBuilt)('keeps Timovi i raspored out of the boot chunks, loaded only by import() (story 21.26)', () => {
+    // The rotation dialog's heading id, which only that screen writes: absent
+    // from every chunk the page boots, present in exactly one other, and that
+    // chunk named by the boot chunks only inside a dynamic `import()`. A
+    // static import of the screen anywhere would put it back at boot.
+    const marker = 'setup-rotation-heading';
+    const boot = entryChunk();
+    const screens = chunkPaths().filter((path) => readFileSync(path, 'utf8').includes(marker));
+
+    expect(boot.includes(marker), 'the screen is in a boot chunk').toBe(false);
+    expect(screens, 'no single chunk holds the screen').toHaveLength(1);
+    const name = (screens[0] ?? '').split(/[\\/]/).at(-1) ?? '';
+    const quoted = `[\`'"]\\./${name.replaceAll('.', '\\.')}[\`'"]`;
+
+    expect(boot, 'the boot chunks do not load the screen lazily').toMatch(new RegExp(`import\\(\\s*${quoted}\\s*\\)`));
+    expect(boot, 'a boot chunk imports the screen statically').not.toMatch(new RegExp(`from\\s*${quoted}`));
   });
 
   it.skipIf(notBuilt)('keeps the PDF writer and its fonts out of the entry chunk, loaded only by import() (story 14.3)', () => {

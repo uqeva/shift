@@ -22,11 +22,13 @@ export const ANNUAL_LEAVE_COLUMN = 'Godišnji odmor';
 export const ANNUAL_LEAVE_DAYS_HEADING = fill(hr.sati.organization.export.days, { name: ANNUAL_LEAVE_COLUMN });
 
 /** The destinations only an admin reaches (`features/navigation/utils/destinations.ts`).
- *  *Povijest promjena* since story 14.2, *Ručni raspored* since story 21.4. */
+ *  *Povijest promjena* since story 14.2, *Ručni raspored* since story 21.4,
+ *  *Timovi i raspored* since story 21.26. */
 export const ADMIN_DESTINATIONS = [
   hr.nav.zaOdluku,
   hr.nav.rucniRaspored,
   hr.nav.povijestPromjena,
+  hr.nav.timoviIRaspored,
   hr.nav.postavkeRotacije,
   hr.nav.organizacija,
 ] as const;

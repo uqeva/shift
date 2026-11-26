@@ -3771,6 +3771,97 @@ const SANCTIONED_SCREEN_KEYS = [
   'rucniRaspored.plan.error.failed',
   // STORY 21.12'S ENTRY, BUILT BY 21.5: a row's job role beside its source.
   'rucniRaspored.rowLine',
+  // STORY 21.26: *Timovi i raspored* (UX-DR84) — its destination, description
+  // and shorter place under *Više*; the page's toolbar, outcome lines, type
+  // strip, team cards, *Ljudi bez turnusa*, person picker, rotation dialog and
+  // *Prvi koraci*.
+  'nav.timoviIRaspored',
+  'shell.description.timoviIRaspored',
+  'shell.place.timoviIRaspored',
+  'postaviRaspored.loading',
+  'postaviRaspored.failed',
+  'postaviRaspored.retry',
+  'postaviRaspored.types.heading',
+  'postaviRaspored.types.add',
+  'postaviRaspored.types.empty',
+  'postaviRaspored.types.notWorking',
+  'postaviRaspored.types.noTimes',
+  'postaviRaspored.types.chip',
+  'postaviRaspored.types.unknown',
+  'postaviRaspored.teams.heading',
+  'postaviRaspored.teams.add',
+  'postaviRaspored.teams.empty',
+  'postaviRaspored.team.members',
+  'postaviRaspored.team.noMembers',
+  'postaviRaspored.team.addMember',
+  'postaviRaspored.team.addMemberNamed',
+  'postaviRaspored.team.remove',
+  'postaviRaspored.team.joins',
+  'postaviRaspored.team.leaves',
+  'postaviRaspored.team.rotation',
+  'postaviRaspored.team.rotationLabel',
+  'postaviRaspored.team.rotationFrom',
+  'postaviRaspored.team.rotationToday',
+  'postaviRaspored.team.noRotation',
+  'postaviRaspored.team.editRotation',
+  'postaviRaspored.team.editRotationNamed',
+  'postaviRaspored.team.holidaysOn',
+  'postaviRaspored.team.holidaysOff',
+  'postaviRaspored.team.minimumOwn',
+  'postaviRaspored.team.minimumOrganization',
+  'postaviRaspored.team.minimumNone',
+  'postaviRaspored.team.edit',
+  'postaviRaspored.team.editNamed',
+  'postaviRaspored.people.heading',
+  'postaviRaspored.people.lede',
+  'postaviRaspored.people.empty',
+  'postaviRaspored.people.noRole',
+  'postaviRaspored.people.schedule',
+  'postaviRaspored.people.scheduleNamed',
+  'postaviRaspored.people.set',
+  'postaviRaspored.people.roleNamed',
+  'postaviRaspored.people.roleNone',
+  'postaviRaspored.people.roleSaved',
+  'postaviRaspored.people.scheduled',
+  'postaviRaspored.pick.teamTitle',
+  'postaviRaspored.pick.teamLede',
+  'postaviRaspored.pick.scheduleTitle',
+  'postaviRaspored.pick.scheduleLede',
+  'postaviRaspored.pick.label',
+  'postaviRaspored.pick.choose',
+  'postaviRaspored.pick.currentTeam',
+  'postaviRaspored.pick.none',
+  'postaviRaspored.pick.newPerson',
+  'postaviRaspored.pick.next',
+  'postaviRaspored.pick.cancel',
+  'postaviRaspored.pick.close',
+  'postaviRaspored.pick.unpicked',
+  'postaviRaspored.host.scheduled',
+  'postaviRaspored.host.openMember',
+  'postaviRaspored.host.unavailable',
+  'postaviRaspored.host.saved',
+  'postaviRaspored.host.someone',
+  'postaviRaspored.rotationDialog.title',
+  'postaviRaspored.rotationDialog.lede',
+  'postaviRaspored.rotationDialog.close',
+  'postaviRaspored.firstRun.heading',
+  'postaviRaspored.firstRun.lede',
+  'postaviRaspored.firstRun.listLabel',
+  'postaviRaspored.firstRun.stepTitle',
+  'postaviRaspored.firstRun.done',
+  'postaviRaspored.firstRun.waiting',
+  'postaviRaspored.firstRun.types.title',
+  'postaviRaspored.firstRun.types.hint',
+  'postaviRaspored.firstRun.types.action',
+  'postaviRaspored.firstRun.team.title',
+  'postaviRaspored.firstRun.team.hint',
+  'postaviRaspored.firstRun.team.action',
+  'postaviRaspored.firstRun.people.title',
+  'postaviRaspored.firstRun.people.hint',
+  'postaviRaspored.firstRun.people.action',
+  'postaviRaspored.firstRun.rotation.title',
+  'postaviRaspored.firstRun.rotation.hint',
+  'postaviRaspored.firstRun.rotation.action',
 ];
 
 /** Everything the resource file is permitted to hold, together. */
@@ -4090,6 +4181,14 @@ const HISTORY_NAMESPACE = 'history.';
  * calendar's empty state says where a schedule comes from, both included.
  */
 const ONBOARDING_NAMESPACE = 'onboarding.';
+/**
+ * STORY 21.26 (UX-DR84): *Timovi i raspored* links the Team (*Tim*), the
+ * Shift Type (*Tipovi smjena*) and the person on one page, and its
+ * destination's description says so, on `onboarding`'s terms: the term
+ * `tip… smjen…`, and `smjen` nowhere else.
+ */
+const SETUP_NAMESPACE = 'postaviRaspored.';
+const SETUP_DESCRIPTION_KEY = 'shell.description.timoviIRaspored';
 const CALENDAR_SOURCES_KEY = 'kalendar.noTeamsWhy';
 /**
  * 0036: the day detail's refusal of an override whose team OR type was
@@ -4173,6 +4272,8 @@ function teamTermOutOfTurn(key: string, message: string): boolean {
     (key.startsWith(ROTATION_OVERRIDE_NAMESPACE) && key !== ROTATION_OVERRIDE_TAKEN_KEY) ||
     key.startsWith(HISTORY_NAMESPACE) ||
     key.startsWith(ONBOARDING_NAMESPACE) ||
+    key.startsWith(SETUP_NAMESPACE) ||
+    key === SETUP_DESCRIPTION_KEY ||
     CALENDAR_TYPE_TERM_KEYS.includes(key) ||
     key === ROTATION_DESCRIPTION_KEY ||
     key === CALENDAR_SOURCES_KEY ||
