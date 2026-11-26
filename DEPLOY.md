@@ -3329,6 +3329,24 @@ the service restarted, then GoTrue alone restarted once the new `shift-web`
 was live, so it fetched the new templates (order rule: the templates come from
 the app origin at start). The checks below, the CSP sweep and
 `shift-ops jobs-check staging` passed.
+**Refreshed 2026-11-26** to `main` (job roles, *Raspored osobe* and member
+schedule versions, the *Ručni raspored* grid, the compact toolbar, personal
+shifts, schedule sources and the holiday rule; the landing app is NOT deployed,
+it waits for its DNS and email): a `pre-migration` backup (§9.12); `main`'s
+compose unchanged since the last refresh and every `content:` file matching
+the one Coolify wrote, so no `PATCH` and no storage update; migrations `0078`
+and `0079` pushed over the loopback and `check-migrations` clean (79 agree); a
+new functions image (probed with `probe-functions-image.sh`) and a new
+`shift-web` (same inputs, signup on; `check-bundle.mjs` and
+`probe-web-image.sh` passed), the web application deployed first and the
+service restarted after it, so GoTrue fetched the templates from the live
+`shift-web` (no separate GoTrue restart needed). The checks below passed. The
+CSP sweep now also visits `/rucni-raspored` and opens (never saves) a member's
+*Raspored osobe* dialog, and opens the history page's *Izvoz* menu before
+*Izvezi u PDF* (the compact toolbar moved it there); no violation, no failed
+request. Both demo organizations sign in; `dvd-mladost`'s verifier reports the
+one known mismatch (a test member the founder added by hand, kept).
+`shift-ops jobs-check staging` passed.
 
 **What exists in Coolify.** A project `shift` with an environment `staging`
 (the founder's choice; the epic had named a project `shift-staging`), holding:
