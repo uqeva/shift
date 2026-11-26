@@ -4,7 +4,7 @@ import { monthOf } from '@shift/domain';
 import { CALENDAR_KEY, type CalendarSnapshot, type CalendarSurfaceState } from '@/features/calendar/services/snapshot';
 import { unknownSnapshotIdsOf } from '@/features/calendar/services/snapshot-skew';
 import { memberMonthDeltasOf, type MemberMonthDelta } from '@/features/calendar/utils/change-preview';
-import { dayDetailOf, rosterOverlapOf, type RosterOverlap } from '@/features/calendar/utils/day-detail';
+import { dayDetailOf, rosterOverlapOf, shiftOverlapOf, type RosterOverlap } from '@/features/calendar/utils/day-detail';
 import { calendarTodayOf } from '@/features/calendar/utils/month';
 import { queueReadFailed, type LeaveRowsAnswer } from '@/features/conflicts/services/conflicts-queue';
 import {
@@ -41,7 +41,7 @@ import {
   type OrganizationSwapFound,
   type SwapStatus,
 } from '@/features/swaps/services/organization-swaps';
-import { swapAppliedOf, swapDayOf, type SwapShiftKey } from '@/features/swaps/services/swap-proposal';
+import { swapAppliedOf, swapShiftShownOf, type SwapShiftKey } from '@/features/swaps/services/swap-proposal';
 import { NO_DEPENDENTS, SWAP_REQUEST_DECISION_DEPENDENTS } from '@/features/teams/services/dependents';
 import { formatDate, formatIsoDate, formatTime } from '@/lib/i18n/format';
 
@@ -101,7 +101,7 @@ export const SWAP_DECISION_UNTRUSTED = 'SWAP_DECISION_UNTRUSTED';
 /** A shift as the screen names it: the day detail's own day (`subota 26.09.2026`) and the team. */
 export interface SwapDayShown {
   readonly day: string;
-  readonly teamName: string;
+  readonly teamName: string | null;
 }
 
 /** What every drawn swap names: the swap, whose it is, and its shifts. */
@@ -118,7 +118,7 @@ export interface SwapDecisionFacts {
 /** One date the swap changes: on `team`'s shift that day, `inName` works instead of `outName`. */
 export interface SwapDecisionLine {
   readonly day: string;
-  readonly teamName: string;
+  readonly teamName: string | null;
   readonly inName: string;
   readonly outName: string;
 }
@@ -231,10 +231,11 @@ export function swapNeedsActors(swap: OrganizationSwap | null): boolean {
  * @throws RangeError when the snapshot lacks the team, or the date cannot be formatted.
  */
 function dayShownOf(snapshot: CalendarSnapshot, shift: SwapShiftKey): SwapDayShown {
-  const teamName = snapshot.teams.find((team) => team.id === shift.teamId)?.name;
-  const day = swapDayOf(snapshot, shift)?.date ?? formatIsoDate(shift.date);
+  // STORY 21.8: a Personal Shift counted with no team is named `bez tima` (`null`).
+  const teamName = shift.teamId === null ? null : snapshot.teams.find((team) => team.id === shift.teamId)?.name;
+  const day = swapShiftShownOf(snapshot, shift)?.day ?? formatIsoDate(shift.date);
 
-  if (teamName === undefined) throw new RangeError(`team ${shift.teamId} is not in the snapshot`);
+  if (teamName === undefined) throw new RangeError(`team ${String(shift.teamId)} is not in the snapshot`);
   if (day === null) throw new RangeError(`the date ${shift.date} cannot be formatted`);
 
   return { day, teamName };
@@ -348,6 +349,13 @@ export function swapDecisionPreviewOf(
 
   // A DOUBLE BOOKING over the "after": the member's other shifts as the swap leaves them.
   const overlaps = putOn.flatMap(({ shift, inId }) => {
+    // STORY 21.8: a Personal Shift, the taker's own leg (team or none), against their other legs.
+    if (shift.personal !== undefined) {
+      const overlap = shiftOverlapOf(after, inId, { teamId: shift.teamId, date: shift.date, shiftTypeId: shift.personal.shiftTypeId });
+
+      return overlap === null ? [] : [overlap];
+    }
+
     const detail = dayDetailOf(after, shift.teamId, shift.date);
     const overlap = detail === null ? null : rosterOverlapOf(after, detail, inId);
 
@@ -624,6 +632,8 @@ const REFUSALS: readonly { readonly code: string; readonly message: string | nul
 /** 23514 is any check; 0036 names the archived team's own, and only that one is "archived". */
 const CHECK_VIOLATION = '23514';
 const ROSTER_OVERRIDE_ARCHIVED = 'ROSTER_OVERRIDE_ARCHIVED';
+/** STORY 21.8: 0077's save refuses a personal side whose type or team was archived since (22023, by name). */
+const PERSONAL_ASSIGNMENTS_INVALID = 'PERSONAL_ASSIGNMENTS_INVALID';
 
 /**
  * A refused decision by SQLSTATE, or by 0049's message when the code is
@@ -633,7 +643,7 @@ const ROSTER_OVERRIDE_ARCHIVED = 'ROSTER_OVERRIDE_ARCHIVED';
  * anything else failed.
  */
 export function swapDecisionFailureOf(error: SwapDecisionError): SwapDecisionFailure {
-  if (error.message === ROSTER_OVERRIDE_ARCHIVED) return SWAP_DECISION_ARCHIVED;
+  if (error.message === ROSTER_OVERRIDE_ARCHIVED || error.message === PERSONAL_ASSIGNMENTS_INVALID) return SWAP_DECISION_ARCHIVED;
   if (error.code === CHECK_VIOLATION) return SWAP_DECISION_FAILED;
 
   const byCode = REFUSALS.find((refusal) => refusal.code === error.code);

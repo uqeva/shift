@@ -91,7 +91,7 @@ describe('the read (story 12.4)', () => {
       ['range', 0, 999],
     ]);
     expect(ORGANIZATION_SWAP_REQUESTS_COLUMNS).toContain(
-      `${DECISIONS_EMBED}(outcome,roster_override_id,return_roster_override_id,decided_by,decided_at)`,
+      `${DECISIONS_EMBED}(outcome,roster_override_id,return_roster_override_id,personal_assignment_id,return_personal_assignment_id,decided_by,decided_at)`,
     );
     expect(ORGANIZATION_SWAP_REQUESTS_COLUMNS).toContain('created_at');
     expect(organizationSwapRequestsQueryOptions(() => table).queryKey).toEqual(ORGANIZATION_SWAP_REQUESTS_KEY);
@@ -138,10 +138,58 @@ describe('the parse, never a partial list', () => {
       outcome: SWAP_APPROVED,
       rosterOverrideId: 'ro-given',
       returnRosterOverrideId: null,
+      personalAssignmentId: null,
+      returnPersonalAssignmentId: null,
       decidedBy: DECIDING_ADMIN,
       decidedAt: CLOSED_AT,
     });
     expect(swaps?.[5]?.decision).toMatchObject({ outcome: SWAP_REJECTED, rosterOverrideId: null });
+  });
+
+  it('story 21.8: reads a Personal Shift on either side, with its type and its team or none, and an approval naming its assignments', () => {
+    const swaps = organizationSwapsOf([
+      swapRowOf({ id: 'teamless', team_id: null, given_personal: true, shift_type_id: 'type-day' }),
+      decidedSwapRowOf(
+        'approved',
+        {
+          id: 'mixed',
+          return_team_id: null,
+          return_date: '2026-09-14',
+          return_personal: true,
+          return_shift_type_id: 'type-day',
+        },
+        { return_personal_assignment_id: 'pa-return' },
+      ),
+      decidedSwapRowOf(
+        'approved',
+        { id: 'personal-given', given_personal: true, shift_type_id: 'type-day' },
+        { roster_override_id: null, personal_assignment_id: 'pa-given' },
+      ),
+    ]);
+
+    expect(swaps?.map((swap) => [swap.given, swap.returnShift])).toEqual([
+      [{ teamId: null, date: '2026-09-13', personal: { shiftTypeId: 'type-day' } }, null],
+      [{ teamId: TEAM_B, date: '2026-09-13' }, { teamId: null, date: '2026-09-14', personal: { shiftTypeId: 'type-day' } }],
+      [{ teamId: TEAM_B, date: '2026-09-13', personal: { shiftTypeId: 'type-day' } }, null],
+    ]);
+    expect(swaps?.[1]?.decision).toMatchObject({ rosterOverrideId: 'ro-given', returnPersonalAssignmentId: 'pa-return' });
+    expect(swaps?.[2]?.decision).toMatchObject({ rosterOverrideId: null, personalAssignmentId: 'pa-given' });
+  });
+
+  it('story 21.8: refuses a side whose form and type disagree, a team shift with no team, or an approval naming the wrong record', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    for (const row of [
+      swapRowOf({ team_id: null }),
+      swapRowOf({ given_personal: true }),
+      swapRowOf({ shift_type_id: 'type-day' }),
+      swapRowOf({ given_personal: 'yes', shift_type_id: 'type-day' }),
+      swapRowOf({ return_personal: true, return_date: '2026-09-14' }),
+      decidedSwapRowOf('approved', { given_personal: true, shift_type_id: 'type-day' }),
+      decidedSwapRowOf('rejected', {}, { personal_assignment_id: 'pa-given' }),
+    ]) {
+      expect(organizationSwapsOf([row])).toBeNull();
+    }
   });
 
   it('reads an approval with a return shift as naming both overrides', () => {
@@ -311,6 +359,8 @@ describe('the decided swaps (Odlučeno, UX-DR52)', () => {
         outcome: SWAP_REJECTED,
         rosterOverrideId: null,
         returnRosterOverrideId: null,
+        personalAssignmentId: null,
+        returnPersonalAssignmentId: null,
         decidedBy: DECIDING_ADMIN,
         decidedAt: CLOSED_AT,
       }),

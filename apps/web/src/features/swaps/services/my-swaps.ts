@@ -8,7 +8,7 @@ import { NO_LEAVE_RECORDS, type LeaveRecordsByMember } from '@/features/hours/se
 import {
   SWAP_REQUESTS_TABLE,
   swapAppliedOf,
-  swapDayOf,
+  swapShiftShownOf,
   swapShiftWorkedBy,
   type SwapShiftKey,
 } from '@/features/swaps/services/swap-proposal';
@@ -21,12 +21,14 @@ import {
   SWAP_PROPOSED,
   SWAP_REJECTED,
   SWAP_WITHDRAWN,
+  SWAP_SHIFT_COLUMNS,
   swapLastDateOf,
   swapOpen,
+  swapShiftsOfRow,
   swapStatusOf,
   type SwapStatus,
 } from '@/features/swaps/services/organization-swaps';
-import { formatIsoDate, isIsoDate } from '@/lib/i18n/format';
+import { formatIsoDate } from '@/lib/i18n/format';
 
 /**
  * THE VIEWER'S OWN SWAPS (story 12.3; FR-67, FR-69): the one member read of
@@ -62,7 +64,7 @@ import { formatIsoDate, isIsoDate } from '@/lib/i18n/format';
 export const MY_SWAP_REQUESTS_KEY = ['my-swap-requests'] as const;
 
 /** The columns read: the swap's own facts, its answer and close, and its decision's outcome. */
-export const MY_SWAP_REQUESTS_COLUMNS = `id,proposer_id,addressee_id,team_id,date,return_team_id,return_date,answer,closed_at,${DECISIONS_EMBED}(outcome)`;
+export const MY_SWAP_REQUESTS_COLUMNS = `id,proposer_id,addressee_id,${SWAP_SHIFT_COLUMNS},answer,closed_at,${DECISIONS_EMBED}(outcome)`;
 
 /** The read could not be answered, or answered something that is not rows. */
 export const MY_SWAPS_UNAVAILABLE = 'MY_SWAPS_UNAVAILABLE';
@@ -217,27 +219,14 @@ function swapOf(row: unknown): MySwap | null {
   const id = idOf(row['id']);
   const proposerId = idOf(row['proposer_id']);
   const addresseeId = idOf(row['addressee_id']);
-  const teamId = idOf(row['team_id']);
-  const date = row['date'];
-  const returnTeamId = row['return_team_id'];
-  const returnDate = row['return_date'];
+  // STORY 21.8: the organization read's own parse of both shifts, a Personal Shift's included.
+  const shifts = swapShiftsOfRow(row);
   const status = swapStatusOf(row['closed_at'], row['answer'], row[DECISIONS_EMBED]);
 
-  if (id === null || proposerId === null || addresseeId === null || teamId === null || status === null) return null;
+  if (id === null || proposerId === null || addresseeId === null || shifts === null || status === null) return null;
   if (proposerId === addresseeId) return null;
-  if (typeof date !== 'string' || !isIsoDate(date)) return null;
 
-  let returnShift: SwapShiftKey | null = null;
-
-  if (returnTeamId !== null || returnDate !== null) {
-    const backTeam = idOf(returnTeamId);
-
-    if (backTeam === null || typeof returnDate !== 'string' || !isIsoDate(returnDate)) return null;
-
-    returnShift = { teamId: backTeam, date: returnDate };
-  }
-
-  return { id, proposerId, addresseeId, given: { teamId, date }, returnShift, status };
+  return { id, proposerId, addresseeId, given: shifts.given, returnShift: shifts.returnShift, status };
 }
 
 /**
@@ -320,6 +309,8 @@ export interface SwapShiftShown {
   readonly day: string;
   /** The team's name; `null` for a team the snapshot does not hold, which the card words as unknown. */
   readonly team: string | null;
+  /** STORY 21.8: a Personal Shift counted with no team, worded `bez tima` (then `team` is `null`). */
+  readonly noTeam: boolean;
 }
 
 /** One date of the consequence: on `shift`, the viewer works instead of the proposer, or the proposer instead of the viewer. */
@@ -360,13 +351,15 @@ export interface MySwapRow {
 
 /** The shift as a row names it: the day detail's own day and team, or the bare date and the snapshot's team name. */
 function shiftShownOf(snapshot: CalendarSnapshot, shift: SwapShiftKey): SwapShiftShown {
-  const day = swapDayOf(snapshot, shift);
+  const shown = swapShiftShownOf(snapshot, shift);
+  const noTeam = shift.teamId === null;
 
-  if (day !== null) return { day: day.date, team: day.teamName };
+  if (shown !== null) return { day: shown.day, team: shown.teamName, noTeam };
 
   return {
     day: formatIsoDate(shift.date) ?? shift.date,
     team: snapshot.teams.find((team) => team.id === shift.teamId)?.name ?? null,
+    noTeam,
   };
 }
 

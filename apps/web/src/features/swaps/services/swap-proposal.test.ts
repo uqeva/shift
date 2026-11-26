@@ -55,13 +55,14 @@ import {
   swapProposedStepOf,
   swapProposedValuesOf,
   swapReturnOptionsOf,
-  swapReturnShiftOf,
   swapReturnValueOf,
   swapSearchOf,
   swapSendCheckOf,
   swapSendFailureOf,
   swapSendMessageKey,
   type SwapCheckRefusal,
+  type SwapGiven,
+  SWAP_NO_TEAM,
   type SwapSendFailure,
   swapViewOf,
   withSwapProposed,
@@ -160,7 +161,7 @@ function dayOf(snapshot: CalendarSnapshot, teamId: string, date = DATE): DayDeta
   return detail;
 }
 
-function givenOf(snapshot: CalendarSnapshot): DayDetail {
+function givenOf(snapshot: CalendarSnapshot): SwapGiven {
   const given = ownSwapShiftOf(snapshot, { dan: DATE, smjena: A }, TODAY, null);
 
   if (given === null) throw new Error('not the viewer’s shift');
@@ -202,7 +203,7 @@ describe('the link and the given shift (story 12.2)', () => {
     const off = await snapshotOf({ rosterOverrides: [calendarRosterOverrideRow('ro-off', A, DATE, VIEWER_MEMBER, null)] });
 
     expect(ownSwapShiftOf(off, { dan: DATE, smjena: A }, TODAY, null)).toBeNull();
-    expect(givenOf(snapshot).teamId).toBe(A);
+    expect(givenOf(snapshot).key).toEqual({ teamId: A, date: DATE });
   });
 
   it('a roster change putting the viewer on another team’s working shift makes it theirs to offer', async () => {
@@ -210,7 +211,7 @@ describe('the link and the given shift (story 12.2)', () => {
     const added = await snapshotOf({ rosterOverrides: [calendarRosterOverrideRow('ro-on', B, DATE, null, VIEWER_MEMBER)] });
 
     expect(swapOfferedOf(added, dayOf(added, B), TODAY, null)).toBe(true);
-    expect(ownSwapShiftOf(added, { dan: DATE, smjena: B }, TODAY, null)?.teamId).toBe(B);
+    expect(ownSwapShiftOf(added, { dan: DATE, smjena: B }, TODAY, null)?.key.teamId).toBe(B);
   });
 
   it('Marked (story 12.3): a shift the viewer already proposed in an open swap offers no link and no form', () => {
@@ -292,7 +293,7 @@ describe('the return options (story 12.2)', () => {
       ['2026-09-10', 'Noć'],
       ['2026-09-13', 'Dan'],
     ]);
-    expect(options.every((one) => one.teamId === B && one.blocked === null)).toBe(true);
+    expect(options.every((one) => one.key.teamId === B && one.key.personal === undefined && one.blocked === null)).toBe(true);
     expect(options.at(-1)?.date).toBe('2026-10-31');
     expect(options.every((one) => one.date >= TODAY && one.date <= '2026-10-31')).toBe(true);
   });
@@ -324,9 +325,11 @@ describe('the return options (story 12.2)', () => {
   });
 
   it('round-trips a return option through its field value', () => {
-    expect(swapReturnShiftOf(swapReturnValueOf({ teamId: B, date: '2026-09-13' }))).toEqual({ teamId: B, date: '2026-09-13' });
-    expect(swapReturnShiftOf('')).toBeNull();
-    expect(swapReturnShiftOf('2026-02-31/x')).toBeNull();
+    expect(swapReturnValueOf({ key: { teamId: B, date: '2026-09-13' } })).toBe(`2026-09-13/${B}`);
+    // Story 21.8: a Personal Shift's value names its type too, and a teamless one `bez-tima`.
+    expect(swapReturnValueOf({ key: { teamId: null, date: '2026-09-13', personal: { shiftTypeId: 'type-x' } } })).toBe(
+      `2026-09-13/${SWAP_NO_TEAM}/type-x`,
+    );
   });
 });
 
@@ -423,14 +426,14 @@ describe('the preview (story 12.2)', () => {
 describe('the choice (story 12.2 review)', () => {
   const choiceOf = (colleagueId: string, back: { readonly teamId: string; readonly date: string } | null = null) => ({
     colleagueId,
-    returnValue: back === null ? SWAP_NO_RETURN : swapReturnValueOf(back),
+    returnValue: back === null ? SWAP_NO_RETURN : swapReturnValueOf({ key: back }),
   });
 
   it('drops the return shift when the colleague changes, even to a teammate offering the same shift', () => {
     const given = givenOf(snapshot);
     const back = { teamId: B, date: '2026-09-13' };
     // Ivo and Ana both work B on 09-13: the same value is on offer for each.
-    expect(swapReturnOptionsOf(snapshot, given, ANA, TODAY).map(swapReturnValueOf)).toContain(swapReturnValueOf(back));
+    expect(swapReturnOptionsOf(snapshot, given, ANA, TODAY).map(swapReturnValueOf)).toContain(swapReturnValueOf({ key: back }));
 
     const chosen = choiceOf(IVO, back);
     const switched = swapChoiceOnColleague(chosen, ANA);
@@ -472,7 +475,7 @@ describe('the send-time check (FR-66)', () => {
   const given = { teamId: A, date: DATE };
   const choiceOf = (colleagueId: string, back: { readonly teamId: string; readonly date: string } | null = null) => ({
     colleagueId,
-    returnValue: back === null ? SWAP_NO_RETURN : swapReturnValueOf(back),
+    returnValue: back === null ? SWAP_NO_RETURN : swapReturnValueOf({ key: back }),
   });
   const codeOf = (outcome: ReturnType<typeof swapSendCheckOf>): SwapCheckRefusal | null => (outcome.ok ? null : outcome.code);
 

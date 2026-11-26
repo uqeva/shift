@@ -12,14 +12,14 @@ import { MODE_MOJ } from '@/features/calendar/utils/month';
  * — or, a person chosen (story 3.3b), that person's day list in its place.
  */
 export function CalendarMonthBody({ screen }: { readonly screen: CalendarScreenState }): ReactNode {
-  const { snapshot, month, mode, skeleton, openDay } = screen;
+  const { snapshot, month, mode, skeleton, openDay, teamlessSwapOffered } = screen;
 
   if (month === null) {
     return <CalendarSkeleton shape={skeleton} />;
   }
 
   if (mode === MODE_MOJ) {
-    return <CalendarDays snapshot={snapshot} days={month.days} openDay={openDay} />;
+    return <CalendarDays snapshot={snapshot} days={month.days} openDay={openDay} teamlessSwapOffered={teamlessSwapOffered} />;
   }
 
   if (month.person === null) {

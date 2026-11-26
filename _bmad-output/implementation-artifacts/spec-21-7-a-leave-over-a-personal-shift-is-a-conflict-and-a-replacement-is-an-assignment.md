@@ -10,7 +10,7 @@ context:
   - '{project-root}/_bmad-output/implementation-artifacts/spec-21-6-personal-shifts-are-read-wherever-shifts-are-read.md'
 ---
 
-Status: review, built, CI pending (no PR yet; branch `feat/21-7-teamless-conflicts`). Baseline: `main` at `69ef8fc` (21.16/21.17 merged, `0080`). Migration `0081`. Touches `hr.json` (hot): the parallel 21.18/21.19 story has no migration; rebase on conflict. Run unattended (the coordinator's brief): both checkpoints self-approved, decisions in Design Notes.
+Status: done. PR #381, squash `25f38d3`, merged 2026-11-26 with `CI passed` green (run 45771977641). CI run 1 (45766452468) failed the database job on the relink trigger's `old` alias (fixed by `42f386b`), run 2 (45768524028) failed e2e shard 4's teamless cover status line (fixed by `7c8447a`); both are recorded in the Spec Change Log. Set `done` and this line written by story 21.8. Before the merge: Baseline: `main` at `69ef8fc` (21.16/21.17 merged, `0080`). Migration `0081`. Touches `hr.json` (hot): the parallel 21.18/21.19 story has no migration; rebase on conflict. Run unattended (the coordinator's brief): both checkpoints self-approved, decisions in Design Notes.
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 
@@ -131,7 +131,7 @@ Status: review, built, CI pending (no PR yet; branch `feat/21-7-teamless-conflic
 
 **Run 2026-11-26 (after the review patches):** build, typecheck and lint clean; web 203 files, 7315 tests (`teamless-conflicts.test.ts` 20); domain and ICS unchanged since the run above; the 35 DB-free root files pass (the theme files and `localization-applied` after a fresh `pnpm build`).
 
-**Not run locally (STRICT DATABASE RULE):** `0081` was never applied. The `provisioning` (inventories, keys, check, indexes, privileges), `rls-isolation` (the `my_conflict_resolutions` shape and six cases), `concurrent-writes` (the lock entry) cases and the e2e case (`rucni-raspored.spec.ts`, story 21.7) run first in CI.
+**Not run locally (STRICT DATABASE RULE):** `0081` was never applied locally. CI ran the `provisioning` (inventories, keys, check, indexes, privileges), `rls-isolation` (the `my_conflict_resolutions` shape and six cases), `concurrent-writes` (the lock entry) cases and the e2e case (`rucni-raspored.spec.ts`, story 21.7): green on run 45771977641 after the two fixes above.
 
 ## Suggested Review Order
 

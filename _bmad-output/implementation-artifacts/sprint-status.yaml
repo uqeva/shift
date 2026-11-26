@@ -749,9 +749,9 @@ development_status:
   21-3-the-calendar-scrolls-with-the-page-kalendar-bez-unutarnjeg-s: done  # PR #364, squash 9ea215f, CI green
   21-4-an-admin-plans-the-month-in-ručni-raspored: done  # PR #369, squash a5cf067, CI green
   21-5-popuni-uzorkom-and-kopiraj-fill-a-range: done  # PR #372, squash fdedebc, CI green; the role beside each name built, the grid's Posao filter deferred to 21.25
-  21-6-personal-shifts-are-read-wherever-shifts-are-read: review  # built, CI pending
-  21-7-a-leave-over-a-personal-shift-is-a-conflict-and-a-replacemen: review  # built, CI pending; feat/21-7-teamless-conflicts (0081), no PR yet
-  21-8-swaps-give-and-take-personal-shifts: ready-for-dev  # after 21.6
+  21-6-personal-shifts-are-read-wherever-shifts-are-read: done  # PR #374, squash d09fffb, CI green
+  21-7-a-leave-over-a-personal-shift-is-a-conflict-and-a-replacemen: done  # PR #381, squash 25f38d3, CI green (0081)
+  21-8-swaps-give-and-take-personal-shifts: review  # built, CI pending; feat/21-8-personal-swaps (0083, merges after 21.20's 0082), no PR yet
   21-9-the-schedule-source-rule-in-the-domain: done  # PR #373, squash 0163497, CI green
   21-10-an-admin-gives-a-member-their-own-rotation-or-makes-them-man: done  # PR #377, squash 14b3e58, CI green (0079); Ljudi directory label deferred
   21-11-a-seasonal-member-s-season-is-set-in-one-step: ready-for-dev  # independent

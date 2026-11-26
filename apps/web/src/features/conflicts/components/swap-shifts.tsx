@@ -5,7 +5,7 @@ import { t } from '@/lib/i18n';
 
 /** A swap's shift: `13.09.2026 · Smjena B`. */
 function shiftShown(shift: SwapShiftNamed): string {
-  return t('zaOdluku.swap.shift', { date: shift.dateShown, team: shift.teamName });
+  return t('zaOdluku.swap.shift', { date: shift.dateShown, team: shift.teamName ?? t('kalendar.cell.noTeam') });
 }
 
 /**

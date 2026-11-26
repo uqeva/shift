@@ -20,7 +20,7 @@ import { LEAVE_READY, LEAVE_UNSCHEDULED, memberLeaveBaseOf } from '@/features/le
 import { MY_LEAVE_READY, MY_LEAVE_UNSCHEDULED, myLeaveOf } from '@/features/leave/services/my-leave';
 import { replacementCandidatesOf } from '@/features/calendar/utils/replacement-candidates';
 import { hoursExportOf } from '@/features/hours/services/hours-export';
-import { swapColleaguesOf } from '@/features/swaps/services/swap-proposal';
+import { swapColleaguesOf, swapGivenOfDay } from '@/features/swaps/services/swap-proposal';
 import { organizationHoursOf } from '@/features/hours/services/organization-hours';
 import { lentFromText } from '@/components/loan-mark';
 import { initLocalization, t } from '@/lib/i18n';
@@ -469,7 +469,7 @@ describe('a position is held in the home team, never on a loan team', () => {
 
     // A swap's colleague on B's Dan of 13.09.: their home position, none once lent to D that day.
     const colleagueOf = (snapshot: CalendarSnapshot) =>
-      swapColleaguesOf(snapshot, detailOn(snapshot, 'pilot-smjena-b', '2026-09-13')).find((one) => one.id === ZORAN)?.position;
+      swapColleaguesOf(snapshot, swapGivenOfDay(detailOn(snapshot, 'pilot-smjena-b', '2026-09-13'))).find((one) => one.id === ZORAN)?.position;
 
     expect(colleagueOf(await withPosition([]))).toBe('vozač');
     expect(colleagueOf(await withPosition([calendarLoanRow('loan-d', ZORAN, D, '2026-09-13', '2026-09-13')]))).toBeNull();

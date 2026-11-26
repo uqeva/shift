@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -19,10 +20,15 @@ import { translateCellLabel } from '@/features/calendar/utils/cell-label';
 import { calendarMessageKey, type CalendarSnapshot } from '@/features/calendar/services/snapshot';
 import { PERSON_HEADING_ID } from '@/features/calendar/utils/element-ids';
 import { MONTH_HEADING_ID } from '@/features/calendar/utils/grid-keys';
+import { SWAP_NO_TEAM } from '@/features/swaps/services/swap-proposal';
 import { t } from '@/lib/i18n';
+import { formatIsoDate } from '@/lib/i18n/format';
 
 /** Opens `teamId` on `date`, `opener` getting focus back on close. */
 type OpenDay = (teamId: string, date: string, opener: HTMLElement) => void;
+
+/** STORY 21.8: whether the viewer's own teamless Personal Shift on a date is offered for a swap; none off *Moj raspored*. */
+type TeamlessSwapOffered = ((date: string) => boolean) | null;
 
 /** A day on a team, as a button that opens that team's detail on that date (story 3.4b). */
 function renderDayButton(
@@ -53,15 +59,28 @@ function renderDayButton(
  * a button, since a day detail is a team on a date. Named in full by its
  * label (`bez tima`, `dodijeljeno ručno`), as a button would be.
  */
-function renderTeamlessShift(cell: CalendarCell, label: string | null): ReactNode {
+function renderTeamlessShift(cell: CalendarCell, label: string | null, date: string, swapOffered: TeamlessSwapOffered): ReactNode {
   return (
-    <span role="group" aria-label={label ?? undefined} className="flex min-h-11 min-w-0 flex-1 items-stretch print:min-h-0">
+    <span role="group" aria-label={label ?? undefined} className="flex min-h-11 min-w-0 flex-1 flex-wrap items-stretch gap-1 print:min-h-0">
       <CalendarCellBox cell={cell} inGrid={false} noTeam labelled={label !== null} />
+      {/* STORY 21.8: the day detail's *Predloži zamjenu*, for the one shift that has no day detail. */}
+      {swapOffered?.(date) === true ? (
+        <Button asChild variant="outline" className="h-11 print:hidden">
+          <Link to="/kalendar/zamjena" search={{ dan: date, smjena: SWAP_NO_TEAM }} aria-label={t('kalendar.swap.actionOn', { day: formatIsoDate(date) ?? date })}>
+            {t('kalendar.swap.action')}
+          </Link>
+        </Button>
+      ) : null}
     </span>
   );
 }
 
-function renderDay(openDay: OpenDay, day: CalendarDay, labels: readonly (string | null)[]): ReactNode {
+function renderDay(
+  openDay: OpenDay,
+  day: CalendarDay,
+  labels: readonly (string | null)[],
+  swapOffered: TeamlessSwapOffered,
+): ReactNode {
   return (
     <li
       key={day.date}
@@ -87,7 +106,7 @@ function renderDay(openDay: OpenDay, day: CalendarDay, labels: readonly (string 
           {day.shifts.map((shift, index) => (
             <span key={`${String(index)}-${String(shift.teamId)}`} className="flex min-w-0">
               {shift.teamId === null
-                ? renderTeamlessShift(shift.cell, labels[index] ?? null)
+                ? renderTeamlessShift(shift.cell, labels[index] ?? null, day.date, swapOffered)
                 : renderDayButton(openDay, shift.teamId, day.date, shift.cell, labels[index] ?? null)}
             </span>
           ))}
@@ -109,6 +128,7 @@ function renderDayList(
   days: CalendarDayListOutcome,
   empty: (inactive: boolean) => string,
   ofPerson: boolean,
+  swapOffered: TeamlessSwapOffered = null,
 ): ReactNode {
   // The day list's own failure: the alert and no list. The grid is unaffected.
   if (!days.ok) {
@@ -133,7 +153,7 @@ function renderDayList(
       <ol
         aria-labelledby={ofPerson ? `${PERSON_HEADING_ID} ${MONTH_HEADING_ID}` : MONTH_HEADING_ID}
         className="divide-y divide-border px-4 pb-4">
-        {days.days.map((day, index) => renderDay(openDay, day, labels[index] ?? []))}
+        {days.days.map((day, index) => renderDay(openDay, day, labels[index] ?? [], swapOffered))}
       </ol>
     </>
   );
@@ -208,18 +228,20 @@ export function CalendarTeamDays({
   );
 }
 
-/** *Moj raspored* (story 3.2a): the viewer's own day list. */
+/** *Moj raspored* (story 3.2a): the viewer's own day list; since story 21.8 a teamless Personal Shift offers its swap. */
 export function CalendarDays({
   snapshot,
   days,
   openDay,
+  teamlessSwapOffered = null,
 }: {
   readonly snapshot: CalendarSnapshot | null;
   readonly days: CalendarDayListOutcome;
   readonly openDay: OpenDay;
+  readonly teamlessSwapOffered?: TeamlessSwapOffered;
 }): ReactNode {
   // What is true, never an empty list: the viewer is on no team, or inactive, this month.
-  return renderDayList(snapshot, openDay, days, (inactive) => t(dayListEmptyMessageKey(inactive, false)), false);
+  return renderDayList(snapshot, openDay, days, (inactive) => t(dayListEmptyMessageKey(inactive, false)), false, teamlessSwapOffered);
 }
 
 /** The person chosen in *Sve smjene* (story 3.3b): their name, then their day list. */

@@ -1,17 +1,18 @@
 import {
+  PERSONAL_ASSIGNMENT_OFF,
+  PERSONAL_ASSIGNMENT_SHIFT,
   activeOn,
   adjacentMonth,
   effectiveTeamOn,
-  hasTeam,
   memberScheduleOfMonth,
   monthOf,
   type CollisionResolution,
+  type MemberShift,
 } from '@shift/domain';
 
 import {
   ROSTER_CHANGE_SAVE,
   rosterChangeSnapshotOf,
-  type RosterChangeApplied,
   type RosterChangeRefusal,
 } from '@/features/calendar/services/roster-erasures';
 import type { CalendarSnapshot, CalendarSurfaceState, CalendarViewer } from '@/features/calendar/services/snapshot';
@@ -20,11 +21,12 @@ import {
   DAY_WORKING,
   MEMBER_ROLE,
   dayDetailOf,
+  memberPersonalShiftOf,
   swapOfferedOf,
   type DayDetail,
   type OpenSwapProposal,
 } from '@/features/calendar/utils/day-detail';
-import { memberScheduleInputOf } from '@/features/calendar/utils/month';
+import { memberScheduleInputOf, typeRangeOn, weekdayOf } from '@/features/calendar/utils/month';
 import {
   NO_LEAVE_RECORDS,
   hoursLeaveKeysOf,
@@ -32,6 +34,7 @@ import {
   leaveRecordsIn,
   type LeaveRecordsByMember,
 } from '@/features/hours/services/hours-conflicts';
+import { draftAppliedOf, draftKeyOf, liveAssignmentOf, type ManualDraftCell } from '@/features/planning/services/manual-grid';
 import { compareText, formatIsoDate, isIsoDate } from '@/lib/i18n/format';
 import { monthInMessageKey, yearOfMonthText } from '@/utils/filter-bar';
 
@@ -69,6 +72,16 @@ import { monthInMessageKey, yearOfMonthText } from '@/utils/filter-bar';
  *
  * THE WRITE is 0049's plain insert of the seven proposal columns, its
  * refusals mapped by SQLSTATE. Nothing here reads `swap_requests`.
+ *
+ * STORY 21.8 (AD-26 as amended): a PERSONAL SHIFT — the member's live
+ * assignment's working shift, or their personal rotation's — is given and
+ * taken too. It is named by its member and date, with the team it counts
+ * with (none: `bez tima`) and its type ({@link SwapShiftKey}'s `personal`),
+ * and 0083 stores both. Its "after" is the approval's own: the taker's `SHIFT`
+ * of that type and team and the giver's `OFF` (`draftAppliedOf`, the grid's
+ * "after"), refused ({@link SWAP_TAKER_ASSIGNED}) when the taker already
+ * holds a live `SHIFT` assignment that date, as 0083 refuses the approval. A swap with
+ * a personal side never names one date twice.
  */
 
 // ---------------------------------------------------------------- the view
@@ -109,9 +122,22 @@ export function swapViewOf(calendar: CalendarSurfaceState): SwapView {
 export interface SwapSearch {
   /** `YYYY-MM-DD`; absent when the URL names none or a malformed one. */
   readonly dan?: string;
-  /** The team's id; absent when the URL names none. */
+  /** The team's id, or {@link SWAP_NO_TEAM} (story 21.8); absent when the URL names none. */
   readonly smjena?: string;
 }
+
+/**
+ * STORY 21.8: the taker of a Personal Shift already holds a working
+ * assignment that date — one Personal Shift a member and date (R14.1), so
+ * 0083 refuses the approval (23505 `SWAP_REQUEST_TAKER_ASSIGNED`).
+ */
+export const SWAP_TAKER_ASSIGNED = 'takerAssigned';
+
+/** Why a change cannot be offered: a roster key would refuse it, or (story 21.8) its taker holds an assignment that date. */
+export type SwapBlock = RosterChangeRefusal | typeof SWAP_TAKER_ASSIGNED;
+
+/** STORY 21.8: the URL's `smjena` for the viewer's Personal Shift counted with no team (`bez tima`). */
+export const SWAP_NO_TEAM = 'bez-tima';
 
 /** The route's search, kept only where it is a text of the right shape: anything else names no shift. */
 export function swapSearchOf(search: Record<string, unknown>): SwapSearch {
@@ -126,10 +152,107 @@ export function swapSearchOf(search: Record<string, unknown>): SwapSearch {
 
 // --------------------------------------------------------- the given shift
 
-/** One shift: a team on a date (`YYYY-MM-DD`), as 0049 names it. */
-export interface SwapShiftKey {
-  readonly teamId: string;
+/**
+ * One shift as 0049 and 0083 name it: a team's rotation shift on a date
+ * (`YYYY-MM-DD`); or, since story 21.8, a member's PERSONAL SHIFT on a date,
+ * the team it counts with (`null`: none) and its type under `personal`. Whose
+ * it is, is the swap's side: the proposer's given shift, the addressee's
+ * return shift.
+ */
+export type SwapShiftKey =
+  | { readonly teamId: string; readonly date: string; readonly personal?: undefined }
+  | { readonly teamId: string | null; readonly date: string; readonly personal: SwapPersonal };
+
+/** A personal side's type (story 21.8): what the taker's assignment is of. */
+export interface SwapPersonal {
+  readonly shiftTypeId: string;
+}
+
+/** Whether two shift keys name the same shift: the same team (or none), date and form, and type. */
+export function sameSwapShift(left: SwapShiftKey, right: SwapShiftKey): boolean {
+  return (
+    left.teamId === right.teamId &&
+    left.date === right.date &&
+    (left.personal?.shiftTypeId ?? null) === (right.personal?.shiftTypeId ?? null)
+  );
+}
+
+/**
+ * THE GIVEN SHIFT as the form draws it: its key, its day, team (`null`: `bez
+ * tima`), type and times, and the members it is never offered to.
+ */
+export interface SwapGiven {
+  readonly key: SwapShiftKey;
+  /** `YYYY-MM-DD`. */
+  readonly isoDate: string;
+  /** `subota 26.09.2026`, the day detail's own wording. */
   readonly date: string;
+  /** The team's name; `null` for a Personal Shift counted with no team. */
+  readonly teamName: string | null;
+  readonly typeName: string | null;
+  /** `19:00–07:00`; `null` for a type with no times. */
+  readonly range: string | null;
+  /** Who works it already: a team shift's roster, or the viewer alone for a Personal Shift. */
+  readonly workerIds: readonly string[];
+}
+
+/** `subota 26.09.2026`, as the day detail words a date; `null` for one that cannot be formatted. */
+export function swapLongDayOf(date: string): string | null {
+  const full = formatIsoDate(date);
+
+  return full === null ? null : `${weekdayOf(date)} ${full}`;
+}
+
+/** The type's name and times on `date`, or nulls for a type the snapshot lacks. */
+function typeShownOf(
+  snapshot: CalendarSnapshot,
+  shiftTypeId: string,
+  date: string,
+): { readonly typeName: string | null; readonly range: string | null } {
+  const type = snapshot.types.find((one) => one.id === shiftTypeId);
+
+  return type === undefined ? { typeName: null, range: null } : { typeName: type.name, range: typeRangeOn(type, date) };
+}
+
+/** A team's name, or `null` for none or one the snapshot lacks. */
+function teamNameOf(snapshot: CalendarSnapshot, teamId: string | null): string | null {
+  return teamId === null ? null : (snapshot.teams.find((team) => team.id === teamId)?.name ?? null);
+}
+
+/** STORY 21.8: `memberId`'s Personal Shift on `date` as a swap names it, or `null` for none. */
+function personalKeyOf(snapshot: CalendarSnapshot, memberId: string, date: string): SwapShiftKey | null {
+  const shift = memberPersonalShiftOf(snapshot, memberId, date);
+
+  return shift === null ? null : { teamId: shift.teamId, date, personal: { shiftTypeId: shift.shiftTypeId } };
+}
+
+/** The given shift drawn from a Personal Shift of the viewer's (story 21.8), or `null` when the snapshot cannot word it. */
+function personalGivenOf(snapshot: CalendarSnapshot, key: SwapShiftKey): SwapGiven | null {
+  const day = swapLongDayOf(key.date);
+
+  if (day === null || key.personal === undefined) return null;
+
+  return {
+    key,
+    isoDate: key.date,
+    date: day,
+    teamName: teamNameOf(snapshot, key.teamId),
+    ...typeShownOf(snapshot, key.personal.shiftTypeId, key.date),
+    workerIds: [snapshot.viewer.memberId],
+  };
+}
+
+/** The given shift drawn from a team's day detail. */
+export function swapGivenOfDay(detail: DayDetail): SwapGiven {
+  return {
+    key: { teamId: detail.teamId, date: detail.isoDate },
+    isoDate: detail.isoDate,
+    date: detail.date,
+    teamName: detail.teamName,
+    typeName: detail.typeName,
+    range: detail.range,
+    workerIds: detail.roster.map((member) => member.id),
+  };
 }
 
 /**
@@ -159,22 +282,70 @@ export function ownSwapShiftOf(
   search: SwapSearch,
   today: string | null,
   proposals: readonly OpenSwapProposal[] | null,
-): DayDetail | null {
+): SwapGiven | null {
   if (search.dan === undefined || search.smjena === undefined) return null;
+
+  // STORY 21.8: the viewer's Personal Shift counted with no team has no day
+  // detail: the same rules, asked of the shift itself.
+  if (search.smjena === SWAP_NO_TEAM) {
+    if (today === null || snapshot.viewer.role !== MEMBER_ROLE || search.dan < today) return null;
+    if (swapAlreadyProposedOf(snapshot, search, today, proposals) !== null) return null;
+
+    const own = personalKeyOf(snapshot, snapshot.viewer.memberId, search.dan);
+
+    return own === null || own.teamId !== null ? null : personalGivenOf(snapshot, own);
+  }
 
   const detail = dayOf(snapshot, search.smjena, search.dan);
 
-  return swapOfferedOf(snapshot, detail, today, proposals) ? detail : null;
+  if (detail === null || !swapOfferedOf(snapshot, detail, today, proposals)) return null;
+
+  // STORY 21.8: the viewer's Personal Shift counted with this team, else the team's rotation shift.
+  const own = personalKeyOf(snapshot, snapshot.viewer.memberId, detail.isoDate);
+
+  return own !== null && own.teamId === detail.teamId ? personalGivenOf(snapshot, own) : swapGivenOfDay(detail);
 }
 
-/** The day detail of `shift`, or `null` for none or one that cannot be derived (the cause logged). */
+/**
+ * The viewer's open proposal of the shift the URL names (story 12.3; since
+ * story 21.8 a teamless one too, by {@link SWAP_NO_TEAM}), or `null`: none, a
+ * viewer who is not member-role, a date before `today`, or the proposals
+ * unknown (`null`).
+ */
+export function swapAlreadyProposedOf(
+  snapshot: CalendarSnapshot,
+  search: SwapSearch,
+  today: string | null,
+  proposals: readonly OpenSwapProposal[] | null,
+): { readonly colleagueName: string | null } | null {
+  if (search.dan === undefined || search.smjena === undefined || today === null || proposals === null) return null;
+  if (snapshot.viewer.role !== MEMBER_ROLE || search.dan < today) return null;
+
+  const teamId = search.smjena === SWAP_NO_TEAM ? null : search.smjena;
+  const proposal = proposals.find((one) => one.teamId === teamId && one.date === search.dan);
+
+  if (proposal === undefined) return null;
+
+  return { colleagueName: snapshot.members.find((member) => member.id === proposal.addresseeId)?.name ?? null };
+}
+
+/** The day detail of a team shift `shift`, or `null` for a Personal Shift, none, or one that cannot be derived (the cause logged). */
 export function swapDayOf(snapshot: CalendarSnapshot, shift: SwapShiftKey): DayDetail | null {
-  return dayOf(snapshot, shift.teamId, shift.date);
+  return shift.personal !== undefined || shift.teamId === null ? null : dayOf(snapshot, shift.teamId, shift.date);
 }
 
-/** Whether `memberId` is on the working roster of `shift` as the day detail derives it (`rosterOn`, the overrides in force). */
+/**
+ * Whether `memberId` still works `shift`: a team shift's working roster as
+ * the day detail derives it (`rosterOn`, the overrides in force); a Personal
+ * Shift (story 21.8) as their own, of the same type and counted with the same
+ * team.
+ */
 export function swapShiftWorkedBy(snapshot: CalendarSnapshot, shift: SwapShiftKey, memberId: string): boolean {
-  return works(dayOf(snapshot, shift.teamId, shift.date), memberId);
+  if (shift.personal === undefined) return works(dayOf(snapshot, shift.teamId, shift.date), memberId);
+
+  const own = personalKeyOf(snapshot, memberId, shift.date);
+
+  return own !== null && sameSwapShift(own, shift);
 }
 
 // ------------------------------------------------------------ the options
@@ -188,23 +359,69 @@ export interface SwapColleague {
   /** Their position in their own team on the date; shown, never used. */
   readonly position: string | null;
   /** Why the given shift cannot pass to them ({@link ROSTER_TAKEN}), or `null`. */
-  readonly blocked: RosterChangeRefusal | null;
+  readonly blocked: SwapBlock | null;
 }
 
-/** The given shift handed from `proposerId` (the viewer, unless named) to `colleagueId`, as the roster-change "after" applies it. */
+/**
+ * `shift` handed from `giverId` to `takerId` over `calendar`: a team shift as
+ * the roster-change "after" applies it (0049's override); a Personal Shift
+ * (story 21.8) as 0083's approval writes it — the taker's `SHIFT` of its type
+ * and counted team, the giver's `OFF` — refused ({@link SWAP_TAKER_ASSIGNED})
+ * when the taker already holds a live `SHIFT` assignment that date.
+ */
+function sideApplied(calendar: CalendarSnapshot, shift: SwapShiftKey, giverId: string, takerId: string): SwapApplied {
+  if (shift.personal === undefined) {
+    return rosterChangeSnapshotOf(calendar, {
+      kind: ROSTER_CHANGE_SAVE,
+      teamId: shift.teamId,
+      date: shift.date,
+      memberOutId: giverId,
+      memberInId: takerId,
+    });
+  }
+
+  // 0083 refuses a taker's live `SHIFT` assignment; the browser also refuses a taker's personal rotation
+  // shift that date, which the database cannot derive (AD-3) and the save would silently replace (review).
+  if (
+    liveAssignmentOf(calendar, { memberId: takerId, date: shift.date })?.kind === PERSONAL_ASSIGNMENT_SHIFT ||
+    memberPersonalShiftOf(calendar, takerId, shift.date) !== null
+  ) {
+    return { ok: false, code: SWAP_TAKER_ASSIGNED };
+  }
+
+  const taker: ManualDraftCell = {
+    memberId: takerId,
+    date: shift.date,
+    value: { kind: PERSONAL_ASSIGNMENT_SHIFT, shiftTypeId: shift.personal.shiftTypeId, teamId: shift.teamId },
+  };
+  const giver: ManualDraftCell = { memberId: giverId, date: shift.date, value: { kind: PERSONAL_ASSIGNMENT_OFF } };
+
+  return {
+    ok: true,
+    after: draftAppliedOf(
+      calendar,
+      new Map([
+        [draftKeyOf(taker), taker],
+        [draftKeyOf(giver), giver],
+      ]),
+    ),
+    from: shift.date,
+  };
+}
+
+/** A swap's "after", or why it cannot be applied. */
+export type SwapApplied =
+  | { readonly ok: true; readonly after: CalendarSnapshot; readonly from: string }
+  | { readonly ok: false; readonly code: SwapBlock };
+
+/** The given shift handed from `proposerId` (the viewer, unless named) to `colleagueId`. */
 function givenApplied(
   snapshot: CalendarSnapshot,
   given: SwapShiftKey,
   colleagueId: string,
   proposerId: string = snapshot.viewer.memberId,
-): RosterChangeApplied {
-  return rosterChangeSnapshotOf(snapshot, {
-    kind: ROSTER_CHANGE_SAVE,
-    teamId: given.teamId,
-    date: given.date,
-    memberOutId: proposerId,
-    memberInId: colleagueId,
-  });
+): SwapApplied {
+  return sideApplied(snapshot, given, proposerId, colleagueId);
 }
 
 /** The return shift handed from `colleagueId` to `proposerId` (the viewer, unless named), over `after`. */
@@ -213,14 +430,8 @@ function returnApplied(
   shift: SwapShiftKey,
   colleagueId: string,
   proposerId: string = after.viewer.memberId,
-): RosterChangeApplied {
-  return rosterChangeSnapshotOf(after, {
-    kind: ROSTER_CHANGE_SAVE,
-    teamId: shift.teamId,
-    date: shift.date,
-    memberOutId: colleagueId,
-    memberInId: proposerId,
-  });
+): SwapApplied {
+  return sideApplied(after, shift, colleagueId, proposerId);
 }
 
 /** A swap as 0049 stores it, whoever the viewer is: the two members, the given shift and any return shift. */
@@ -237,17 +448,12 @@ export interface SwapParties {
  * addressee off and the proposer on the return shift — over the calendar's
  * roster-change "after" (`rosterChangeSnapshotOf`), or its refusal.
  */
-export function swapAppliedOf(snapshot: CalendarSnapshot, swap: SwapParties): RosterChangeApplied {
+export function swapAppliedOf(snapshot: CalendarSnapshot, swap: SwapParties): SwapApplied {
   const first = givenApplied(snapshot, swap.given, swap.addresseeId, swap.proposerId);
 
   if (!first.ok || swap.returnShift === null) return first;
 
   return returnApplied(first.after, swap.returnShift, swap.addresseeId, swap.proposerId);
-}
-
-/** The given shift's key, from its day detail. */
-function givenKeyOf(given: DayDetail): SwapShiftKey {
-  return { teamId: given.teamId, date: given.isoDate };
 }
 
 /**
@@ -257,16 +463,16 @@ function givenKeyOf(given: DayDetail): SwapShiftKey {
  * reason, so the choice is explained rather than missing. Never throws: a
  * list that cannot be derived is empty, the cause logged.
  */
-export function swapColleaguesOf(snapshot: CalendarSnapshot, given: DayDetail): readonly SwapColleague[] {
+export function swapColleaguesOf(snapshot: CalendarSnapshot, given: SwapGiven): readonly SwapColleague[] {
   try {
-    const rostered = new Set(given.roster.map((member) => member.id));
+    const rostered = new Set(given.workerIds);
     const colleagues: SwapColleague[] = [];
 
     for (const member of snapshot.members) {
       if (member.id === snapshot.viewer.memberId || rostered.has(member.id)) continue;
       if (!activeOn(member.statuses, given.isoDate)) continue;
 
-      const applied = givenApplied(snapshot, givenKeyOf(given), member.id);
+      const applied = givenApplied(snapshot, given.key, member.id);
 
       colleagues.push({
         id: member.id,
@@ -288,17 +494,19 @@ export function swapColleaguesOf(snapshot: CalendarSnapshot, given: DayDetail): 
 
 /** A return shift the form offers: the colleague's working shift, as the day detail names it. */
 export interface SwapReturnOption {
-  readonly teamId: string;
+  /** The shift as it would be stored (story 21.8: a Personal Shift's carries `personal`). */
+  readonly key: SwapShiftKey;
   /** `YYYY-MM-DD`. */
   readonly date: string;
-  readonly teamName: string;
+  /** The team's name; `null` for a Personal Shift counted with no team (story 21.8). */
+  readonly teamName: string | null;
   /** `subota 26.09.2026`, the day detail's own wording. */
   readonly day: string;
   readonly typeName: string;
   /** `19:00–07:00`; `null` for a type with no times. */
   readonly range: string | null;
   /** Why the swap cannot take this shift in return ({@link ROSTER_TAKEN}), or `null`. */
-  readonly blocked: RosterChangeRefusal | null;
+  readonly blocked: SwapBlock | null;
 }
 
 /** The value of the colleague field's placeholder: nobody chosen yet. */
@@ -307,25 +515,20 @@ export const SWAP_NO_COLLEAGUE = '';
 /** The value of the return field's "none": a one-way cover. */
 export const SWAP_NO_RETURN = '';
 
-/** A return option's value in the field: its date and team, never ambiguous (an id has no `/`… and a date none either). */
-export function swapReturnValueOf(shift: SwapShiftKey): string {
-  return `${shift.date}/${shift.teamId}`;
-}
+/**
+ * A return option's value in the field: its date and team (or {@link
+ * SWAP_NO_TEAM}), never ambiguous (an id has no `/`… and a date none either).
+ * A Personal Shift's adds its type (story 21.8).
+ */
+export function swapReturnValueOf(option: { readonly key: SwapShiftKey }): string {
+  const { key } = option;
+  const team = key.teamId ?? SWAP_NO_TEAM;
 
-/** The shift a return field's value names, or `null` for {@link SWAP_NO_RETURN} or anything malformed. */
-export function swapReturnShiftOf(value: string): SwapShiftKey | null {
-  const slash = value.indexOf('/');
-
-  if (slash < 0) return null;
-
-  const date = value.slice(0, slash);
-  const teamId = value.slice(slash + 1);
-
-  return isIsoDate(date) && teamId !== '' ? { teamId, date } : null;
+  return key.personal === undefined ? `${key.date}/${team}` : `${key.date}/${team}/${key.personal.shiftTypeId}`;
 }
 
 /** The last month the return window reaches: the month after the given date's (FR-66 decision 3). */
-function lastReturnMonthOf(given: DayDetail): string | null {
+function lastReturnMonthOf(given: SwapGiven): string | null {
   return adjacentMonth(monthOf(given.isoDate), 1);
 }
 
@@ -351,7 +554,7 @@ function works(day: DayDetail | null, memberId: string): boolean {
  */
 export function swapReturnOptionsOf(
   snapshot: CalendarSnapshot,
-  given: DayDetail,
+  given: SwapGiven,
   colleagueId: string,
   today: string,
 ): readonly SwapReturnOption[] {
@@ -363,7 +566,7 @@ export function swapReturnOptionsOf(
   try {
     const history = { memberId: colleague.id, memberships: colleague.memberships, statuses: colleague.statuses };
     const teamOrder = new Map(snapshot.teams.map((team, index) => [team.id, index]));
-    const first = givenApplied(snapshot, givenKeyOf(given), colleague.id);
+    const first = givenApplied(snapshot, given.key, colleague.id);
     const options: SwapReturnOption[] = [];
     let month: string | null = monthOf(today);
 
@@ -372,30 +575,19 @@ export function swapReturnOptionsOf(
         if (day.date < today) continue;
         if (!activeOn(snapshot.viewer.statuses, day.date)) continue;
 
-        // Story 21.1: a Personal Shift counted with no team is not offered until story 21.8.
-        const shifts = day.shifts
-          .filter(hasTeam)
-          .sort((left, right) => (teamOrder.get(left.teamId) ?? 0) - (teamOrder.get(right.teamId) ?? 0));
+        // STORY 21.8: a Personal Shift is offered too, in the teams' order (no team last); a swap with a
+        // personal side never names one date twice (0083).
+        const shifts = [...day.shifts].sort(
+          (left, right) => (teamOrder.get(left.teamId ?? '') ?? teamOrder.size) - (teamOrder.get(right.teamId ?? '') ?? teamOrder.size),
+        );
 
         for (const shift of shifts) {
-          if (shift.teamId === given.teamId && day.date === given.isoDate) continue;
+          const option = returnOptionOf(snapshot, first, colleague.id, day.date, shift);
 
-          const detail = dayOf(snapshot, shift.teamId, day.date);
+          if (option === null || sameSwapShift(option.key, given.key)) continue;
+          if (day.date === given.isoDate && (given.key.personal !== undefined || option.key.personal !== undefined)) continue;
 
-          if (detail === null || detail.typeName === null) continue;
-          if (!works(detail, colleague.id) || works(detail, snapshot.viewer.memberId)) continue;
-
-          const key = { teamId: shift.teamId, date: day.date };
-          const second = first.ok ? returnApplied(first.after, key, colleague.id) : first;
-
-          options.push({
-            ...key,
-            teamName: detail.teamName,
-            day: detail.date,
-            typeName: detail.typeName,
-            range: detail.range,
-            blocked: second.ok ? null : second.code,
-          });
+          options.push(option);
         }
       }
 
@@ -410,6 +602,63 @@ export function swapReturnOptionsOf(
   }
 }
 
+/**
+ * One of the colleague's shifts on `date` as a return option, or `null` when
+ * it is none: a team shift the colleague is on the working roster of and the
+ * viewer is not; or (story 21.8) the colleague's own Personal Shift of a
+ * working type.
+ */
+function returnOptionOf(
+  snapshot: CalendarSnapshot,
+  first: SwapApplied,
+  colleagueId: string,
+  date: string,
+  shift: MemberShift,
+): SwapReturnOption | null {
+  if (shift.personalAssignmentId !== undefined || shift.personalRotation === true) {
+    if (shift.shiftTypeId === null) return null;
+
+    const key: SwapShiftKey = { teamId: shift.teamId, date, personal: { shiftTypeId: shift.shiftTypeId } };
+    const day = swapLongDayOf(date);
+    const shown = typeShownOf(snapshot, shift.shiftTypeId, date);
+
+    if (day === null || shown.typeName === null) return null;
+    if (snapshot.types.find((type) => type.id === shift.shiftTypeId)?.isWorking !== true) return null;
+
+    const second = first.ok ? returnApplied(first.after, key, colleagueId) : first;
+
+    return {
+      key,
+      date,
+      teamName: teamNameOf(snapshot, shift.teamId),
+      day,
+      typeName: shown.typeName,
+      range: shown.range,
+      blocked: second.ok ? null : second.code,
+    };
+  }
+
+  if (shift.teamId === null) return null;
+
+  const detail = dayOf(snapshot, shift.teamId, date);
+
+  if (detail === null || detail.typeName === null) return null;
+  if (!works(detail, colleagueId) || works(detail, snapshot.viewer.memberId)) return null;
+
+  const key: SwapShiftKey = { teamId: shift.teamId, date };
+  const second = first.ok ? returnApplied(first.after, key, colleagueId) : first;
+
+  return {
+    key,
+    date,
+    teamName: detail.teamName,
+    day: detail.date,
+    typeName: detail.typeName,
+    range: detail.range,
+    blocked: second.ok ? null : second.code,
+  };
+}
+
 // ------------------------------------------------------------- the preview
 
 /** The preview: who works which date, and each member's hours per month. */
@@ -421,7 +670,8 @@ export const SWAP_PREVIEW_BLOCKED = 'blocked';
 export interface SwapPreviewLine {
   /** `subota 26.09.2026`. */
   readonly day: string;
-  readonly teamName: string;
+  /** `null`: a Personal Shift counted with no team (story 21.8). */
+  readonly teamName: string | null;
   readonly inId: string;
   readonly outId: string;
 }
@@ -433,7 +683,7 @@ export type SwapPreview =
       /** The viewer's months first, then the colleague's, each in month order; `0` included. */
       readonly hours: readonly MemberMonthDelta[];
     }
-  | { readonly kind: typeof SWAP_PREVIEW_BLOCKED; readonly code: RosterChangeRefusal };
+  | { readonly kind: typeof SWAP_PREVIEW_BLOCKED; readonly code: SwapBlock };
 
 /**
  * What the swap would do once approved: `null` while no colleague is chosen,
@@ -446,7 +696,7 @@ export type SwapPreview =
  */
 export function swapPreviewOf(
   snapshot: CalendarSnapshot,
-  given: DayDetail,
+  given: SwapGiven,
   colleagueId: string,
   returnShift: SwapShiftKey | null,
   proposerLeaveKeys: readonly CollisionResolution[],
@@ -461,7 +711,7 @@ export function swapPreviewOf(
 
   try {
     const proposerId = snapshot.viewer.memberId;
-    const first = givenApplied(snapshot, givenKeyOf(given), colleagueId);
+    const first = givenApplied(snapshot, given.key, colleagueId);
 
     if (!first.ok) return { kind: SWAP_PREVIEW_BLOCKED, code: first.code };
 
@@ -469,7 +719,7 @@ export function swapPreviewOf(
     let after = first.after;
 
     if (returnShift !== null) {
-      const back = dayOf(snapshot, returnShift.teamId, returnShift.date);
+      const back = swapShiftShownOf(snapshot, returnShift);
 
       if (back === null) return null;
 
@@ -478,7 +728,7 @@ export function swapPreviewOf(
       if (!second.ok) return { kind: SWAP_PREVIEW_BLOCKED, code: second.code };
 
       after = second.after;
-      lines.push({ day: back.date, teamName: back.teamName, inId: proposerId, outId: colleagueId });
+      lines.push({ day: back.day, teamName: back.teamName, inId: proposerId, outId: colleagueId });
     }
 
     const months = [...new Set([given.isoDate, ...(returnShift === null ? [] : [returnShift.date])].map(monthOf))].sort();
@@ -497,6 +747,27 @@ export function swapPreviewOf(
 
     return null;
   }
+}
+
+/**
+ * A shift as a line names it: the day detail's day and team for a team shift,
+ * the long date and the counted team (`null`: none) for a Personal Shift
+ * (story 21.8); `null` for a team shift the snapshot holds no day of, or a
+ * date that cannot be formatted.
+ */
+export function swapShiftShownOf(
+  snapshot: CalendarSnapshot,
+  shift: SwapShiftKey,
+): { readonly day: string; readonly teamName: string | null } | null {
+  if (shift.personal === undefined) {
+    const detail = dayOf(snapshot, shift.teamId, shift.date);
+
+    return detail === null ? null : { day: detail.date, teamName: detail.teamName };
+  }
+
+  const day = swapLongDayOf(shift.date);
+
+  return day === null ? null : { day, teamName: teamNameOf(snapshot, shift.teamId) };
 }
 
 // ------------------------------------------------- the choice and the check
@@ -566,7 +837,7 @@ export function swapChoiceOf(
   if (option === undefined) return { ok: false, code: SWAP_RETURN_GONE };
   if (option.blocked !== null) return { ok: false, code: SWAP_BLOCKED };
 
-  return { ok: true, colleague, returnShift: { teamId: option.teamId, date: option.date } };
+  return { ok: true, colleague, returnShift: option.key };
 }
 
 /**
@@ -586,9 +857,10 @@ export function swapSendCheckOf(
   today: string | null,
 ): SwapChoice {
   // The proposals are not asked here: an open one is 0049's 23505 to refuse.
-  const own = ownSwapShiftOf(snapshot, { dan: given.date, smjena: given.teamId }, today, null);
+  const own = ownSwapShiftOf(snapshot, { dan: given.date, smjena: given.teamId ?? SWAP_NO_TEAM }, today, null);
 
-  if (own === null || today === null) return { ok: false, code: SWAP_GIVEN_GONE };
+  // STORY 21.8: still the same shift — a team's became a Personal Shift, or its type changed, is gone.
+  if (own === null || today === null || !sameSwapShift(own.key, given)) return { ok: false, code: SWAP_GIVEN_GONE };
 
   const colleagues = swapColleaguesOf(snapshot, own);
   const returnOptions =
@@ -596,9 +868,7 @@ export function swapSendCheckOf(
   const resolved = swapChoiceOf(colleagues, returnOptions, choice);
 
   if (!resolved.ok || resolved.returnShift === null) return resolved;
-  if (!works(dayOf(snapshot, resolved.returnShift.teamId, resolved.returnShift.date), resolved.colleague.id)) {
-    return { ok: false, code: SWAP_RETURN_GONE };
-  }
+  if (!swapShiftWorkedBy(snapshot, resolved.returnShift, resolved.colleague.id)) return { ok: false, code: SWAP_RETURN_GONE };
 
   return resolved;
 }
@@ -700,7 +970,7 @@ export interface SwapRequestInsertTable {
   insert(values: Readonly<Record<string, unknown>>): PromiseLike<{ readonly error: SwapWriteError | null }>;
 }
 
-/** A proposal as 0049's seven proposal columns take it. */
+/** A proposal as 0049's seven proposal columns take it, and 0083's four (story 21.8). */
 export interface SwapProposal {
   readonly organizationId: string;
   readonly proposerId: string;
@@ -723,6 +993,29 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
+ * The row 0049 and 0083 insert for `proposal`: a team side names its team, a
+ * personal side (story 21.8) its counted team (or none), the flag and its
+ * type. A team-only proposal names 0049's seven columns alone, as before.
+ */
+export function swapInsertOf(proposal: SwapProposal): Readonly<Record<string, unknown>> {
+  const { given, returnShift } = proposal;
+
+  return {
+    organization_id: proposal.organizationId,
+    proposer_id: proposal.proposerId,
+    addressee_id: proposal.addresseeId,
+    team_id: given.teamId,
+    date: given.date,
+    return_team_id: returnShift?.teamId ?? null,
+    return_date: returnShift?.date ?? null,
+    ...(given.personal === undefined ? {} : { given_personal: true, shift_type_id: given.personal.shiftTypeId }),
+    ...(returnShift?.personal === undefined
+      ? {}
+      : { return_personal: true, return_shift_type_id: returnShift.personal.shiftTypeId }),
+  };
+}
+
+/**
  * Send `proposal`: 0049's plain insert. `created_by` and `created_at` come
  * from their defaults, and the answer and the close are never named (the
  * column grant refuses them).
@@ -731,15 +1024,7 @@ export async function sendSwapProposal(table: SwapRequestInsertTable, proposal: 
   let answered: unknown;
 
   try {
-    answered = await table.insert({
-      organization_id: proposal.organizationId,
-      proposer_id: proposal.proposerId,
-      addressee_id: proposal.addresseeId,
-      team_id: proposal.given.teamId,
-      date: proposal.given.date,
-      return_team_id: proposal.returnShift?.teamId ?? null,
-      return_date: proposal.returnShift?.date ?? null,
-    });
+    answered = await table.insert(swapInsertOf(proposal));
   } catch (cause) {
     console.error(SWAP_FAILED, cause);
 
@@ -777,10 +1062,11 @@ export const SWAP_PROPOSED_STATE = 'swapProposed';
 export interface SwapProposed {
   /** `YYYY-MM-DD`. */
   readonly date: string;
-  readonly teamName: string;
+  /** `null`: a Personal Shift counted with no team (story 21.8). */
+  readonly teamName: string | null;
   readonly colleagueName: string;
-  /** The shift taken in return, `YYYY-MM-DD` and its team's name; `null` for a one-way cover. */
-  readonly returnShift: { readonly date: string; readonly teamName: string } | null;
+  /** The shift taken in return, `YYYY-MM-DD` and its team's name (`null`: none); `null` for a one-way cover. */
+  readonly returnShift: { readonly date: string; readonly teamName: string | null } | null;
 }
 
 /** The entry's state with `proposed` added under {@link SWAP_PROPOSED_STATE}, every other field kept. */
@@ -808,13 +1094,14 @@ export function swapProposedOf(state: unknown): SwapProposed | null {
   const { date, teamName, colleagueName, returnShift } = proposed;
 
   if (typeof date !== 'string' || formatIsoDate(date) === null) return null;
-  if (typeof teamName !== 'string' || typeof colleagueName !== 'string') return null;
+  if ((typeof teamName !== 'string' && teamName !== null) || typeof colleagueName !== 'string') return null;
   if (returnShift === null || returnShift === undefined) return { date, teamName, colleagueName, returnShift: null };
   if (!isRecord(returnShift)) return null;
 
   const back = { date: returnShift['date'], teamName: returnShift['teamName'] };
 
-  if (typeof back.date !== 'string' || formatIsoDate(back.date) === null || typeof back.teamName !== 'string') return null;
+  if (typeof back.date !== 'string' || formatIsoDate(back.date) === null) return null;
+  if (typeof back.teamName !== 'string' && back.teamName !== null) return null;
 
   return { date, teamName, colleagueName, returnShift: { date: back.date, teamName: back.teamName } };
 }
@@ -827,10 +1114,10 @@ export function swapMonthOf(month: string): { readonly key: ReturnType<typeof mo
   return { key: monthInMessageKey(month), year: yearOfMonthText(month) };
 }
 
-/** The status line's values: the date `20.11.2026`, the shift and the colleague. */
+/** The status line's values: the date `20.11.2026`, the shift (`null`: no team, story 21.8) and the colleague. */
 export type SwapProposedValues = {
   readonly date: string;
-  readonly team: string;
+  readonly team: string | null;
   readonly name: string;
 };
 
@@ -840,7 +1127,7 @@ export type SwapProposedLine =
   | {
       readonly withReturn: true;
       readonly key: 'kalendar.swap.sentWithReturn';
-      readonly values: SwapProposedValues & { readonly returnDate: string; readonly returnTeam: string };
+      readonly values: SwapProposedValues & { readonly returnDate: string; readonly returnTeam: string | null };
     };
 
 /** The line as it names the swap: the date, the shift and the colleague, and the return shift if any. */
@@ -888,6 +1175,16 @@ export function swapProposedStepOf(shown: SwapProposed | null, state: unknown, c
 }
 
 // ------------------------------------------------------------- the words
+
+/** An option's line when it cannot be chosen: a roster key's refusal, or (story 21.8) a taker who holds an assignment that date. */
+export function swapBlockedLineMessageKey(code: SwapBlock): 'kalendar.swap.taken' | 'kalendar.swap.takerAssigned' {
+  return code === SWAP_TAKER_ASSIGNED ? 'kalendar.swap.takerAssigned' : 'kalendar.swap.taken';
+}
+
+/** The preview's words for a swap that cannot be applied. */
+export function swapBlockedMessageKey(code: SwapBlock): 'kalendar.swap.blocked' | 'kalendar.swap.takerAssignedBlocked' {
+  return code === SWAP_TAKER_ASSIGNED ? 'kalendar.swap.takerAssignedBlocked' : 'kalendar.swap.blocked';
+}
 
 /** The message a refused send says, by its code. */
 export function swapSendMessageKey(

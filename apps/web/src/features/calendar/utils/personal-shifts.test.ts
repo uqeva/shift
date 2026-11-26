@@ -271,7 +271,7 @@ describe('the day detail', () => {
     expect(ana?.position).toBeNull();
   });
 
-  it('a Personal Shift is never offered for a swap here (story 21.8); the same member’s rotation shift is', () => {
+  it('story 21.8: a Personal Shift counted with the team is offered for a swap, as the same member’s rotation shift is', () => {
     const asAna = { ...snapshot, viewer: { ...snapshot.viewer, memberId: ANA, role: 'member_role' as const } };
     const rotation = detailOf(A, A_ROTATION_NIGHT);
 
@@ -279,8 +279,9 @@ describe('the day detail', () => {
     expect(rotation.roster.find((member) => member.id === ANA)).toBeDefined();
     expect(A_ROTATION_NIGHT >= TODAY).toBe(true);
     expect(swapOfferedOf(asAna, rotation, TODAY, [])).toBe(true);
-    // On *Noć* 13.10. she is on *Sastav* only through her assignment.
-    expect(swapOfferedOf(asAna, detailOf(A, A_NIGHT), TODAY, [])).toBe(false);
+    // On *Noć* 13.10. she is on *Sastav* only through her assignment: offered since story 21.8, once.
+    expect(swapOfferedOf(asAna, detailOf(A, A_NIGHT), TODAY, [])).toBe(true);
+    expect(swapOfferedOf(asAna, detailOf(A, A_NIGHT), TODAY, [{ teamId: A, date: A_NIGHT, addresseeId: 'x' }])).toBe(false);
   });
 
   it('a swap’s colleague works the shift by rotation, never through a Personal Assignment alone', () => {

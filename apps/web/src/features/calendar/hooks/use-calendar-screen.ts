@@ -1,6 +1,6 @@
 import type { CollisionResolution } from '@shift/domain';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react';
+import { useCallback, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react';
 
 import { useDayDetail } from '@/features/calendar/hooks/use-day-detail';
 import { useSnapshotSkewRefresh } from '@/features/calendar/hooks/use-snapshot-skew-refresh';
@@ -76,6 +76,7 @@ import { MEMBER_ROLE_KEY } from '@/features/navigation/services/role';
 import { NO_GROUP_STAFFING, dayStaffingOf } from '@/features/staffing/services/short-staffed';
 import { useMySwapRequestsRead } from '@/features/swaps/hooks/use-my-swaps';
 import { MY_SWAP_REQUESTS_KEY, openSwapProposalsOf } from '@/features/swaps/services/my-swaps';
+import { SWAP_NO_TEAM, ownSwapShiftOf } from '@/features/swaps/services/swap-proposal';
 import { FRESHNESS_OFFLINE, ZONE_FROM_CALENDAR } from '@/lib/offline/freshness';
 import { useSnapshotFreshness } from '@/lib/offline/use-snapshot-freshness';
 import { supabaseClient } from '@/lib/supabase/client';
@@ -403,6 +404,13 @@ export function useCalendarScreen(
   // on a shift they already proposed, which the footer marks instead.
   const swapOffered = swapOfferedOf(snapshot, detail, today, proposals);
   const swapProposed = swapProposalMarkOf(snapshot, detail, today, proposals);
+  // STORY 21.8: *Predloži zamjenu* on the viewer's own Personal Shift counted
+  // with no team, which has no day detail: the swap surface's own rule.
+  const teamlessSwapOffered = useCallback(
+    (date: string): boolean =>
+      snapshot !== null && ownSwapShiftOf(snapshot, { dan: date, smjena: SWAP_NO_TEAM }, today, proposals) !== null,
+    [snapshot, today, proposals],
+  );
   // Built once per month shown, not on every focus move.
   const labels = useMemo(() => (month === null ? null : gridCellLabelsOf(month, translateCellLabel)), [month]);
 
@@ -546,6 +554,7 @@ export function useCalendarScreen(
     dayGroupStaffing,
     swapOffered,
     swapProposed,
+    teamlessSwapOffered,
     candidateLeave,
     leaveKeys,
     leaveRecords,

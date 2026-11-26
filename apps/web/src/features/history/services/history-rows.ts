@@ -415,6 +415,9 @@ const FIELD_KEYS: Readonly<Record<HistoryField, ReturnType<typeof historyFieldMe
   addressee: 'history.field.addressee',
   team: 'history.field.team',
   returnTeam: 'history.field.returnTeam',
+  givenPersonal: 'history.field.givenPersonal',
+  returnPersonal: 'history.field.returnPersonal',
+  returnShiftType: 'history.field.returnShiftType',
   active: 'history.field.active',
   position: 'history.field.position',
   archived: 'history.field.archived',
@@ -484,6 +487,9 @@ export function historyFieldMessageKey(
   | 'history.field.addressee'
   | 'history.field.team'
   | 'history.field.returnTeam'
+  | 'history.field.givenPersonal'
+  | 'history.field.returnPersonal'
+  | 'history.field.returnShiftType'
   | 'history.field.active'
   | 'history.field.position'
   | 'history.field.archived'

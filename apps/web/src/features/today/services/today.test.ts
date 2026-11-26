@@ -323,6 +323,26 @@ describe("today's one case", () => {
     }
   });
 
+  it('story 21.8: is scheduled on no team while the viewer holds a Personal Shift, and shows it today', async () => {
+    const base = await snapshotOf({ versions: [] });
+    const working = base.types.find((type) => type.isWorking);
+
+    if (working === undefined) throw new Error('no working type');
+
+    const assignment = { id: 'pa-today', date: '2026-10-01', kind: 'SHIFT' as const, shiftTypeId: working.id, teamId: null };
+    const snapshot = {
+      ...base,
+      members: base.members.map((member) =>
+        member.id === base.viewer.memberId ? { ...member, personalAssignments: [assignment] } : member,
+      ),
+      viewer: { ...base.viewer, personalAssignments: [assignment] },
+    };
+    const today = todayViewOf(snapshot, [], noonOf('2026-10-01'));
+
+    expect(today.kind).not.toBe(TODAY_UNSCHEDULED);
+    expect(readyOf(today).todayCase.kind).not.toBe(CASE_FREE);
+  });
+
   it('gives an admin on a team the same screen as a member', async () => {
     const admin = await snapshotOf({ role: 'admin' });
 

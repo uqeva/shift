@@ -218,6 +218,10 @@ export const HISTORY_FIELDS = [
   'addressee',
   'team',
   'returnTeam',
+  // Story 21.8 (0083): whether a swap's given or return shift is a personal shift, and the return one's type.
+  'givenPersonal',
+  'returnPersonal',
+  'returnShiftType',
   'active',
   'position',
   'archived',
@@ -399,6 +403,10 @@ export const HISTORY_HIDDEN_COLUMNS: ReadonlySet<string> = new Set([
   // same save writes that assignment, which the history shows as its own
   // entry (*Ručni raspored*), so the link itself is bookkeeping.
   'personal_assignment_id',
+  // Story 21.8 (0083): the taker's assignment a swap's approval wrote on the
+  // return side, as `personal_assignment_id` names the given side's. The same
+  // save's *Ručni raspored* entry shows it.
+  'return_personal_assignment_id',
 ]);
 
 type FieldType =
@@ -454,6 +462,9 @@ const FIELD_OF_COLUMN: Readonly<Record<string, readonly [HistoryField, FieldType
   addressee_id: ['addressee', 'member'],
   team_id: ['team', 'team'],
   return_team_id: ['returnTeam', 'team'],
+  given_personal: ['givenPersonal', 'boolean'],
+  return_personal: ['returnPersonal', 'boolean'],
+  return_shift_type_id: ['returnShiftType', 'shift-type'],
   active: ['active', 'boolean'],
   // Text on a team membership (0015), a number on a rotation step (0016).
   position: ['position', 'auto'],

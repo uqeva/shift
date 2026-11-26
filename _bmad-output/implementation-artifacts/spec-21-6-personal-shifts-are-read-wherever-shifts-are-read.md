@@ -10,6 +10,8 @@ context:
   - '{project-root}/_bmad-output/implementation-artifacts/spec-21-4-an-admin-plans-the-month-in-rucni-raspored.md'
 ---
 
+Status: done. PR #374, squash `d09fffb`, merged 2026-11-25 with `CI passed` green (run 45698249225 at `f985d2c`). The first CI run (45695288965 at `8dbde2a`) failed one e2e case in shard 3 (`people/leave` cost, `toHaveCount`), passed on the rebased push with no fix of its own; the day detail's missing rotation steps were fixed after the merge by #375 (`7ddc632`). Set `done` and this line written by story 21.8.
+
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 
 ## Intent
@@ -134,7 +136,7 @@ context:
 **Results on the final base (2026-11-25, rebased on `fdedebc`, #372 21.5, before push):** the conflicts were the pin counts (*Ručni raspored* destination strings 120), `element-ids.ts`, `use-manual-schedule.ts` (21.5's fill and copy state beside the `?dan=` effect, both kept), `localization-applied` SOURCES, DESIGN.md and the status files. `pnpm typecheck`, `pnpm lint`, `pnpm build` exit 0. Domain: 24 files, 1073 tests. Web: 196 files, 7148 tests. DB-free root files (the four above): 3095 tests. All pass. Gitleaks is the orchestrator's; not run here.
 
 **Residual risks:**
-- No DB, e2e or perf run locally (STRICT DATABASE RULE; CI is the gate). No migration or RPC changed.
+- No DB, e2e or perf run locally (STRICT DATABASE RULE). CI settled the DB and e2e jobs: green on run 45698249225 (PR #374). No migration or RPC changed. Perf was never run (it runs in no CI job).
 - Admin *Danas*'s week grid draws no group: a deferred-work entry (story 21.6's section).
 - The member page's card and the grid's `?dan=` opening are checked by their pure halves (`single-cell`, `manualSearchOf`), the structural pins and typecheck; no render or e2e drives the hand-off.
 

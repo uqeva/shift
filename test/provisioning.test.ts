@@ -2389,15 +2389,25 @@ describe('every organization table carries row level security, and only its revi
         'answered_at',
         'closed_by',
         'closed_at',
+        // Story 21.8 (0083): a Personal Shift on either side, and its type.
+        'given_personal',
+        'shift_type_id',
+        'return_personal',
+        'return_shift_type_id',
       ]);
       expect(requests.tables).toEqual(['authenticated:SELECT']);
+      // Story 21.8 (0083): the four Personal Shift facts join the proposal's insert.
       expect(requests.columns, 'the writable swap columns changed, or anon holds one').toEqual([
         'authenticated:INSERT:addressee_id',
         'authenticated:INSERT:date',
+        'authenticated:INSERT:given_personal',
         'authenticated:INSERT:organization_id',
         'authenticated:INSERT:proposer_id',
         'authenticated:INSERT:return_date',
+        'authenticated:INSERT:return_personal',
+        'authenticated:INSERT:return_shift_type_id',
         'authenticated:INSERT:return_team_id',
+        'authenticated:INSERT:shift_type_id',
         'authenticated:INSERT:team_id',
       ]);
       const decisions = await heldPrivileges(client, 'swap_request_decisions', [
@@ -2408,6 +2418,9 @@ describe('every organization table carries row level security, and only its revi
         'return_roster_override_id',
         'decided_by',
         'decided_at',
+        // Story 21.8 (0083): the takers' assignments an approval wrote.
+        'personal_assignment_id',
+        'return_personal_assignment_id',
       ]);
       expect(decisions.tables).toEqual(['authenticated:SELECT']);
       expect(decisions.columns, 'a session may write a decision column, or anon holds one').toEqual([]);
@@ -2427,30 +2440,44 @@ describe('every organization table carries row level security, and only its revi
           order by 1, 2`,
       );
       expect(keys.map((row) => `${row.table}: ${row.definition}`).sort()).toEqual([
-        "swap_request_decisions: CHECK (((outcome = 'approved'::text) = (roster_override_id IS NOT NULL)))",
+        // Story 21.8 (0083): each side's form (a team shift or a Personal Shift, its type), and an
+        // approval naming an override or an assignment on each side, never both.
+        "swap_request_decisions: CHECK (((outcome = 'approved'::text) = ((roster_override_id IS NOT NULL) OR (personal_assignment_id IS NOT NULL))))",
+        "swap_request_decisions: CHECK (((return_personal_assignment_id IS NULL) OR (outcome = 'approved'::text)))",
         "swap_request_decisions: CHECK (((return_roster_override_id IS NULL) OR (outcome = 'approved'::text)))",
+        'swap_request_decisions: CHECK (((return_roster_override_id IS NULL) OR (return_personal_assignment_id IS NULL)))',
+        'swap_request_decisions: CHECK (((roster_override_id IS NULL) OR (personal_assignment_id IS NULL)))',
         "swap_request_decisions: CHECK ((outcome = ANY (ARRAY['approved'::text, 'rejected'::text, 'deactivated'::text])))",
         'swap_request_decisions: FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE',
+        'swap_request_decisions: FOREIGN KEY (organization_id, personal_assignment_id) REFERENCES personal_assignments(organization_id, id)',
         'swap_request_decisions: FOREIGN KEY (organization_id, request_id) REFERENCES swap_requests(organization_id, id)',
+        'swap_request_decisions: FOREIGN KEY (organization_id, return_personal_assignment_id) REFERENCES personal_assignments(organization_id, id)',
         'swap_request_decisions: FOREIGN KEY (organization_id, return_roster_override_id) REFERENCES roster_overrides(organization_id, id)',
         'swap_request_decisions: FOREIGN KEY (organization_id, roster_override_id) REFERENCES roster_overrides(organization_id, id)',
         'swap_request_decisions: PRIMARY KEY (request_id)',
-        // One override backs at most one decision; a rejection's null repeats.
+        'swap_request_decisions: UNIQUE (organization_id, personal_assignment_id)',
+        'swap_request_decisions: UNIQUE (organization_id, return_personal_assignment_id)',
         'swap_request_decisions: UNIQUE (organization_id, return_roster_override_id)',
         'swap_request_decisions: UNIQUE (organization_id, roster_override_id)',
         'swap_requests: CHECK ((((answer IS NULL) = (answered_by IS NULL)) AND ((answer IS NULL) = (answered_at IS NULL))))',
         "swap_requests: CHECK (((answer IS DISTINCT FROM 'declined'::text) OR (closed_at IS NOT NULL)))",
         'swap_requests: CHECK (((closed_by IS NULL) = (closed_at IS NULL)))',
+        'swap_requests: CHECK (((return_date IS NULL) = ((return_team_id IS NULL) AND (NOT return_personal))))',
         "swap_requests: CHECK (((return_date IS NULL) OR (isfinite(return_date) AND (return_date >= '0001-01-01'::date) AND (return_date < '10000-01-01'::date))))",
-        'swap_requests: CHECK (((return_team_id IS NULL) = (return_date IS NULL)))',
-        'swap_requests: CHECK (((return_team_id IS NULL) OR ((return_team_id IS DISTINCT FROM team_id) OR (return_date IS DISTINCT FROM date))))',
+        'swap_requests: CHECK (((return_date IS NULL) OR (return_date <> date) OR ((NOT given_personal) AND (NOT return_personal))))',
+        'swap_requests: CHECK (((return_date IS NULL) OR given_personal OR return_personal OR (return_team_id IS DISTINCT FROM team_id) OR (return_date IS DISTINCT FROM date)))',
         "swap_requests: CHECK ((answer = ANY (ARRAY['accepted'::text, 'declined'::text])))",
+        'swap_requests: CHECK ((given_personal = (shift_type_id IS NOT NULL)))',
+        'swap_requests: CHECK ((given_personal OR (team_id IS NOT NULL)))',
         "swap_requests: CHECK ((isfinite(date) AND (date >= '0001-01-01'::date) AND (date < '10000-01-01'::date)))",
         'swap_requests: CHECK ((proposer_id <> addressee_id))',
+        'swap_requests: CHECK ((return_personal = (return_shift_type_id IS NOT NULL)))',
         'swap_requests: FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE',
         'swap_requests: FOREIGN KEY (organization_id, addressee_id) REFERENCES members(organization_id, id)',
         'swap_requests: FOREIGN KEY (organization_id, proposer_id) REFERENCES members(organization_id, id)',
+        'swap_requests: FOREIGN KEY (organization_id, return_shift_type_id) REFERENCES shift_types(organization_id, id)',
         'swap_requests: FOREIGN KEY (organization_id, return_team_id) REFERENCES teams(organization_id, id)',
+        'swap_requests: FOREIGN KEY (organization_id, shift_type_id) REFERENCES shift_types(organization_id, id)',
         'swap_requests: FOREIGN KEY (organization_id, team_id) REFERENCES teams(organization_id, id)',
         'swap_requests: PRIMARY KEY (id)',
         'swap_requests: UNIQUE (organization_id, id)',
@@ -2465,12 +2492,18 @@ describe('every organization table carries row level security, and only its revi
         'CREATE INDEX swap_requests_organization_addressee_idx ON public.swap_requests USING btree (organization_id, addressee_id)',
         'CREATE INDEX swap_requests_organization_id_idx ON public.swap_requests USING btree (organization_id)',
         'CREATE INDEX swap_requests_organization_proposer_idx ON public.swap_requests USING btree (organization_id, proposer_id)',
+        // Story 21.8 (0083): the keys a shift type is cleaned up through.
+        'CREATE INDEX swap_requests_return_shift_type_idx ON public.swap_requests USING btree (organization_id, return_shift_type_id) WHERE (return_shift_type_id IS NOT NULL)',
+        'CREATE INDEX swap_requests_shift_type_idx ON public.swap_requests USING btree (organization_id, shift_type_id) WHERE (shift_type_id IS NOT NULL)',
+        'CREATE UNIQUE INDEX swap_request_decisions_personal_assignment_key ON public.swap_request_decisions USING btree (organization_id, personal_assignment_id)',
         'CREATE UNIQUE INDEX swap_request_decisions_pkey ON public.swap_request_decisions USING btree (request_id)',
+        'CREATE UNIQUE INDEX swap_request_decisions_return_personal_assignment_key ON public.swap_request_decisions USING btree (organization_id, return_personal_assignment_id)',
         'CREATE UNIQUE INDEX swap_request_decisions_return_roster_override_key ON public.swap_request_decisions USING btree (organization_id, return_roster_override_id)',
         'CREATE UNIQUE INDEX swap_request_decisions_roster_override_key ON public.swap_request_decisions USING btree (organization_id, roster_override_id)',
         // One open swap per given shift, and per return shift.
-        'CREATE UNIQUE INDEX swap_requests_open_given_key ON public.swap_requests USING btree (organization_id, proposer_id, team_id, date) WHERE (closed_at IS NULL)',
-        'CREATE UNIQUE INDEX swap_requests_open_return_key ON public.swap_requests USING btree (organization_id, addressee_id, return_team_id, return_date) WHERE ((closed_at IS NULL) AND (return_team_id IS NOT NULL))',
+        // Story 21.8 (0083): NULLS NOT DISTINCT, so a teamless Personal Shift is still held once.
+        'CREATE UNIQUE INDEX swap_requests_open_given_key ON public.swap_requests USING btree (organization_id, proposer_id, team_id, date) NULLS NOT DISTINCT WHERE (closed_at IS NULL)',
+        'CREATE UNIQUE INDEX swap_requests_open_return_key ON public.swap_requests USING btree (organization_id, addressee_id, return_team_id, return_date) NULLS NOT DISTINCT WHERE ((closed_at IS NULL) AND (return_date IS NOT NULL))',
         'CREATE UNIQUE INDEX swap_requests_organization_id_id_key ON public.swap_requests USING btree (organization_id, id)',
         'CREATE UNIQUE INDEX swap_requests_pkey ON public.swap_requests USING btree (id)',
       ]);

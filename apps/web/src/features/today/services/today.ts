@@ -30,6 +30,7 @@ import {
   type CalendarDay,
   type CalendarMarks,
 } from '@/features/calendar/utils/month';
+import { holdsPersonalShifts } from '@/features/calendar/utils/day-detail';
 import { loanNoticeShownOf, type LoanNotice } from '@/features/calendar/utils/loan-marks';
 import { leaveRecordsOf, type LeaveRecord } from '@/features/leave/services/leave-list';
 import { leaveHalfOptionsOf } from '@/features/leave/services/leave-section';
@@ -331,7 +332,9 @@ export function todayViewOf(snapshot: CalendarSnapshot, rows: readonly unknown[]
 
     // STORY 18.5: a viewer with no team is scheduled while a loan of theirs
     // covers today or lies ahead; with none, or only past ones, unscheduled.
-    if (viewer.memberships.length === 0 && loanAheadOf(viewer.loans, today) === null) {
+    // STORY 21.8: so is one who holds a Personal Shift on some date (an
+    // assignment or a personal rotation, R14, R15): a student on no team.
+    if (viewer.memberships.length === 0 && loanAheadOf(viewer.loans, today) === null && !holdsPersonalShifts(viewer)) {
       return { kind: TODAY_UNSCHEDULED, today: shown };
     }
 

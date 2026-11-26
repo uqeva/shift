@@ -18,6 +18,7 @@ import {
   type Collision,
   type LeaveHalf,
   type LeaveRange,
+  type PersonalShift,
 } from '@shift/domain';
 
 import {
@@ -1269,12 +1270,29 @@ function compareNearby(left: NearbyShift, right: NearbyShift): number {
 export function rosterOverlapOf(snapshot: CalendarSnapshot, detail: DayDetail, memberId: string): RosterOverlap | null {
   if (memberId === ROSTER_NOBODY || detail.kind !== DAY_WORKING || detail.shiftTypeId === null) return null;
 
+  return shiftOverlapOf(snapshot, memberId, { teamId: detail.teamId, date: detail.isoDate, shiftTypeId: detail.shiftTypeId });
+}
+
+/**
+ * STORY 21.8: {@link rosterOverlapOf} for any one shift of `memberId`'s — a
+ * team's, or a Personal Shift counted with a team or none — given by its
+ * team, date and type: their first other shift on the day before, the day or
+ * the day after whose times overlap it, or `null`. Their shift of `teamId`
+ * on that date is never counted against itself.
+ *
+ * @throws RangeError as {@link rosterOverlapOf}.
+ */
+export function shiftOverlapOf(
+  snapshot: CalendarSnapshot,
+  memberId: string,
+  shift: { readonly teamId: string | null; readonly date: string; readonly shiftTypeId: string },
+): RosterOverlap | null {
   const member = snapshot.members.find((one) => one.id === memberId);
 
   if (member === undefined) return null;
 
-  const day = detail.isoDate;
-  const open = windowOf(snapshot, detail.shiftTypeId, day, 0);
+  const day = shift.date;
+  const open = windowOf(snapshot, shift.shiftTypeId, day, 0);
 
   if (open === null) return null;
 
@@ -1290,26 +1308,26 @@ export function rosterOverlapOf(snapshot: CalendarSnapshot, detail: DayDetail, m
   for (const { date, shifts } of months.flatMap((month) => memberScheduleOfMonth(input, month))) {
     if (!dates.includes(date)) continue;
 
-    for (const shift of shifts) {
+    for (const leg of shifts) {
       // Story 21.6: a Personal Shift counted with no team is a leg too.
-      if (shift.shiftTypeId === null) continue;
-      if (shift.teamId === detail.teamId && date === day) continue;
-      nearby.push({ date, teamId: shift.teamId, shiftTypeId: shift.shiftTypeId, own: !shift.viaOverride });
+      if (leg.shiftTypeId === null) continue;
+      if (leg.teamId === shift.teamId && date === day) continue;
+      nearby.push({ date, teamId: leg.teamId, shiftTypeId: leg.shiftTypeId, own: !leg.viaOverride });
     }
   }
 
   // `Array.prototype.sort` is stable: equal ones keep the domain's order.
-  for (const shift of nearby.sort(compareNearby)) {
-    const team = shift.teamId === null ? null : snapshot.teams.find((one) => one.id === shift.teamId);
-    const theirs = windowOf(snapshot, shift.shiftTypeId, shift.date, daysBetween(day, shift.date));
+  for (const leg of nearby.sort(compareNearby)) {
+    const team = leg.teamId === null ? null : snapshot.teams.find((one) => one.id === leg.teamId);
+    const theirs = windowOf(snapshot, leg.shiftTypeId, leg.date, daysBetween(day, leg.date));
 
     if (team === undefined || theirs === null) continue;
     if (theirs.window.start < open.window.end && open.window.start < theirs.window.end) {
       return {
         memberName: member.name,
         teamName: team === null ? null : team.name,
-        date: shift.date,
-        day: `${weekdayOf(shift.date)} ${dayMonthOf(shift.date)}`,
+        date: leg.date,
+        day: `${weekdayOf(leg.date)} ${dayMonthOf(leg.date)}`,
         range: theirs.range,
       };
     }
@@ -1576,9 +1594,31 @@ export const MEMBER_ROLE: CalendarViewer['role'] = 'member_role';
  * side alone: a swap the viewer was asked about marks nothing here.
  */
 export interface OpenSwapProposal {
-  readonly teamId: string;
+  /** STORY 21.8: `null` for a Personal Shift counted with no team. */
+  readonly teamId: string | null;
   readonly date: string;
   readonly addresseeId: string;
+}
+
+/**
+ * STORY 21.8 (R14.3, R15.3): `memberId`'s Personal Shift on `date` — their
+ * live assignment's working shift, else their personal rotation's — as
+ * `personalShiftOn` derives it over the snapshot, with the holiday rule; or
+ * `null` for none, a member the snapshot lacks, or one that cannot be derived
+ * (the cause logged).
+ */
+export function memberPersonalShiftOf(snapshot: CalendarSnapshot, memberId: string, date: string): PersonalShift | null {
+  const member = snapshot.members.find((one) => one.id === memberId);
+
+  if (member === undefined) return null;
+
+  try {
+    return personalShiftOn(member, date, new Set(workingShiftTypeIdsOf(snapshot)), snapshot.steps, holidayRuleOfCalendar(snapshot));
+  } catch (cause) {
+    console.error(cause);
+
+    return null;
+  }
 }
 
 /** The day detail's mark: the viewer already proposed this shift, to `colleagueName` (`null` when the snapshot does not name them). */
@@ -1629,9 +1669,17 @@ export function swapOfferedOf(
 ): boolean {
   if (snapshot === null || detail === null || today === null) return false;
   if (snapshot.viewer.role !== MEMBER_ROLE) return false;
-  if (detail.kind !== DAY_WORKING || detail.isoDate < today) return false;
+  if (detail.isoDate < today) return false;
   if (swapProposalMarkOf(snapshot, detail, today, proposals) !== null) return false;
 
-  // Story 21.6: a Personal Shift is never swapped here (story 21.8 swaps it).
-  return detail.roster.some((member) => member.id === snapshot.viewer.memberId && member.assigned !== true);
+  // STORY 21.8: the viewer's own Personal Shift counted with this team — an
+  // assignment's or a personal rotation's, in the day's type or a group's,
+  // on a working day or not — is swapped too, by member and date.
+  if (memberPersonalShiftOf(snapshot, snapshot.viewer.memberId, detail.isoDate)?.teamId === detail.teamId) return true;
+  if (detail.kind !== DAY_WORKING) return false;
+
+  // A rotation shift on the team's roster (the overrides in force applied).
+  return detail.roster.some(
+    (member) => member.id === snapshot.viewer.memberId && member.assigned !== true && member.personalRotation !== true,
+  );
 }
