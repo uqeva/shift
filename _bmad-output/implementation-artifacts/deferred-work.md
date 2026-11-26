@@ -2535,3 +2535,24 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-21-13-floaters-are-suggested-for-an-uncovered-shift-by-role.md`
   summary: OWNER a later polish story. The day detail's roster dialog (story 7.9, `replacementCandidatesOf`) suggests no floater: *Predložene zamjene* is on *Za odluku*'s resolution screen only, where a pick resolves the conflict. A roster change from the calendar still lists every candidate in the three groups.
   evidence: Spec 21.13 Code Map (`resolution-screen.ts` only).
+
+## Deferred from: story 21.11, a seasonal member's season is set in one step (2026-11-26)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-11-a-seasonal-member-s-season-is-set-in-one-step.md`
+  summary: OWNER CI (first run). `0085` was never applied locally (STRICT DATABASE RULE): the provisioning grantees entry for `private.member_status_version_appendable`, the three rls-isolation season cases (a change after a scheduled one, a three-row season with only its latest cancellable, a non-alternating multi-row insert refused) and `e2e/tests/people/member-season.spec.ts` are written unrun. A failure there is the migration's or the case's, settled in CI.
+  evidence: Spec 21.11 § Verification.
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-11-a-seasonal-member-s-season-is-set-in-one-step.md`
+  summary: OWNER a later polish story. The *Sezona* dialog names the versions it writes and the leave requests it closes, but not the deactivation dialog's other two lines: the team's size and the member's duties left that month (7.13c), and the short-staffed block (11.2). Nor does it (or the deactivation dialog) name the open swaps 0049 closes.
+  evidence: Story 21.11 Code Map (`use-member-season.ts` reads the requests only).
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-11-a-seasonal-member-s-season-is-set-in-one-step.md`
+  summary: OWNER a later story, if the pilot meets it. *Nova osoba*'s season is a second request after `admin-auth`'s create, not one transaction: a refused season leaves the new member active from today (the credential step says so, and the member page sets it). Making it atomic means `admin-auth` writing the versions through the caller's client right after the member row, with a compensation it cannot have (no session deletes a member since 0036).
+  evidence: Story 21.11 Design Note 3.
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-11-a-seasonal-member-s-season-is-set-in-one-step.md`
+  summary: OWNER a later story (the feed). Since 0085 a reactivation can be scheduled after a deactivation that is itself still ahead (a season set over a scheduled deactivation), and 0067's `revoke_calendar_feed_on_status_change` revokes the member's live calendar link at insert time for any active version written after an inactive one, so the link stops while the member is still active today; and a link created after that insert works again from the season's start. Decide whether the revocation moves to the inactive version's date (a job) or stays at insert.
+  evidence: Story 21.11 review (edge-case hunter); 0067:520-545.
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-11-a-seasonal-member-s-season-is-set-in-one-step.md`
+  summary: OWNER a later polish story. A season cannot be cancelled as one: *Poništi* withdraws the latest change only (its button and confirmation name no date), so withdrawing a season's end leaves the member active from its start; a season's "inactive from today" row is in effect at once and cannot be withdrawn at all; and a season set over a scheduled reactivation on D (inactive before it) leaves the member active on D alone (the rows must follow D). A *Poništi sezonu* action and the date on *Poništi* would close it.
+  evidence: Story 21.11 review (blind hunter, edge-case hunter, epic AC auditor).
+- source_spec: `_bmad-output/implementation-artifacts/spec-21-11-a-seasonal-member-s-season-is-set-in-one-step.md`
+  summary: OWNER a later e2e sweep. 21.11's e2e drives an active member's season from the status card only: *Nova osoba* with a season (the rows for the new id, a refused range before the create, the unsaved line), a season with a leave conflict to erase, and the last-admin refusal are covered by unit tests of `seasonPlanOf`, `seasonAskOf` and `memberChangeSnapshotOf` but not end to end, and no hook test runs `useMemberSeason` or `useMemberCreate`'s season path. *Nova osoba* also does not run the last-admin rule before the create for a new admin with a season (the season is then refused after it, with the unsaved line).
+  evidence: Story 21.11 review (verification gap, edge-case hunter).

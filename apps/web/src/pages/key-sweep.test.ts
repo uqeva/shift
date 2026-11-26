@@ -8,6 +8,7 @@ import {
   MEMBER_EDIT,
   MEMBER_FACTS_KEYS,
   MEMBER_FLOATER_KEYS,
+  MEMBER_SEASON_KEYS,
   MEMBER_LIST,
   MEMBER_LIST_KEYS,
   MEMBER_WRITE_KEYS,
@@ -95,6 +96,8 @@ describe('the keys rendered and the keys declared are the same set', () => {
       CREDENTIAL_COPY_KEYS,
       // STORY 21.13: *Zamjena*'s facts lines and refusals.
       MEMBER_FLOATER_KEYS,
+      // STORY 21.11: *Sezona*'s row lines and refusals.
+      MEMBER_SEASON_KEYS,
     ]
       .map((file) => source(file))
       .join('\n');

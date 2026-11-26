@@ -153,6 +153,8 @@ const SANCTIONED_PLURAL_KEYS = [
   // 0041: the pending leave requests a deactivation closes — `1 zahtjev`,
   // `2 zahtjeva`, `5 zahtjeva` — and that cancelling it does not reopen them.
   'ljudi.status.deactivateRequests',
+  // STORY 21.11: the same requests a season's inactive versions close.
+  'ljudi.season.requests',
   // STORY 11.2: people at work against Minimum Members, in the short-staffed
   // block and the resolution strip — `radi 1`, `rade 2`, `radi 5 od najmanje
   // 6`, and `ne radi nitko` at zero, the verb agreeing.
@@ -780,6 +782,32 @@ const SANCTIONED_SCREEN_KEYS = [
   'ljudi.status.withdrawConfirm',
   'ljudi.status.cancel',
   'ljudi.status.saved',
+  // STORY 21.11: *Sezona* — the status card's season dialog and *Nova osoba*'s optional season.
+  'ljudi.season.heading',
+  'ljudi.season.action',
+  'ljudi.season.open',
+  'ljudi.season.lede',
+  'ljudi.season.start',
+  'ljudi.season.end',
+  'ljudi.season.hint',
+  'ljudi.season.planHeading',
+  'ljudi.season.rowActive',
+  'ljudi.season.rowInactive',
+  'ljudi.season.save',
+  'ljudi.season.cancel',
+  'ljudi.season.saved',
+  'ljudi.season.addLegend',
+  'ljudi.season.addHint',
+  'ljudi.season.addUnsaved',
+  'ljudi.season.error.dates',
+  'ljudi.season.error.past',
+  'ljudi.season.error.scheduled',
+  'ljudi.season.error.order',
+  'ljudi.season.error.tooLate',
+  'ljudi.season.error.self',
+  'ljudi.season.error.stale',
+  'ljudi.season.error.lastAdmin',
+  'ljudi.season.error.unavailable',
   // The navigation chrome, part B — FOUR, and each one is a string that had no
   // surface to live on until this commit.
   //

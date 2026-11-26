@@ -8,6 +8,7 @@ import type { MemberScreen } from '@/features/members/hooks/member-edit-context'
 import { useMemberBasics } from '@/features/members/hooks/use-member-basics';
 import { useMemberLoan } from '@/features/members/hooks/use-member-loan';
 import { useMemberScheduleSource } from '@/features/members/hooks/use-member-schedule-source';
+import { useMemberSeason } from '@/features/members/hooks/use-member-season';
 import { useMemberReset } from '@/features/members/hooks/use-member-reset';
 import { useMemberStatus } from '@/features/members/hooks/use-member-status';
 import { useMemberTeam } from '@/features/members/hooks/use-member-team';
@@ -210,6 +211,8 @@ export function useMemberEdit(id: string) {
   const loan = useMemberLoan(screen);
   // STORY 21.10: *Raspored osobe*, its own dialogs, held apart from the spread blocks.
   const scheduleSource = useMemberScheduleSource(screen);
+  // STORY 21.11: the status card's *Sezona*, its own dialog and write.
+  const season = useMemberSeason(screen);
 
   return {
     // The basics and the allowance dialogs' save.
@@ -235,6 +238,8 @@ export function useMemberEdit(id: string) {
     ...loan,
     // STORY 21.10: *Raspored osobe*.
     scheduleSource,
+    // STORY 21.11: *Sezona*.
+    season,
     today,
     offersPosition,
     positionsRefusal,

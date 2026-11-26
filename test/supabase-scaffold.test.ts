@@ -4866,6 +4866,8 @@ describe('the access-control migration', () => {
     expect(insert, 'a version may be dated on or before the latest one').toMatch(
       /effective_from > coalesce\(public\.member_latest_version\(member_id\)/,
     );
+    // 0008'S DECLARATION: story 21.11's 0085 alters the policy without this
+    // conjunct (a season schedules several changes); its own describe pins that.
     expect(insert, 'a second change may be scheduled on top of one').toMatch(
       /coalesce\(public\.member_latest_version\(member_id\), '-infinity'::date\)\s*<= public\.organization_today\(organization_id\)/,
     );
@@ -8103,5 +8105,70 @@ describe('floaters and the roles they cover (0084, story 21.13)', () => {
     const text = sql();
     expect(text).not.toMatch(/insert into public\.(floater_roles|members)/);
     expect(text).not.toMatch(/member_schedule_inputs|notify_members|notification_outbox|enqueue/);
+  });
+});
+
+describe("a seasonal member's season is set in one step (0085, story 21.11)", () => {
+  const MIGRATION = '0085_member_seasons.sql';
+  const raw = (): string => readFileSync(join(supabaseRoot, 'migrations', MIGRATION), 'utf8');
+  const sql = (): string => stripLineComments(raw());
+  const appendable = (): string => {
+    const lines = raw().split('\n');
+    const start = lines.findIndex((line) => line.startsWith('create function private.member_status_version_appendable('));
+    if (start < 0) return '';
+    const end = lines.findIndex((line, index) => index > start && line === '$$;');
+    return lines.slice(start, end + 1).join('\n');
+  };
+
+  it("alters 0008's insert policy, never declaring a second one, and leaves the delete policy as it was", () => {
+    const text = sql();
+    expect(text).not.toMatch(/create policy|drop policy/);
+    expect(text.match(/alter policy [a-z_]+/g)).toEqual(['alter policy member_status_versions_insert_by_own_active_admin']);
+    expect(text).not.toMatch(/member_status_versions_delete_scheduled_by_own_active_admin/);
+    expect(text).not.toMatch(/create (or replace )?trigger|create or replace function|grant [^;]* on table/);
+  });
+
+  it("keeps every 0008 conjunct but the one-scheduled-change rule, and reads the member's own history only through a private definer", () => {
+    const policy =
+      /alter policy member_status_versions_insert_by_own_active_admin on public\.member_status_versions[\s\S]*?\n {2}\);/.exec(sql())?.[0] ??
+      '';
+    expect(policy, 'the policy is not altered').not.toBe('');
+    expect(policy).toMatch(/with check[\s\S]*organization_id = nullif/i);
+    expect(policy).toContain("access.member_role = 'admin'");
+    expect(policy).toMatch(/created_by = \(select auth\.uid\(\)\)/);
+    expect(policy).toMatch(/effective_from >= public\.organization_today\(organization_id\)/);
+    expect(policy).toMatch(/self\.auth_user_id = \(select auth\.uid\(\)\)/);
+    // 0023's concurrent case expects the last-admin rule read as 0008 reads it.
+    expect(policy).toContain('public.member_active_from(admin.id, member_status_versions.effective_from)');
+    expect(policy).toContain('private.member_status_version_appendable(organization_id, member_id, effective_from, active)');
+    expect(policy, 'a second change may still not be scheduled on top of one').not.toMatch(
+      /member_latest_version|<= public\.organization_today/,
+    );
+    expect(policy, 'the policy reads its own table directly, which recurses (42P17)').not.toMatch(
+      /from public\.member_status_versions/,
+    );
+  });
+
+  it('appends in date order and alternates, answering only for an active admin of the tenant it is given', () => {
+    const helper = appendable();
+    expect(helper).toMatch(
+      /^create function private\.member_status_version_appendable\(\n {2}p_organization uuid,\n {2}p_member uuid,\n {2}p_effective_from date,\n {2}p_active boolean\n\)\nreturns boolean\nlanguage plpgsql\nvolatile\nsecurity definer\nset search_path = ''\n/,
+    );
+    expect(helper).toMatch(/where access\.is_active\s+and access\.member_role = 'admin';/);
+    expect(helper).toMatch(/if admin_organization is null or admin_organization <> p_organization then\s+return false;/);
+    expect(helper).toMatch(
+      /where v\.organization_id = p_organization\s+and v\.member_id = p_member\s+order by v\.effective_from desc\s+limit 1;/,
+    );
+    expect(helper).toMatch(/if latest_from is null then\s+return p_active is not true;/);
+    expect(helper).toMatch(/return p_effective_from > latest_from\s+and p_active is distinct from latest_state;/);
+    // No variable named like a column, and no plpgsql alias of the row.
+    expect(helper).not.toMatch(/^\s+(active|effective_from|member_id|organization_id)\s+[a-z]+;/m);
+    expect(helper).not.toMatch(/\b(old|new)\./);
+    expect(sql()).toContain(
+      'revoke execute on function private.member_status_version_appendable(uuid, uuid, date, boolean) from public, anon, service_role;',
+    );
+    expect(sql()).toContain(
+      'grant execute on function private.member_status_version_appendable(uuid, uuid, date, boolean) to authenticated;',
+    );
   });
 });

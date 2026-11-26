@@ -1812,7 +1812,7 @@ describe('a status change is one appended version or one cancelled one, judged b
       change: WITHDRAW,
       today: TODAY,
       scheduled: version(false, '2026-09-30'),
-      status: { activeToday: true, since: null, scheduled: version(false, '2026-09-30') },
+      status: { activeToday: true, since: null, scheduled: version(false, '2026-09-30'), upcoming: [version(false, '2026-09-30')] },
     });
     expect(statusOfferOf(backNextWeek, CALLER.authUserId, TODAY)).toMatchObject({
       change: WITHDRAW,
@@ -2140,10 +2140,10 @@ describe('a status change is one appended version or one cancelled one, judged b
   });
 
   it("names the date the version in effect took effect, or today for an untouched member", () => {
-    expect(statusSinceOf({ activeToday: false, since: '2026-09-01', scheduled: null }, TODAY)).toBe(
+    expect(statusSinceOf({ activeToday: false, since: '2026-09-01', scheduled: null, upcoming: [] }, TODAY)).toBe(
       '2026-09-01',
     );
-    expect(statusSinceOf({ activeToday: true, since: null, scheduled: null }, TODAY)).toBe(TODAY);
+    expect(statusSinceOf({ activeToday: true, since: null, scheduled: null, upcoming: [] }, TODAY)).toBe(TODAY);
   });
 
   it('offers no dated change once the latest version is on the last day a date can carry', () => {

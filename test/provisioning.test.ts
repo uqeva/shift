@@ -3408,6 +3408,9 @@ describe('the access-control layer runs as the owner and hands that power to nob
     // for an active admin of the tenant they are given.
     { name: 'member_schedule_version_insertable', argumentCount: 4, expected: ['authenticated'], schema: 'private' },
     { name: 'member_schedule_version_is_latest', argumentCount: 3, expected: ['authenticated'], schema: 'private' },
+    // STORY 21.11 (0085). The status insert policy's read of the member's own
+    // history (after the latest, alternating), on the same terms.
+    { name: 'member_status_version_appendable', argumentCount: 4, expected: ['authenticated'], schema: 'private' },
     // STORY 18.4 (0064). The loan team rule its definers and re-check call,
     // and the archive refusal's trigger function, on 0043's terms.
     { name: 'team_loan_team_refused', argumentCount: 4, expected: [], schema: 'private' },

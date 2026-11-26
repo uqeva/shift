@@ -53,7 +53,7 @@ describe("the organization's leave requests have one binding (retro 8–9)", () 
     expect(organizationLeaveRequestsReadOptions().queryKey).toEqual(ORGANIZATION_LEAVE_REQUESTS_KEY);
   });
 
-  it('is what Danas, Za odluku, a conflict\'s resolution and the member page\'s deactivation read through', () => {
+  it('is what Danas, Za odluku, a conflict\'s resolution and the member page\'s deactivation and season read through', () => {
     const observers = modules
       .filter(({ text }) => /\b(useOrganizationLeaveRequests|organizationLeaveRequestsReadOptions)\(\)/.test(text))
       .map(({ name }) => name)
@@ -63,6 +63,8 @@ describe("the organization's leave requests have one binding (retro 8–9)", () 
     expect(observers).toEqual([
       join('features', 'conflicts', 'hooks', 'use-conflict-resolution.ts'),
       join('features', 'conflicts', 'hooks', 'use-conflicts-queue.ts'),
+      // STORY 21.11: the requests a season closes, as a deactivation's.
+      join('features', 'members', 'hooks', 'use-member-season.ts'),
       join('features', 'members', 'hooks', 'use-member-status.ts'),
       join('features', 'today', 'hooks', 'use-admin-today.ts'),
     ]);

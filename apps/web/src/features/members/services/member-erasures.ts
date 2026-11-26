@@ -63,6 +63,8 @@ export const MEMBER_CHANGE_TEAM_WITHDRAW = 'team-withdraw';
 export const MEMBER_CHANGE_STATUS = 'status';
 /** The scheduled status version dated `day`, withdrawn. */
 export const MEMBER_CHANGE_STATUS_WITHDRAW = 'status-withdraw';
+/** A season's status versions (story 21.11), appended in date order; `day` is the first one's. */
+export const MEMBER_CHANGE_SEASON = 'season';
 
 export type MemberChange =
   | {
@@ -75,7 +77,14 @@ export type MemberChange =
     }
   | { readonly kind: typeof MEMBER_CHANGE_TEAM_WITHDRAW; readonly memberId: string; readonly day: string }
   | { readonly kind: typeof MEMBER_CHANGE_STATUS; readonly memberId: string; readonly active: boolean; readonly day: string }
-  | { readonly kind: typeof MEMBER_CHANGE_STATUS_WITHDRAW; readonly memberId: string; readonly day: string };
+  | { readonly kind: typeof MEMBER_CHANGE_STATUS_WITHDRAW; readonly memberId: string; readonly day: string }
+  | {
+      readonly kind: typeof MEMBER_CHANGE_SEASON;
+      readonly memberId: string;
+      /** The first row's date: the diff runs from it. */
+      readonly day: string;
+      readonly versions: readonly StatusVersion[];
+    };
 
 /** Why the database would refuse the write anyway: the card's own refusal code. */
 export type MemberChangeRefusal =
@@ -225,6 +234,25 @@ export function memberChangeSnapshotOf(
         { ...member, statuses: member.statuses.filter((version) => version.effectiveFrom !== change.day) },
         scheduled.active,
       );
+    }
+    case MEMBER_CHANGE_SEASON: {
+      // APPENDED AFTER THE LATEST (0085): a scheduled change is no refusal,
+      // but a row on or before the fresh history's latest version is — the
+      // history moved since the dialog planned the season.
+      // AND STILL ALTERNATING: the first row changes the fresh latest state
+      // (none is active), as 0085's `member_status_version_appendable` asks.
+      const latest = member.statuses.reduce<StatusVersion | null>(
+        (last, version) => (last === null || version.effectiveFrom > last.effectiveFrom ? version : last),
+        null,
+      );
+
+      if (change.versions.some((version) => version.effectiveFrom < today)) return { ok: false, code: MEMBER_STATUS_STALE };
+      if (latest !== null && change.versions.some((version) => version.effectiveFrom <= latest.effectiveFrom)) {
+        return { ok: false, code: MEMBER_STATUS_STALE };
+      }
+      if (change.versions[0]?.active === (latest?.active ?? true)) return { ok: false, code: MEMBER_STATUS_STALE };
+
+      return applied({ ...member, statuses: [...member.statuses, ...change.versions] });
     }
   }
 }
